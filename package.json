@@ -1,0 +1,27 @@
+{
+  "name": "com.playground.quick-actions",
+  "version": "0.1.0",
+  "displayName": "Quick Actions for iOS & Android",
+  "description": "Home-screen quick actions (the shortcuts revealed by long-pressing the app icon) for Unity, on iOS (UIApplicationShortcutItem) and Android (ShortcutManager). Create and remove shortcuts at runtime and get a callback with the action id on launch or resume. Zero native edits required. Unity 2022 LTS and newer (incl. Unity 6).",
+  "unity": "2022.3",
+  "keywords": [
+    "ios",
+    "android",
+    "quick-actions",
+    "app-shortcuts",
+    "home-screen",
+    "shortcuts",
+    "mobile"
+  ],
+  "author": {
+    "name": "playground"
+  },
+  "license": "MIT",
+  "samples": [
+    {
+      "displayName": "Demo",
+      "description": "On-screen IMGUI demo: add/remove shortcuts at runtime and watch the performed-action log.",
+      "path": "Samples~/Demo"
+    }
+  ]
+}

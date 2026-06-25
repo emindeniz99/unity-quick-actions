@@ -1,0 +1,18 @@
+using System.Collections.Generic;
+
+namespace Playground.QuickActions.Internal
+{
+    /// <summary>
+    /// No-op bridge used in the Editor and on unsupported platforms so the public
+    /// API is always safe to call. Quick actions only exist on device.
+    /// </summary>
+    internal sealed class NullQuickActionsBridge : IQuickActionsBridge
+    {
+        public bool IsPlatformSupported => false;
+        public void SetShortcuts(IList<QuickActionItem> items) { }
+        public void RemoveAll() { }
+        public string GetLastPerformed() => null;
+        public void ResetLastPerformed() { }
+        public string ConsumePendingPerformed() => null;
+    }
+}
