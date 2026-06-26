@@ -12,9 +12,9 @@ product, and the path to launch. Companion to
 | Core feature (dynamic) | ✅ done | `QuickActions` API; iOS swizzle; Android trampoline |
 | Static shortcuts | ✅ done | Project Settings asset + iOS/Android post-processors |
 | Cross-version Android | ✅ done | trampoline avoids `UnityPlayerActivity`/`GameActivity` divergence |
-| C# compiles | ✅ verified | `dotnet` build, 4 configs, 0 warnings |
+| C# compiles | ✅ verified | `dotnet` build, 6 configs, 0 warnings |
 | Android plugin compiles | ✅ verified | `javac` vs SDK stubs |
-| Unit tests | ✅ 15 passing | `dotnet test` (list logic, validity, equality, icon map, dispatch) |
+| Unit tests | ✅ 16 passing | `dotnet test` (list logic, validity, equality, icon map, dispatch) |
 | Self code-review | ✅ done | 8-angle review; all confirmed bugs fixed |
 | Docs | ✅ done | README, CHANGELOG, ROADMAP, plans, per-folder READMEs |
 | Store images | ✅ generated | `store/` at exact required sizes |

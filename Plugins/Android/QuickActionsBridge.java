@@ -75,15 +75,17 @@ public final class QuickActionsBridge {
 
         // The OS cap covers manifest (static) + dynamic shortcuts combined, so
         // leave room for any static ones; otherwise setDynamicShortcuts throws.
-        int budget = manager.getMaxShortcutCountPerActivity() - manager.getManifestShortcuts().size();
-        if (budget < 0) budget = 0;
-        if (shortcuts.size() > budget) {
-            shortcuts = new ArrayList<>(shortcuts.subList(0, budget));
-        }
+        // getManifestShortcuts/setDynamicShortcuts can throw IllegalStateException
+        // (e.g. user locked) — keep it all inside the guard so nothing crosses JNI.
         try {
+            int budget = manager.getMaxShortcutCountPerActivity() - manager.getManifestShortcuts().size();
+            if (budget < 0) budget = 0;
+            if (shortcuts.size() > budget) {
+                shortcuts = new ArrayList<>(shortcuts.subList(0, budget));
+            }
             manager.setDynamicShortcuts(shortcuts);
-        } catch (IllegalArgumentException | IllegalStateException e) {
-            android.util.Log.w("QuickActions", "setDynamicShortcuts rejected", e);
+        } catch (RuntimeException e) {
+            android.util.Log.w("QuickActions", "setDynamicShortcuts failed", e);
         }
     }
 

@@ -33,8 +33,8 @@ flow, and the trade-offs behind them — distinct from the line-level bug review
      └───────────────────────┘  └─────────────────────────────────────┘
 
    QuickActionsRuntime (MonoBehaviour, auto-created)  ← native tap notifications
-     · polls bridge.ConsumePendingPerformed() on first frame + OnApplicationFocus
-     · receives iOS warm taps via UnitySendMessage("QuickActionsRuntime","OnPerformed")
+     · drains bridge.ConsumePendingPerformed() one frame after startup (cold)
+       and on OnApplicationFocus(true)/OnApplicationPause(false) (warm) — one channel
 
    Editor (build-time, separate assembly):
      QuickActionsSettings (ScriptableObject) ─▶ Project Settings provider
@@ -67,9 +67,10 @@ source of truth; native is a write-through projection.*
 `ConsumePendingPerformed()` → raises `Performed`. `LastPerformed` also exposes it
 (pull alternative).
 
-**C. Warm tap:** iOS → `performActionForShortcutItem` → `UnitySendMessage` →
-`OnPerformed` → `Performed`. Android → trampoline records + foregrounds Unity →
-`OnApplicationFocus(true)` → poll → `Performed`.
+**C. Warm tap (single pull channel, as shipped):** iOS → `performActionForShortcutItem`
+enqueues; Android → trampoline records + foregrounds Unity. Both → the app
+regains focus → `OnApplicationFocus(true)`/`OnApplicationPause(false)` → poll
+drains the queue → `Performed`. (The original push design is analysed as W2.)
 
 ## 4. Key design decisions & rationale
 
@@ -91,7 +92,7 @@ source of truth; native is a write-through projection.*
   new bridge + one factory branch.
 - Single, narrow extension seam (`IQuickActionsBridge`) for new capabilities.
 - Main-thread-only delivery; no background-thread event hazards.
-- Managed logic is unit-testable without Unity (proven: 15 passing tests).
+- Managed logic is unit-testable without Unity (16 headless-passing tests; 18 authored, 2 Unity-only).
 - Native memory ownership is explicit (malloc ↔ native free).
 
 ## 6. Weaknesses / risks (severity · recommendation)

@@ -28,8 +28,16 @@ namespace Playground.QuickActions.Internal
         {
             if (string.IsNullOrEmpty(json))
                 return new List<QuickActionItem>();
-            var list = JsonUtility.FromJson<QuickActionList>(json);
-            return list?.items ?? new List<QuickActionItem>();
+            try
+            {
+                var list = JsonUtility.FromJson<QuickActionList>(json);
+                return list?.items ?? new List<QuickActionItem>();
+            }
+            catch (Exception)
+            {
+                // A malformed native payload must not throw out of a facade method.
+                return new List<QuickActionItem>();
+            }
         }
     }
 }

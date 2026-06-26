@@ -1,4 +1,6 @@
-#if UNITY_ANDROID
+// Gated by the Editor.Android asmdef's defineConstraints (UNITY_ANDROID), so it
+// only compiles when Android is the active build target and the Android editor
+// extension exists.
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
@@ -184,4 +186,3 @@ namespace Playground.QuickActions.Editor
         }
     }
 }
-#endif

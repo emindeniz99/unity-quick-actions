@@ -16,7 +16,7 @@ tools/setup.sh         # one-time: install dotnet + JDK if missing
 | Check | How |
 |-------|-----|
 | Stable `.meta` for every asset | `tools/gen_meta.py` (idempotent) |
-| Runtime + Editor C# | `dotnet build` against the UnityEngine/UnityEditor **stubs** in `Stubs/`, four configs: `Editor`, `iOS`, `Android`, `Sample` — each defines the matching `UNITY_*` symbols so every `#if` branch is exercised. |
+| Runtime + Editor C# | `dotnet build` against the UnityEngine/UnityEditor **stubs** in `Stubs/`, six configs: `Editor`, `EditoriOS`, `EditorAndroid`, `iOS`, `Android`, `Sample` — each defines the matching `UNITY_*` symbols so every `#if` branch is exercised. The `EditoriOS`/`EditorAndroid` configs compile each build post-processor in isolation (mirroring the gated asmdefs). **Caveat:** the stubs stand in for the real `UnityEditor.iOS.Xcode` / `UnityEditor.Android` extension DLLs, so asmdef `precompiledReferences` resolution is only truly validated in a real Unity build. |
 | Android plugin (Java) | `javac` against the minimal Android SDK **stubs** in `JavaStubs/`. |
 
 ## Why stubs

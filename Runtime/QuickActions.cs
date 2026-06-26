@@ -59,9 +59,9 @@ namespace Playground.QuickActions
         /// from, for this session; null otherwise.
         ///
         /// This is a <b>pull-based alternative</b> to <see cref="Performed"/> for
-        /// code that does not subscribe — do not route on both for the same tap, or
-        /// a cold launch is handled twice (the launch also raises
-        /// <see cref="Performed"/>).
+        /// code that does not subscribe — do not route on both for the same tap
+        /// (cold launch <i>or</i> warm resume), or that tap is handled twice (every
+        /// tap also raises <see cref="Performed"/>).
         /// </summary>
         public static string LastPerformed => Bridge.GetLastPerformed();
 

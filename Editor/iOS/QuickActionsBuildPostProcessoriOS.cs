@@ -1,4 +1,5 @@
-#if UNITY_IOS
+// Gated by the Editor.iOS asmdef's defineConstraints (UNITY_IOS), so it only
+// compiles when iOS is the active build target and UnityEditor.iOS.Xcode exists.
 using System.IO;
 using Playground.QuickActions;
 using UnityEditor;
@@ -64,4 +65,3 @@ namespace Playground.QuickActions.Editor
         }
     }
 }
-#endif

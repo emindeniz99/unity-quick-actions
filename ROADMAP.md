@@ -34,3 +34,12 @@ The stub harness compiles the C#/Java but can't confirm Unity-only wiring:
 - Consider hardening the exported trampoline (it must be `exported` for the
   launcher to start it, but another app could fire a `PERFORM.<id>` action —
   low impact, only spoofs an in-app shortcut id).
+- **CI limitation:** the stub harness compiles the post-processors (incl. an
+  isolated per-platform pass) but cannot validate the asmdef `precompiledReferences`
+  resolving to the real extension DLLs — that is Unity-only. Confirm in a real
+  Editor on iOS/Android targets.
+- **iOS scene lifecycle:** cold-launch dedup relies on the app-delegate model
+  (returning `NO` from `didFinishLaunchingWithOptions` suppresses the duplicate
+  `performActionForShortcutItem`). Unity's trampoline uses the app-delegate model
+  by default; if a project adopts the `UIScene` lifecycle, add a
+  `windowScene:performActionForShortcutItem:` hook and queue-level dedup.

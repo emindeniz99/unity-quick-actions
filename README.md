@@ -121,8 +121,9 @@ on first access it **reconciles** that list with the shortcuts the OS already ha
 ## Limitations / roadmap
 
 See [`ROADMAP.md`](./ROADMAP.md). Notable: per-item rasterized icons from
-`Texture2D`, pinned shortcuts, OS-backed `GetAll()`, and automated device CI are
-not implemented.
+`Texture2D`, pinned shortcuts, and automated device CI are not implemented.
+(OS read-back recovers ids/titles but not icons — reconciled items report
+`IconType.None`.)
 
 ## Verification
 
@@ -130,7 +131,7 @@ The package is type-checked and compiled without Unity via a stub-based harness:
 
 ```bash
 tools/setup.sh     # install dotnet + JDK (once; pre-baked in the devcontainer)
-tools/verify.sh    # .meta gen + C# compile (4 configs) + 15 unit tests + Android plugin
+tools/verify.sh    # .meta gen + C# compile (6 configs) + 16 unit tests + Android plugin
 ```
 
 `verify.sh` runs the unit tests via `dotnet test`; the same tests (plus

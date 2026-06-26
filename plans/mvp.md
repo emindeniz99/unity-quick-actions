@@ -142,10 +142,16 @@ intent donation, `.unitypackage` export, automated device CI.
   asset + iOS `Info.plist` and Android `shortcuts.xml`/manifest post-processors,
   with the trampoline decoding an action-encoded id for XML shortcuts.
 - **Unity-free CI verification** (`.verify/` + `tools/verify.sh`): the C#
-  compiles against UnityEngine/UnityEditor stubs (4 configs) and the Android
+  compiles against UnityEngine/UnityEditor stubs (6 configs) and the Android
   plugin against Android SDK stubs; toolchain baked into the devcontainer. This
   replaces the "structural lint only" plan with real compilation. The iOS `.mm`
   remains review-only (no Apple SDK on Linux).
 - A Unity 2022.3 LTS Editor is installed under `/opt/unity` in this environment
   for manual project smoke-testing; on-device builds still require macOS/Xcode
   (iOS) and a licensed editor.
+- **Superseded since this plan:** the warm-delivery design above
+  (iOS `UnitySendMessage` push) was unified into a **single pull channel** — iOS
+  warm taps now enqueue and are drained by the focus/pause poll, same as cold and
+  Android. `UnitySendMessage`/`OnPerformed`/`OnShortcutTriggered` no longer exist.
+  See `architecture-review.md` (W2) for the rationale. Treat the tables above as
+  the original plan, not the current code.

@@ -16,6 +16,19 @@
 #import <objc/runtime.h>
 #import <string.h>
 
+// Unity compiles plugin .mm with ARC. The static NSString assignments below rely
+// on ARC for retain/release; fail loudly rather than corrupt memory under MRC.
+#if !__has_feature(objc_arc)
+#error "QuickActions.mm requires ARC (Unity enables it for plugins by default)."
+#endif
+
+// Runs `block` on the main thread, synchronously if already there. Used for
+// UIKit writes so a same-frame read-back (GetShortcutsJson) sees them.
+static void QARunOnMain(dispatch_block_t block) {
+    if ([NSThread isMainThread]) block();
+    else dispatch_async(dispatch_get_main_queue(), block);
+}
+
 // Per-session state, mirroring the Android side: the "last performed" id lives
 // only for this process run (a cold launch sets it before Unity reads it), so a
 // later normal launch never reports a stale shortcut.
@@ -32,19 +45,20 @@ static void QAEnsureState(void) {
     });
 }
 
-// Records the tapped action. `queue` is YES for cold launch (the event is
-// delivered by the C# poll) and NO for warm resume (UnitySendMessage handles it).
+// Records the tapped action: stores it as "last" and, when `queue` is YES,
+// enqueues it for the single C# poll channel. Both cold and warm taps pass YES;
+// `copy` pins the (possibly autoreleased) type string.
 static void QAStorePerformed(NSString *type, BOOL queue) {
     if (type.length == 0) return;
     QAEnsureState();
     @synchronized (gQALock) {
-        gQALastPerformed = type;
-        if (queue) [gQAPending addObject:type];
+        gQALastPerformed = [type copy];
+        if (queue) [gQAPending addObject:[type copy]];
     }
 }
 
-// Returns a malloc'd copy of `s` (freed on the C# side via Marshal.FreeHGlobal),
-// or NULL for nil/empty.
+// Returns a malloc'd copy of `s` (freed on the C# side via _QuickActions_FreeString,
+// which calls free()), or NULL for nil/empty.
 static char *QACopyCString(NSString *s) {
     if (s.length == 0) return NULL;
     const char *utf8 = s.UTF8String;
@@ -115,6 +129,9 @@ static BOOL QADidFinishLaunching(id self, SEL _cmd, UIApplication *application, 
 
     // Returning NO when launched from a shortcut tells iOS not to also invoke
     // performActionForShortcutItem for this same item (we already captured it).
+    // This dedup relies on the UIApplicationDelegate lifecycle, which Unity's
+    // trampoline uses by default. Under the UIScene lifecycle the cold shortcut
+    // arrives via the scene delegate instead — see ROADMAP.
     return launchedFromShortcut ? NO : result;
 }
 
@@ -152,7 +169,9 @@ static void QAPerformActionForShortcutItem(id self, SEL _cmd, UIApplication *app
             (BOOL (*)(id, SEL, UIApplication *, NSDictionary *))method_getImplementation(didFinish);
         class_replaceMethod(cls, didFinishSel, (IMP)QADidFinishLaunching, method_getTypeEncoding(didFinish));
     } else {
-        class_addMethod(cls, didFinishSel, (IMP)QADidFinishLaunching, "B@:@@");
+        // Defensive fallback (Unity always implements the selector). BOOL is
+        // 'c' (signed char) in the ObjC ABI.
+        class_addMethod(cls, didFinishSel, (IMP)QADidFinishLaunching, "c@:@@");
     }
 
     // Install application:performActionForShortcutItem:completionHandler:
@@ -175,13 +194,13 @@ extern "C" {
 
 void _QuickActions_SetShortcuts(const char *json) {
     NSString *value = json != NULL ? [NSString stringWithUTF8String:json] : @"";
-    dispatch_async(dispatch_get_main_queue(), ^{
+    QARunOnMain(^{
         [UIApplication sharedApplication].shortcutItems = QABuildItems(value);
     });
 }
 
 void _QuickActions_RemoveAll(void) {
-    dispatch_async(dispatch_get_main_queue(), ^{
+    QARunOnMain(^{
         [UIApplication sharedApplication].shortcutItems = @[];
     });
 }

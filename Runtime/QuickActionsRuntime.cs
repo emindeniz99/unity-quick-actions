@@ -57,6 +57,16 @@ namespace Playground.QuickActions
                 PollPending();
         }
 
+        private void OnApplicationPause(bool paused)
+        {
+            // Second, independent resume signal. Some OEMs don't reliably fire
+            // OnApplicationFocus when a translucent activity (the Android
+            // trampoline) is involved, but OnApplicationPause(false) is guaranteed
+            // on resume. Draining is idempotent (the queue is consumed once).
+            if (!paused && _ready)
+                PollPending();
+        }
+
         private static void PollPending()
         {
             // Drain the native queue: a cold launch (and Android warm resume) may
