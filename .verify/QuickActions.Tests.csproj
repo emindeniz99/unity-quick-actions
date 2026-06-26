@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Executes the platform-agnostic unit tests here via `dotnet test`, against
+       the UnityEngine stubs and the no-op (editor) bridge. The Unity Test Runner
+       runs the SAME test files plus SerializationTests (which needs real
+       JsonUtility and is excluded here). AssemblyName matches the InternalsVisibleTo
+       in Runtime/AssemblyInfo.cs so white-box tests can reach internals. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <AssemblyName>Playground.QuickActions.Tests</AssemblyName>
+    <IsPackable>false</IsPackable>
+    <DefineConstants>UNITY_EDITOR;UNITY_2022_3_OR_NEWER</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="NUnit" Version="3.14.0" />
+    <PackageReference Include="NUnit3TestAdapter" Version="4.6.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Stubs/**/*.cs" />
+    <Compile Include="../Runtime/**/*.cs" />
+    <Compile Include="../Tests/Editor/QuickActionsApiTests.cs" />
+    <Compile Include="../Tests/Editor/QuickActionItemTests.cs" />
+  </ItemGroup>
+</Project>

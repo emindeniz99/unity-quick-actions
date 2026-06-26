@@ -13,11 +13,11 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 VERIFY="$ROOT/.verify"
 fail=0
 
-echo "== 1/3  .meta generation =="
+echo "== 1/4  .meta generation =="
 python3 "$ROOT/tools/gen_meta.py" || fail=1
 
 echo
-echo "== 2/3  C# compile (UnityEngine/UnityEditor stubs) =="
+echo "== 2/4  C# compile (UnityEngine/UnityEditor stubs) =="
 if command -v dotnet >/dev/null 2>&1; then
   export DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_NOLOGO=1
   for proj in Editor iOS Android Sample; do
@@ -30,7 +30,16 @@ else
 fi
 
 echo
-echo "== 3/3  Java compile (Android SDK stubs) =="
+echo "== 3/4  C# unit tests (dotnet test) =="
+if command -v dotnet >/dev/null 2>&1; then
+  if ! dotnet test "$VERIFY/QuickActions.Tests.csproj" -v q --nologo \
+       | grep -E 'Passed!|Failed!|error|Passed:|Failed:'; then fail=1; fi
+else
+  echo "!! dotnet not found — run tools/setup.sh first"; fail=1
+fi
+
+echo
+echo "== 4/4  Java compile (Android SDK stubs) =="
 if command -v javac >/dev/null 2>&1; then
   TMP="$(mktemp -d)"
   mkdir -p "$TMP/out"
