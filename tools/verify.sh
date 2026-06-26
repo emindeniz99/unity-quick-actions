@@ -4,7 +4,8 @@
 #   1. gen_meta.py        -> every asset has a stable .meta
 #   2. dotnet build x7    -> Runtime/Editor C# type-checks against UnityEngine/
 #                            UnityEditor stubs (editor, iOS, Android, sample)
-#   3. javac              -> Android plugin compiles against Android SDK stubs
+#   3. dotnet test        -> NUnit unit tests against the stub harness
+#   4. javac              -> Android plugin compiles against Android SDK stubs
 #
 # Exit non-zero on any failure. See .verify/README.md for the rationale.
 set -uo pipefail

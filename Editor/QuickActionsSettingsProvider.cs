@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 
@@ -38,8 +39,46 @@ namespace Playground.QuickActions.Editor
                     EditorGUILayout.LabelField("Static shortcuts (baked into the build)", EditorStyles.boldLabel);
                     UnityEditor.Editor.CreateCachedEditor(settings, null, ref _cachedEditor);
                     _cachedEditor.OnInspectorGUI();
+
+                    // The build post-processors silently skip duplicate/empty ids and
+                    // empty titles, so surface those here — otherwise a misconfigured
+                    // shortcut just goes missing from the build with no warning.
+                    var problem = Validate(settings);
+                    if (problem != null)
+                        EditorGUILayout.HelpBox(problem, MessageType.Warning);
                 }
             };
+        }
+
+        /// <summary>
+        /// Returns a human-readable warning if any static shortcut would be dropped
+        /// at build time (empty id/title, or a duplicate id), else null.
+        /// </summary>
+        private static string Validate(QuickActionsSettings settings)
+        {
+            var seen = new HashSet<string>();
+            var duplicates = new List<string>();
+            var emptyCount = 0;
+            foreach (var item in settings.StaticShortcuts)
+            {
+                if (item == null || string.IsNullOrEmpty(item.Id) || string.IsNullOrEmpty(item.Title))
+                {
+                    emptyCount++;
+                    continue;
+                }
+                if (!seen.Add(item.Id))
+                    duplicates.Add(item.Id);
+            }
+
+            if (emptyCount == 0 && duplicates.Count == 0)
+                return null;
+
+            var parts = new List<string>();
+            if (emptyCount > 0)
+                parts.Add($"{emptyCount} shortcut(s) missing an Id or Title");
+            if (duplicates.Count > 0)
+                parts.Add($"duplicate Id(s): {string.Join(", ", duplicates)}");
+            return "These will be skipped in the build — " + string.Join("; ", parts) + ".";
         }
     }
 }

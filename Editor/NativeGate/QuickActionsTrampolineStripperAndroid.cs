@@ -21,6 +21,11 @@ namespace Playground.QuickActions.Editor.NativeGate
     {
         private const string AndroidNs = "http://schemas.android.com/apk/res/android";
         private const string TrampolineClass = "com.playground.quickactions.QuickActionsTrampolineActivity";
+        // The source manifest authors the fully-qualified name, so the merged manifest
+        // normally keeps it. Also accept the relative `.QuickActionsTrampolineActivity`
+        // shorthand so the gate can't silently fail to strip if the name is ever
+        // shortened (fail-safe: prefer over-matching to leaving a live trampoline).
+        private const string TrampolineClassShort = ".QuickActionsTrampolineActivity";
 
         public int callbackOrder => 90;
 
@@ -43,7 +48,8 @@ namespace Playground.QuickActions.Editor.NativeGate
                 var removed = false;
                 foreach (var activity in doc.GetElementsByTagName("activity").Cast<XmlElement>().ToList())
                 {
-                    if (activity.GetAttribute("name", AndroidNs) == TrampolineClass)
+                    var name = activity.GetAttribute("name", AndroidNs);
+                    if (name == TrampolineClass || name == TrampolineClassShort)
                     {
                         activity.ParentNode.RemoveChild(activity);
                         removed = true;

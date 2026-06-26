@@ -28,6 +28,9 @@ namespace Playground.QuickActions.Editor
 
             // QuickActions.mm compiles into the UnityFramework target.
             var target = project.GetUnityFrameworkTargetGuid();
+            // Keep any project-/xcconfig-level defines (Unity sets several on this
+            // target) before appending ours, so we extend rather than shadow them.
+            project.AddBuildProperty(target, "GCC_PREPROCESSOR_DEFINITIONS", "$(inherited)");
             project.AddBuildProperty(target, "GCC_PREPROCESSOR_DEFINITIONS", "QUICKACTIONS_ENABLED=1");
 
             project.WriteToFile(projectPath);

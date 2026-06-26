@@ -14,7 +14,7 @@ namespace Playground.QuickActions
     // (value - 1) to UIApplicationShortcutIconType, and the Android side indexes
     // ICON_NAMES by value. They are pinned explicitly so inserting/reordering a
     // member can never silently shift the native mapping. None must stay 0,
-    // Compose 1, ... Update 29. (A unit test asserts the count and key values.)
+    // Compose 1, ... Update 29. (A unit test pins every value individually.)
     public enum IconType
     {
         None = 0,

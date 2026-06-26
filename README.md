@@ -94,6 +94,16 @@ the `defineConstraints` from the asmdefs (or flip `tools/gen_meta.py`), drop the
 > exercised by the stub harness — verify it once in a real build (a dev build with
 > the define and a prod build without it; diff the output for `QuickActions`).
 
+> **Static-shortcuts caveat when toggling the define.** If you configured static
+> shortcuts (Project Settings ▸ Quick Actions), the `QuickActionsSettings.asset`
+> references an Editor script that lives in the gated assembly. Open the project
+> with the define **off** and Unity reports that asset as "missing script" (the
+> class isn't compiled) — harmless, and it resolves the moment you re-enable the
+> define. If you don't use static shortcuts this never appears. To avoid it
+> entirely, delete the settings asset before disabling the define, or keep the
+> define on in the Editor and gate only your prod **Build Profile** (the
+> recommended setup).
+
 ## Usage
 
 ```csharp
@@ -188,7 +198,7 @@ The package is type-checked and compiled without Unity via a stub-based harness:
 
 ```bash
 tools/setup.sh     # install dotnet + JDK (once; pre-baked in the devcontainer)
-tools/verify.sh    # .meta gen + C# compile (7 configs) + 22 unit tests + Android plugin
+tools/verify.sh    # .meta gen + C# compile (7 configs) + 25 unit tests + Android plugin
 ```
 
 `verify.sh` runs the unit tests via `dotnet test`; the same tests (plus

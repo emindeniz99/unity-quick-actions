@@ -48,14 +48,53 @@ namespace Playground.QuickActions.Tests
         }
 
         [Test]
-        public void IconType_CountAndRangeArePinned()
+        public void IconType_EveryValueIsPinned()
         {
-            // Load-bearing contract: 30 values (None=0 .. Update=29), index-aligned
-            // with the Android ICON_NAMES array and (value-1) with Apple's enum.
-            // If this fails after editing IconType, update ICON_NAMES in
-            // QuickActionsBridge.java to match.
-            Assert.AreEqual(30, System.Enum.GetValues(typeof(IconType)).Length);
-            Assert.AreEqual(29, (int)IconType.Update);
+            // Load-bearing contract: each member's integer is index-aligned with the
+            // Android ICON_NAMES array and (value-1) with Apple's UIApplicationShortcut
+            // IconType. A reorder (even one that keeps the count and endpoints) would
+            // silently break the native icon mapping, so pin EVERY value, not just the
+            // ends. If this fails after editing IconType, update ICON_NAMES in
+            // QuickActionsBridge.java and the (value-1) cast in QuickActions.mm to match.
+            var expected = new (IconType icon, int value)[]
+            {
+                (IconType.None, 0),
+                (IconType.Compose, 1),
+                (IconType.Play, 2),
+                (IconType.Pause, 3),
+                (IconType.Add, 4),
+                (IconType.Location, 5),
+                (IconType.Search, 6),
+                (IconType.Share, 7),
+                (IconType.Prohibit, 8),
+                (IconType.Contact, 9),
+                (IconType.Home, 10),
+                (IconType.MarkLocation, 11),
+                (IconType.Favorite, 12),
+                (IconType.Love, 13),
+                (IconType.Cloud, 14),
+                (IconType.Invitation, 15),
+                (IconType.Confirmation, 16),
+                (IconType.Mail, 17),
+                (IconType.Message, 18),
+                (IconType.Date, 19),
+                (IconType.Time, 20),
+                (IconType.CapturePhoto, 21),
+                (IconType.CaptureVideo, 22),
+                (IconType.Task, 23),
+                (IconType.TaskCompleted, 24),
+                (IconType.Alarm, 25),
+                (IconType.Bookmark, 26),
+                (IconType.Shuffle, 27),
+                (IconType.Audio, 28),
+                (IconType.Update, 29),
+            };
+
+            foreach (var (icon, value) in expected)
+                Assert.AreEqual(value, (int)icon, $"IconType.{icon} must equal {value}");
+
+            // No member is left out of the table above (catches an ADDED value too).
+            Assert.AreEqual(expected.Length, System.Enum.GetValues(typeof(IconType)).Length);
         }
     }
 }

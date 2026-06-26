@@ -15,7 +15,32 @@ namespace Playground.QuickActions.Tests
     public class QuickActionsApiTests
     {
         [SetUp]
-        public void Reset() => QuickActions.RemoveAll();
+        public void Reset()
+        {
+            // Guarantee a clean default bridge and no leaked event subscribers even if
+            // a prior test threw before its own cleanup ran (test isolation, Rule 9).
+            QuickActions.OverrideBridgeForTesting(null);
+            ClearPerformedSubscribers();
+            QuickActions.RemoveAll();
+        }
+
+        [TearDown]
+        public void Cleanup()
+        {
+            QuickActions.OverrideBridgeForTesting(null);
+            ClearPerformedSubscribers();
+        }
+
+        // The Performed event is process-wide static; a handler that leaks from one
+        // test would corrupt the next. Reset its backing field between tests.
+        private static void ClearPerformedSubscribers()
+        {
+            typeof(QuickActions)
+                .GetField("Performed",
+                    System.Reflection.BindingFlags.Static |
+                    System.Reflection.BindingFlags.NonPublic)
+                ?.SetValue(null, null);
+        }
 
         private static QuickActionItem Item(string id, string title = "Title") =>
             new QuickActionItem(id, title);
@@ -233,6 +258,60 @@ namespace Playground.QuickActions.Tests
             finally { QuickActions.OverrideBridgeForTesting(null); }
         }
 
+        [Test]
+        public void Dispatch_RaisesPerformedExactlyOnce()
+        {
+            // The runtime's _ready gate + idempotent drain exist to deliver each tap
+            // once; assert the count, not just the last id (which can't see a double-fire).
+            var count = 0;
+            void Handler(string id) => count++;
+            QuickActions.Performed += Handler;
+            try
+            {
+                QuickActions.Dispatch("launch_id");
+                Assert.AreEqual(1, count);
+            }
+            finally
+            {
+                QuickActions.Performed -= Handler;
+            }
+        }
+
+        [Test]
+        public void AddList_ValidItems_PushesToOsExactlyOnce()
+        {
+            // N valid items must be one OS update, not N (the whole point of AddList).
+            var fake = new FakeBridge();
+            QuickActions.OverrideBridgeForTesting(fake);
+            try
+            {
+                var before = fake.SetCount;
+                QuickActions.AddList(new List<QuickActionItem> { Item("a"), Item("b"), Item("c") });
+                Assert.AreEqual(before + 1, fake.SetCount);
+                CollectionAssert.AreEquivalent(
+                    new[] { "a", "b", "c" }, fake.Shortcuts.ConvertAll(i => i.Id));
+            }
+            finally { QuickActions.OverrideBridgeForTesting(null); }
+        }
+
+        [Test]
+        public void RemoveAll_WhenBridgeThrows_LeavesInMemoryStateIntact()
+        {
+            // RemoveAll clears the OS FIRST; if that throws, the in-memory list must
+            // survive so a later access reconciles. This locks the documented ordering:
+            // reordering RemoveAll to clear _items first would make this test fail.
+            var fake = new ThrowingRemoveAllBridge();
+            QuickActions.OverrideBridgeForTesting(fake);
+            try
+            {
+                Assert.IsTrue(QuickActions.Add(Item("a")));
+                Assert.Throws<System.InvalidOperationException>(() => QuickActions.RemoveAll());
+                CollectionAssert.AreEquivalent(
+                    new[] { "a" }, QuickActions.GetAll().ConvertAll(i => i.Id));
+            }
+            finally { QuickActions.OverrideBridgeForTesting(null); }
+        }
+
         private sealed class FakeBridge : IQuickActionsBridge
         {
             public readonly List<QuickActionItem> Shortcuts = new List<QuickActionItem>();
@@ -249,6 +328,23 @@ namespace Playground.QuickActions.Tests
             public void ResetLastPerformed() { }
             public string ConsumePendingPerformed() => null;
             public IList<QuickActionItem> GetShortcuts() => new List<QuickActionItem>(Shortcuts);
+        }
+
+        // A bridge whose RemoveAll throws, to verify RemoveAll's OS-first ordering.
+        private sealed class ThrowingRemoveAllBridge : IQuickActionsBridge
+        {
+            private readonly List<QuickActionItem> _shortcuts = new List<QuickActionItem>();
+            public bool IsPlatformSupported => true;
+            public void SetShortcuts(IList<QuickActionItem> items)
+            {
+                _shortcuts.Clear();
+                _shortcuts.AddRange(items);
+            }
+            public void RemoveAll() => throw new System.InvalidOperationException("native failure");
+            public string GetLastPerformed() => null;
+            public void ResetLastPerformed() { }
+            public string ConsumePendingPerformed() => null;
+            public IList<QuickActionItem> GetShortcuts() => new List<QuickActionItem>(_shortcuts);
         }
 
         private sealed class ReentrantBridge : IQuickActionsBridge

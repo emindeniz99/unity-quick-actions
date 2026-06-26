@@ -48,6 +48,12 @@ The stub harness compiles the C#/Java but can't confirm Unity-only wiring:
   class remains; literally-zero needs the package excluded from the prod project).
   Detection uses `PlayerSettings.GetScriptingDefineSymbols`; confirm it reflects
   per-Build-Profile defines on Unity 6.
+- **Settings-asset orphan when the define is off:** `QuickActionsSettings` (the
+  static-shortcuts ScriptableObject) lives in the gated Editor assembly, so a
+  project that has a `QuickActionsSettings.asset` and is opened with
+  `QUICKACTIONS_ENABLED` off shows it as "missing script". Harmless and reversible
+  (re-enable the define), documented in README. A future cleanup could move the SO
+  *type* into an always-compiled editor assembly so the asset never orphans.
 - **iOS scene lifecycle:** cold-launch dedup relies on the app-delegate model
   (returning `NO` from `didFinishLaunchingWithOptions` suppresses the duplicate
   `performActionForShortcutItem`). Unity's trampoline uses the app-delegate model
