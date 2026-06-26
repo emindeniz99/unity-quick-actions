@@ -51,7 +51,7 @@ under `Packages/`, and removing the one line removes it completely (see
 Once published to [OpenUPM](https://openupm.com), install with the CLI:
 
 ```bash
-openupm add com.playground.quick-actions
+openupm add com.emindeniz99.quick-actions
 ```
 
 …or add the scoped registry manually to `Packages/manifest.json`, then add the
@@ -63,11 +63,11 @@ package under `dependencies`:
     {
       "name": "package.openupm.com",
       "url": "https://package.openupm.com",
-      "scopes": [ "com.playground" ]
+      "scopes": [ "com.emindeniz99" ]
     }
   ],
   "dependencies": {
-    "com.playground.quick-actions": "0.1.0"
+    "com.emindeniz99.quick-actions": "0.1.0"
   }
 }
 ```
@@ -89,7 +89,7 @@ open Editor (or *Assets ▸ Import Package ▸ Custom Package…*). It installs 
 or:
 
 ```json
-"com.playground.quick-actions": "file:../path/to/projects/quick-actions-unity"
+"com.emindeniz99.quick-actions": "file:../path/to/projects/quick-actions-unity"
 ```
 
 ---

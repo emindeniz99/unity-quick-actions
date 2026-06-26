@@ -31,10 +31,10 @@ just use `v0.1.0`.)
 
 1. Go to <https://openupm.com/packages/add/> and enter the repo URL, **or** open a
    PR against <https://github.com/openupm/openupm> adding
-   `data/packages/com.playground.quick-actions.yml`:
+   `data/packages/com.emindeniz99.quick-actions.yml`:
 
    ```yaml
-   name: com.playground.quick-actions
+   name: com.emindeniz99.quick-actions
    displayName: Quick Actions for iOS & Android
    repoUrl: https://github.com/emindeniz99/playground
    parentDir: projects/quick-actions-unity   # subfolder with package.json
@@ -49,9 +49,11 @@ just use `v0.1.0`.)
 
 ## Notes
 
-- The package name `com.playground.quick-actions` must be globally unique on
-  OpenUPM. If it's taken, rename to e.g. `com.emindeniz99.quick-actions` (this
-  cascades into the asmdef names and the C# namespace — do it before first tag).
+- The package name `com.emindeniz99.quick-actions` is author-scoped so it's
+  globally unique on OpenUPM. It is independent of the C# namespace and asmdef
+  names (`Playground.QuickActions`), which stay as-is — the UPM name and the code
+  namespace don't have to match. (The Android Java package
+  `com.playground.quickactions` is also independent and unchanged.)
 - OpenUPM only serves the package's runtime/editor content; `Samples~/`,
   `Tests/`, and dev tooling are handled normally by UPM (`Samples~` imported
   on demand, `Tests` excluded from consumer builds).
