@@ -48,9 +48,17 @@ build — not the C# assemblies, not the iOS `.mm` (so the app-delegate swizzle
 never runs), not the Android `.java`/trampoline manifest entry. Zero code, zero
 behaviour change. This is fail-safe: if you forget, production stays clean.
 
-How it's wired: every asmdef and every native plugin `.meta` carries
-`defineConstraints: [QUICKACTIONS_ENABLED]`, so Unity skips compiling/linking
-them unless the define is present.
+How it's wired (two mechanisms, because Unity treats them differently):
+
+- **Managed C#** — every asmdef carries `defineConstraints: [QUICKACTIONS_ENABLED]`,
+  so Unity won't compile the assemblies unless the define is set.
+- **Native plugins** — Unity's Define Constraints *don't apply to native plugins*
+  (a known engine limitation), so an ungated build hook
+  (`Editor/Gate/QuickActionsNativeGate.cs`, an `IPreprocessBuildWithReport`)
+  toggles the iOS/Android native plugins' build compatibility to match: it
+  includes them only when the managed `Playground.QuickActions` assembly is part
+  of the build (i.e. the define is set), and excludes them otherwise. So a prod
+  build with the define off links no `.mm`/`.java` and merges no trampoline.
 
 **To use it in your dev build:**
 

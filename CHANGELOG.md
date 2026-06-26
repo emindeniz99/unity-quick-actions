@@ -30,8 +30,11 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Unity Test Runner and via `dotnet test`; plus JsonUtility serialization tests.
 - Store collateral: marketing images at Asset Store sizes (`store/`,
   `tools/gen_store_images.py`), `STORE_CHECKLIST.md`, and `plans/release.md`.
-- **Opt-in `QUICKACTIONS_ENABLED` gate:** every asmdef and native plugin `.meta`
-  carries `defineConstraints: [QUICKACTIONS_ENABLED]`, so without the define
-  (the default) nothing — C#, iOS `.mm`/swizzle, Android `.java`/trampoline
-  manifest — enters the build. Add the define to a dev Build Profile to use it;
-  production builds stay completely clean. See README "Dev-only".
+- **Opt-in `QUICKACTIONS_ENABLED` gate:** managed asmdefs use
+  `defineConstraints: [QUICKACTIONS_ENABLED]`; native plugins (which Unity won't
+  gate via define constraints) are toggled by an ungated build hook
+  (`Editor/Gate/QuickActionsNativeGate.cs`) that includes the iOS `.mm`/Android
+  `.java`/trampoline manifest only when the managed package is in the build. So
+  without the define (the default) nothing — C#, iOS swizzle, Android trampoline —
+  enters the build. Add the define to a dev Build Profile to use it; production
+  builds stay completely clean. See README "Dev-only".

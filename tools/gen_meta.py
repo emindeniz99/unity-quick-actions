@@ -96,11 +96,11 @@ def plugin_meta(guid: str, platform: str) -> str:
         "  serializedVersion: 2\n"
         "  iconMap: {}\n"
         "  executionOrder: {}\n"
-        # Opt-in gate: the native plugin is only compiled/linked into the build
-        # when the QUICKACTIONS_ENABLED scripting define is set (dev). Absent it
-        # (prod), the .mm/.java/manifest never enter the Xcode/Gradle project.
-        "  defineConstraints:\n"
-        "  - QUICKACTIONS_ENABLED\n"
+        # NOTE: Unity ignores defineConstraints on NATIVE plugins (it only honors
+        # them for managed/asmdef code). The QUICKACTIONS_ENABLED gate for native
+        # plugins is instead enforced at build time by QuickActionsNativeGate
+        # (Editor/Gate/), which toggles per-platform compatibility. Keep this empty.
+        "  defineConstraints: []\n"
         "  isPreloaded: 0\n"
         "  isOverridable: 0\n"
         "  isExplicitlyReferenced: 0\n"

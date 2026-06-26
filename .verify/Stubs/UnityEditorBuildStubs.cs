@@ -20,6 +20,15 @@ namespace UnityEditor
         public static string applicationIdentifier => "com.example.app";
     }
 
+    public class PluginImporter
+    {
+        public string assetPath => string.Empty;
+        public static PluginImporter[] GetAllImporters() => Array.Empty<PluginImporter>();
+        public bool GetCompatibleWithPlatform(BuildTarget platform) => false;
+        public void SetCompatibleWithPlatform(BuildTarget platform, bool enable) { }
+        public void SaveAndReimport() { }
+    }
+
     public enum BuildTarget { NoTarget, iOS, Android, StandaloneWindows64, StandaloneOSX, StandaloneLinux64 }
 
     public enum SettingsScope { User, Project }
@@ -52,6 +61,10 @@ namespace UnityEditor.Build
     public interface IPostprocessBuildWithReport : IOrderedCallback
     {
         void OnPostprocessBuild(UnityEditor.Build.Reporting.BuildReport report);
+    }
+    public interface IPreprocessBuildWithReport : IOrderedCallback
+    {
+        void OnPreprocessBuild(UnityEditor.Build.Reporting.BuildReport report);
     }
 }
 
