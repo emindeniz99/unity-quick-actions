@@ -14,9 +14,18 @@
     "mobile"
   ],
   "author": {
-    "name": "playground"
+    "name": "emindeniz99",
+    "url": "https://github.com/emindeniz99"
   },
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/emindeniz99/playground.git",
+    "directory": "projects/quick-actions-unity"
+  },
+  "documentationUrl": "https://github.com/emindeniz99/playground/tree/main/projects/quick-actions-unity",
+  "changelogUrl": "https://github.com/emindeniz99/playground/blob/main/projects/quick-actions-unity/CHANGELOG.md",
+  "licensesUrl": "https://github.com/emindeniz99/playground/blob/main/projects/quick-actions-unity/LICENSE.md",
   "samples": [
     {
       "displayName": "Demo",

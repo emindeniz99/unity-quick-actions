@@ -24,21 +24,78 @@ LTS and newer** (including Unity 6).
 
 ## Install
 
-**Drag-and-drop (classic).** Drag `dist/QuickActions.unitypackage` into an open
-Unity Editor (or *Assets ▸ Import Package ▸ Custom Package…*). It installs under
-`Assets/QuickActions/`. Rebuild it any time with `python3 tools/pack_unitypackage.py`
-(works without Unity).
+Pick whichever fits — all install the same package. The repo is a monorepo, so
+the UPM methods point at the `projects/quick-actions-unity` subfolder.
 
-**UPM (modern).** Package Manager ▸ *Add package from disk…* ▸ select this
-folder's `package.json`. Or add to `Packages/manifest.json`:
+### 1. UPM via Git URL — recommended, works for everyone
+
+No registry, no download. **Package Manager ▸ + ▸ Add package from git URL…** and
+paste (or add the line to `Packages/manifest.json` under `dependencies`):
+
+```
+https://github.com/emindeniz99/playground.git?path=projects/quick-actions-unity
+```
+
+Pin a version with a tag (recommended once tags exist), e.g.:
+
+```
+https://github.com/emindeniz99/playground.git?path=projects/quick-actions-unity#v0.1.0
+```
+
+This is the best fit for the **dev-only** workflow: the package lives read-only
+under `Packages/`, and removing the one line removes it completely (see
+[Dev-only](#dev-only--excluding-it-completely-from-production-builds)).
+
+### 2. UPM via OpenUPM (scoped registry)
+
+Once published to [OpenUPM](https://openupm.com), install with the CLI:
+
+```bash
+openupm add com.playground.quick-actions
+```
+
+…or add the scoped registry manually to `Packages/manifest.json`, then add the
+package under `dependencies`:
+
+```json
+{
+  "scopedRegistries": [
+    {
+      "name": "package.openupm.com",
+      "url": "https://package.openupm.com",
+      "scopes": [ "com.playground" ]
+    }
+  ],
+  "dependencies": {
+    "com.playground.quick-actions": "0.1.0"
+  }
+}
+```
+
+OpenUPM gives version management and update notifications in Package Manager.
+(Publishing it there is a one-time setup — see [`plans/openupm.md`](./plans/openupm.md).)
+
+### 3. Drag-and-drop `.unitypackage` (classic)
+
+Drag [`dist/QuickActions.unitypackage`](./dist/QuickActions.unitypackage) into an
+open Editor (or *Assets ▸ Import Package ▸ Custom Package…*). It installs under
+`Assets/QuickActions/`. Rebuild any time with `python3 tools/pack_unitypackage.py`
+(no Unity needed). This is also what Asset Store buyers get. Note: it lands in
+`Assets/` (editable, not read-only), so it's less clean to fully remove than UPM.
+
+### 4. UPM from a local clone
+
+**Package Manager ▸ Add package from disk…** ▸ select this folder's `package.json`,
+or:
 
 ```json
 "com.playground.quick-actions": "file:../path/to/projects/quick-actions-unity"
 ```
 
-More on packaging/export: [`tools/export-unitypackage.md`](./tools/export-unitypackage.md).
+---
 
-Then import the **Demo** sample from the package page to try it on a device.
+After installing, import the **Demo** sample from the package page to try it on a
+device. More on packaging/export: [`tools/export-unitypackage.md`](./tools/export-unitypackage.md).
 
 ## Dev-only — excluding it completely from production builds
 
