@@ -25,3 +25,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Unity-free verification harness (`.verify/`, `tools/verify.sh`): compiles the
   C# against UnityEngine/UnityEditor stubs and the Android plugin against Android
   SDK stubs. Toolchain baked into the devcontainer image.
+- Unit tests (`Tests/Editor/`): 15 NUnit tests for the runtime API (list
+  management, validity, equality, icon mapping, event dispatch) runnable in the
+  Unity Test Runner and via `dotnet test`; plus JsonUtility serialization tests.
+- Store collateral: marketing images at Asset Store sizes (`store/`,
+  `tools/gen_store_images.py`), `STORE_CHECKLIST.md`, and `plans/release.md`.

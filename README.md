@@ -126,13 +126,15 @@ The package is type-checked and compiled without Unity via a stub-based harness:
 
 ```bash
 tools/setup.sh     # install dotnet + JDK (once; pre-baked in the devcontainer)
-tools/verify.sh    # .meta gen + C# compile (4 configs) + Android plugin compile
+tools/verify.sh    # .meta gen + C# compile (4 configs) + 15 unit tests + Android plugin
 ```
 
-See [`.verify/README.md`](./.verify/README.md). A green run proves everything
-compiles; on-device behaviour is validated with the procedure in
-[`plans/mvp.md`](./plans/mvp.md) (iOS/Android quick actions can't run in the
-Editor or on Linux).
+`verify.sh` runs the unit tests via `dotnet test`; the same tests (plus
+JsonUtility serialization tests) run in Unity's **Test Runner** from
+`Tests/Editor/`. See [`.verify/README.md`](./.verify/README.md). A green run
+proves everything compiles and the logic tests pass; on-device behaviour is
+validated with the procedure in [`plans/mvp.md`](./plans/mvp.md) (iOS/Android
+quick actions can't run in the Editor or on Linux).
 
 ## Notes / learnings
 

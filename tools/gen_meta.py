@@ -166,7 +166,9 @@ def main() -> int:
     created = 0
     for root, dirs, files in os.walk(PKG):
         # Skip hidden/ignored dirs (Unity ignores names ending with ~ or starting .)
-        dirs[:] = [d for d in dirs if not d.endswith("~") and not d.startswith(".")]
+        # and the store/ marketing folder (publishing collateral, not package content).
+        dirs[:] = [d for d in dirs
+                   if not d.endswith("~") and not d.startswith(".") and d != "store"]
 
         for d in dirs:
             abs_dir = os.path.join(root, d)

@@ -4,6 +4,14 @@ The package ships in **UPM** layout. To also distribute it the classic way
 (a `.unitypackage` that drops into `Assets/`), export it from a Unity project
 that has the package installed.
 
+## What to include / exclude
+
+Ship only the package itself. **Include:** `Runtime/`, `Editor/`, `Plugins/`,
+`Samples~/`, `package.json`, `README.md`, `CHANGELOG.md`, `LICENSE.md`,
+`ROADMAP.md`. **Exclude** the dev/publishing collateral: `.verify/`, `tools/`,
+`plans/`, `store/`, `STORE_CHECKLIST.md` (`.verify/` is already hidden from Unity;
+the others must be left out of the exported selection).
+
 ## Option A — Unity Editor (GUI)
 
 1. Install the package (Package Manager ▸ *Add package from disk…*).
