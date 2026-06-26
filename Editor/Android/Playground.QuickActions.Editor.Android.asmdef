@@ -1,0 +1,23 @@
+{
+    "name": "Playground.QuickActions.Editor.Android",
+    "rootNamespace": "Playground.QuickActions.Editor",
+    "references": [
+        "Playground.QuickActions",
+        "Playground.QuickActions.Editor"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "UnityEditor.Android.Extensions.dll"
+    ],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "UNITY_ANDROID"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

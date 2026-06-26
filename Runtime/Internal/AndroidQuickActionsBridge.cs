@@ -57,6 +57,15 @@ namespace Playground.QuickActions.Internal
 
         public string ConsumePendingPerformed() => CallStringStatic("consumePendingPerformed");
 
+        public IList<QuickActionItem> GetShortcuts()
+        {
+            if (!IsPlatformSupported)
+                return new List<QuickActionItem>();
+            using (var bridge = new AndroidJavaClass(BridgeClass))
+            using (var activity = CurrentActivity())
+                return QuickActionList.Parse(bridge.CallStatic<string>("getShortcutsJson", activity));
+        }
+
         private static string CallStringStatic(string method)
         {
             using (var bridge = new AndroidJavaClass(BridgeClass))

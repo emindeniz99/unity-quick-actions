@@ -104,20 +104,19 @@ shortcuts. Static and dynamic shortcuts coexist; iOS shows up to four total.
 ## How it works
 
 - **iOS** — `Plugins/iOS/QuickActions.mm` swizzles `UnityAppController` at
-  `+load`: cold launches are read from `didFinishLaunchingWithOptions:` and
-  queued; warm taps arrive via an injected
-  `application:performActionForShortcutItem:completionHandler:` that calls
-  `UnitySendMessage`. Dynamic shortcut items are set on
-  `UIApplication.shortcutItems`.
-- **Android** — `Plugins/Android/QuickActionsBridge.java` builds
-  `ShortcutInfo`s whose intents target `QuickActionsTrampolineActivity`. The
-  trampoline records the tapped id, brings the Unity activity forward, and
-  finishes; C# polls the id on startup and on regained focus.
+  `+load`: both cold launches (`didFinishLaunchingWithOptions:`) and warm taps
+  (an injected `application:performActionForShortcutItem:completionHandler:`)
+  enqueue the id. Dynamic shortcut items are set on `UIApplication.shortcutItems`.
+- **Android** — `Plugins/Android/QuickActionsBridge.java` builds `ShortcutInfo`s
+  whose intents target `QuickActionsTrampolineActivity`. The trampoline records
+  the tapped id and brings the Unity activity forward.
 
-The C# layer owns the authoritative list and pushes the full set to the OS on
-every change. On a fresh process the in-memory list starts empty (the OS still
-shows the previously-set shortcuts) — re-register on launch if you need
-`GetAll()`/`IsAdded()` to be accurate.
+Delivery is a **single pull channel**: C# drains the native queue one frame after
+startup (cold) and on regained focus (warm) — no `UnitySendMessage`. The C# layer
+owns the authoritative list and pushes the full set to the OS on every change;
+on first access it **reconciles** that list with the shortcuts the OS already has
+(from a previous session), so `GetAll()`/`IsAdded()` are accurate across launches
+(icons excepted).
 
 ## Limitations / roadmap
 

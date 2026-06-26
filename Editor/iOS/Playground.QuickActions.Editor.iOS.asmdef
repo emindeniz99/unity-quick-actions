@@ -1,0 +1,23 @@
+{
+    "name": "Playground.QuickActions.Editor.iOS",
+    "rootNamespace": "Playground.QuickActions.Editor",
+    "references": [
+        "Playground.QuickActions",
+        "Playground.QuickActions.Editor"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "UnityEditor.iOS.Extensions.Xcode.dll"
+    ],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "UNITY_IOS"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using UnityEngine;
 
 namespace Playground.QuickActions.Internal
 {
@@ -20,6 +21,15 @@ namespace Playground.QuickActions.Internal
         {
             if (source != null)
                 items.AddRange(source);
+        }
+
+        /// <summary>Parse a <c>{"items":[...]}</c> payload from the native layer.</summary>
+        internal static List<QuickActionItem> Parse(string json)
+        {
+            if (string.IsNullOrEmpty(json))
+                return new List<QuickActionItem>();
+            var list = JsonUtility.FromJson<QuickActionList>(json);
+            return list?.items ?? new List<QuickActionItem>();
         }
     }
 }

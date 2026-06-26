@@ -16,6 +16,7 @@ namespace Playground.QuickActions.Internal
         [DllImport("__Internal")] private static extern System.IntPtr _QuickActions_GetLastPerformed();
         [DllImport("__Internal")] private static extern void _QuickActions_ResetLastPerformed();
         [DllImport("__Internal")] private static extern System.IntPtr _QuickActions_ConsumePendingPerformed();
+        [DllImport("__Internal")] private static extern System.IntPtr _QuickActions_GetShortcutsJson();
         [DllImport("__Internal")] private static extern void _QuickActions_FreeString(System.IntPtr ptr);
 
         public bool IsPlatformSupported => true;
@@ -32,6 +33,12 @@ namespace Playground.QuickActions.Internal
         public void ResetLastPerformed() => _QuickActions_ResetLastPerformed();
 
         public string ConsumePendingPerformed() => Consume(_QuickActions_ConsumePendingPerformed());
+
+        public System.Collections.Generic.IList<QuickActionItem> GetShortcuts()
+        {
+            var json = Consume(_QuickActions_GetShortcutsJson());
+            return QuickActionList.Parse(json);
+        }
 
         // The native side hands back a malloc'd UTF-8 C string we own. Decode as
         // UTF-8 (ids/titles may be non-ASCII) and free it with the matching native

@@ -93,6 +93,41 @@ public final class QuickActionsBridge {
         if (manager != null) manager.removeAllDynamicShortcuts();
     }
 
+    /**
+     * The OS's current dynamic shortcuts as {"items":[...]} so the managed layer
+     * can reconcile after a cold start. Icons aren't read back (reported as 0).
+     */
+    public static String getShortcutsJson(Activity activity) {
+        JSONArray items = new JSONArray();
+        if (activity != null && Build.VERSION.SDK_INT >= 25) {
+            ShortcutManager manager = activity.getSystemService(ShortcutManager.class);
+            if (manager != null) {
+                for (ShortcutInfo s : manager.getDynamicShortcuts()) {
+                    try {
+                        JSONObject o = new JSONObject();
+                        o.put("Id", s.getId());
+                        CharSequence shortLabel = s.getShortLabel();
+                        CharSequence longLabel = s.getLongLabel();
+                        o.put("Title", shortLabel == null ? "" : shortLabel.toString());
+                        o.put("Subtitle", longLabel == null ? "" : longLabel.toString());
+                        o.put("Icon", 0);
+                        o.put("AndroidDrawable", "");
+                        items.put(o);
+                    } catch (Exception e) {
+                        android.util.Log.w("QuickActions", "Failed to read shortcut", e);
+                    }
+                }
+            }
+        }
+        JSONObject root = new JSONObject();
+        try {
+            root.put("items", items);
+        } catch (Exception e) {
+            return "{\"items\":[]}";
+        }
+        return root.toString();
+    }
+
     private static ShortcutInfo buildShortcut(Activity activity, JSONObject item) {
         String id = item.optString("Id", "");
         String title = item.optString("Title", "");

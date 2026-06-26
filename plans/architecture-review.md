@@ -4,6 +4,12 @@ A high-altitude review of the package's structure, abstractions, control/data
 flow, and the trade-offs behind them — distinct from the line-level bug review
 (those fixes are already in). Dev-facing; excluded from the shipped package.
 
+> **Resolution status:** All seven weaknesses below have been **addressed**.
+> W1 (OS read-back reconcile), W2 (single pull delivery channel), W3 (platform
+> post-processors split into `defineConstraint`-gated asmdefs), W4 (shared
+> bridge), W5 (documented). W6/W7 were accepted-by-design and documented. The
+> analysis is kept as the rationale; the table in §8 marks what shipped.
+
 ## 1. System context & components
 
 ```
@@ -159,26 +165,27 @@ under `LoggingEnable` (it does).
 - **Testability:** managed logic fully testable headless; native + post-processors
   are integration-tested only (inherent to the domain). ✔
 
-## 8. Prioritised recommendations
+## 8. Recommendations — status
 
-| # | Change | Benefit | Risk | When |
-|---|--------|---------|------|------|
-| 1 | OS read-back to reconcile `_items` (W1) | Correct `GetAll`/`IsAdded` across launches | low | post-device |
-| 2 | Single pull delivery channel (W2) | Removes the asymmetry + dedup reasoning | med (timing) | post-device |
-| 3 | Split post-processors into gated asmdefs (W3) | De-risks ext-DLL coupling | low | pre-publish |
-| 4 | Stateless/shared bridge (W4) | Matches reality, clearer | low | anytime |
-| 5 | Document singleton + first-frame-subscribe contract (W5) | Fewer surprises | none | anytime |
+| # | Change | Benefit | Status |
+|---|--------|---------|--------|
+| 1 | OS read-back to reconcile `_items` (W1) | Correct `GetAll`/`IsAdded` across launches | ✅ shipped (`EnsureLoaded` + `GetShortcuts` on each bridge; covered by a unit test) |
+| 2 | Single pull delivery channel (W2) | Removes the asymmetry + dedup reasoning | ✅ shipped (iOS warm now enqueues; `UnitySendMessage`/`OnPerformed` removed) |
+| 3 | Split post-processors into gated asmdefs (W3) | De-risks ext-DLL coupling | ✅ shipped (`Editor/iOS` + `Editor/Android` asmdefs, `defineConstraints`; main Editor asmdef no longer references the DLLs) |
+| 4 | Stateless/shared bridge (W4) | Matches reality, clearer | ✅ shipped |
+| 5 | Document singleton + first-frame-subscribe contract (W5) | Fewer surprises | ✅ shipped |
+
+Remaining validation (not design issues): confirm W2's iOS focus-vs-performAction
+ordering and W3's asmdef DLL resolution **on a real licensed Unity + device** —
+tracked in `ROADMAP.md`.
 
 ## 9. Verdict
 
-The architecture is **sound and well-factored for its scope.** The standout
-decisions — the Android trampoline and chained iOS swizzling — correctly solve
-the hardest cross-version problems, and the facade/bridge split keeps the public
-surface tiny and the platform code isolated and testable.
-
-The two design-level items worth addressing are **W1 (session vs OS state
-divergence)** and **W2 (delivery-channel asymmetry)** — both are clarity/altitude
-improvements rather than defects (the code works as-is). Neither blocks a v1
-release; both are good post-device-validation refactors. **W3** is worth doing
-before publishing to remove the only structural risk on the package's own target
-platforms. None of these require a rewrite — they're refinements on a solid base.
+The architecture is **sound and well-factored for its scope**, and the seven
+review items are now resolved. The standout decisions — the Android trampoline
+and chained iOS swizzling — correctly solve the hardest cross-version problems;
+the facade/bridge split keeps the public surface tiny and the platform code
+isolated and testable; and the delivery model is now a single, uniform pull
+channel with OS-reconciled state. No rewrite was needed — these were refinements
+on a solid base. The only open items are device/real-Unity **validation**, not
+construction.

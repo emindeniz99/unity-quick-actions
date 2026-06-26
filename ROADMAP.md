@@ -5,10 +5,9 @@ commit that ships it.
 
 - **Per-item rasterized icons** — accept a `Texture2D`/`Sprite` and emit a
   template `UIApplicationShortcutIcon` (iOS) and a generated drawable
-  (Android), instead of only system `IconType` glyphs + named drawables.
-- **OS-backed `GetAll()`** — read the currently-installed shortcuts back from
-  `UIApplication.shortcutItems` / `ShortcutManager.getDynamicShortcuts()` so the
-  managed list is accurate after a cold restart without re-registering.
+  (Android), instead of only system `IconType` glyphs + named drawables. This
+  would also let OS read-back recover icons (currently reconciled items come
+  back as `IconType.None`).
 - **Pinned shortcuts** — `requestPinShortcut` on Android; no iOS analog.
 - **Static shortcut custom icons (iOS file icons)** — `UIApplicationShortcutItemIconFile`
   with an asset-catalog template image (Android already supports a drawable via
@@ -23,13 +22,13 @@ commit that ships it.
 
 The stub harness compiles the C#/Java but can't confirm Unity-only wiring:
 
-- Confirm the Editor asmdef's `precompiledReferences`
-  (`UnityEditor.iOS.Extensions.Xcode.dll`, `UnityEditor.Android.Extensions.dll`)
-  resolve when the active build target is iOS/Android, and that on a machine
-  *without* a given module the `#if`-guarded code is skipped with at most a
-  warning (not a compile error).
+- Confirm the gated post-processor asmdefs (`Editor/iOS`, `Editor/Android`,
+  `defineConstraints` `UNITY_IOS` / `UNITY_ANDROID`, with the extension DLLs in
+  `precompiledReferences`) compile when that target is active and are skipped
+  cleanly otherwise.
 - On-device: verify the Android trampoline reliably foregrounds the Unity task
-  and fires `OnApplicationFocus(true)` (warm resume), and that static
+  and fires `OnApplicationFocus(true)` (warm resume), that iOS warm taps land via
+  the focus poll (performAction precedes didBecomeActive), and that static
   shortcuts.xml taps round-trip the action-encoded id. Confirm iOS cold + warm
   on a device via Xcode.
 - Consider hardening the exported trampoline (it must be `exported` for the

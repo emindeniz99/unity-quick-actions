@@ -4,4 +4,5 @@ public class ShortcutManager {
   public void setDynamicShortcuts(List<ShortcutInfo> s){}
   public void removeAllDynamicShortcuts(){}
   public List<ShortcutInfo> getManifestShortcuts(){return new ArrayList<ShortcutInfo>();}
+  public List<ShortcutInfo> getDynamicShortcuts(){return new ArrayList<ShortcutInfo>();}
 }

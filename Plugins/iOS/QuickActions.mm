@@ -5,18 +5,16 @@
 // load time via the Objective-C runtime, so the integrating project needs no
 // manual AppDelegate edits.
 //
-// Delivery model (mirrors the C# side):
-//   * Cold launch  -> captured in didFinishLaunchingWithOptions; queued for the
-//                     Performed event (polled by C#) and stored as "last".
-//   * Warm resume  -> performActionForShortcutItem; pushed immediately via
-//                     UnitySendMessage and stored as "last" (NOT queued, so the
-//                     C# focus-poll cannot double-deliver it).
+// Delivery model (single pull channel, mirrors the C# side):
+//   * Cold launch  -> captured in didFinishLaunchingWithOptions, queued, stored as "last".
+//   * Warm resume  -> performActionForShortcutItem, queued, stored as "last".
+// Both paths enqueue; C# drains the queue on first frame and on focus gain.
+// performActionForShortcutItem runs before applicationDidBecomeActive, so the
+// focus poll reliably catches a warm tap. No UnitySendMessage needed.
 
 #import <UIKit/UIKit.h>
 #import <objc/runtime.h>
 #import <string.h>
-
-extern "C" void UnitySendMessage(const char *obj, const char *method, const char *msg);
 
 // Per-session state, mirroring the Android side: the "last performed" id lives
 // only for this process run (a cold launch sets it before Unity reads it), so a
@@ -124,8 +122,9 @@ static void QAPerformActionForShortcutItem(id self, SEL _cmd, UIApplication *app
                                            UIApplicationShortcutItem *shortcutItem,
                                            void (^completionHandler)(BOOL)) {
     if ([shortcutItem isKindOfClass:[UIApplicationShortcutItem class]]) {
-        QAStorePerformed(shortcutItem.type, NO);
-        UnitySendMessage("QuickActionsRuntime", "OnPerformed", shortcutItem.type.UTF8String);
+        // Enqueue for the single C# poll channel. This runs before
+        // applicationDidBecomeActive, so the focus poll drains it on resume.
+        QAStorePerformed(shortcutItem.type, YES);
     }
     if (completionHandler != nil) completionHandler(YES);
 }
@@ -205,6 +204,29 @@ char *_QuickActions_ConsumePendingPerformed(void) {
         [gQAPending removeObjectAtIndex:0];
         return QACopyCString(value);
     }
+}
+
+// Serializes the OS's current shortcut items as {"items":[...]} so the managed
+// layer can reconcile after a cold start. Icons can't be read back from
+// UIApplicationShortcutItem, so Icon is reported as 0 (None). Called on the main
+// thread (Unity scripting thread).
+char *_QuickActions_GetShortcutsJson(void) {
+    NSArray<UIApplicationShortcutItem *> *items = [UIApplication sharedApplication].shortcutItems;
+    NSMutableArray *out = [NSMutableArray array];
+    for (UIApplicationShortcutItem *item in items) {
+        [out addObject:@{
+            @"Id": item.type ?: @"",
+            @"Title": item.localizedTitle ?: @"",
+            @"Subtitle": item.localizedSubtitle ?: @"",
+            @"Icon": @0,
+            @"AndroidDrawable": @"",
+        }];
+    }
+    NSString *json = @"{\"items\":[]}";
+    NSData *data = [NSJSONSerialization dataWithJSONObject:@{@"items": out} options:0 error:nil];
+    if (data != nil)
+        json = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
+    return QACopyCString(json);
 }
 
 // Frees a string returned by the getters above (paired with malloc in

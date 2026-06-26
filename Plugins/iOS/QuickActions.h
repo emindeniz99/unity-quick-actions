@@ -27,6 +27,10 @@ void _QuickActions_ResetLastPerformed(void);
 // NULL. malloc'd; caller frees via _QuickActions_FreeString.
 char *_QuickActions_ConsumePendingPerformed(void);
 
+// Current OS shortcut items as {"items":[...]} (Icon reported as 0). malloc'd;
+// caller frees. Lets C# reconcile its list after a cold start.
+char *_QuickActions_GetShortcutsJson(void);
+
 // Frees a string returned by the getters above (paired with the native malloc).
 void _QuickActions_FreeString(char *ptr);
 

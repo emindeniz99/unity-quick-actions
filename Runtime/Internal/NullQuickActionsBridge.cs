@@ -14,5 +14,6 @@ namespace Playground.QuickActions.Internal
         public string GetLastPerformed() => null;
         public void ResetLastPerformed() { }
         public string ConsumePendingPerformed() => null;
+        public IList<QuickActionItem> GetShortcuts() => new List<QuickActionItem>();
     }
 }

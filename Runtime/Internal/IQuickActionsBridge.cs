@@ -33,8 +33,16 @@ namespace Playground.QuickActions.Internal
         /// <summary>
         /// Pull-and-clear the next queued "performed" id used to raise the
         /// <see cref="QuickActions.Performed"/> event. Null if the queue is empty.
-        /// Covers cold launch on both platforms and warm resume on Android.
+        /// Covers cold launch and warm resume on both platforms (single channel).
         /// </summary>
         string ConsumePendingPerformed();
+
+        /// <summary>
+        /// The shortcuts the OS currently has installed (set in a previous session
+        /// too). Lets the managed layer reconcile its in-memory list after a cold
+        /// start. Icons are not recoverable, so they come back as
+        /// <see cref="IconType.None"/>.
+        /// </summary>
+        IList<QuickActionItem> GetShortcuts();
     }
 }

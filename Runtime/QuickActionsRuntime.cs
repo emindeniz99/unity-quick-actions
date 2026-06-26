@@ -5,16 +5,12 @@ namespace Playground.QuickActions
 {
     /// <summary>
     /// Hidden, auto-created singleton that funnels native "a quick action was
-    /// performed" notifications into <see cref="QuickActions.Performed"/>.
-    ///
-    /// Its GameObject name — "QuickActionsRuntime" — is the <c>UnitySendMessage</c>
-    /// target hard-coded in the iOS native layer, so do not rename it. Delivery
-    /// paths:
-    ///   * Cold launch (iOS + Android) → polled one frame after startup, so user
+    /// performed" notifications into <see cref="QuickActions.Performed"/> through a
+    /// single pull channel. Delivery paths:
+    ///   * Cold launch (iOS + Android) → drained one frame after startup, so user
     ///     scripts have had their Awake/OnEnable/Start to subscribe first.
-    ///   * Android warm resume (via the trampoline activity) → polled in
-    ///     <see cref="OnApplicationFocus"/>.
-    ///   * iOS warm resume → native <c>UnitySendMessage</c> → <see cref="OnPerformed"/>.
+    ///   * Warm resume (iOS + Android) → drained in <see cref="OnApplicationFocus"/>
+    ///     when the app returns to the foreground.
     /// </summary>
     [AddComponentMenu("")]
     internal sealed class QuickActionsRuntime : MonoBehaviour
@@ -53,15 +49,13 @@ namespace Playground.QuickActions
 
         private void OnApplicationFocus(bool hasFocus)
         {
-            // Android warm-resume arrives via the trampoline activity, which stores
-            // the id and brings Unity to the front — no UnitySendMessage. Ignore the
-            // initial focus (the cold launch is handled by DispatchColdLaunch).
+            // Warm resume: the OS has stored the tapped id (iOS performAction /
+            // Android trampoline) and the app is returning to the foreground.
+            // Ignore the initial focus — the cold launch is handled by
+            // DispatchColdLaunch.
             if (hasFocus && _ready)
                 PollPending();
         }
-
-        /// <summary>iOS warm-resume sink. Keep this exact public signature.</summary>
-        public void OnPerformed(string actionId) => QuickActions.Dispatch(actionId);
 
         private static void PollPending()
         {

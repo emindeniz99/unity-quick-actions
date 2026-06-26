@@ -16,17 +16,37 @@ namespace Playground.QuickActions
     /// and <see cref="LastPerformed"/> holds the id the app was last launched from
     /// (poll it at startup for cold launches).
     ///
-    /// This is a process-wide singleton (one shortcut set per app). The in-memory
-    /// list reflects only what was added <i>this session</i> — the OS retains the
-    /// actual shortcuts across restarts, so re-register on launch if you rely on
-    /// <see cref="GetAll"/> / <see cref="IsAdded"/> after a cold start.
+    /// This is a process-wide singleton (one shortcut set per app). On first
+    /// access the in-memory list is reconciled with the shortcuts the OS already
+    /// has (from a previous session), so <see cref="GetAll"/> / <see cref="IsAdded"/>
+    /// stay accurate across launches. Icons are not recoverable from the OS, so
+    /// reconciled items come back with <see cref="IconType.None"/>.
     /// </summary>
     public static class QuickActions
     {
         private static IQuickActionsBridge _bridge;
         private static readonly List<QuickActionItem> _items = new List<QuickActionItem>();
+        private static bool _loaded;
 
         private static IQuickActionsBridge Bridge => _bridge ??= QuickActionsBridgeFactory.Create();
+
+        /// <summary>
+        /// On first list access, seed the in-memory set from the shortcuts the OS
+        /// already has (set in a previous session), so <see cref="GetAll"/> /
+        /// <see cref="IsAdded"/> are accurate after a cold start.
+        /// </summary>
+        private static void EnsureLoaded()
+        {
+            if (_loaded)
+                return;
+            _loaded = true;
+            var existing = Bridge.GetShortcuts();
+            if (existing != null && existing.Count > 0)
+            {
+                _items.Clear();
+                _items.AddRange(existing);
+            }
+        }
 
         /// <summary>When true, the API logs its operations through <c>Debug.Log</c>.</summary>
         public static bool LoggingEnable { get; set; }
@@ -68,6 +88,7 @@ namespace Playground.QuickActions
         {
             if (item == null)
                 throw new ArgumentNullException(nameof(item));
+            EnsureLoaded();
 
             if (!item.IsValid)
             {
@@ -95,6 +116,7 @@ namespace Playground.QuickActions
         {
             if (items == null)
                 throw new ArgumentNullException(nameof(items));
+            EnsureLoaded();
 
             var changed = false;
             foreach (var item in items)
@@ -112,11 +134,19 @@ namespace Playground.QuickActions
                 Push();
         }
 
-        /// <summary>Snapshot of the currently added quick actions (this session).</summary>
-        public static List<QuickActionItem> GetAll() => new List<QuickActionItem>(_items);
+        /// <summary>Snapshot of the currently installed quick actions.</summary>
+        public static List<QuickActionItem> GetAll()
+        {
+            EnsureLoaded();
+            return new List<QuickActionItem>(_items);
+        }
 
         /// <summary>The added action with this id, or null.</summary>
-        public static QuickActionItem GetById(string id) => _items.FirstOrDefault(a => a.Id == id);
+        public static QuickActionItem GetById(string id)
+        {
+            EnsureLoaded();
+            return _items.FirstOrDefault(a => a.Id == id);
+        }
 
         /// <summary>Remove a quick action. Returns true if one was removed.</summary>
         public static bool Remove(QuickActionItem item) => item != null && RemoveById(item.Id);
@@ -124,7 +154,10 @@ namespace Playground.QuickActions
         /// <summary>Remove the quick action with this id. Returns true if one was removed.</summary>
         public static bool RemoveById(string id)
         {
-            if (string.IsNullOrEmpty(id) || _items.RemoveAll(a => a.Id == id) == 0)
+            if (string.IsNullOrEmpty(id))
+                return false;
+            EnsureLoaded();
+            if (_items.RemoveAll(a => a.Id == id) == 0)
                 return false;
 
             Push();
@@ -135,6 +168,7 @@ namespace Playground.QuickActions
         /// <summary>Remove every quick action.</summary>
         public static void RemoveAll()
         {
+            _loaded = true; // becoming authoritative; no OS reconcile needed
             _items.Clear();
             Bridge.RemoveAll();
             Log("Removed all quick actions.");
@@ -144,7 +178,13 @@ namespace Playground.QuickActions
         public static bool IsAdded(QuickActionItem item) => item != null && IsAdded(item.Id);
 
         /// <summary>True if an action with this id is added.</summary>
-        public static bool IsAdded(string id) => !string.IsNullOrEmpty(id) && _items.Any(a => a.Id == id);
+        public static bool IsAdded(string id)
+        {
+            if (string.IsNullOrEmpty(id))
+                return false;
+            EnsureLoaded();
+            return _items.Any(a => a.Id == id);
+        }
 
         // ---- internal: called by QuickActionsRuntime ----
 
@@ -162,6 +202,17 @@ namespace Playground.QuickActions
         /// instance (the platform bridges are stateless; native state is global).
         /// </summary>
         internal static string ConsumeNextPending() => Bridge.ConsumePendingPerformed();
+
+        /// <summary>
+        /// Test seam: swap the platform bridge and reset cached state. Passing null
+        /// restores the default bridge for the build target.
+        /// </summary>
+        internal static void OverrideBridgeForTesting(IQuickActionsBridge bridge)
+        {
+            _bridge = bridge;
+            _loaded = false;
+            _items.Clear();
+        }
 
         private static void Push() => Bridge.SetShortcuts(_items);
 

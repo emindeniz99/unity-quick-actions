@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using NUnit.Framework;
 using Playground.QuickActions;
+using Playground.QuickActions.Internal;
 
 namespace Playground.QuickActions.Tests
 {
@@ -131,6 +132,47 @@ namespace Playground.QuickActions.Tests
             {
                 QuickActions.Performed -= Handler;
             }
+        }
+
+        [Test]
+        public void FirstAccess_ReconcilesFromOsPersistedShortcuts()
+        {
+            var fake = new FakeBridge();
+            fake.Shortcuts.Add(new QuickActionItem("os1", "One"));
+            fake.Shortcuts.Add(new QuickActionItem("os2", "Two"));
+            QuickActions.OverrideBridgeForTesting(fake);
+            try
+            {
+                // GetAll/IsAdded reflect what the OS already had (W1).
+                Assert.IsTrue(QuickActions.IsAdded("os1"));
+                CollectionAssert.AreEquivalent(
+                    new[] { "os1", "os2" },
+                    QuickActions.GetAll().ConvertAll(i => i.Id));
+
+                // Adding writes the full reconciled set back to the OS.
+                Assert.IsTrue(QuickActions.Add(new QuickActionItem("os3", "Three")));
+                Assert.AreEqual(3, fake.Shortcuts.Count);
+            }
+            finally
+            {
+                QuickActions.OverrideBridgeForTesting(null);
+            }
+        }
+
+        private sealed class FakeBridge : IQuickActionsBridge
+        {
+            public readonly List<QuickActionItem> Shortcuts = new List<QuickActionItem>();
+            public bool IsPlatformSupported => true;
+            public void SetShortcuts(IList<QuickActionItem> items)
+            {
+                Shortcuts.Clear();
+                Shortcuts.AddRange(items);
+            }
+            public void RemoveAll() => Shortcuts.Clear();
+            public string GetLastPerformed() => null;
+            public void ResetLastPerformed() { }
+            public string ConsumePendingPerformed() => null;
+            public IList<QuickActionItem> GetShortcuts() => new List<QuickActionItem>(Shortcuts);
         }
     }
 }
