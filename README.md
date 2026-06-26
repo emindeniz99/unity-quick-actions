@@ -70,9 +70,12 @@ Constraints only work for managed code, **not** native plugins):
 
 **To use it in your dev build:**
 
-1. Add `QUICKACTIONS_ENABLED` to **Project Settings ▸ Player ▸ Scripting Define
-   Symbols** — ideally only in your **dev Build Profile** (Unity 2022.3/6 Build
-   Profiles let you set per-profile defines), so your prod profile never has it.
+1. Add `QUICKACTIONS_ENABLED` to your **Scripting Define Symbols**. Recommended
+   setup: keep it **on in the Editor** (Project Settings ▸ Player) and rely on a
+   prod **Build Profile** that omits it — Build Profile defines override the
+   Player setting at build time, so prod stays clean while the Editor compiles
+   the package (this also avoids the "missing script" note on the settings asset,
+   see below). Per-profile defines are a Unity 2022.3/6 Build Profiles feature.
 2. Guard your own call sites so your game still compiles when the define is off
    and the `QuickActions` type doesn't exist:
 
@@ -91,8 +94,11 @@ the `defineConstraints` from the asmdefs (or flip `tools/gen_meta.py`), drop the
 `#if QUICKACTIONS_ENABLED` from the `.mm`, and delete the two gate post-processors.
 
 > The native gating edits the generated Xcode/Gradle project and can't be
-> exercised by the stub harness — verify it once in a real build (a dev build with
-> the define and a prod build without it; diff the output for `QuickActions`).
+> exercised by the stub harness — verify it once in a real build. Concretely, in a
+> **prod build (define off)**: the generated Xcode project should contain **no**
+> `QUICKACTIONS_ENABLED` (grep the `.pbxproj`) and the merged Android manifest
+> should contain **no** `QuickActionsTrampolineActivity` (it's stripped). In a
+> **dev build (define on)** both are present.
 
 > **Static-shortcuts caveat when toggling the define.** If you configured static
 > shortcuts (Project Settings ▸ Quick Actions), the `QuickActionsSettings.asset`
@@ -106,41 +112,57 @@ the `defineConstraints` from the asmdefs (or flip `tools/gen_meta.py`), drop the
 
 ## Usage
 
+No setup, prefab, or `Init()` call is needed — call the static `QuickActions`
+API and the tap event pump self-initializes. Subscribe to `Performed` from a
+script **in your first scene** (in `Awake`/`OnEnable` for safety): the
+cold-launch tap is delivered one frame after startup — after the first scene's
+`Awake`/`OnEnable`/`Start` have run — so an early subscriber catches it. Wire it
+up later, or only in a scene loaded afterward, and you'll miss the cold-launch
+tap (warm taps still arrive).
+
 ```csharp
+using System.Collections.Generic;
 using Playground.QuickActions;
+using UnityEngine;
 
-void Start()
+public class ShortcutRouter : MonoBehaviour
 {
-    QuickActions.LoggingEnable = true;            // optional Debug.Log tracing
-    QuickActions.Performed += OnShortcut;         // fires on tap (incl. cold launch)
-
-    QuickActions.Add(new QuickActionItem(
-        id: "new_game", title: "New Game",
-        subtitle: "Start fresh", icon: IconType.Add));
-
-    QuickActions.AddList(new List<QuickActionItem>
+    void Awake()
     {
-        new QuickActionItem("continue", "Continue", "Resume last save", IconType.Play),
-        new QuickActionItem("daily",    "Daily Reward", "Claim today",   IconType.Favorite),
-    });
-}
+        // Subscribe early so the cold-launch tap (delivered next frame) isn't missed.
+        QuickActions.Performed += OnShortcut;
+        QuickActions.LoggingEnable = true;        // optional Debug.Log tracing
 
-// Fires on every tap, including the cold launch that started the app.
-void OnShortcut(string id) => Route(id);
+        QuickActions.Add(new QuickActionItem(
+            id: "new_game", title: "New Game",
+            subtitle: "Start fresh", icon: IconType.Add));
+
+        QuickActions.AddList(new List<QuickActionItem>
+        {
+            new QuickActionItem("continue", "Continue", "Resume last save", IconType.Play),
+            new QuickActionItem("daily",    "Daily Reward", "Claim today",   IconType.Favorite),
+        });
+    }
+
+    void OnDestroy() => QuickActions.Performed -= OnShortcut;
+
+    // Fires on every tap, including the cold launch that started the app.
+    void OnShortcut(string id) => Route(id);
+}
 ```
 
 ### API
 
 | Member | Purpose |
 |--------|---------|
-| `bool IsPlatformSupported` | True on a supported device; false in-Editor. |
+| `bool IsPlatformSupported` | True on a supported device; false in-Editor (calls are safe no-ops there — test on a device). |
 | `bool LoggingEnable` | Toggle `Debug.Log` tracing. |
 | `event Action<string> Performed` | Tapped action id (main thread; includes cold launch). |
 | `string LastPerformed` | Id the app was last launched/resumed from, or null. |
 | `void ResetLastPerformed()` | Clear `LastPerformed`. |
 | `bool Add(QuickActionItem)` | Add one; false if invalid or id already added. |
 | `void AddList(IList<QuickActionItem>)` | Add several in one OS update. |
-| `List<QuickActionItem> GetAll()` | Snapshot of this session's actions. |
+| `List<QuickActionItem> GetAll()` | Snapshot of the currently installed dynamic actions (OS-reconciled). |
 | `QuickActionItem GetById(string)` | Lookup by id. |
 | `bool Remove(QuickActionItem)` / `RemoveById(string)` | Remove one. |
 | `void RemoveAll()` | Remove every action. |
