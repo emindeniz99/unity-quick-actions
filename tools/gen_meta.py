@@ -168,7 +168,8 @@ def main() -> int:
         # Skip hidden/ignored dirs (Unity ignores names ending with ~ or starting .)
         # and the store/ marketing folder (publishing collateral, not package content).
         dirs[:] = [d for d in dirs
-                   if not d.endswith("~") and not d.startswith(".") and d != "store"]
+                   if not d.endswith("~") and not d.startswith(".")
+                   and d not in ("store", "dist")]
 
         for d in dirs:
             abs_dir = os.path.join(root, d)

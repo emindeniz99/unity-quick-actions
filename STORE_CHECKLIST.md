@@ -5,6 +5,22 @@ Everything needed to publish **Quick Actions for iOS & Android**. Sources:
 [Start publishing](https://assetstore.unity.com/publishing/publish-and-sell-assets),
 [Marketing image sizes](https://support.unity.com/hc/en-us/articles/210122403).
 
+## Status — done vs needs-you
+
+✅ **Done in repo (run `tools/release.sh` to regenerate all):**
+listing texts (`store/listing/`), marketing images (`store/`), prebuilt
+drag-and-drop package (`dist/QuickActions.unitypackage`), compile + 15 unit
+tests green, full source + docs.
+
+⏳ **Needs your account / hardware (can't be automated):**
+1. Create the free publisher account + accept the agreement.
+2. Open the package in a **licensed** Unity (2022.3 LTS + Unity 6) and confirm a
+   clean import; switch to iOS/Android targets.
+3. **Device test** (Android device; iOS via macOS/Xcode) + one real screenshot.
+4. Pick a price, upload `dist/QuickActions.unitypackage`, submit for review.
+
+---
+
 ## 0. Cost & account (the "is it free?" answer)
 
 - **Publishing is free.** No fee to create a publisher account or list assets.
@@ -22,32 +38,25 @@ Everything needed to publish **Quick Actions for iOS & Android**. Sources:
 - [ ] Fill publisher name, description, logo, and payout (PayPal/bank) details.
 - [ ] Accept the Asset Store Provider Agreement.
 
-## 2. Package metadata (draft below — reuse verbatim)
+## 2. Package metadata — ✅ written, paste-ready in `store/listing/`
 
-- [ ] **Title:** Quick Actions for iOS & Android
-- [ ] **Category:** Tools ▸ Integration
-- [ ] **Summary (≤ ~200 chars):** "Home-screen quick actions (long-press app-icon
-      shortcuts) for iOS & Android. Create them at runtime or bake them into the
-      build, get a tap callback — one C# API, zero native edits."
-- [ ] **Description:** adapt [`README.md`](./README.md) (features, API, How it
-      works, limitations). Keep it benefit-led; lead with the long-press value.
-- [ ] **Tags:** ios, android, quick actions, app shortcuts, home screen,
-      shortcuts, mobile, UIApplicationShortcutItem, ShortcutManager.
-- [ ] **Version:** `0.1.0` (matches `package.json` + `CHANGELOG.md`).
-- [ ] **Supported Unity:** 2022.3 LTS and newer (incl. Unity 6).
-- [ ] **Render pipelines:** Built-in / URP / HDRP (no rendering — all compatible).
-- [ ] **Price:** decide free vs paid (≥ $4.99).
+All copy is prepared in [`store/listing/`](./store/listing/) — paste verbatim:
+- [x] **Title / Category / Version / compatibility:** [`metadata.md`](./store/listing/metadata.md)
+- [x] **Summary:** [`summary.txt`](./store/listing/summary.txt)
+- [x] **Description:** [`description.md`](./store/listing/description.md)
+- [x] **Tags / keywords:** [`tags.txt`](./store/listing/tags.txt)
+- [ ] **Price:** decide free vs paid (≥ $4.99) — your call.
 
 ## 3. Marketing images (generated → `store/`)
 
-All sizes are pre-built by `python3 tools/gen_store_images.py`. See
+All sizes are ✅ pre-built by `python3 tools/gen_store_images.py`. See
 [`store/README.md`](./store/README.md).
 
-- [ ] **Icon** 160×160, no text — `store/icon.png`
-- [ ] **Card** 420×280 — `store/card.png`
-- [ ] **Cover** 1950×1300 — `store/cover.png`
-- [ ] **Social** 1200×630 — `store/social.png`
-- [ ] **Screenshots** ≥1200w (2400×1600 here), ≥1 — `store/screenshot-*.png`
+- [x] **Icon** 160×160, no text — `store/icon.png`
+- [x] **Card** 420×280 — `store/card.png`
+- [x] **Cover** 1950×1300 — `store/cover.png`
+- [x] **Social** 1200×630 — `store/social.png`
+- [x] **Screenshots** ≥1200w (2400×1600 here), ≥1 — `store/screenshot-*.png`
 - [ ] ⚠️ Replace `screenshot-1` with a **real on-device** long-press capture
       before submitting (store prefers in-context shots over mockups). Optional
       but improves approval odds & conversion.
@@ -55,17 +64,16 @@ All sizes are pre-built by `python3 tools/gen_store_images.py`. See
 
 ## 4. Package contents — what to ship (and what to strip)
 
-Export a **clean** `.unitypackage` (see
-[`tools/export-unitypackage.md`](./tools/export-unitypackage.md)) containing
-ONLY the package:
+✅ A clean `.unitypackage` is **prebuilt** at `dist/QuickActions.unitypackage`
+(`tools/pack_unitypackage.py`, no Unity needed). It already:
 
-- [ ] Include: `Runtime/`, `Editor/`, `Plugins/`, `Samples~/`, `package.json`,
-      `README.md`, `CHANGELOG.md`, `LICENSE.md`, `ROADMAP.md`.
-- [ ] **Exclude dev-only folders:** `.verify/`, `tools/`, `plans/`, `store/`,
-      `STORE_CHECKLIST.md` — these are repo/publishing collateral, not for buyers.
-- [ ] Every included asset has a committed `.meta` (run `tools/verify.sh`).
-- [ ] Ships **full source** for the native plugins (`.mm`, `.java`) — no
-      precompiled-only DLLs (allowed, but source is required for review trust).
+- [x] Includes only package content, remapped under `Assets/QuickActions/`
+      (Runtime, Editor, Plugins, Example, README/CHANGELOG/LICENSE/ROADMAP).
+- [x] Excludes dev/publishing collateral (`.verify/`, `tools/`, `plans/`,
+      `store/`, `dist/`, `Tests/`, `STORE_CHECKLIST.md`, `package.json`).
+- [x] Carries every asset's committed `.meta` GUID (scene→script refs intact).
+- [x] Ships **full source** for the native plugins (`.mm`, `.java`).
+- [ ] Import it once in a licensed Editor to confirm before uploading.
 
 ## 5. Technical review gates (do before upload)
 

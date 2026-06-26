@@ -24,14 +24,19 @@ LTS and newer** (including Unity 6).
 
 ## Install
 
-**UPM (recommended).** Package Manager ▸ *Add package from disk…* ▸ select this
+**Drag-and-drop (classic).** Drag `dist/QuickActions.unitypackage` into an open
+Unity Editor (or *Assets ▸ Import Package ▸ Custom Package…*). It installs under
+`Assets/QuickActions/`. Rebuild it any time with `python3 tools/pack_unitypackage.py`
+(works without Unity).
+
+**UPM (modern).** Package Manager ▸ *Add package from disk…* ▸ select this
 folder's `package.json`. Or add to `Packages/manifest.json`:
 
 ```json
 "com.playground.quick-actions": "file:../path/to/projects/quick-actions-unity"
 ```
 
-**.unitypackage / classic `Assets/`** — see [`tools/export-unitypackage.md`](./tools/export-unitypackage.md).
+More on packaging/export: [`tools/export-unitypackage.md`](./tools/export-unitypackage.md).
 
 Then import the **Demo** sample from the package page to try it on a device.
 

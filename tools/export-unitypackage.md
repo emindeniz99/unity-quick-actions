@@ -4,6 +4,19 @@ The package ships in **UPM** layout. To also distribute it the classic way
 (a `.unitypackage` that drops into `Assets/`), export it from a Unity project
 that has the package installed.
 
+## Option 0 — prebuilt, no Unity needed (recommended)
+
+`tools/pack_unitypackage.py` builds a valid `.unitypackage` directly from the
+source files and their `.meta` GUIDs — no Unity install required:
+
+```bash
+python3 tools/pack_unitypackage.py   # -> dist/QuickActions.unitypackage
+```
+
+It already applies the include/exclude rules below and remaps content under
+`Assets/QuickActions/`. Drag the result into the Editor to install. (Import it
+once in a real Editor to confirm before submitting to the store.)
+
 ## What to include / exclude
 
 Ship only the package itself. **Include:** `Runtime/`, `Editor/`, `Plugins/`,

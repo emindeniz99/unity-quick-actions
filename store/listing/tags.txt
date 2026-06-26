@@ -1,0 +1,12 @@
+quick actions
+app shortcuts
+home screen
+shortcuts
+ios
+android
+mobile
+UIApplicationShortcutItem
+ShortcutManager
+deep link
+launch
+native plugin
