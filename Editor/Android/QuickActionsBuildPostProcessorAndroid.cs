@@ -121,8 +121,8 @@ namespace Playground.QuickActions.Editor
                 var longName = "qa_long_" + index;
                 index++;
                 var subtitle = string.IsNullOrEmpty(item.Subtitle) ? item.Title : item.Subtitle;
-                strings.AppendLine($"  <string name=\"{shortName}\">{Escape(item.Title)}</string>");
-                strings.AppendLine($"  <string name=\"{longName}\">{Escape(subtitle)}</string>");
+                strings.AppendLine($"  <string name=\"{shortName}\" formatted=\"false\">{EscapeResValue(item.Title)}</string>");
+                strings.AppendLine($"  <string name=\"{longName}\" formatted=\"false\">{EscapeResValue(subtitle)}</string>");
 
                 shortcuts.AppendLine("  <shortcut");
                 shortcuts.AppendLine($"      android:shortcutId=\"{Escape(item.Id)}\"");
@@ -194,6 +194,33 @@ namespace Playground.QuickActions.Editor
                     default: sb.Append(c); break;
                 }
             }
+            return sb.ToString();
+        }
+
+        // String-resource VALUES need Android resource escaping on top of XML
+        // escaping: after aapt2 parses the XML, a bare apostrophe or double-quote is
+        // a span delimiter and a leading '@'/'?' is a resource reference — all break
+        // the build. (formatted="false" on the element neutralizes a literal '%'.)
+        private static string EscapeResValue(string value)
+        {
+            var sb = new StringBuilder(value.Length);
+            foreach (var c in value)
+            {
+                if (c < 0x20)
+                    continue;
+                switch (c)
+                {
+                    case '&': sb.Append("&amp;"); break;   // XML well-formedness
+                    case '<': sb.Append("&lt;"); break;
+                    case '>': sb.Append("&gt;"); break;
+                    case '\'': sb.Append("\\'"); break;    // Android: escape apostrophe
+                    case '"': sb.Append("\\\""); break;    // Android: escape quote
+                    case '\\': sb.Append("\\\\"); break;   // Android: escape backslash
+                    default: sb.Append(c); break;
+                }
+            }
+            if (sb.Length > 0 && (sb[0] == '@' || sb[0] == '?'))
+                sb.Insert(0, '\\');
             return sb.ToString();
         }
     }

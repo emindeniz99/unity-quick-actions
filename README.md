@@ -39,8 +39,12 @@ https://github.com/emindeniz99/playground.git?path=projects/quick-actions-unity
 Pin a version with a tag (recommended once tags exist), e.g.:
 
 ```
-https://github.com/emindeniz99/playground.git?path=projects/quick-actions-unity#v0.1.0
+https://github.com/emindeniz99/playground.git?path=projects/quick-actions-unity#quick-actions/v0.1.0
 ```
+
+(The tag is prefixed `quick-actions/v…` because this is a monorepo — see
+[`plans/openupm.md`](./plans/openupm.md). No tags exist yet; the default-branch
+URL above works in the meantime.)
 
 This is the best fit for the **dev-only** workflow: the package lives read-only
 under `Packages/`, and removing the one line removes it completely (see
@@ -242,10 +246,12 @@ asset*, and add entries. At build time:
   its `Id` in the intent action (XML shortcuts can't carry extras).
 
 Taps are delivered through the same `Performed` / `LastPerformed` path as dynamic
-shortcuts. Static and dynamic shortcuts coexist; iOS shows up to four total.
-Note: static shortcuts are **not** surfaced by the runtime query API —
-`GetAll()`/`IsAdded()` see only dynamic shortcuts, so don't reuse a static
-shortcut's `Id` in a runtime `Add()` (it would create a duplicate).
+shortcuts. Static and dynamic shortcuts coexist; iOS shows up to four total
+(extra dynamic items beyond the cap are silently not shown by iOS). Note: static
+shortcuts are **not** surfaced by the runtime query API — `GetAll()`/`IsAdded()`
+see only dynamic shortcuts, so avoid reusing a static shortcut's `Id` in a
+runtime `Add()`: on iOS it shows twice, and on Android the colliding dynamic item
+is dropped (the rest of the set is unaffected).
 
 ## How it works
 
@@ -263,6 +269,21 @@ owns the authoritative list and pushes the full set to the OS on every change;
 on first access it **reconciles** that list with the shortcuts the OS already has
 (from a previous session), so `GetAll()`/`IsAdded()` are accurate across launches
 (icons excepted).
+
+## Security: a shortcut tap is not an authenticated action
+
+Treat the id from `Performed` / `LastPerformed` as a **navigation hint, not an
+authorization**. On Android the trampoline activity must be `exported` for the
+launcher to start it, so another app on the device could fire the same intent and
+spoof a tap; on either platform the id is just a string the OS hands you. So:
+
+- **Don't wire a shortcut id directly to a destructive or privileged action**
+  (delete account, spend currency, switch user) without your normal in-app
+  confirmation/auth. Route the id to a screen, not to an irreversible side effect.
+- `LastPerformed` is **sticky** for the session (cleared only by
+  `ResetLastPerformed()`), so don't re-read it on every `OnApplicationFocus` — a
+  resume that wasn't a shortcut tap (e.g. returning from a call) would replay the
+  old id. Use the `Performed` event for taps, or reset after consuming.
 
 ## Limitations / roadmap
 

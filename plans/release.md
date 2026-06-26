@@ -14,7 +14,7 @@ product, and the path to launch. Companion to
 | Cross-version Android | ✅ done | trampoline avoids `UnityPlayerActivity`/`GameActivity` divergence |
 | C# compiles | ✅ verified | `dotnet` build, 6 configs, 0 warnings |
 | Android plugin compiles | ✅ verified | `javac` vs SDK stubs |
-| Unit tests | ✅ 16 passing | `dotnet test` (list logic, validity, equality, icon map, dispatch) |
+| Unit tests | ✅ 25 passing (dotnet) + 2 Unity-only = 27 authored | `dotnet test` (list logic, validity, equality, icon pin, dispatch, reconcile, ordering) |
 | Self code-review | ✅ done | 8-angle review; all confirmed bugs fixed |
 | Docs | ✅ done | README, CHANGELOG, ROADMAP, plans, per-folder READMEs |
 | Store images | ✅ generated | `store/` at exact required sizes |

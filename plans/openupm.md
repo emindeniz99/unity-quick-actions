@@ -37,11 +37,14 @@ just use `v0.1.0`.)
    name: com.emindeniz99.quick-actions
    displayName: Quick Actions for iOS & Android
    repoUrl: https://github.com/emindeniz99/playground
-   parentDir: projects/quick-actions-unity   # subfolder with package.json
    gitTagPrefix: quick-actions/v              # matches the tag scheme above
    minVersion: 0.1.0
    licenseSpdxId: MIT
    ```
+
+   OpenUPM **auto-detects** the package's subfolder from where `package.json`
+   lives — there is no `parentDir`/`packageFolder` field; the `gitTagPrefix` is
+   what distinguishes this package's tags from other projects in the monorepo.
 
 2. After the PR merges, OpenUPM's CI picks up each matching tag and publishes it
    to `https://package.openupm.com` within minutes. New tags publish

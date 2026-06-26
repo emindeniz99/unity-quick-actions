@@ -35,11 +35,12 @@ namespace Playground.QuickActions.Tests
         // test would corrupt the next. Reset its backing field between tests.
         private static void ClearPerformedSubscribers()
         {
-            typeof(QuickActions)
-                .GetField("Performed",
-                    System.Reflection.BindingFlags.Static |
-                    System.Reflection.BindingFlags.NonPublic)
-                ?.SetValue(null, null);
+            var field = typeof(QuickActions).GetField("Performed",
+                System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic);
+            // Fail loud if the event is ever renamed — a silent no-op here would let
+            // leaked subscribers corrupt later tests without any failure (Rule 9/12).
+            Assert.NotNull(field, "QuickActions.Performed backing field not found — test isolation would silently break.");
+            field.SetValue(null, null);
         }
 
         private static QuickActionItem Item(string id, string title = "Title") =>

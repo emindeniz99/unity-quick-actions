@@ -1,5 +1,12 @@
 # Quick Actions for Unity — Implementation Plan (MVP / v0.1)
 
+> ⚠️ **Historical planning doc — superseded.** The API/native-contract tables
+> below reflect an early design (e.g. `IsSupported`, `ShortcutTriggered`,
+> `SetDynamicShortcuts`, a `QuickAction` type, string icons) that changed during
+> implementation. For the **authoritative** API see `README.md` and the source of
+> truth `Runtime/QuickActions.cs` / `QuickActionItem.cs` / `IconType.cs`. Kept for
+> design rationale only.
+
 ## Context
 
 The paid Unity Asset Store package **"Quick Actions for iOS and Android"**
