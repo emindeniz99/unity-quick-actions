@@ -22,6 +22,12 @@
 #error "QuickActions.mm requires ARC (Unity enables it for plugins by default)."
 #endif
 
+// Entire native layer is gated by QUICKACTIONS_ENABLED (set on the Xcode
+// target by the iOS build post-processor only when the package is enabled).
+// When the define is absent (production), this file compiles to nothing —
+// no +load swizzle, no symbols.
+#if QUICKACTIONS_ENABLED
+
 // Runs `block` on the main thread, synchronously if already there. Used for
 // UIKit writes so a same-frame read-back (GetShortcutsJson) sees them.
 static void QARunOnMain(dispatch_block_t block) {
@@ -263,3 +269,5 @@ void _QuickActions_FreeString(char *ptr) {
 }
 
 } // extern "C"
+
+#endif // QUICKACTIONS_ENABLED

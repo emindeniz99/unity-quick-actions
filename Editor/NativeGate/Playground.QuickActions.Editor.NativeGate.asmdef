@@ -1,0 +1,20 @@
+{
+    "name": "Playground.QuickActions.Editor.NativeGate",
+    "rootNamespace": "Playground.QuickActions.Editor.NativeGate",
+    "references": [],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "UnityEditor.Android.Extensions.dll"
+    ],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "UNITY_ANDROID"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

@@ -19,7 +19,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `IconType` system-icon enum, Editor *About* window, and a Demo sample.
 - Static shortcuts: a **Project Settings ▸ Quick Actions** asset plus build
   post-processors that bake shortcuts into iOS `Info.plist`
-  (`UIApplicationShortcutItems`) and Android `res/xml/shortcuts.xml` +
+  (`UIApplicationShortcutItems`) and Android `res/xml/quickactions_shortcuts.xml` +
   launcher-activity meta-data. Static intents reuse the trampoline via an
   action-encoded id.
 - Unity-free verification harness (`.verify/`, `tools/verify.sh`): compiles the
@@ -31,10 +31,11 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Store collateral: marketing images at Asset Store sizes (`store/`,
   `tools/gen_store_images.py`), `STORE_CHECKLIST.md`, and `plans/release.md`.
 - **Opt-in `QUICKACTIONS_ENABLED` gate:** managed asmdefs use
-  `defineConstraints: [QUICKACTIONS_ENABLED]`; native plugins (which Unity won't
-  gate via define constraints) are toggled by an ungated build hook
-  (`Editor/Gate/QuickActionsNativeGate.cs`) that includes the iOS `.mm`/Android
-  `.java`/trampoline manifest only when the managed package is in the build. So
-  without the define (the default) nothing — C#, iOS swizzle, Android trampoline —
-  enters the build. Add the define to a dev Build Profile to use it; production
-  builds stay completely clean. See README "Dev-only".
+  `defineConstraints: [QUICKACTIONS_ENABLED]`. Native plugins (which Unity won't
+  gate via define constraints) are gated at the build-output level: the iOS
+  `.mm` is wrapped in `#if QUICKACTIONS_ENABLED` and a gated post-processor adds
+  that macro to the Xcode project only when enabled (so it compiles to nothing in
+  prod); an ungated post-processor strips the trampoline `<activity>` from the
+  Android manifest when disabled. With the define off there is zero C# and no iOS
+  swizzle (the trampoline `.java` remains a dead, unreachable class). Add the
+  define to a dev Build Profile to use it. See README "Dev-only".

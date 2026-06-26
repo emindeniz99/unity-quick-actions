@@ -94,7 +94,13 @@ public final class QuickActionsBridge {
     public static void removeAll(Activity activity) {
         if (activity == null || Build.VERSION.SDK_INT < 25) return;
         ShortcutManager manager = activity.getSystemService(ShortcutManager.class);
-        if (manager != null) manager.removeAllDynamicShortcuts();
+        if (manager == null) return;
+        try {
+            manager.removeAllDynamicShortcuts();
+        } catch (RuntimeException e) {
+            // e.g. IllegalStateException on a locked profile — never cross JNI.
+            android.util.Log.w("QuickActions", "removeAllDynamicShortcuts failed", e);
+        }
     }
 
     /**

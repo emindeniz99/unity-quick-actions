@@ -18,15 +18,7 @@ namespace UnityEditor
     public static class PlayerSettings
     {
         public static string applicationIdentifier => "com.example.app";
-    }
-
-    public class PluginImporter
-    {
-        public string assetPath => string.Empty;
-        public static PluginImporter[] GetAllImporters() => Array.Empty<PluginImporter>();
-        public bool GetCompatibleWithPlatform(BuildTarget platform) => false;
-        public void SetCompatibleWithPlatform(BuildTarget platform, bool enable) { }
-        public void SaveAndReimport() { }
+        public static string GetScriptingDefineSymbols(UnityEditor.Build.NamedBuildTarget target) => string.Empty;
     }
 
     public enum BuildTarget { NoTarget, iOS, Android, StandaloneWindows64, StandaloneOSX, StandaloneLinux64 }
@@ -57,6 +49,12 @@ namespace UnityEditor
 
 namespace UnityEditor.Build
 {
+    public struct NamedBuildTarget
+    {
+        public static readonly NamedBuildTarget Android = default;
+        public static readonly NamedBuildTarget iOS = default;
+    }
+
     public interface IOrderedCallback { int callbackOrder { get; } }
     public interface IPostprocessBuildWithReport : IOrderedCallback
     {
@@ -88,6 +86,15 @@ namespace UnityEditor.Android
 
 namespace UnityEditor.iOS.Xcode
 {
+    public class PBXProject
+    {
+        public static string GetPBXProjectPath(string buildPath) => string.Empty;
+        public void ReadFromFile(string path) { }
+        public void WriteToFile(string path) { }
+        public string GetUnityFrameworkTargetGuid() => string.Empty;
+        public void AddBuildProperty(string targetGuid, string name, string value) { }
+    }
+
     public class PlistDocument
     {
         public PlistElementDict root = new PlistElementDict();

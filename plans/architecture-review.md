@@ -39,7 +39,7 @@ flow, and the trade-offs behind them — distinct from the line-level bug review
    Editor (build-time, separate assembly):
      QuickActionsSettings (ScriptableObject) ─▶ Project Settings provider
      ─▶ iOS post-processor  (Info.plist UIApplicationShortcutItems)
-     ─▶ Android post-processor (res/xml/shortcuts.xml + manifest meta-data)
+     ─▶ Android post-processor (res/xml/quickactions_shortcuts.xml + manifest meta-data)
 ```
 
 ## 2. Responsibilities (cohesion check)
@@ -92,7 +92,7 @@ drains the queue → `Performed`. (The original push design is analysed as W2.)
   new bridge + one factory branch.
 - Single, narrow extension seam (`IQuickActionsBridge`) for new capabilities.
 - Main-thread-only delivery; no background-thread event hazards.
-- Managed logic is unit-testable without Unity (16 headless-passing tests; 18 authored, 2 Unity-only).
+- Managed logic is unit-testable without Unity (22 headless-passing tests; 24 authored, 2 Unity-only).
 - Native memory ownership is explicit (malloc ↔ native free).
 
 ## 6. Weaknesses / risks (severity · recommendation)

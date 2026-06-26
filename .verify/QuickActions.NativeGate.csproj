@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Compiles the UNGATED native gate (Editor/NativeGate) with QUICKACTIONS_ENABLED
+       ABSENT — mirroring the real ungated asmdef, which must compile and run when
+       the package define is off. Catches any accidental dependency on a gated type. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <OutputType>Library</OutputType>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <DefineConstants>UNITY_EDITOR;UNITY_2022_3_OR_NEWER;UNITY_ANDROID</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Stubs/**/*.cs" />
+    <Compile Include="../Editor/NativeGate/**/*.cs" />
+  </ItemGroup>
+</Project>

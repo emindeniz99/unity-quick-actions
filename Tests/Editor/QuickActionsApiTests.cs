@@ -149,9 +149,11 @@ namespace Playground.QuickActions.Tests
                     new[] { "os1", "os2" },
                     QuickActions.GetAll().ConvertAll(i => i.Id));
 
-                // Adding writes the full reconciled set back to the OS.
+                // Adding writes the full MERGED set back to the OS (not just the new one).
                 Assert.IsTrue(QuickActions.Add(new QuickActionItem("os3", "Three")));
-                Assert.AreEqual(3, fake.Shortcuts.Count);
+                CollectionAssert.AreEquivalent(
+                    new[] { "os1", "os2", "os3" },
+                    fake.Shortcuts.ConvertAll(i => i.Id));
             }
             finally
             {
@@ -159,12 +161,86 @@ namespace Playground.QuickActions.Tests
             }
         }
 
+        [Test]
+        public void Reconcile_DropsInvalidAndDuplicateOsItems()
+        {
+            var fake = new FakeBridge();
+            fake.Shortcuts.Add(new QuickActionItem("dup", "A"));
+            fake.Shortcuts.Add(new QuickActionItem("dup", "B"));      // duplicate id
+            fake.Shortcuts.Add(new QuickActionItem("", "no id"));      // invalid
+            QuickActions.OverrideBridgeForTesting(fake);
+            try
+            {
+                CollectionAssert.AreEquivalent(new[] { "dup" }, QuickActions.GetAll().ConvertAll(i => i.Id));
+            }
+            finally { QuickActions.OverrideBridgeForTesting(null); }
+        }
+
+        [Test]
+        public void RemoveAll_ThenAdd_DoesNotResurrectOsShortcuts()
+        {
+            var fake = new FakeBridge();
+            fake.Shortcuts.Add(new QuickActionItem("os1", "One"));
+            fake.Shortcuts.Add(new QuickActionItem("os2", "Two"));
+            QuickActions.OverrideBridgeForTesting(fake);
+            try
+            {
+                QuickActions.RemoveAll();                 // clean slate despite OS having os1,os2
+                Assert.AreEqual(0, QuickActions.GetAll().Count);
+                Assert.AreEqual(0, fake.Shortcuts.Count);
+
+                Assert.IsTrue(QuickActions.Add(new QuickActionItem("x", "X")));
+                CollectionAssert.AreEquivalent(new[] { "x" }, QuickActions.GetAll().ConvertAll(i => i.Id));
+            }
+            finally { QuickActions.OverrideBridgeForTesting(null); }
+        }
+
+        [Test]
+        public void AddList_AllInvalidOrDuplicate_DoesNotPush()
+        {
+            var fake = new FakeBridge();
+            QuickActions.OverrideBridgeForTesting(fake);
+            try
+            {
+                Assert.IsTrue(QuickActions.Add(Item("a")));
+                var before = fake.SetCount;
+                QuickActions.AddList(new List<QuickActionItem> { Item("a"), null, new QuickActionItem("", "bad") });
+                Assert.AreEqual(before, fake.SetCount); // nothing valid/new → no OS push
+            }
+            finally { QuickActions.OverrideBridgeForTesting(null); }
+        }
+
+        [Test]
+        public void AddList_WithNullElement_SkipsItNoThrow()
+        {
+            Assert.DoesNotThrow(() =>
+                QuickActions.AddList(new List<QuickActionItem> { null, Item("b") }));
+            CollectionAssert.AreEquivalent(new[] { "b" }, QuickActions.GetAll().ConvertAll(i => i.Id));
+        }
+
+        [Test]
+        public void EnsureLoaded_ReentrantBridge_LoadsOnceWithoutRecursing()
+        {
+            var fake = new ReentrantBridge();
+            QuickActions.OverrideBridgeForTesting(fake);
+            try
+            {
+                // GetShortcuts re-enters the facade (IsAdded) mid-load; the _loading
+                // guard must prevent recursion and only load once.
+                Assert.DoesNotThrow(() => QuickActions.IsAdded("anything"));
+                Assert.AreEqual(1, fake.GetShortcutsCalls);
+            }
+            finally { QuickActions.OverrideBridgeForTesting(null); }
+        }
+
         private sealed class FakeBridge : IQuickActionsBridge
         {
             public readonly List<QuickActionItem> Shortcuts = new List<QuickActionItem>();
+            public int SetCount;
             public bool IsPlatformSupported => true;
             public void SetShortcuts(IList<QuickActionItem> items)
             {
+                SetCount++;
                 Shortcuts.Clear();
                 Shortcuts.AddRange(items);
             }
@@ -173,6 +249,23 @@ namespace Playground.QuickActions.Tests
             public void ResetLastPerformed() { }
             public string ConsumePendingPerformed() => null;
             public IList<QuickActionItem> GetShortcuts() => new List<QuickActionItem>(Shortcuts);
+        }
+
+        private sealed class ReentrantBridge : IQuickActionsBridge
+        {
+            public int GetShortcutsCalls;
+            public bool IsPlatformSupported => true;
+            public void SetShortcuts(IList<QuickActionItem> items) { }
+            public void RemoveAll() { }
+            public string GetLastPerformed() => null;
+            public void ResetLastPerformed() { }
+            public string ConsumePendingPerformed() => null;
+            public IList<QuickActionItem> GetShortcuts()
+            {
+                GetShortcutsCalls++;
+                QuickActions.IsAdded("reentry"); // re-enter during load
+                return new List<QuickActionItem>();
+            }
         }
     }
 }

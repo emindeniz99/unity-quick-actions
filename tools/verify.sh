@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Full static verification for quick-actions-unity, runnable without a Unity
-# install. Three checks:
+# install. Four checks:
 #   1. gen_meta.py        -> every asset has a stable .meta
-#   2. dotnet build x4    -> Runtime/Editor C# type-checks against UnityEngine/
+#   2. dotnet build x7    -> Runtime/Editor C# type-checks against UnityEngine/
 #                            UnityEditor stubs (editor, iOS, Android, sample)
 #   3. javac              -> Android plugin compiles against Android SDK stubs
 #
@@ -20,7 +20,7 @@ echo
 echo "== 2/4  C# compile (UnityEngine/UnityEditor stubs) =="
 if command -v dotnet >/dev/null 2>&1; then
   export DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_NOLOGO=1
-  for proj in Editor EditoriOS EditorAndroid iOS Android Sample; do
+  for proj in Editor EditoriOS EditorAndroid NativeGate iOS Android Sample; do
     echo "-- QuickActions.$proj.csproj"
     if ! dotnet build "$VERIFY/QuickActions.$proj.csproj" -v q -nologo \
          | grep -Ev '^\s*$|Determining|Restored '; then fail=1; fi

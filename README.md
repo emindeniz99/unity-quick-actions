@@ -42,23 +42,31 @@ Then import the **Demo** sample from the package page to try it on a device.
 
 ## Dev-only — excluding it completely from production builds
 
-The whole package is **opt-in via the `QUICKACTIONS_ENABLED` scripting define**.
-Without that define (the default), **nothing** from this package enters the
-build — not the C# assemblies, not the iOS `.mm` (so the app-delegate swizzle
-never runs), not the Android `.java`/trampoline manifest entry. Zero code, zero
-behaviour change. This is fail-safe: if you forget, production stays clean.
+The package is **opt-in via the `QUICKACTIONS_ENABLED` scripting define**. Without
+it (the default), production stays clean — fail-safe: if you forget the define,
+nothing activates.
 
-How it's wired (two mechanisms, because Unity treats them differently):
+How it's wired (managed and native need different mechanisms — Unity's Define
+Constraints only work for managed code, **not** native plugins):
 
-- **Managed C#** — every asmdef carries `defineConstraints: [QUICKACTIONS_ENABLED]`,
-  so Unity won't compile the assemblies unless the define is set.
-- **Native plugins** — Unity's Define Constraints *don't apply to native plugins*
-  (a known engine limitation), so an ungated build hook
-  (`Editor/Gate/QuickActionsNativeGate.cs`, an `IPreprocessBuildWithReport`)
-  toggles the iOS/Android native plugins' build compatibility to match: it
-  includes them only when the managed `Playground.QuickActions` assembly is part
-  of the build (i.e. the define is set), and excludes them otherwise. So a prod
-  build with the define off links no `.mm`/`.java` and merges no trampoline.
+- **Managed C#** — the gated asmdefs carry `defineConstraints: [QUICKACTIONS_ENABLED]`,
+  so the assemblies aren't compiled unless the define is set. With the define off
+  there is **zero** C#.
+- **iOS native** — `Plugins/iOS/QuickActions.mm` is wrapped in `#if QUICKACTIONS_ENABLED`.
+  A build post-processor in the *gated* `Editor.iOS` assembly
+  (`QuickActionsEnableMacroiOS`) adds the `QUICKACTIONS_ENABLED=1` macro to the
+  generated Xcode project — but only runs when the define is set. With the define
+  off, the macro is never added and the `.mm` compiles to **nothing**: no `+load`
+  swizzle, no symbols. **Zero** iOS behaviour.
+- **Android native** — an *ungated* post-processor
+  (`Editor/NativeGate/QuickActionsTrampolineStripperAndroid`) removes the
+  trampoline `<activity>` from the generated manifest when the define is off, so
+  the trampoline can't be launched (the package is **inert**). One caveat: the
+  trampoline `.java` still compiles into the APK as a small dead, unreachable
+  class — Unity can't conditionally exclude a loose native source. For a
+  *literally*-zero Android footprint, keep the package out of the prod project
+  (see below). Both post-processors edit the **build output**, so they work for
+  read-only UPM packages.
 
 **To use it in your dev build:**
 
@@ -76,10 +84,15 @@ How it's wired (two mechanisms, because Unity treats them differently):
    #endif
    ```
 
-A **prod build** (define absent) compiles none of this and ships none of it.
-(Want it always-on instead — e.g. for an Asset Store release? Remove the
-`defineConstraints` from the asmdefs and the plugin `.meta` files, or flip
-`tools/gen_meta.py` to emit an empty list.)
+For a **guaranteed-zero** prod (no dead class either), don't ship the package in
+the prod project at all — e.g. install it as a UPM Git dependency only on your
+dev branch/manifest. Want it **always-on** (e.g. an Asset Store release)? Remove
+the `defineConstraints` from the asmdefs (or flip `tools/gen_meta.py`), drop the
+`#if QUICKACTIONS_ENABLED` from the `.mm`, and delete the two gate post-processors.
+
+> The native gating edits the generated Xcode/Gradle project and can't be
+> exercised by the stub harness — verify it once in a real build (a dev build with
+> the define and a prod build without it; diff the output for `QuickActions`).
 
 ## Usage
 
@@ -175,7 +188,7 @@ The package is type-checked and compiled without Unity via a stub-based harness:
 
 ```bash
 tools/setup.sh     # install dotnet + JDK (once; pre-baked in the devcontainer)
-tools/verify.sh    # .meta gen + C# compile (6 configs) + 16 unit tests + Android plugin
+tools/verify.sh    # .meta gen + C# compile (7 configs) + 22 unit tests + Android plugin
 ```
 
 `verify.sh` runs the unit tests via `dotnet test`; the same tests (plus

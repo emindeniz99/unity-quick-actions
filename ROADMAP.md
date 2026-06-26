@@ -38,13 +38,16 @@ The stub harness compiles the C#/Java but can't confirm Unity-only wiring:
   isolated per-platform pass) but cannot validate the asmdef `precompiledReferences`
   resolving to the real extension DLLs — that is Unity-only. Confirm in a real
   Editor on iOS/Android targets.
-- **Native gate (dev-only):** confirm `QuickActionsNativeGate`
-  (`Editor/Gate/`) actually excludes the iOS `.mm`/Android `.java`/manifest from a
-  build when `QUICKACTIONS_ENABLED` is off — i.e. that `SetCompatibleWithPlatform`
-  + `SaveAndReimport` in `OnPreprocessBuild` takes effect for the current build
-  (standard pattern, but the reimport-mid-build behaviour is Unity-only-testable).
-  Do a dev build (define on) and a prod build (define off) and diff the generated
-  Xcode/Gradle project for any `QuickActions` file.
+- **Native gate (dev-only):** confirm the build-output gating works on device.
+  iOS: `QuickActionsEnableMacroiOS` (gated) adds `QUICKACTIONS_ENABLED=1` to the
+  Xcode `UnityFramework` target only when enabled, and `QuickActions.mm` is
+  wrapped in `#if QUICKACTIONS_ENABLED` — verify a prod build's Xcode project has
+  no `QuickActions` symbols. Android: `QuickActionsTrampolineStripperAndroid`
+  (ungated) removes the trampoline `<activity>` when the define is off — verify
+  the prod manifest has no `QuickActionsTrampolineActivity` (the `.java` dead
+  class remains; literally-zero needs the package excluded from the prod project).
+  Detection uses `PlayerSettings.GetScriptingDefineSymbols`; confirm it reflects
+  per-Build-Profile defines on Unity 6.
 - **iOS scene lifecycle:** cold-launch dedup relies on the app-delegate model
   (returning `NO` from `didFinishLaunchingWithOptions` suppresses the duplicate
   `performActionForShortcutItem`). Unity's trampoline uses the app-delegate model

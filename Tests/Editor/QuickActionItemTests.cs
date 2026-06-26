@@ -46,5 +46,16 @@ namespace Playground.QuickActions.Tests
             Assert.AreEqual(1, (int)IconType.Compose);
             Assert.AreEqual(4, (int)IconType.Add);
         }
+
+        [Test]
+        public void IconType_CountAndRangeArePinned()
+        {
+            // Load-bearing contract: 30 values (None=0 .. Update=29), index-aligned
+            // with the Android ICON_NAMES array and (value-1) with Apple's enum.
+            // If this fails after editing IconType, update ICON_NAMES in
+            // QuickActionsBridge.java to match.
+            Assert.AreEqual(30, System.Enum.GetValues(typeof(IconType)).Length);
+            Assert.AreEqual(29, (int)IconType.Update);
+        }
     }
 }

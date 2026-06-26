@@ -1,5 +1,6 @@
 // Gated by the Editor.iOS asmdef's defineConstraints (UNITY_IOS), so it only
 // compiles when iOS is the active build target and UnityEditor.iOS.Xcode exists.
+using System.Collections.Generic;
 using System.IO;
 using Playground.QuickActions;
 using UnityEditor;
@@ -44,11 +45,14 @@ namespace Playground.QuickActions.Editor
 
             // Replace any existing array so re-runs are idempotent.
             var items = plist.root.CreateArray("UIApplicationShortcutItems");
+            var seen = new HashSet<string>();
             var count = 0;
             foreach (var item in settings.StaticShortcuts)
             {
                 if (item == null || string.IsNullOrEmpty(item.Id) || string.IsNullOrEmpty(item.Title))
                     continue;
+                if (!seen.Add(item.Id))
+                    continue; // skip duplicate ids (parity with the Android post-processor)
 
                 var dict = items.AddDict();
                 dict.SetString("UIApplicationShortcutItemType", item.Id);

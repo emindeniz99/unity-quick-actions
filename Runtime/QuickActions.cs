@@ -54,7 +54,13 @@ namespace Playground.QuickActions
                 if (existing != null && existing.Count > 0)
                 {
                     _items.Clear();
-                    _items.AddRange(existing);
+                    var seen = new HashSet<string>();
+                    foreach (var item in existing)
+                    {
+                        // Trust nothing from the native payload: drop invalid/duplicate ids.
+                        if (item != null && item.IsValid && seen.Add(item.Id))
+                            _items.Add(item);
+                    }
                 }
                 _loaded = true;
             }
@@ -160,6 +166,8 @@ namespace Playground.QuickActions
         /// <summary>The added action with this id, or null.</summary>
         public static QuickActionItem GetById(string id)
         {
+            if (string.IsNullOrEmpty(id))
+                return null;
             EnsureLoaded();
             return _items.FirstOrDefault(a => a.Id == id);
         }
@@ -184,9 +192,11 @@ namespace Playground.QuickActions
         /// <summary>Remove every quick action.</summary>
         public static void RemoveAll()
         {
-            _loaded = true; // becoming authoritative; no OS reconcile needed
-            _items.Clear();
+            // Clear the OS first; if it throws, leave our in-memory state intact so
+            // a later access reconciles with what the OS actually still has.
             Bridge.RemoveAll();
+            _items.Clear();
+            _loaded = true; // now authoritative — skip any later OS reconcile
             Log("Removed all quick actions.");
         }
 
