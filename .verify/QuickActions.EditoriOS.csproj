@@ -12,7 +12,7 @@
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <OutputType>Library</OutputType>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
-    <DefineConstants>UNITY_EDITOR;UNITY_2022_3_OR_NEWER;UNITY_IOS</DefineConstants>
+    <DefineConstants>UNITY_EDITOR;UNITY_2022_3_OR_NEWER;UNITY_IOS;QUICKACTIONS_ENABLED</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Stubs/**/*.cs" />

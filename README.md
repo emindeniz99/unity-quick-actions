@@ -40,6 +40,39 @@ More on packaging/export: [`tools/export-unitypackage.md`](./tools/export-unityp
 
 Then import the **Demo** sample from the package page to try it on a device.
 
+## Dev-only — excluding it completely from production builds
+
+The whole package is **opt-in via the `QUICKACTIONS_ENABLED` scripting define**.
+Without that define (the default), **nothing** from this package enters the
+build — not the C# assemblies, not the iOS `.mm` (so the app-delegate swizzle
+never runs), not the Android `.java`/trampoline manifest entry. Zero code, zero
+behaviour change. This is fail-safe: if you forget, production stays clean.
+
+How it's wired: every asmdef and every native plugin `.meta` carries
+`defineConstraints: [QUICKACTIONS_ENABLED]`, so Unity skips compiling/linking
+them unless the define is present.
+
+**To use it in your dev build:**
+
+1. Add `QUICKACTIONS_ENABLED` to **Project Settings ▸ Player ▸ Scripting Define
+   Symbols** — ideally only in your **dev Build Profile** (Unity 2022.3/6 Build
+   Profiles let you set per-profile defines), so your prod profile never has it.
+2. Guard your own call sites so your game still compiles when the define is off
+   and the `QuickActions` type doesn't exist:
+
+   ```csharp
+   #if QUICKACTIONS_ENABLED
+   using Playground.QuickActions;
+   ...
+   QuickActions.Add(new QuickActionItem("new_game", "New Game"));
+   #endif
+   ```
+
+A **prod build** (define absent) compiles none of this and ships none of it.
+(Want it always-on instead — e.g. for an Asset Store release? Remove the
+`defineConstraints` from the asmdefs and the plugin `.meta` files, or flip
+`tools/gen_meta.py` to emit an empty list.)
+
 ## Usage
 
 ```csharp

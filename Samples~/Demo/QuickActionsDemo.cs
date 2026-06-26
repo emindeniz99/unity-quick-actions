@@ -1,3 +1,7 @@
+// Guarded by the package's opt-in define: the QuickActions types only exist when
+// QUICKACTIONS_ENABLED is set, so the demo (compiled into Assembly-CSharp) must
+// guard its call sites the same way your own game code does. See the README.
+#if QUICKACTIONS_ENABLED
 using System.Collections.Generic;
 using Playground.QuickActions;
 using UnityEngine;
@@ -82,3 +86,4 @@ namespace Playground.QuickActions.DemoSample
         }
     }
 }
+#endif

@@ -96,7 +96,11 @@ def plugin_meta(guid: str, platform: str) -> str:
         "  serializedVersion: 2\n"
         "  iconMap: {}\n"
         "  executionOrder: {}\n"
-        "  defineConstraints: []\n"
+        # Opt-in gate: the native plugin is only compiled/linked into the build
+        # when the QUICKACTIONS_ENABLED scripting define is set (dev). Absent it
+        # (prod), the .mm/.java/manifest never enter the Xcode/Gradle project.
+        "  defineConstraints:\n"
+        "  - QUICKACTIONS_ENABLED\n"
         "  isPreloaded: 0\n"
         "  isOverridable: 0\n"
         "  isExplicitlyReferenced: 0\n"

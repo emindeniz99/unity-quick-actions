@@ -16,7 +16,8 @@
     ],
     "autoReferenced": true,
     "defineConstraints": [
-        "UNITY_ANDROID"
+        "UNITY_ANDROID",
+        "QUICKACTIONS_ENABLED"
     ],
     "versionDefines": [],
     "noEngineReferences": false

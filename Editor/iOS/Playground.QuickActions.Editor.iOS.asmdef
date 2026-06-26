@@ -16,7 +16,8 @@
     ],
     "autoReferenced": true,
     "defineConstraints": [
-        "UNITY_IOS"
+        "UNITY_IOS",
+        "QUICKACTIONS_ENABLED"
     ],
     "versionDefines": [],
     "noEngineReferences": false
