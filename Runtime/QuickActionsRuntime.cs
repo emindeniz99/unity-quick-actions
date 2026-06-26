@@ -1,3 +1,4 @@
+using System.Collections;
 using Playground.QuickActions.Internal;
 using UnityEngine;
 
@@ -10,7 +11,8 @@ namespace Playground.QuickActions
     /// Its GameObject name — "QuickActionsRuntime" — is the <c>UnitySendMessage</c>
     /// target hard-coded in the iOS native layer, so do not rename it. Delivery
     /// paths:
-    ///   * Cold launch (iOS + Android) → polled in <see cref="Awake"/>.
+    ///   * Cold launch (iOS + Android) → polled one frame after startup, so user
+    ///     scripts have had their Awake/OnEnable/Start to subscribe first.
     ///   * Android warm resume (via the trampoline activity) → polled in
     ///     <see cref="OnApplicationFocus"/>.
     ///   * iOS warm resume → native <c>UnitySendMessage</c> → <see cref="OnPerformed"/>.
@@ -21,6 +23,10 @@ namespace Playground.QuickActions
         private const string GameObjectName = "QuickActionsRuntime";
 
         private static QuickActionsRuntime _instance;
+
+        // Becomes true after the deferred cold-launch dispatch, after which focus
+        // changes are treated as warm resumes.
+        private bool _ready;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         private static void Bootstrap()
@@ -34,11 +40,24 @@ namespace Playground.QuickActions
             go.hideFlags = HideFlags.HideInHierarchy;
         }
 
-        private void Awake() => PollPending();
+        private void Awake() => StartCoroutine(DispatchColdLaunch());
+
+        private IEnumerator DispatchColdLaunch()
+        {
+            // Wait one frame so the initial scene's Awake/OnEnable/Start have run
+            // and any subscriber to QuickActions.Performed exists; otherwise the
+            // cold-launch event is raised before anyone is listening.
+            yield return null;
+            _ready = true;
+            PollPending();
+        }
 
         private void OnApplicationFocus(bool hasFocus)
         {
-            if (hasFocus)
+            // Android warm-resume arrives via the trampoline activity, which stores
+            // the id and brings Unity to the front — no UnitySendMessage. Ignore the
+            // initial focus (the cold launch is handled by DispatchColdLaunch).
+            if (hasFocus && _ready)
                 PollPending();
         }
 

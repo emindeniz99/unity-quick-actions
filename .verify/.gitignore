@@ -1,0 +1,3 @@
+# dotnet build artifacts from the verification harness — never committed.
+bin/
+obj/

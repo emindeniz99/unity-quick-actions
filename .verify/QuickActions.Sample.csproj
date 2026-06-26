@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Compile-only check of the Demo sample against the Runtime. Confirms the
+       sample's use of the API resolves (incl. the QuickActions type vs the
+       Playground.QuickActions namespace from the DemoSample sub-namespace). -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <OutputType>Library</OutputType>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <DefineConstants>UNITY_EDITOR;UNITY_2022_3_OR_NEWER;UNITY_IOS;UNITY_ANDROID</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Stubs/**/*.cs" />
+    <Compile Include="../Runtime/**/*.cs" />
+    <Compile Include="../Samples~/Demo/**/*.cs" />
+  </ItemGroup>
+</Project>

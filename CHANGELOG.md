@@ -17,3 +17,11 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   trampoline activity that works on both `UnityPlayerActivity` and
   `UnityPlayerGameActivity`.
 - `IconType` system-icon enum, Editor *About* window, and a Demo sample.
+- Static shortcuts: a **Project Settings ▸ Quick Actions** asset plus build
+  post-processors that bake shortcuts into iOS `Info.plist`
+  (`UIApplicationShortcutItems`) and Android `res/xml/shortcuts.xml` +
+  launcher-activity meta-data. Static intents reuse the trampoline via an
+  action-encoded id.
+- Unity-free verification harness (`.verify/`, `tools/verify.sh`): compiles the
+  C# against UnityEngine/UnityEditor stubs and the Android plugin against Android
+  SDK stubs. Toolchain baked into the devcontainer image.

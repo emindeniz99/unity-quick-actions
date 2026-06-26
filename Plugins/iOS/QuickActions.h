@@ -24,8 +24,11 @@ char *_QuickActions_GetLastPerformed(void);
 void _QuickActions_ResetLastPerformed(void);
 
 // Pull-and-clear the next queued performed id for the C# Performed event, or
-// NULL. malloc'd; caller frees.
+// NULL. malloc'd; caller frees via _QuickActions_FreeString.
 char *_QuickActions_ConsumePendingPerformed(void);
+
+// Frees a string returned by the getters above (paired with the native malloc).
+void _QuickActions_FreeString(char *ptr);
 
 #ifdef __cplusplus
 }

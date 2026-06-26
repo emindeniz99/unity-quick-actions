@@ -10,8 +10,12 @@ LTS and newer** (including Unity 6).
 | iOS | `UIApplicationShortcutItem` (dynamic) | iOS 9 |
 | Android | `ShortcutManager` dynamic shortcuts | API 25 (Android 7.1) |
 
-- **Runtime API** — add/remove shortcuts from C#; the OS keeps them across launches.
-- **Tap callback** — `Performed` event + `LastPerformed` for cold launches.
+- **Runtime (dynamic) API** — add/remove shortcuts from C#; the OS keeps them across launches.
+- **Static shortcuts** — configure shortcuts in **Project Settings ▸ Quick
+  Actions**; build post-processors bake them into `Info.plist` (iOS) and
+  `shortcuts.xml` (Android) so they exist on first launch.
+- **Tap callback** — `Performed` event + `LastPerformed` for cold launches —
+  identical for static and dynamic shortcuts.
 - **Zero native edits** — the iOS app delegate is hooked at load via the ObjC
   runtime; the Android trampoline activity is merged in from a plugin manifest.
 - **Version-proof Android** — a trampoline activity instead of subclassing
@@ -50,15 +54,9 @@ void Start()
         new QuickActionItem("continue", "Continue", "Resume last save", IconType.Play),
         new QuickActionItem("daily",    "Daily Reward", "Claim today",   IconType.Favorite),
     });
-
-    // Pull-based cold-launch routing (alternative to the event):
-    if (QuickActions.LastPerformed is string id)
-    {
-        Route(id);
-        QuickActions.ResetLastPerformed();
-    }
 }
 
+// Fires on every tap, including the cold launch that started the app.
 void OnShortcut(string id) => Route(id);
 ```
 
@@ -82,6 +80,22 @@ void OnShortcut(string id) => Route(id);
 `QuickActionItem`: `Id` (required, unique), `Title` (required), `Subtitle`,
 `Icon` (`IconType`, iOS system glyph), `AndroidDrawable` (optional drawable name).
 
+### Static shortcuts (baked into the build)
+
+For shortcuts that must exist on the **first** launch (before any runtime
+`Add`), open **Project Settings ▸ Quick Actions**, click *Create settings
+asset*, and add entries. At build time:
+
+- **iOS** — written into the Xcode `Info.plist` as `UIApplicationShortcutItems`
+  (`UIApplicationShortcutItemType` = your `Id`, plus title/subtitle/system icon).
+- **Android** — written to `res/xml/quickactions_shortcuts.xml` (with generated
+  string resources), and the `android.app.shortcuts` meta-data is injected into
+  the launcher activity. Each static intent targets the trampoline and encodes
+  its `Id` in the intent action (XML shortcuts can't carry extras).
+
+Taps are delivered through the same `Performed` / `LastPerformed` path as dynamic
+shortcuts. Static and dynamic shortcuts coexist; iOS shows up to four total.
+
 ## How it works
 
 - **iOS** — `Plugins/iOS/QuickActions.mm` swizzles `UnityAppController` at
@@ -103,13 +117,28 @@ shows the previously-set shortcuts) — re-register on launch if you need
 ## Limitations / roadmap
 
 See [`ROADMAP.md`](./ROADMAP.md). Notable: per-item rasterized icons from
-`Texture2D`, pinned shortcuts, and automated device CI are not implemented.
+`Texture2D`, pinned shortcuts, OS-backed `GetAll()`, and automated device CI are
+not implemented.
+
+## Verification
+
+The package is type-checked and compiled without Unity via a stub-based harness:
+
+```bash
+tools/setup.sh     # install dotnet + JDK (once; pre-baked in the devcontainer)
+tools/verify.sh    # .meta gen + C# compile (4 configs) + Android plugin compile
+```
+
+See [`.verify/README.md`](./.verify/README.md). A green run proves everything
+compiles; on-device behaviour is validated with the procedure in
+[`plans/mvp.md`](./plans/mvp.md) (iOS/Android quick actions can't run in the
+Editor or on Linux).
 
 ## Notes / learnings
 
-- Min Unity is 2022.3 LTS. The native hooks avoid editing generated
-  `UnityAppController` / `UnityPlayerActivity`, which is why no build
-  post-processor is needed.
-- This container has no Unity Editor, so the package was authored and
-  statically checked but not compiled here — see [`plans/mvp.md`](./plans/mvp.md)
-  for the device test procedure.
+- Min Unity is 2022.3 LTS. The dynamic native hooks avoid editing generated
+  `UnityAppController` / `UnityPlayerActivity`; only **static** shortcuts need
+  build post-processors (Info.plist / shortcuts.xml).
+- The iOS `.mm` is compiled by Unity against the real SDK; here it's reviewed
+  and brace/structure-checked only (no Apple SDK on Linux). The C# and Android
+  Java are fully compiled against stubs by `tools/verify.sh`.

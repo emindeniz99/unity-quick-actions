@@ -136,6 +136,12 @@ static void QAPerformActionForShortcutItem(id self, SEL _cmd, UIApplication *app
 @implementation QuickActionsAppControllerHook
 
 + (void)load {
+    // Install once. Guards against a duplicated +load capturing our own hook as
+    // the "original" IMP, which would recurse infinitely on launch.
+    static BOOL installed = NO;
+    if (installed) return;
+    installed = YES;
+
     Class cls = NSClassFromString(@"UnityAppController");
     if (cls == Nil) return;
 
@@ -199,6 +205,12 @@ char *_QuickActions_ConsumePendingPerformed(void) {
         [gQAPending removeObjectAtIndex:0];
         return QACopyCString(value);
     }
+}
+
+// Frees a string returned by the getters above (paired with malloc in
+// QACopyCString). Called from C# so the alloc/free use the same allocator.
+void _QuickActions_FreeString(char *ptr) {
+    if (ptr != NULL) free(ptr);
 }
 
 } // extern "C"

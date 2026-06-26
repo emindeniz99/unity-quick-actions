@@ -16,6 +16,7 @@ namespace Playground.QuickActions.Internal
         [DllImport("__Internal")] private static extern System.IntPtr _QuickActions_GetLastPerformed();
         [DllImport("__Internal")] private static extern void _QuickActions_ResetLastPerformed();
         [DllImport("__Internal")] private static extern System.IntPtr _QuickActions_ConsumePendingPerformed();
+        [DllImport("__Internal")] private static extern void _QuickActions_FreeString(System.IntPtr ptr);
 
         public bool IsPlatformSupported => true;
 
@@ -32,13 +33,15 @@ namespace Playground.QuickActions.Internal
 
         public string ConsumePendingPerformed() => Consume(_QuickActions_ConsumePendingPerformed());
 
-        // The native side hands back a malloc'd C string we own; copy then free.
+        // The native side hands back a malloc'd UTF-8 C string we own. Decode as
+        // UTF-8 (ids/titles may be non-ASCII) and free it with the matching native
+        // free() rather than Marshal.FreeHGlobal (allocator pairing).
         private static string Consume(System.IntPtr ptr)
         {
             if (ptr == System.IntPtr.Zero)
                 return null;
-            var value = Marshal.PtrToStringAnsi(ptr);
-            Marshal.FreeHGlobal(ptr);
+            var value = Marshal.PtrToStringUTF8(ptr);
+            _QuickActions_FreeString(ptr);
             return string.IsNullOrEmpty(value) ? null : value;
         }
     }

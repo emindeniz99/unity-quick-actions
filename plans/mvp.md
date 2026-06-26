@@ -135,3 +135,17 @@ finishes; C# reads it via `OnApplicationFocus(true)` poll and on startup.
 
 Pinned shortcuts, per-shortcut custom rasterized icons from Texture2D, Siri
 intent donation, `.unitypackage` export, automated device CI.
+
+## Addendum — what actually shipped in v0.1
+
+- **Static shortcuts were added** (originally out of scope): Project Settings
+  asset + iOS `Info.plist` and Android `shortcuts.xml`/manifest post-processors,
+  with the trampoline decoding an action-encoded id for XML shortcuts.
+- **Unity-free CI verification** (`.verify/` + `tools/verify.sh`): the C#
+  compiles against UnityEngine/UnityEditor stubs (4 configs) and the Android
+  plugin against Android SDK stubs; toolchain baked into the devcontainer. This
+  replaces the "structural lint only" plan with real compilation. The iOS `.mm`
+  remains review-only (no Apple SDK on Linux).
+- A Unity 2022.3 LTS Editor is installed under `/opt/unity` in this environment
+  for manual project smoke-testing; on-device builds still require macOS/Xcode
+  (iOS) and a licensed editor.

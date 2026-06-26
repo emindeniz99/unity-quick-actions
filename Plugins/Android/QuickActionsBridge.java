@@ -28,6 +28,11 @@ public final class QuickActionsBridge {
 
     public static final String EXTRA_ACTION_ID = "com.playground.quickactions.ACTION_ID";
 
+    // Static shortcuts declared in res/xml cannot carry intent extras, so their id
+    // is encoded as the intent action suffix: ACTION_PREFIX + "<id>". Keep in sync
+    // with the Android build post-processor.
+    public static final String ACTION_PREFIX = "com.playground.quickactions.PERFORM.";
+
     // Names of bundled drawables looked up for IconType values (index = enum int).
     // Index 0 (None) is intentionally empty. Provide drawables named
     // ic_quickaction_<name> in your project to use them.
@@ -68,12 +73,18 @@ public final class QuickActionsBridge {
             return;
         }
 
-        // Android caps the number of dynamic shortcuts; trim to the OS maximum.
-        int max = manager.getMaxShortcutCountPerActivity();
-        if (shortcuts.size() > max) {
-            shortcuts = new ArrayList<>(shortcuts.subList(0, max));
+        // The OS cap covers manifest (static) + dynamic shortcuts combined, so
+        // leave room for any static ones; otherwise setDynamicShortcuts throws.
+        int budget = manager.getMaxShortcutCountPerActivity() - manager.getManifestShortcuts().size();
+        if (budget < 0) budget = 0;
+        if (shortcuts.size() > budget) {
+            shortcuts = new ArrayList<>(shortcuts.subList(0, budget));
         }
-        manager.setDynamicShortcuts(shortcuts);
+        try {
+            manager.setDynamicShortcuts(shortcuts);
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            android.util.Log.w("QuickActions", "setDynamicShortcuts rejected", e);
+        }
     }
 
     public static void removeAll(Activity activity) {

@@ -31,9 +31,12 @@ namespace Playground.QuickActions
 
         /// <summary>
         /// Id of the quick action the app was most recently launched or resumed
-        /// from, persisted by the OS until <see cref="ResetLastPerformed"/>. Read it
-        /// during startup to route a cold launch. Null when the app was not started
-        /// from a quick action.
+        /// from, for this session; null otherwise.
+        ///
+        /// This is a <b>pull-based alternative</b> to <see cref="Performed"/> for
+        /// code that does not subscribe — do not route on both for the same tap, or
+        /// a cold launch is handled twice (the launch also raises
+        /// <see cref="Performed"/>).
         /// </summary>
         public static string LastPerformed => Bridge.GetLastPerformed();
 
@@ -42,6 +45,8 @@ namespace Playground.QuickActions
         /// <see cref="QuickActionItem.Id"/> whenever a quick action is performed —
         /// including the cold launch that started the app. Subscribe in
         /// <c>Awake</c>/<c>OnEnable</c> so the cold-launch event is not missed.
+        /// This is the recommended channel; prefer it over polling
+        /// <see cref="LastPerformed"/>.
         /// </summary>
         public static event Action<string> Performed;
 

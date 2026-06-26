@@ -16,17 +16,17 @@ namespace Playground.QuickActions.Editor
         private const string Snippet =
 @"using Playground.QuickActions;
 
+void Awake()
+{
+    // Fires on every tap, including the cold launch that started the app.
+    QuickActions.Performed += id => Debug.Log($""Tapped: {id}"");
+}
+
 void Start()
 {
-    QuickActions.Performed += id => Debug.Log($""Tapped: {id}"");
-
     QuickActions.Add(new QuickActionItem(
         id: ""new_game"", title: ""New Game"",
         subtitle: ""Start fresh"", icon: IconType.Add));
-
-    // Cold launch routing:
-    if (QuickActions.LastPerformed != null)
-        Debug.Log($""Launched from: {QuickActions.LastPerformed}"");
 }";
 
         [MenuItem("Window/Quick Actions")]

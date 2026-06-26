@@ -30,14 +30,9 @@ namespace Playground.QuickActions.DemoSample
 
         private void OnDestroy() => QuickActions.Performed -= OnPerformed;
 
-        private void Start()
-        {
-            // A cold launch is reported through Performed (subscribed in Awake) and
-            // is also readable here for pull-based routing.
-            if (!string.IsNullOrEmpty(QuickActions.LastPerformed))
-                Add($"Launched from '{QuickActions.LastPerformed}'");
-        }
-
+        // A cold launch is reported through Performed (subscribed in Awake); this
+        // demo routes everything through that one channel. LastPerformed is shown
+        // in the on-screen label as the pull-based alternative.
         private void OnPerformed(string id) => Add($"Performed '{id}'");
 
         private void Add(string line)
