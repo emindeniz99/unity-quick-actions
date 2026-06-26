@@ -15,6 +15,11 @@ namespace Playground.QuickActions
     /// one, <see cref="Performed"/> fires with its <see cref="QuickActionItem.Id"/>,
     /// and <see cref="LastPerformed"/> holds the id the app was last launched from
     /// (poll it at startup for cold launches).
+    ///
+    /// This is a process-wide singleton (one shortcut set per app). The in-memory
+    /// list reflects only what was added <i>this session</i> — the OS retains the
+    /// actual shortcuts across restarts, so re-register on launch if you rely on
+    /// <see cref="GetAll"/> / <see cref="IsAdded"/> after a cold start.
     /// </summary>
     public static class QuickActions
     {
@@ -150,6 +155,13 @@ namespace Playground.QuickActions
             Log($"Performed quick action '{actionId}'.");
             Performed?.Invoke(actionId);
         }
+
+        /// <summary>
+        /// Pull-and-clear the next queued "performed" id from the shared bridge.
+        /// Used by <see cref="QuickActionsRuntime"/> so there is a single bridge
+        /// instance (the platform bridges are stateless; native state is global).
+        /// </summary>
+        internal static string ConsumeNextPending() => Bridge.ConsumePendingPerformed();
 
         private static void Push() => Bridge.SetShortcuts(_items);
 

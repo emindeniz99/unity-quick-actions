@@ -1,5 +1,4 @@
 using System.Collections;
-using Playground.QuickActions.Internal;
 using UnityEngine;
 
 namespace Playground.QuickActions
@@ -67,10 +66,10 @@ namespace Playground.QuickActions
         private static void PollPending()
         {
             // Drain the native queue: a cold launch (and Android warm resume) may
-            // have more than one id buffered before scripting was ready.
-            var bridge = QuickActionsBridgeFactory.Create();
+            // have more than one id buffered before scripting was ready. Goes
+            // through the shared QuickActions bridge (single instance).
             string id;
-            while (!string.IsNullOrEmpty(id = bridge.ConsumePendingPerformed()))
+            while (!string.IsNullOrEmpty(id = QuickActions.ConsumeNextPending()))
                 QuickActions.Dispatch(id);
         }
     }
