@@ -81,6 +81,8 @@ public final class QuickActionsBridge {
             int budget = manager.getMaxShortcutCountPerActivity() - manager.getManifestShortcuts().size();
             if (budget < 0) budget = 0;
             if (shortcuts.size() > budget) {
+                android.util.Log.w("QuickActions", "Trimmed dynamic shortcuts to fit the OS cap: kept "
+                        + budget + " of " + shortcuts.size() + " (static/manifest shortcuts share the cap)");
                 shortcuts = new ArrayList<>(shortcuts.subList(0, budget));
             }
             manager.setDynamicShortcuts(shortcuts);

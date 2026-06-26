@@ -225,11 +225,10 @@ char *_QuickActions_ConsumePendingPerformed(void) {
     }
 }
 
-// Serializes the OS's current shortcut items as {"items":[...]} so the managed
-// layer can reconcile after a cold start. Icons can't be read back from
-// UIApplicationShortcutItem, so Icon is reported as 0 (None). Called on the main
-// thread (Unity scripting thread).
-char *_QuickActions_GetShortcutsJson(void) {
+// Builds {"items":[...]} from the OS's current *dynamic* shortcut items (static
+// Info.plist items are not surfaced by shortcutItems). Icons can't be read back,
+// so Icon is reported as 0 (None). Must run on the main thread (UIApplication).
+static char *QABuildShortcutsJson(void) {
     NSArray<UIApplicationShortcutItem *> *items = [UIApplication sharedApplication].shortcutItems;
     NSMutableArray *out = [NSMutableArray array];
     for (UIApplicationShortcutItem *item in items) {
@@ -246,6 +245,15 @@ char *_QuickActions_GetShortcutsJson(void) {
     if (data != nil)
         json = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
     return QACopyCString(json);
+}
+
+// Reads the dynamic shortcuts, marshalling onto the main thread (UIApplication is
+// main-thread-only) — symmetric with the QARunOnMain-guarded writers.
+char *_QuickActions_GetShortcutsJson(void) {
+    if ([NSThread isMainThread]) return QABuildShortcutsJson();
+    __block char *result = NULL;
+    dispatch_sync(dispatch_get_main_queue(), ^{ result = QABuildShortcutsJson(); });
+    return result;
 }
 
 // Frees a string returned by the getters above (paired with malloc in

@@ -177,12 +177,24 @@ namespace Playground.QuickActions.Editor
 
         private static string Escape(string value)
         {
-            return value
-                .Replace("&", "&amp;")
-                .Replace("<", "&lt;")
-                .Replace(">", "&gt;")
-                .Replace("\"", "&quot;")
-                .Replace("'", "&apos;");
+            var sb = new StringBuilder(value.Length);
+            foreach (var c in value)
+            {
+                // Drop XML-1.0-illegal control chars (also keeps the action-encoded
+                // id single-line so the trampoline's prefix match stays intact).
+                if (c < 0x20)
+                    continue;
+                switch (c)
+                {
+                    case '&': sb.Append("&amp;"); break;
+                    case '<': sb.Append("&lt;"); break;
+                    case '>': sb.Append("&gt;"); break;
+                    case '"': sb.Append("&quot;"); break;
+                    case '\'': sb.Append("&apos;"); break;
+                    default: sb.Append(c); break;
+                }
+            }
+            return sb.ToString();
         }
     }
 }

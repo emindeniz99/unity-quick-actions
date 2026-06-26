@@ -1,1 +1,5 @@
-package android.util; public class Log { public static int w(String t,String m,Throwable e){return 0;} }
+package android.util;
+public class Log {
+  public static int w(String t, String m){return 0;}
+  public static int w(String t, String m, Throwable e){return 0;}
+}

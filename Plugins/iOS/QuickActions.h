@@ -16,8 +16,8 @@ void _QuickActions_SetShortcuts(const char *json);
 // Clear all dynamic shortcut items.
 void _QuickActions_RemoveAll(void);
 
-// Id the app was last launched/resumed from (persisted), or NULL.
-// Returns a malloc'd C string the caller frees (C# Marshal.FreeHGlobal).
+// Id the app was last launched/resumed from (this session), or NULL.
+// malloc'd; caller frees via _QuickActions_FreeString.
 char *_QuickActions_GetLastPerformed(void);
 
 // Clear the persisted "last performed" id.

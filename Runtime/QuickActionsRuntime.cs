@@ -19,8 +19,11 @@ namespace Playground.QuickActions
 
         private static QuickActionsRuntime _instance;
 
-        // Becomes true after the deferred cold-launch dispatch, after which focus
-        // changes are treated as warm resumes.
+        // Set after the one-frame cold-launch dispatch. Gating focus/pause on it
+        // prevents draining the cold-launch id before user scripts have subscribed
+        // (the initial focus fires during startup, before Awake/Start run). The
+        // coroutine always completes on this DontDestroyOnLoad object, so this is
+        // not a delivery single-point-of-failure in practice.
         private bool _ready;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]

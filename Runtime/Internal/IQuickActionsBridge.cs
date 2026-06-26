@@ -38,10 +38,10 @@ namespace Playground.QuickActions.Internal
         string ConsumePendingPerformed();
 
         /// <summary>
-        /// The shortcuts the OS currently has installed (set in a previous session
-        /// too). Lets the managed layer reconcile its in-memory list after a cold
-        /// start. Icons are not recoverable, so they come back as
-        /// <see cref="IconType.None"/>.
+        /// The <b>dynamic</b> shortcuts the OS currently has (set in a previous
+        /// session too); static/build-time shortcuts are not included on either
+        /// platform. Lets the managed layer reconcile its list after a cold start.
+        /// Icons are not recoverable, so they come back as <see cref="IconType.None"/>.
         /// </summary>
         IList<QuickActionItem> GetShortcuts();
     }

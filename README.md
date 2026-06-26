@@ -100,6 +100,9 @@ asset*, and add entries. At build time:
 
 Taps are delivered through the same `Performed` / `LastPerformed` path as dynamic
 shortcuts. Static and dynamic shortcuts coexist; iOS shows up to four total.
+Note: static shortcuts are **not** surfaced by the runtime query API —
+`GetAll()`/`IsAdded()` see only dynamic shortcuts, so don't reuse a static
+shortcut's `Id` in a runtime `Add()` (it would create a duplicate).
 
 ## How it works
 

@@ -16,35 +16,51 @@ namespace Playground.QuickActions
     /// and <see cref="LastPerformed"/> holds the id the app was last launched from
     /// (poll it at startup for cold launches).
     ///
-    /// This is a process-wide singleton (one shortcut set per app). On first
-    /// access the in-memory list is reconciled with the shortcuts the OS already
-    /// has (from a previous session), so <see cref="GetAll"/> / <see cref="IsAdded"/>
-    /// stay accurate across launches. Icons are not recoverable from the OS, so
-    /// reconciled items come back with <see cref="IconType.None"/>.
+    /// This is a process-wide singleton (one shortcut set per app). Call its API
+    /// from the <b>main thread</b> only (it is not internally synchronized). On
+    /// first access the in-memory list is reconciled with the <b>dynamic</b>
+    /// shortcuts the OS already has (from a previous session), so
+    /// <see cref="GetAll"/> / <see cref="IsAdded"/> stay accurate across launches;
+    /// icons aren't recoverable, so reconciled items report <see cref="IconType.None"/>.
+    /// Static (build-time) shortcuts are <i>not</i> reconciled — don't reuse a
+    /// static shortcut's id at runtime. The first <see cref="Add"/> therefore
+    /// merges with the reconciled set; call <see cref="RemoveAll"/> first to start
+    /// from a clean slate.
     /// </summary>
     public static class QuickActions
     {
         private static IQuickActionsBridge _bridge;
         private static readonly List<QuickActionItem> _items = new List<QuickActionItem>();
         private static bool _loaded;
+        private static bool _loading;
 
         private static IQuickActionsBridge Bridge => _bridge ??= QuickActionsBridgeFactory.Create();
 
         /// <summary>
-        /// On first list access, seed the in-memory set from the shortcuts the OS
-        /// already has (set in a previous session), so <see cref="GetAll"/> /
-        /// <see cref="IsAdded"/> are accurate after a cold start.
+        /// On first list access, seed the in-memory set from the <b>dynamic</b>
+        /// shortcuts the OS already has (set in a previous session), so
+        /// <see cref="GetAll"/> / <see cref="IsAdded"/> are accurate after a cold
+        /// start. Static (build-time) shortcuts are not surfaced here. Marks loaded
+        /// only on success, and guards against re-entrancy from the bridge call.
         /// </summary>
         private static void EnsureLoaded()
         {
-            if (_loaded)
+            if (_loaded || _loading)
                 return;
-            _loaded = true;
-            var existing = Bridge.GetShortcuts();
-            if (existing != null && existing.Count > 0)
+            _loading = true;
+            try
             {
-                _items.Clear();
-                _items.AddRange(existing);
+                var existing = Bridge.GetShortcuts();
+                if (existing != null && existing.Count > 0)
+                {
+                    _items.Clear();
+                    _items.AddRange(existing);
+                }
+                _loaded = true;
+            }
+            finally
+            {
+                _loading = false;
             }
         }
 
