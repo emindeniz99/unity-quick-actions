@@ -18,6 +18,12 @@ namespace Playground.QuickActions.DemoSample
         private readonly List<string> _log = new List<string>();
         private Vector2 _scroll;
 
+        // Cache LastPerformed instead of reading it in OnGUI: IMGUI calls OnGUI
+        // several times per frame and each LastPerformed read round-trips through the
+        // native bridge (a string marshal). It only changes on launch/resume, so
+        // refresh it once at startup and whenever a tap arrives.
+        private string _lastPerformed;
+
         private static readonly QuickActionItem[] Catalog =
         {
             new QuickActionItem("new_game", "New Game", "Start fresh", IconType.Add),
@@ -30,6 +36,7 @@ namespace Playground.QuickActions.DemoSample
         {
             QuickActions.LoggingEnable = true;
             QuickActions.Performed += OnPerformed;
+            _lastPerformed = QuickActions.LastPerformed; // cold-launch value, read once
         }
 
         private void OnDestroy() => QuickActions.Performed -= OnPerformed;
@@ -37,7 +44,11 @@ namespace Playground.QuickActions.DemoSample
         // A cold launch is reported through Performed (subscribed in Awake); this
         // demo routes everything through that one channel. LastPerformed is shown
         // in the on-screen label as the pull-based alternative.
-        private void OnPerformed(string id) => Add($"Performed '{id}'");
+        private void OnPerformed(string id)
+        {
+            _lastPerformed = id;
+            Add($"Performed '{id}'");
+        }
 
         private void Add(string line)
         {
@@ -51,7 +62,7 @@ namespace Playground.QuickActions.DemoSample
             using (new GUILayout.AreaScope(new Rect(pad, pad, Screen.width - pad * 2, Screen.height - pad * 2)))
             {
                 GUILayout.Label($"Quick Actions Demo   supported={QuickActions.IsPlatformSupported}");
-                GUILayout.Label($"LastPerformed: {QuickActions.LastPerformed ?? "(none)"}");
+                GUILayout.Label($"LastPerformed: {_lastPerformed ?? "(none)"}");
 
                 GUILayout.Space(8);
                 if (GUILayout.Button("Add 3 shortcuts", GUILayout.Height(56)))
@@ -71,6 +82,7 @@ namespace Playground.QuickActions.DemoSample
                 if (GUILayout.Button("Reset LastPerformed", GUILayout.Height(56)))
                 {
                     QuickActions.ResetLastPerformed();
+                    _lastPerformed = null;
                     Add("Reset LastPerformed");
                 }
 

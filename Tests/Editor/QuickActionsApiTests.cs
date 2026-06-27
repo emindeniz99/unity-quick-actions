@@ -118,6 +118,20 @@ namespace Playground.QuickActions.Tests
         }
 
         [Test]
+        public void GetAll_PreservesInsertionOrder()
+        {
+            // Shortcut order is user-visible (it's the order pushed to the OS), so pin
+            // the sequence with AreEqual — most other tests use AreEquivalent and would
+            // not catch a reorder regression.
+            QuickActions.Add(Item("z"));
+            QuickActions.Add(Item("a"));
+            QuickActions.AddList(new List<QuickActionItem> { Item("m"), Item("b") });
+            CollectionAssert.AreEqual(
+                new[] { "z", "a", "m", "b" },
+                QuickActions.GetAll().ConvertAll(i => i.Id));
+        }
+
+        [Test]
         public void GetAll_ReturnsCopy_NotInternalList()
         {
             QuickActions.Add(Item("a"));
