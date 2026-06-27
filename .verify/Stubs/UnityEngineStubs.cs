@@ -11,6 +11,7 @@ namespace UnityEngine
         public HideFlags hideFlags;
         public static void DontDestroyOnLoad(Object target) { }
         public static void Destroy(Object obj) { }
+        public static void DestroyImmediate(Object obj) { }
     }
 
     public class Component : Object { }
@@ -153,5 +154,10 @@ namespace UnityEngine
         public T Call<T>(string methodName, params object[] args) => default;
         public void Call(string methodName, params object[] args) { }
         public void Dispose() { }
+    }
+
+    public class AndroidJavaException : System.Exception
+    {
+        public AndroidJavaException(string message) : base(message) { }
     }
 }

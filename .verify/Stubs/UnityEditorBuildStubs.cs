@@ -13,6 +13,8 @@ namespace UnityEditor
         public static T LoadAssetAtPath<T>(string path) where T : UnityEngine.Object => null;
         public static void CreateAsset(UnityEngine.Object asset, string path) { }
         public static void SaveAssets() { }
+        public static bool IsValidFolder(string path) => false;
+        public static string CreateFolder(string parent, string newFolderName) => string.Empty;
     }
 
     public static class PlayerSettings
@@ -30,13 +32,16 @@ namespace UnityEditor
         public string label;
         public IEnumerable<string> keywords;
         public Action<string> guiHandler;
+        public Action deactivateHandler;
         public SettingsProvider(string path, SettingsScope scopes) { }
     }
 
     [AttributeUsage(AttributeTargets.Method)]
     public sealed class SettingsProviderAttribute : Attribute { }
 
-    public class Editor
+    // Real UnityEditor.Editor is a ScriptableObject (→ UnityEngine.Object), so
+    // Object.DestroyImmediate(editor) is valid; mirror that here.
+    public class Editor : UnityEngine.Object
     {
         public static Editor CreateEditor(UnityEngine.Object obj) => new Editor();
         public static void CreateCachedEditor(UnityEngine.Object obj, Type editorType, ref Editor previousEditor)
@@ -93,6 +98,7 @@ namespace UnityEditor.iOS.Xcode
         public void WriteToFile(string path) { }
         public string GetUnityFrameworkTargetGuid() => string.Empty;
         public void AddBuildProperty(string targetGuid, string name, string value) { }
+        public string GetBuildPropertyForAnyConfig(string targetGuid, string name) => string.Empty;
     }
 
     public class PlistDocument

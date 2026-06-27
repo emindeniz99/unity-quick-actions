@@ -98,8 +98,11 @@ def plugin_meta(guid: str, platform: str) -> str:
         "  executionOrder: {}\n"
         # NOTE: Unity ignores defineConstraints on NATIVE plugins (it only honors
         # them for managed/asmdef code). The QUICKACTIONS_ENABLED gate for native
-        # plugins is instead enforced at build time by QuickActionsNativeGate
-        # (Editor/Gate/), which toggles per-platform compatibility. Keep this empty.
+        # plugins is instead enforced at build-output level: the iOS .mm is wrapped
+        # in #if QUICKACTIONS_ENABLED and Editor/iOS/QuickActionsEnableMacroiOS adds
+        # the macro to the Xcode project only when enabled; Editor/NativeGate/
+        # QuickActionsTrampolineStripperAndroid strips the trampoline <activity>
+        # from the manifest when disabled. Keep this empty.
         "  defineConstraints: []\n"
         "  isPreloaded: 0\n"
         "  isOverridable: 0\n"

@@ -23,8 +23,11 @@ if command -v dotnet >/dev/null 2>&1; then
   export DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_NOLOGO=1
   for proj in Editor EditoriOS EditorAndroid NativeGate iOS Android Sample; do
     echo "-- QuickActions.$proj.csproj"
-    if ! dotnet build "$VERIFY/QuickActions.$proj.csproj" -v q -nologo \
-         | grep -Ev '^\s*$|Determining|Restored '; then fail=1; fi
+    # Decide pass/fail on dotnet's exit code, not on whether grep matched output
+    # (a quieter dotnet could otherwise mark a clean build FAIL).
+    out="$(dotnet build "$VERIFY/QuickActions.$proj.csproj" -v q -nologo 2>&1)"; rc=$?
+    echo "$out" | grep -Ev '^\s*$|Determining|Restored ' || true
+    if [ "$rc" -ne 0 ]; then fail=1; fi
   done
 else
   echo "!! dotnet not found — run tools/setup.sh first"; fail=1
@@ -33,8 +36,9 @@ fi
 echo
 echo "== 3/4  C# unit tests (dotnet test) =="
 if command -v dotnet >/dev/null 2>&1; then
-  if ! dotnet test "$VERIFY/QuickActions.Tests.csproj" -v q --nologo \
-       | grep -E 'Passed!|Failed!|error|Passed:|Failed:'; then fail=1; fi
+  out="$(dotnet test "$VERIFY/QuickActions.Tests.csproj" -v q --nologo 2>&1)"; rc=$?
+  echo "$out" | grep -E 'Passed!|Failed!|error|Passed:|Failed:' || true
+  if [ "$rc" -ne 0 ]; then fail=1; fi
 else
   echo "!! dotnet not found — run tools/setup.sh first"; fail=1
 fi

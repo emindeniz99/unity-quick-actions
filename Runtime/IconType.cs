@@ -4,11 +4,14 @@ namespace Playground.QuickActions
     /// Built-in icon for a quick action.
     ///
     /// On <b>iOS</b> each value maps to a <c>UIApplicationShortcutIconType</c>
-    /// system glyph. On <b>Android</b> there is no system shortcut-icon catalog,
-    /// so the icon is taken from a bundled drawable named
-    /// <c>ic_quickaction_&lt;value&gt;</c> (lower-case) when present, otherwise the
-    /// app icon is used. See <see cref="QuickActionItem.AndroidDrawable"/> to
-    /// override the Android drawable explicitly.
+    /// system glyph. On <b>Android</b> there is no system shortcut-icon catalog, so
+    /// the icon is taken from a bundled drawable named
+    /// <c>ic_quickaction_&lt;snake_case&gt;</c> — the enum member lower-cased with
+    /// underscores between words, e.g. <see cref="MarkLocation"/> →
+    /// <c>ic_quickaction_mark_location</c>, <see cref="Play"/> →
+    /// <c>ic_quickaction_play</c> (the exact names in the Java <c>ICON_NAMES</c>
+    /// table). When the drawable is absent the app icon is used. See
+    /// <see cref="QuickActionItem.AndroidDrawable"/> to override it explicitly.
     /// </summary>
     // The integer values are a load-bearing contract: the iOS native layer casts
     // (value - 1) to UIApplicationShortcutIconType, and the Android side indexes

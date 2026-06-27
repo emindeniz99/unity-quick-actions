@@ -61,9 +61,19 @@ namespace Playground.QuickActions.Internal
         {
             if (!IsPlatformSupported)
                 return new List<QuickActionItem>();
-            using (var bridge = new AndroidJavaClass(BridgeClass))
-            using (var activity = CurrentActivity())
-                return QuickActionList.Parse(bridge.CallStatic<string>("getShortcutsJson", activity));
+            try
+            {
+                using (var bridge = new AndroidJavaClass(BridgeClass))
+                using (var activity = CurrentActivity())
+                    return QuickActionList.Parse(bridge.CallStatic<string>("getShortcutsJson", activity));
+            }
+            catch (AndroidJavaException e)
+            {
+                // Defense in depth: the Java side already guards, but never let a
+                // JNI exception escape into the facade's first-access reconcile.
+                Debug.LogWarning("[QuickActions] GetShortcuts failed: " + e.Message);
+                return new List<QuickActionItem>();
+            }
         }
 
         private static string CallStringStatic(string method)

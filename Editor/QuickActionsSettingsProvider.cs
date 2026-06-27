@@ -46,6 +46,16 @@ namespace Playground.QuickActions.Editor
                     var problem = Validate(settings);
                     if (problem != null)
                         EditorGUILayout.HelpBox(problem, MessageType.Warning);
+                },
+                deactivateHandler = () =>
+                {
+                    // Don't leak the cached inspector (and avoid GUI on a destroyed
+                    // target after the page closes), matching AssetSettingsProvider.
+                    if (_cachedEditor != null)
+                    {
+                        Object.DestroyImmediate(_cachedEditor);
+                        _cachedEditor = null;
+                    }
                 }
             };
         }

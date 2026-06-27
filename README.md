@@ -268,7 +268,12 @@ startup (cold) and on regained focus (warm) — no `UnitySendMessage`. The C# la
 owns the authoritative list and pushes the full set to the OS on every change;
 on first access it **reconciles** that list with the shortcuts the OS already has
 (from a previous session), so `GetAll()`/`IsAdded()` are accurate across launches
-(icons excepted).
+(icons excepted; on Android a reconciled item with no subtitle reports its title
+as the subtitle, since the OS stores only the long label).
+
+If you add more shortcuts than the OS shows (iOS caps at 4 total), the overflow is
+dropped: iOS lets the OS pick; Android keeps the **first** N you added (by insertion
+order) and logs the rest. Keep your most important shortcuts first.
 
 ## Security: a shortcut tap is not an authenticated action
 

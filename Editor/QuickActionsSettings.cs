@@ -48,10 +48,30 @@ namespace Playground.QuickActions.Editor
                 return existing;
 
             var settings = CreateInstance<QuickActionsSettings>();
-            Directory.CreateDirectory(Path.GetDirectoryName(DefaultAssetPath));
+            // Create the folder through the AssetDatabase (not Directory.Create
+            // Directory, which it doesn't know about) so CreateAsset persists on a
+            // clean project where Assets/QuickActions doesn't exist yet.
+            EnsureAssetFolder(Path.GetDirectoryName(DefaultAssetPath));
             AssetDatabase.CreateAsset(settings, DefaultAssetPath);
             AssetDatabase.SaveAssets();
             return settings;
+        }
+
+        // Create every missing folder segment under "Assets/" via the AssetDatabase.
+        private static void EnsureAssetFolder(string folder)
+        {
+            folder = folder.Replace('\\', '/');
+            if (AssetDatabase.IsValidFolder(folder))
+                return;
+            var parts = folder.Split('/');
+            var current = parts[0]; // "Assets"
+            for (var i = 1; i < parts.Length; i++)
+            {
+                var next = current + "/" + parts[i];
+                if (!AssetDatabase.IsValidFolder(next))
+                    AssetDatabase.CreateFolder(current, parts[i]);
+                current = next;
+            }
         }
     }
 }

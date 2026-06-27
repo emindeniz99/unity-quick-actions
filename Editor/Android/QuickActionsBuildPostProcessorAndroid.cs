@@ -58,10 +58,34 @@ namespace Playground.QuickActions.Editor
                 return;
             }
 
-            var appId = PlayerSettings.applicationIdentifier;
+            var appId = ResolveApplicationId(path);
             WriteResources(moduleDir, settings, appId);
             InjectMetaData(manifestPath);
             Debug.Log($"[QuickActions] Wrote {settings.StaticShortcuts.Count} static shortcut(s) to the Android project.");
+        }
+
+        // The static intent targets the trampoline by explicit package+class, so it
+        // must use the REAL shipping applicationId. A Gradle `applicationId` override
+        // (common in prod / flavors) isn't reflected by PlayerSettings, so prefer the
+        // launcher module's build.gradle value and only fall back to the Player setting.
+        private static string ResolveApplicationId(string unityLibraryPath)
+        {
+            try
+            {
+                var gradle = Path.GetFullPath(Path.Combine(unityLibraryPath, "..", "launcher", "build.gradle"));
+                if (File.Exists(gradle))
+                {
+                    var m = System.Text.RegularExpressions.Regex.Match(
+                        File.ReadAllText(gradle), @"applicationId\s+['""]([^'""]+)['""]");
+                    if (m.Success)
+                        return m.Groups[1].Value;
+                }
+            }
+            catch
+            {
+                // fall through to the Player setting
+            }
+            return PlayerSettings.applicationIdentifier;
         }
 
         private static bool HasLauncherActivity(string manifestPath)

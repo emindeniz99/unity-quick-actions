@@ -28,9 +28,19 @@ namespace Playground.QuickActions.Editor
 
             // QuickActions.mm compiles into the UnityFramework target.
             var target = project.GetUnityFrameworkTargetGuid();
+            // Idempotent: an "Append" build re-runs post-processing over the existing
+            // Xcode project, so don't add the macro twice. AddBuildProperty appends
+            // (unlike the plist writer), so guard on the current value first.
+            var existing = project.GetBuildPropertyForAnyConfig(target, "GCC_PREPROCESSOR_DEFINITIONS") ?? "";
+            if (existing.Contains("QUICKACTIONS_ENABLED=1"))
+            {
+                project.WriteToFile(projectPath);
+                return;
+            }
             // Keep any project-/xcconfig-level defines (Unity sets several on this
             // target) before appending ours, so we extend rather than shadow them.
-            project.AddBuildProperty(target, "GCC_PREPROCESSOR_DEFINITIONS", "$(inherited)");
+            if (!existing.Contains("$(inherited)"))
+                project.AddBuildProperty(target, "GCC_PREPROCESSOR_DEFINITIONS", "$(inherited)");
             project.AddBuildProperty(target, "GCC_PREPROCESSOR_DEFINITIONS", "QUICKACTIONS_ENABLED=1");
 
             project.WriteToFile(projectPath);

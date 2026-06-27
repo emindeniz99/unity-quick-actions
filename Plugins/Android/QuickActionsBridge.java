@@ -130,20 +130,27 @@ public final class QuickActionsBridge {
         if (activity != null && Build.VERSION.SDK_INT >= 25) {
             ShortcutManager manager = activity.getSystemService(ShortcutManager.class);
             if (manager != null) {
-                for (ShortcutInfo s : manager.getDynamicShortcuts()) {
-                    try {
-                        JSONObject o = new JSONObject();
-                        o.put("Id", s.getId());
-                        CharSequence shortLabel = s.getShortLabel();
-                        CharSequence longLabel = s.getLongLabel();
-                        o.put("Title", shortLabel == null ? "" : shortLabel.toString());
-                        o.put("Subtitle", longLabel == null ? "" : longLabel.toString());
-                        o.put("Icon", 0);
-                        o.put("AndroidDrawable", "");
-                        items.put(o);
-                    } catch (Exception e) {
-                        android.util.Log.w("QuickActions", "Failed to read shortcut", e);
+                try {
+                    // getDynamicShortcuts itself can throw IllegalStateException
+                    // (e.g. a locked/background device) — keep it inside the guard
+                    // so nothing crosses JNI; reconcile with whatever we collected.
+                    for (ShortcutInfo s : manager.getDynamicShortcuts()) {
+                        try {
+                            JSONObject o = new JSONObject();
+                            o.put("Id", s.getId());
+                            CharSequence shortLabel = s.getShortLabel();
+                            CharSequence longLabel = s.getLongLabel();
+                            o.put("Title", shortLabel == null ? "" : shortLabel.toString());
+                            o.put("Subtitle", longLabel == null ? "" : longLabel.toString());
+                            o.put("Icon", 0);
+                            o.put("AndroidDrawable", "");
+                            items.put(o);
+                        } catch (Exception e) {
+                            android.util.Log.w("QuickActions", "Failed to read shortcut", e);
+                        }
                     }
+                } catch (RuntimeException e) {
+                    android.util.Log.w("QuickActions", "getDynamicShortcuts failed", e);
                 }
             }
         }

@@ -1,8 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!-- Mirrors the Editor.iOS asmdef in isolation: compiles the iOS post-processor
-       with ONLY UNITY_IOS defined and WITHOUT the Android post-processor present,
-       catching accidental cross-platform coupling. (The actual extension-DLL
-       resolution is still Unity-only — stubs stand in here.) -->
+       with ONLY UNITY_IOS defined and WITHOUT the Android post-processor or the
+       Android-only NativeGate stripper present, catching accidental cross-platform
+       coupling. (The actual extension-DLL resolution is still Unity-only — stubs
+       stand in here.) -->
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <LangVersion>9.0</LangVersion>
@@ -17,6 +18,6 @@
   <ItemGroup>
     <Compile Include="Stubs/**/*.cs" />
     <Compile Include="../Runtime/**/*.cs" />
-    <Compile Include="../Editor/**/*.cs" Exclude="../Editor/Android/**/*.cs" />
+    <Compile Include="../Editor/**/*.cs" Exclude="../Editor/Android/**/*.cs;../Editor/NativeGate/**/*.cs" />
   </ItemGroup>
 </Project>

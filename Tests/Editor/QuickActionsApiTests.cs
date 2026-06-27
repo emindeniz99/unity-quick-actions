@@ -313,6 +313,34 @@ namespace Playground.QuickActions.Tests
             finally { QuickActions.OverrideBridgeForTesting(null); }
         }
 
+        [Test]
+        public void Drain_DeliversBufferedIdsInOrderExactlyOnce()
+        {
+            // Exercises the real delivery invariant that QuickActionsRuntime.PollPending
+            // relies on: ConsumeNextPending drains the native queue, each id dispatched
+            // once, in order, and a second drain yields nothing. (The MonoBehaviour pump
+            // is Unity-only; this drives the same loop over its building blocks.)
+            var fake = new QueueBridge(new[] { "a", "b", "c" });
+            QuickActions.OverrideBridgeForTesting(fake);
+            var received = new List<string>();
+            void Handler(string id) => received.Add(id);
+            QuickActions.Performed += Handler;
+            try
+            {
+                string id;
+                while (!string.IsNullOrEmpty(id = QuickActions.ConsumeNextPending()))
+                    QuickActions.Dispatch(id);
+
+                CollectionAssert.AreEqual(new[] { "a", "b", "c" }, received); // order pinned, not just set
+                Assert.IsNull(QuickActions.ConsumeNextPending());             // consumed exactly once
+            }
+            finally
+            {
+                QuickActions.Performed -= Handler;
+                QuickActions.OverrideBridgeForTesting(null);
+            }
+        }
+
         private sealed class FakeBridge : IQuickActionsBridge
         {
             public readonly List<QuickActionItem> Shortcuts = new List<QuickActionItem>();
@@ -329,6 +357,20 @@ namespace Playground.QuickActions.Tests
             public void ResetLastPerformed() { }
             public string ConsumePendingPerformed() => null;
             public IList<QuickActionItem> GetShortcuts() => new List<QuickActionItem>(Shortcuts);
+        }
+
+        // A bridge that hands back a scripted queue of pending ids (cold-launch buffer).
+        private sealed class QueueBridge : IQuickActionsBridge
+        {
+            private readonly Queue<string> _pending;
+            public QueueBridge(IEnumerable<string> ids) => _pending = new Queue<string>(ids);
+            public bool IsPlatformSupported => true;
+            public void SetShortcuts(IList<QuickActionItem> items) { }
+            public void RemoveAll() { }
+            public string GetLastPerformed() => null;
+            public void ResetLastPerformed() { }
+            public string ConsumePendingPerformed() => _pending.Count > 0 ? _pending.Dequeue() : null;
+            public IList<QuickActionItem> GetShortcuts() => new List<QuickActionItem>();
         }
 
         // A bridge whose RemoveAll throws, to verify RemoveAll's OS-first ordering.
