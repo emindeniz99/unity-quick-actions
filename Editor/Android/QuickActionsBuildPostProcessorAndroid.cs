@@ -225,6 +225,8 @@ namespace Playground.QuickActions.Editor
         // escaping: after aapt2 parses the XML, a bare apostrophe or double-quote is
         // a span delimiter and a leading '@'/'?' is a resource reference — all break
         // the build. (formatted="false" on the element neutralizes a literal '%'.)
+        // Note: aapt trims leading/trailing whitespace from the value; intentional
+        // edge whitespace in a title is not preserved (rare; not quote-wrapped here).
         private static string EscapeResValue(string value)
         {
             var sb = new StringBuilder(value.Length);

@@ -32,7 +32,13 @@ INCLUDE_DIRS = [
     ("Runtime", "Runtime"),
     ("Editor", "Editor"),
     ("Plugins", "Plugins"),
-    ("Samples~/Demo", "Example"),   # samples become a plain Example folder
+    # Samples become a plain Example folder. NOTE: the remapped files keep their
+    # original Samples~/Demo .meta GUIDs (so the demo scene's script reference still
+    # resolves). That means this .unitypackage's Example/ assets share GUIDs with the
+    # UPM package's Samples~/Demo — harmless because you install via ONE delivery
+    # method; don't import both the UPM package and this .unitypackage into the same
+    # project, or those few sample GUIDs would collide.
+    ("Samples~/Demo", "Example"),
 ]
 INCLUDE_FILES = ["README.md", "CHANGELOG.md", "LICENSE.md", "ROADMAP.md"]
 
