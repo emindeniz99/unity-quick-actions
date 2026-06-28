@@ -118,6 +118,49 @@ namespace Playground.QuickActions.Tests
         }
 
         [Test]
+        public void GetById_ReturnsMatch_NullForMissingOrNullOrEmpty()
+        {
+            QuickActions.Add(Item("a", "Alpha"));
+            Assert.AreEqual("Alpha", QuickActions.GetById("a").Title);
+            Assert.IsNull(QuickActions.GetById("missing"));
+            Assert.IsNull(QuickActions.GetById(null));
+            Assert.IsNull(QuickActions.GetById(""));
+        }
+
+        [Test]
+        public void LastPerformed_ReflectsBridgeValue()
+        {
+            var fake = new LastPerformedBridge { Last = "boot_id" };
+            QuickActions.OverrideBridgeForTesting(fake);
+            try { Assert.AreEqual("boot_id", QuickActions.LastPerformed); }
+            finally { QuickActions.OverrideBridgeForTesting(null); }
+        }
+
+        [Test]
+        public void ResetLastPerformed_ClearsViaBridge()
+        {
+            var fake = new LastPerformedBridge { Last = "x" };
+            QuickActions.OverrideBridgeForTesting(fake);
+            try
+            {
+                QuickActions.ResetLastPerformed();
+                Assert.AreEqual(1, fake.ResetCount);
+                Assert.IsNull(QuickActions.LastPerformed);
+            }
+            finally { QuickActions.OverrideBridgeForTesting(null); }
+        }
+
+        [Test]
+        public void IsPlatformSupported_ReflectsBridge_FalseOnNoOpBridge()
+        {
+            QuickActions.OverrideBridgeForTesting(new LastPerformedBridge());
+            try { Assert.IsTrue(QuickActions.IsPlatformSupported); }
+            finally { QuickActions.OverrideBridgeForTesting(null); }
+            // The Editor/unsupported no-op bridge reports false (deterministic).
+            Assert.IsFalse(new NullQuickActionsBridge().IsPlatformSupported);
+        }
+
+        [Test]
         public void GetAll_PreservesInsertionOrder()
         {
             // Shortcut order is user-visible (it's the order pushed to the OS), so pin
@@ -384,6 +427,20 @@ namespace Playground.QuickActions.Tests
             public string GetLastPerformed() => null;
             public void ResetLastPerformed() { }
             public string ConsumePendingPerformed() => _pending.Count > 0 ? _pending.Dequeue() : null;
+            public IList<QuickActionItem> GetShortcuts() => new List<QuickActionItem>();
+        }
+
+        // A bridge with a settable last-performed id, to test LastPerformed/Reset.
+        private sealed class LastPerformedBridge : IQuickActionsBridge
+        {
+            public string Last;
+            public int ResetCount;
+            public bool IsPlatformSupported => true;
+            public void SetShortcuts(IList<QuickActionItem> items) { }
+            public void RemoveAll() { }
+            public string GetLastPerformed() => Last;
+            public void ResetLastPerformed() { Last = null; ResetCount++; }
+            public string ConsumePendingPerformed() => null;
             public IList<QuickActionItem> GetShortcuts() => new List<QuickActionItem>();
         }
 
