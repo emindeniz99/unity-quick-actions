@@ -303,7 +303,7 @@ The package is type-checked and compiled without Unity via a stub-based harness:
 
 ```bash
 tools/setup.sh     # install dotnet + JDK (once; pre-baked in the devcontainer)
-tools/verify.sh    # .meta gen + C# compile (7 configs) + 25 unit tests + Android plugin
+tools/verify.sh    # .meta gen + C# compile (7 configs) + 31 unit tests + Android plugin
 ```
 
 `verify.sh` runs the unit tests via `dotnet test`; the same tests (plus
