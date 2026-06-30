@@ -41,6 +41,12 @@ namespace UnityEditor
 
     public enum MessageType { None, Info, Warning, Error }
 
+    public static class EditorApplication
+    {
+        public static bool isPlaying;
+        public static void EnterPlaymode() { }
+    }
+
     [AttributeUsage(AttributeTargets.Method)]
     public sealed class MenuItemAttribute : Attribute
     {

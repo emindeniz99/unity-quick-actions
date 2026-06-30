@@ -76,6 +76,23 @@ so no Canvas/EventSystem needed.
 You can press Play in the Editor to confirm it compiles and the buttons work, but
 **the actual shortcuts only show on a device** (next part).
 
+### A7. Fastest loop: the in-Editor Simulator (no device)
+The home-screen menu doesn't exist in the Editor, but you can still test your
+**tap-handling code** without building anything:
+
+1. **Window ▸ Quick Actions ▸ Simulator.**
+2. Press **Play** (so your game's `Performed` handlers are subscribed — they're
+   usually wired in `Awake`). The window even has a **▶ Enter Play Mode** button.
+3. The window lists your **runtime** shortcuts (whatever your game added via
+   `QuickActions.Add`) and any **static** shortcuts. Click one → it raises
+   `QuickActions.Performed` with that id **exactly like a real tap**, so your
+   routing/handler code runs.
+4. The **Custom id** field fires any id you type — handy to simulate a cold-launch
+   tap from a static shortcut.
+
+This is the loop to use while writing your routing code; only do the real
+device pass (Part B) when you want to verify the OS-level long-press menu itself.
+
 ---
 
 ## B. Test on a real device

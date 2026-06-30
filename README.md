@@ -236,6 +236,15 @@ public class ShortcutRouter : MonoBehaviour
 `QuickActionItem`: `Id` (required, unique), `Title` (required), `Subtitle`,
 `Icon` (`IconType`, iOS system glyph), `AndroidDrawable` (optional drawable name).
 
+### Test in the Editor — no device needed
+
+Quick actions don't appear in the Editor (there's no home screen), but you don't
+need a device to test your **tap handling**. Open **Window ▸ Quick Actions ▸
+Simulator**, press Play, and click any listed shortcut (or type a custom id) — it
+raises `Performed` through the exact same path a real tap takes, so your routing
+code runs. Use this fast loop while coding; build to a device only to verify the
+OS long-press menu itself. (Editor-only — it never ships in a build.)
+
 ### Static shortcuts (baked into the build)
 
 For shortcuts that must exist on the **first** launch (before any runtime
