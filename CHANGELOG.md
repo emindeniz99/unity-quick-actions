@@ -20,8 +20,10 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Editor Simulator** (*Window ▸ Quick Actions ▸ Simulator*): lists the runtime
   and static shortcuts and fires a tap (raises `Performed`, updates `LastPerformed`)
   through the real path so routing code can be tested without a device. In Play
-  Mode it's a warm tap; outside Play Mode it **starts Play Mode and delivers at
-  startup**, mirroring a real cold launch.
+  Mode it's a warm tap; outside Play Mode it **starts Play Mode and seeds the id
+  into the runtime's pending queue before the first scene loads**, so the normal
+  one-frame `QuickActionsRuntime` drain delivers it — a real cold launch through
+  the real pipeline, as if the app was opened by that shortcut while closed.
 - Static shortcuts: a **Project Settings ▸ Quick Actions** asset plus build
   post-processors that bake shortcuts into iOS `Info.plist`
   (`UIApplicationShortcutItems`) and Android `res/xml/quickactions_shortcuts.xml` +

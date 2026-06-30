@@ -119,14 +119,25 @@ namespace Playground.QuickActions
         }
 
 #if UNITY_EDITOR
-        // Set by the in-Editor Simulator so LastPerformed reflects a simulated tap.
-        // Editor-only (#if UNITY_EDITOR) — never compiled into a player build.
+        // Everything below is Editor-only (#if UNITY_EDITOR) — never compiled into a
+        // player build. It lets the Simulator reproduce a real device tap in-Editor.
+
+        // Set so LastPerformed reflects a simulated tap (no native bridge in-Editor).
         internal static string _editorSimulatedLastPerformed;
 
+        // Cold-launch queue: drained by the real ConsumeNextPending path above, so a
+        // simulated cold launch goes through QuickActionsRuntime exactly like the
+        // native pending queue does on a device.
+        private static readonly Queue<string> _editorPending = new Queue<string>();
+
+        // SessionState key shared with the Editor Simulator's RequestColdLaunch — it
+        // survives the domain reload that entering Play Mode triggers.
+        private const string EditorColdLaunchKey = "QuickActions.PendingColdLaunch";
+
         /// <summary>
-        /// Editor Simulator entry point: record <paramref name="id"/> as the last
-        /// performed action (so <see cref="LastPerformed"/> reflects it) and raise
-        /// <see cref="Performed"/> — the same observable result as a real native tap.
+        /// Editor Simulator entry point for a <b>warm</b> tap (app already running):
+        /// record <paramref name="id"/> as last-performed and raise <see cref="Performed"/>
+        /// immediately — the same observable result as a real native tap.
         /// </summary>
         internal static void EditorSimulateTap(string id)
         {
@@ -134,6 +145,24 @@ namespace Playground.QuickActions
                 return;
             _editorSimulatedLastPerformed = id;
             Dispatch(id);
+        }
+
+        /// <summary>
+        /// Runs before the first scene loads when entering Play Mode. If the Simulator
+        /// requested a cold launch (id stashed in <see cref="SessionState"/> before the
+        /// domain reload), seed it into the pending queue so the normal one-frame
+        /// <see cref="QuickActionsRuntime"/> drain delivers it — i.e. the app behaves as
+        /// if it was launched by tapping that shortcut while closed.
+        /// </summary>
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+        private static void EditorSeedColdLaunch()
+        {
+            var id = UnityEditor.SessionState.GetString(EditorColdLaunchKey, "");
+            if (string.IsNullOrEmpty(id))
+                return;
+            UnityEditor.SessionState.EraseString(EditorColdLaunchKey);
+            _editorPending.Enqueue(id);
+            _editorSimulatedLastPerformed = id; // launched-from id, like the device
         }
 #endif
 
@@ -264,7 +293,16 @@ namespace Playground.QuickActions
         /// Used by <see cref="QuickActionsRuntime"/> so there is a single bridge
         /// instance (the platform bridges are stateless; native state is global).
         /// </summary>
-        internal static string ConsumeNextPending() => Bridge.ConsumePendingPerformed();
+        internal static string ConsumeNextPending()
+        {
+#if UNITY_EDITOR
+            // In the Editor the Simulator seeds a cold-launch id here so the normal
+            // runtime drain delivers it through the real path (see EditorSeedColdLaunch).
+            if (_editorPending.Count > 0)
+                return _editorPending.Dequeue();
+#endif
+            return Bridge.ConsumePendingPerformed();
+        }
 
         /// <summary>
         /// Test seam: swap the platform bridge and reset cached state. Passing null
