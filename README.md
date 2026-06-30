@@ -24,6 +24,10 @@ LTS and newer** (including Unity 6).
 
 ## Install
 
+> New here / haven't cloned it yet? See **[`GETTING_STARTED.md`](./GETTING_STARTED.md)**
+> for a full walkthrough: clone → test in a fresh project → run on a device →
+> publish to the Asset Store.
+
 Pick whichever fits — all install the same package. The repo is a monorepo, so
 the UPM methods point at the `projects/quick-actions-unity` subfolder.
 

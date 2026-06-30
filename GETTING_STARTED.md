@@ -1,0 +1,176 @@
+# Getting Started — run it locally, test on a device, publish to the Asset Store
+
+A step-by-step guide for someone who has **not pulled the repo yet**. Three
+parts: **A) get it running locally**, **B) test on a real device**, **C) publish
+to the Unity Asset Store**.
+
+> Key fact up front: this folder is a **Unity package**, not a runnable Unity
+> project. You test it by creating a small empty project and importing it.
+
+---
+
+## 0. What you need
+
+| For | Install |
+|---|---|
+| Everything | [Unity Hub](https://unity.com/download) + a **Unity 2022.3 LTS** editor (Unity 6 also works) |
+| Android testing | The **Android Build Support** module (add it in Unity Hub ▸ the editor ▸ ⚙ Add Modules). Works on Windows/macOS/Linux. |
+| iOS testing | A **Mac** with **Xcode**, plus the **iOS Build Support** module. (iOS cannot be built from Windows/Linux.) |
+| A test device | Android phone (Android 7.1 / API 25+) **or** iPhone. Quick actions do **not** appear in the Editor or on a plain simulator — you need a real long-press on a device. |
+
+Don't have a Mac? Test on **Android first** — it exercises the whole flow and
+needs no Apple hardware.
+
+---
+
+## A. Get it running locally
+
+### A1. Pull the code to your PC
+```bash
+git clone https://github.com/emindeniz99/playground.git
+cd playground/projects/quick-actions-unity
+```
+(The repo is a monorepo; everything for this asset is under
+`projects/quick-actions-unity`.)
+
+### A2. (Optional, no Unity needed) Sanity-check it compiles
+```bash
+tools/setup.sh    # one-time: installs dotnet + JDK if missing
+tools/verify.sh   # → VERIFY: PASS  (compiles C#, runs 31 tests, compiles Java)
+```
+This proves the code is healthy before you even open Unity.
+
+### A3. Make a throwaway test project
+In **Unity Hub ▸ New project ▸ 3D (URP or Built-in, doesn't matter)**. Name it
+`QuickActionsTestbed`. Open it.
+
+### A4. Install the package into the test project
+**Window ▸ Package Manager ▸ + ▸ Add package from disk…** and pick
+`projects/quick-actions-unity/package.json`.
+(Alternative: drag `dist/QuickActions.unitypackage` into the Project window — it
+lands under `Assets/QuickActions/`.)
+
+### A5. ⚠️ Turn the package ON (the #1 gotcha)
+The package is **opt-in**: with no define, the `QuickActions` API doesn't even
+exist and nothing happens. Enable it:
+
+**Project Settings ▸ Player ▸ Other Settings ▸ Scripting Define Symbols** → add:
+```
+QUICKACTIONS_ENABLED
+```
+Do this for **each platform tab** you'll build (Android / iOS). Press Enter, then
+**Apply**. Wait for the recompile.
+
+> If you skip this, the Demo won't compile and `using Playground.QuickActions;`
+> will error — that's expected, just add the define.
+
+### A6. Import the Demo
+Package Manager ▸ select **Quick Actions for iOS & Android** ▸ **Samples** tab ▸
+**Import** next to "Demo". It copies into `Assets/Samples/…/Demo`.
+(If you used the `.unitypackage`, the demo is at `Assets/QuickActions/Example`.)
+
+Open the demo scene (`QuickActionsDemo.unity`) — or just drop the
+`QuickActionsDemo` component onto an empty GameObject in any scene. It's IMGUI,
+so no Canvas/EventSystem needed.
+
+You can press Play in the Editor to confirm it compiles and the buttons work, but
+**the actual shortcuts only show on a device** (next part).
+
+---
+
+## B. Test on a real device
+
+### B1. Android (easiest — no Mac)
+1. **File ▸ Build Settings ▸ Android ▸ Switch Platform** (wait for the reimport).
+2. Make sure `QUICKACTIONS_ENABLED` is in the **Android** Scripting Define Symbols (A5).
+3. Add the demo scene to **Scenes In Build**.
+4. On the phone: enable **Developer Options ▸ USB debugging**, plug it in, accept the prompt.
+5. **Build And Run** (Unity installs and launches the app).
+6. Press the on-screen **"Add 3 shortcuts"** button.
+7. Go to the home screen, **long-press the app icon** → you should see New Game / Continue / Daily Reward.
+8. Tap one → the app opens and the on-screen log shows `Performed '<id>'`.
+9. Force-close the app, tap a shortcut from the long-press menu → it should **cold-launch** and still log the id.
+
+### B2. iOS (needs a Mac + Xcode)
+1. **File ▸ Build Settings ▸ iOS ▸ Switch Platform**.
+2. Confirm `QUICKACTIONS_ENABLED` is in the **iOS** define symbols.
+3. **Build** → choose a folder → Unity generates an Xcode project.
+4. Open the `.xcodeproj`/`.xcworkspace` in Xcode, set your **Signing Team**, plug in an iPhone, **Run**.
+5. Same checks as Android steps 6–9 (add shortcuts, long-press the icon, tap, cold-launch).
+
+### B3. Prove the dev-only gate (the "zero in production" promise)
+Make a **production** build with the define **removed**:
+1. Remove `QUICKACTIONS_ENABLED` from Scripting Define Symbols (that platform).
+2. Build again.
+3. Android: open the generated `…/unityLibrary/src/main/AndroidManifest.xml` (or the merged manifest) → there should be **no** `QuickActionsTrampolineActivity`.
+4. iOS: search the generated Xcode project for `QUICKACTIONS_ENABLED` → **none**; the `.mm` compiles to nothing.
+5. The shortcuts no longer appear — confirming the package is inert in prod.
+
+(Full device procedure also in [`plans/mvp.md`](./plans/mvp.md); readiness matrix
+in [`PRODUCTION_READINESS.md`](./PRODUCTION_READINESS.md).)
+
+---
+
+## C. Publish to the Unity Asset Store
+
+> Detailed checklist with paste-ready text/images: [`STORE_CHECKLIST.md`](./STORE_CHECKLIST.md).
+> Publishing is **free** (you keep 70%, Unity takes 30%; price free or ≥ $4.99).
+
+### C0. ⚠️ Decide: gated or always-on for the store
+Right now the package is **dev-only gated** — a buyer who imports it and doesn't
+set `QUICKACTIONS_ENABLED` sees **nothing**, which is bad UX for a paid asset.
+For a store release you almost certainly want it **always-on**:
+
+- Remove `defineConstraints: ["QUICKACTIONS_ENABLED"]` from the asmdefs (or flip
+  it in `tools/gen_meta.py` and regenerate), drop the `#if QUICKACTIONS_ENABLED`
+  from `Plugins/iOS/QuickActions.mm`, and delete the two gate post-processors
+  (`Editor/iOS/QuickActionsEnableMacroiOS.cs`, `Editor/NativeGate/…StripperAndroid.cs`).
+- See the **"Want it always-on?"** note in [`README.md`](./README.md#dev-only--excluding-it-completely-from-production-builds).
+
+Keep the gated version only if you're selling it explicitly as a *dev-only* tool
+and say so loudly in the listing. **Pick this before you build the upload.**
+
+### C1. Create a publisher account
+Go to <https://publisher.unity.com>, sign in with your Unity ID, create a
+**Publisher profile**, fill payout (PayPal/bank), and accept the Provider Agreement.
+
+### C2. Validate the package in a real Unity (the device gate)
+Before uploading, do the device tests in Part B on **both** 2022.3 LTS and Unity 6,
+with **zero console errors/warnings**. This is the one thing that must pass and
+that I could not do for you (no Unity/devices in the build environment).
+
+### C3. Build the upload package
+- Easiest: install **Asset Store Publishing Tools** from the Asset Store (search
+  it in the Package Manager / Asset Store), which adds an uploader window in Unity.
+- Or upload the prebuilt `dist/QuickActions.unitypackage` (rebuild any time with
+  `python3 tools/pack_unitypackage.py`). Make sure it reflects your gated/always-on choice.
+
+### C4. Fill the listing (everything is pre-written)
+In the publisher portal, create a draft package and paste from
+[`store/listing/`](./store/listing/): `metadata.md` (title/category/version),
+`summary.txt`, `description.md`, `tags.txt`. Upload the images from
+[`store/`](./store/) (icon 160×160, card 420×280, cover 1950×1300, screenshots).
+**Replace at least one screenshot with a real on-device long-press capture** —
+the current ones are mockups and the store prefers in-context shots.
+
+### C5. Submit
+Set price/availability, then **Submit for review**. Review is manual — typically
+a few business days, up to ~2 weeks. You'll get an approval or a decline with
+specific feedback to fix and resubmit.
+
+---
+
+## Quick reference
+
+| Symptom | Cause / fix |
+|---|---|
+| `QuickActions` type not found / Demo won't compile | `QUICKACTIONS_ENABLED` define missing (step A5) — add it for that platform |
+| Nothing happens in the Editor Play mode | Expected — shortcuts only exist on a device (Part B) |
+| Long-press shows no shortcuts | Did you press "Add 3 shortcuts" first? Android < 7.1 (API 25) isn't supported |
+| Buyer imported the store asset and "nothing works" | You shipped the **gated** version — make it always-on for the store (step C0) |
+| iOS build but can't run | Needs a Mac + Xcode + a signing team (step B2) |
+
+Other docs: [`README.md`](./README.md) (API + install) ·
+[`STORE_CHECKLIST.md`](./STORE_CHECKLIST.md) (submission) ·
+[`PRODUCTION_READINESS.md`](./PRODUCTION_READINESS.md) (what's tested) ·
+[`plans/openupm.md`](./plans/openupm.md) (free OpenUPM distribution).
