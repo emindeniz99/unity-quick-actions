@@ -45,7 +45,21 @@ namespace UnityEditor
     {
         public static bool isPlaying;
         public static void EnterPlaymode() { }
+        public static Action update;
+        public static Action<PlayModeStateChange> playModeStateChanged;
     }
+
+    public enum PlayModeStateChange { EnteredEditMode, ExitingEditMode, EnteredPlayMode, ExitingPlayMode }
+
+    public static class SessionState
+    {
+        public static void SetString(string key, string value) { }
+        public static string GetString(string key, string defaultValue) => defaultValue;
+        public static void EraseString(string key) { }
+    }
+
+    [AttributeUsage(AttributeTargets.Class)]
+    public sealed class InitializeOnLoadAttribute : Attribute { }
 
     [AttributeUsage(AttributeTargets.Method)]
     public sealed class MenuItemAttribute : Attribute

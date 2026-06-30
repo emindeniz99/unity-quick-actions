@@ -85,7 +85,19 @@ namespace Playground.QuickActions
         /// (cold launch <i>or</i> warm resume), or that tap is handled twice (every
         /// tap also raises <see cref="Performed"/>).
         /// </summary>
-        public static string LastPerformed => Bridge.GetLastPerformed();
+        public static string LastPerformed
+        {
+            get
+            {
+#if UNITY_EDITOR
+                // The in-Editor Simulator records simulated taps here (there is no
+                // native bridge in the Editor), so LastPerformed is realistic too.
+                if (_editorSimulatedLastPerformed != null)
+                    return _editorSimulatedLastPerformed;
+#endif
+                return Bridge.GetLastPerformed();
+            }
+        }
 
         /// <summary>
         /// Raised on the main thread with the tapped action's
@@ -98,7 +110,32 @@ namespace Playground.QuickActions
         public static event Action<string> Performed;
 
         /// <summary>Clear the persisted <see cref="LastPerformed"/> id.</summary>
-        public static void ResetLastPerformed() => Bridge.ResetLastPerformed();
+        public static void ResetLastPerformed()
+        {
+#if UNITY_EDITOR
+            _editorSimulatedLastPerformed = null;
+#endif
+            Bridge.ResetLastPerformed();
+        }
+
+#if UNITY_EDITOR
+        // Set by the in-Editor Simulator so LastPerformed reflects a simulated tap.
+        // Editor-only (#if UNITY_EDITOR) — never compiled into a player build.
+        internal static string _editorSimulatedLastPerformed;
+
+        /// <summary>
+        /// Editor Simulator entry point: record <paramref name="id"/> as the last
+        /// performed action (so <see cref="LastPerformed"/> reflects it) and raise
+        /// <see cref="Performed"/> — the same observable result as a real native tap.
+        /// </summary>
+        internal static void EditorSimulateTap(string id)
+        {
+            if (string.IsNullOrEmpty(id))
+                return;
+            _editorSimulatedLastPerformed = id;
+            Dispatch(id);
+        }
+#endif
 
         /// <summary>
         /// Add one quick action. Returns false (without changing anything) when the

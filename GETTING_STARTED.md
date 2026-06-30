@@ -81,14 +81,17 @@ The home-screen menu doesn't exist in the Editor, but you can still test your
 **tap-handling code** without building anything:
 
 1. **Window ▸ Quick Actions ▸ Simulator.**
-2. Press **Play** (so your game's `Performed` handlers are subscribed — they're
-   usually wired in `Awake`). The window even has a **▶ Enter Play Mode** button.
-3. The window lists your **runtime** shortcuts (whatever your game added via
+2. It lists your **runtime** shortcuts (whatever your game added via
    `QuickActions.Add`) and any **static** shortcuts. Click one → it raises
    `QuickActions.Performed` with that id **exactly like a real tap**, so your
-   routing/handler code runs.
-4. The **Custom id** field fires any id you type — handy to simulate a cold-launch
-   tap from a static shortcut.
+   routing/handler code runs (`LastPerformed` updates too).
+3. Two modes, just like a device:
+   - **In Play Mode** → delivered immediately (a *warm* tap).
+   - **Not in Play Mode** → clicking **starts Play Mode and fires the tap at
+     startup**, exactly like tapping the icon while the app is closed (*cold
+     launch*) — the realistic iOS/Android cold-start path.
+4. The **Custom id** field fires any id you type — handy to cold-launch from a
+   static shortcut's id.
 
 This is the loop to use while writing your routing code; only do the real
 device pass (Part B) when you want to verify the OS-level long-press menu itself.

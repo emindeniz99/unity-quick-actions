@@ -18,8 +18,10 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `UnityPlayerGameActivity`.
 - `IconType` system-icon enum, Editor *About* window, and a Demo sample.
 - **Editor Simulator** (*Window ▸ Quick Actions ▸ Simulator*): lists the runtime
-  and static shortcuts and fires a tap (raises `Performed` through the real path)
-  so routing code can be tested in Play Mode without building to a device.
+  and static shortcuts and fires a tap (raises `Performed`, updates `LastPerformed`)
+  through the real path so routing code can be tested without a device. In Play
+  Mode it's a warm tap; outside Play Mode it **starts Play Mode and delivers at
+  startup**, mirroring a real cold launch.
 - Static shortcuts: a **Project Settings ▸ Quick Actions** asset plus build
   post-processors that bake shortcuts into iOS `Info.plist`
   (`UIApplicationShortcutItems`) and Android `res/xml/quickactions_shortcuts.xml` +

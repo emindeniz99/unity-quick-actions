@@ -33,10 +33,10 @@ namespace Playground.QuickActions.Editor
             {
                 EditorGUILayout.Space();
                 EditorGUILayout.HelpBox(
-                    "Enter Play Mode so the tap reaches your game's Performed handlers " +
-                    "(usually wired up in Awake/OnEnable).", MessageType.Info);
-                if (GUILayout.Button("▶ Enter Play Mode"))
-                    EditorApplication.EnterPlaymode();
+                    "Not in Play Mode. Clicking a shortcut will START Play Mode and " +
+                    "deliver it as a COLD LAUNCH — like tapping the icon while the app " +
+                    "is closed. The tap fires at startup, once your Awake/OnEnable " +
+                    "handlers are subscribed.", MessageType.Info);
             }
 
             // Runtime shortcuts the game added this session (in-memory authoritative list).
@@ -82,12 +82,18 @@ namespace Playground.QuickActions.Editor
                 Debug.LogWarning("[QuickActions] Simulator: enter an id first.");
                 return;
             }
-            // The same internal entry point the iOS/Android bridges drain taps into.
-            QuickActions.Dispatch(id);
-            Debug.Log($"[QuickActions] Simulated tap → Performed('{id}')" +
-                      (EditorApplication.isPlaying
-                          ? ""
-                          : "  (not in Play Mode — your runtime handlers may not be subscribed)"));
+            if (EditorApplication.isPlaying)
+            {
+                // Warm tap: deliver to the running game's live handlers right now.
+                QuickActions.EditorSimulateTap(id);
+                Debug.Log($"[QuickActions] Simulated tap → Performed('{id}')");
+            }
+            else
+            {
+                // Cold launch: start the app (Play Mode) and deliver at startup.
+                Debug.Log($"[QuickActions] Cold launch: entering Play Mode to deliver '{id}'…");
+                QuickActionsPlayModeColdLaunch.RequestColdLaunch(id);
+            }
         }
     }
 }

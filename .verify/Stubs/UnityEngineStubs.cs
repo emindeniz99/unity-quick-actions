@@ -160,4 +160,9 @@ namespace UnityEngine
     {
         public AndroidJavaException(string message) : base(message) { }
     }
+
+    public static class Time
+    {
+        public static int frameCount;
+    }
 }

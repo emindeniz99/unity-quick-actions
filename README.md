@@ -240,10 +240,16 @@ public class ShortcutRouter : MonoBehaviour
 
 Quick actions don't appear in the Editor (there's no home screen), but you don't
 need a device to test your **tap handling**. Open **Window ▸ Quick Actions ▸
-Simulator**, press Play, and click any listed shortcut (or type a custom id) — it
-raises `Performed` through the exact same path a real tap takes, so your routing
-code runs. Use this fast loop while coding; build to a device only to verify the
-OS long-press menu itself. (Editor-only — it never ships in a build.)
+Simulator** and click any listed shortcut (or type a custom id) — it raises
+`Performed` through the exact same path a real tap takes, so your routing code
+runs (`LastPerformed` updates too). Two modes, matching the device:
+
+- **In Play Mode** → delivered immediately (a *warm* tap).
+- **Not in Play Mode** → it **starts Play Mode and delivers at startup**, exactly
+  like tapping the icon while the app is closed (a *cold launch*).
+
+Use this fast loop while coding; build to a device only to verify the OS
+long-press menu itself. (Editor-only — it never ships in a build.)
 
 ### Static shortcuts (baked into the build)
 
