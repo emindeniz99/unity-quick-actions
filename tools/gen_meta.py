@@ -15,7 +15,8 @@ Routing:
   * everything else (.md,.json,.unity,.txt,...) -> DefaultImporter
 
 Skips: the package root, any `*~` directory (e.g. Samples~) — Unity ignores
-those — and existing `.meta` files.
+those — hidden dirs (incl. `.verify/`), the `store/` and `dist/` collateral
+dirs, and existing `.meta` files.
 """
 import hashlib
 import os

@@ -220,7 +220,7 @@ public class ShortcutRouter : MonoBehaviour
 
 | Member | Purpose |
 |--------|---------|
-| `bool IsPlatformSupported` | True on a supported device; false in-Editor (calls are safe no-ops there — test on a device). |
+| `bool IsPlatformSupported` | True on a supported device; false in-Editor (calls are safe no-ops there — use the [Simulator](#test-in-the-editor--no-device-needed) to test taps). |
 | `bool LoggingEnable` | Toggle `Debug.Log` tracing. |
 | `event Action<string> Performed` | Tapped action id (main thread; includes cold launch). |
 | `string LastPerformed` | Id the app was last launched/resumed from, or null. |
@@ -241,12 +241,13 @@ public class ShortcutRouter : MonoBehaviour
 Quick actions don't appear in the Editor (there's no home screen), but you don't
 need a device to test your **tap handling**. Open **Window ▸ Quick Actions ▸
 Simulator** and click any listed shortcut (or type a custom id) — it raises
-`Performed` through the exact same path a real tap takes, so your routing code
-runs (`LastPerformed` updates too). Two modes, matching the device:
+`Performed` exactly as a real tap does, so your routing code runs
+(`LastPerformed` updates too). Two modes, matching the device:
 
 - **In Play Mode** → delivered immediately (a *warm* tap).
-- **Not in Play Mode** → it **starts Play Mode and delivers at startup**, exactly
-  like tapping the icon while the app is closed (a *cold launch*).
+- **Not in Play Mode** → it **starts Play Mode and delivers at startup** through
+  the runtime's real pending-queue drain, exactly like tapping the icon while the
+  app is closed (a *cold launch*).
 
 Use this fast loop while coding; build to a device only to verify the OS
 long-press menu itself. (Editor-only — it never ships in a build.)
@@ -322,7 +323,7 @@ The package is type-checked and compiled without Unity via a stub-based harness:
 
 ```bash
 tools/setup.sh     # install dotnet + JDK (once; pre-baked in the devcontainer)
-tools/verify.sh    # .meta gen + C# compile (7 configs) + 31 unit tests + Android plugin
+tools/verify.sh    # .meta gen + C# compile (7 configs) + 33 unit tests + Android plugin
 ```
 
 `verify.sh` runs the unit tests via `dotnet test`; the same tests (plus

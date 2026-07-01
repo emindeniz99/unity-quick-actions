@@ -1,4 +1,5 @@
 using UnityEditor;
+using UnityEngine;
 
 namespace Playground.QuickActions.Editor
 {
@@ -11,18 +12,43 @@ namespace Playground.QuickActions.Editor
     /// pipeline. The id is kept in <see cref="SessionState"/> so it survives the
     /// domain reload that entering Play Mode triggers. Editor-only.
     /// </summary>
+    [InitializeOnLoad]
     internal static class QuickActionsPlayModeColdLaunch
     {
-        // Must match QuickActions.EditorColdLaunchKey (the runtime seeder reads it).
-        private const string PendingKey = "QuickActions.PendingColdLaunch";
+        static QuickActionsPlayModeColdLaunch()
+        {
+            // Disarm a stale request so it can't fire a phantom cold launch on a later,
+            // unrelated Play. SessionState lives for the whole editor session, and play
+            // entry can silently fail after the key was written (compile error, the
+            // user cancelling the save-scene dialog).
+            if (!EditorApplication.isPlayingOrWillChangePlaymode)
+                SessionState.EraseString(QuickActions.EditorColdLaunchKey);
+            EditorApplication.playModeStateChanged += state =>
+            {
+                if (state == PlayModeStateChange.EnteredEditMode)
+                    SessionState.EraseString(QuickActions.EditorColdLaunchKey);
+            };
+        }
 
         /// <summary>Stash the id and enter Play Mode; the runtime delivers it at startup.</summary>
         public static void RequestColdLaunch(string id)
         {
             if (string.IsNullOrEmpty(id))
                 return;
-            SessionState.SetString(PendingKey, id);
+            if (EditorUtility.scriptCompilationFailed)
+            {
+                Debug.LogWarning("[QuickActions] Simulator: fix compile errors first — Play Mode can't start.");
+                return;
+            }
+            SessionState.SetString(QuickActions.EditorColdLaunchKey, id);
             EditorApplication.EnterPlaymode();
+            // If entry is refused (e.g. the save-scene dialog is cancelled) no play-mode
+            // event ever fires — check afterwards and disarm.
+            EditorApplication.delayCall += () =>
+            {
+                if (!EditorApplication.isPlayingOrWillChangePlaymode)
+                    SessionState.EraseString(QuickActions.EditorColdLaunchKey);
+            };
         }
     }
 }

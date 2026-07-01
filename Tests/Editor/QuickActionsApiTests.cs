@@ -161,6 +161,36 @@ namespace Playground.QuickActions.Tests
         }
 
         [Test]
+        public void EditorSimulateTap_RaisesPerformed_AndSetsLastPerformed_UntilReset()
+        {
+            string received = null;
+            void Handler(string id) => received = id;
+            QuickActions.Performed += Handler;
+            try
+            {
+                QuickActions.EditorSimulateTap("sim_id");
+                Assert.AreEqual("sim_id", received);
+                Assert.AreEqual("sim_id", QuickActions.LastPerformed);
+                QuickActions.ResetLastPerformed();
+                Assert.IsNull(QuickActions.LastPerformed);
+            }
+            finally { QuickActions.Performed -= Handler; }
+        }
+
+        [Test]
+        public void OverrideBridgeForTesting_ClearsSimulatedTapState()
+        {
+            // A Simulator click before a test run must not shadow the test bridge's
+            // LastPerformed (the editor seam takes priority in the getter) — the test
+            // seam has to wipe simulated state or edit-mode tests turn flaky.
+            QuickActions.EditorSimulateTap("stale_sim");
+            var fake = new LastPerformedBridge { Last = "boot_id" };
+            QuickActions.OverrideBridgeForTesting(fake);
+            try { Assert.AreEqual("boot_id", QuickActions.LastPerformed); }
+            finally { QuickActions.OverrideBridgeForTesting(null); }
+        }
+
+        [Test]
         public void GetAll_PreservesInsertionOrder()
         {
             // Shortcut order is user-visible (it's the order pushed to the OS), so pin

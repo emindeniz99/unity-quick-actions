@@ -14,12 +14,21 @@ namespace Playground.QuickActions.Editor
     {
         private string _customId = "";
 
+        // Cached: GetOrNull does a project-wide AssetDatabase.FindAssets, too slow to
+        // run on every OnGUI repaint in a large project.
+        private QuickActionsSettings _settings;
+
         [MenuItem("Window/Quick Actions/Simulator")]
         private static void Open()
         {
             var window = GetWindow<QuickActionsSimulatorWindow>(false, "QA Simulator");
             window.minSize = new Vector2(360, 320);
         }
+
+        private void OnEnable() => RefreshSettings();
+        private void OnFocus() => RefreshSettings();
+        private void OnProjectChange() => RefreshSettings();
+        private void RefreshSettings() => _settings = QuickActionsSettings.GetOrNull();
 
         private void OnGUI()
         {
@@ -50,12 +59,11 @@ namespace Playground.QuickActions.Editor
                     DrawTapButton(item.Title, item.Id);
 
             // Static shortcuts from the settings asset (baked into the build at build time).
-            var settings = QuickActionsSettings.GetOrNull();
-            if (settings != null && settings.StaticShortcuts.Count > 0)
+            if (_settings != null && _settings.StaticShortcuts.Count > 0)
             {
                 EditorGUILayout.Space();
                 EditorGUILayout.LabelField("Static shortcuts (baked into the build)", EditorStyles.boldLabel);
-                foreach (var item in settings.StaticShortcuts)
+                foreach (var item in _settings.StaticShortcuts)
                     if (item != null && !string.IsNullOrEmpty(item.Id))
                         DrawTapButton(item.Title, item.Id);
             }

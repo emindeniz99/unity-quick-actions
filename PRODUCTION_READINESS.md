@@ -6,9 +6,9 @@ for production. Honest status — nothing marked "ready" that wasn't actually
 exercised.
 
 **Legend — Verified by:**
-`unit` = headless NUnit (`dotnet test`, 31 tests) · `unity-test` = Unity Test
+`unit` = headless NUnit (`dotnet test`, 33 tests) · `unity-test` = Unity Test
 Runner only (JsonUtility) · `static` = compiles in the stub harness (7 configs) ·
-`review` = human/agent code review (6 rounds + a 15-unit workflow) ·
+`review` = human/agent code review (7 rounds + a 15-unit workflow) ·
 `device` = **requires a real Unity Editor + device — NOT done here**.
 
 ## 1. Runtime API (managed) — fully testable, GREEN
@@ -56,6 +56,7 @@ Runner only (JsonUtility) · `static` = compiles in the stub harness (7 configs)
 | Static shortcuts → iOS `Info.plist` (`PBXProject`/`PlistDocument`) | static + review | ⏳ **Unity** — real extension DLLs + a build |
 | Static shortcuts → Android `res/xml` + strings + meta-data (escaping, real `applicationId`) | static + review | ⏳ **Unity** — real Gradle project |
 | Project Settings ▸ Quick Actions UI (+ asset create, dup-id warning) | static + review | ⏳ **Unity** — Editor GUI |
+| Editor Simulator (warm tap + Play-Mode cold-launch seed, play-session state reset) | unit (seam: `EditorSimulateTap…`, `OverrideBridgeForTesting_ClearsSimulatedTapState`) + static + review | ⏳ **Unity** — manual Editor check of the window/Play-Mode flow |
 
 ## 5. Dev-only `QUICKACTIONS_ENABLED` gate (the headline guarantee)
 
@@ -68,9 +69,9 @@ Runner only (JsonUtility) · `static` = compiles in the stub harness (7 configs)
 ## Sign-off
 
 - **Headless gate (closable here): GREEN.** `tools/verify.sh` → **VERIFY: PASS** —
-  7 C# configs compile, **31 unit tests pass**, Java compiles, every asset has a
+  7 C# configs compile, **33 unit tests pass**, Java compiles, every asset has a
   stable `.meta`. Every managed feature has a dedicated, intent-encoding test
-  (Rule 9). Reviewed one-by-one across 6 rounds + a 15-unit adversarial workflow
+  (Rule 9). Reviewed one-by-one across 7 rounds + a 15-unit adversarial workflow
   (32 findings raised, 26 fixed/closed, 6 rejected, **0 P0 ship-blockers**).
 - **Device gate (NOT closable in this container): OPEN.** Everything marked
   ⏳ above needs a licensed Unity (2022.3 LTS **and** Unity 6) + an iOS device

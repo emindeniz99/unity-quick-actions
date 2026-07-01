@@ -130,9 +130,30 @@ namespace Playground.QuickActions
         // native pending queue does on a device.
         private static readonly Queue<string> _editorPending = new Queue<string>();
 
-        // SessionState key shared with the Editor Simulator's RequestColdLaunch — it
-        // survives the domain reload that entering Play Mode triggers.
-        private const string EditorColdLaunchKey = "QuickActions.PendingColdLaunch";
+        // SessionState key shared with the Editor Simulator's RequestColdLaunch (which
+        // references this constant via InternalsVisibleTo, so the two sides can't
+        // drift apart) — it survives the domain reload that entering Play Mode triggers.
+        internal const string EditorColdLaunchKey = "QuickActions.PendingColdLaunch";
+
+        /// <summary>
+        /// Mirrors a real process restart when Enter Play Mode Options disable domain
+        /// reload: in the Editor, statics survive play sessions, but on a device every
+        /// launch starts clean — without this, a simulated tap's LastPerformed, the
+        /// in-memory list, and stale Performed subscribers (targeting destroyed
+        /// MonoBehaviours) would leak into the next play session. SubsystemRegistration
+        /// runs before BeforeSceneLoad, so this cannot race the cold-launch seeder.
+        /// </summary>
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void EditorResetForPlaySession()
+        {
+            _editorSimulatedLastPerformed = null;
+            _editorPending.Clear();
+            _items.Clear();
+            _loaded = false;
+            _loading = false;
+            _bridge = null;
+            Performed = null;
+        }
 
         /// <summary>
         /// Editor Simulator entry point for a <b>warm</b> tap (app already running):
@@ -313,6 +334,12 @@ namespace Playground.QuickActions
             _bridge = bridge;
             _loaded = false;
             _items.Clear();
+#if UNITY_EDITOR
+            // Also drop simulated-tap state, or a Simulator click before an edit-mode
+            // test run would shadow the fake bridge's LastPerformed (flaky tests).
+            _editorSimulatedLastPerformed = null;
+            _editorPending.Clear();
+#endif
         }
 
         private static void Push() => Bridge.SetShortcuts(_items);

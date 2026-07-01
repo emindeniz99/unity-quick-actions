@@ -92,7 +92,7 @@ drains the queue → `Performed`. (The original push design is analysed as W2.)
   new bridge + one factory branch.
 - Single, narrow extension seam (`IQuickActionsBridge`) for new capabilities.
 - Main-thread-only delivery; no background-thread event hazards.
-- Managed logic is unit-testable without Unity (31 headless-passing tests; 33 authored, 2 Unity-only).
+- Managed logic is unit-testable without Unity (33 headless-passing tests; 35 authored, 2 Unity-only).
 - Native memory ownership is explicit (malloc ↔ native free).
 
 ## 6. Weaknesses / risks (severity · recommendation)

@@ -9,7 +9,7 @@ Everything needed to publish **Quick Actions for iOS & Android**. Sources:
 
 ✅ **Done in repo (run `tools/release.sh` to regenerate all):**
 listing texts (`store/listing/`), marketing images (`store/`), prebuilt
-drag-and-drop package (`dist/QuickActions.unitypackage`), compile + 31 unit
+drag-and-drop package (`dist/QuickActions.unitypackage`), compile + 33 unit
 tests green, full source + docs.
 
 ⏳ **Needs your account / hardware (can't be automated):**
@@ -79,7 +79,7 @@ All sizes are ✅ pre-built by `python3 tools/gen_store_images.py`. See
 
 - [ ] Imports into a fresh **2022.3 LTS** project with **zero console
       errors/warnings**; repeat on **Unity 6**.
-- [ ] `tools/verify.sh` is green (compile + 31 unit tests + Android plugin).
+- [ ] `tools/verify.sh` is green (compile + 33 unit tests + Android plugin).
 - [ ] Switch build target to **iOS** and **Android** → Editor still compiles
       (confirms the asmdef extension-DLL references resolve — see ROADMAP).
 - [ ] Build to an **iOS device** (needs macOS/Xcode) and an **Android device**:

@@ -44,7 +44,17 @@ namespace UnityEditor
     public static class EditorApplication
     {
         public static bool isPlaying;
+        public static bool isPlayingOrWillChangePlaymode;
         public static void EnterPlaymode() { }
+        public static Action delayCall;
+        public static Action<PlayModeStateChange> playModeStateChanged;
+    }
+
+    public enum PlayModeStateChange { EnteredEditMode, ExitingEditMode, EnteredPlayMode, ExitingPlayMode }
+
+    public static class EditorUtility
+    {
+        public static bool scriptCompilationFailed;
     }
 
     public static class SessionState
@@ -53,6 +63,9 @@ namespace UnityEditor
         public static string GetString(string key, string defaultValue) => defaultValue;
         public static void EraseString(string key) { }
     }
+
+    [AttributeUsage(AttributeTargets.Class)]
+    public sealed class InitializeOnLoadAttribute : Attribute { }
 
     [AttributeUsage(AttributeTargets.Method)]
     public sealed class MenuItemAttribute : Attribute

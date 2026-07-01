@@ -36,7 +36,7 @@ cd playground/projects/quick-actions-unity
 ### A2. (Optional, no Unity needed) Sanity-check it compiles
 ```bash
 tools/setup.sh    # one-time: installs dotnet + JDK if missing
-tools/verify.sh   # → VERIFY: PASS  (compiles C#, runs 31 tests, compiles Java)
+tools/verify.sh   # → VERIFY: PASS  (compiles C#, runs 33 tests, compiles Java)
 ```
 This proves the code is healthy before you even open Unity.
 
@@ -83,7 +83,7 @@ The home-screen menu doesn't exist in the Editor, but you can still test your
 1. **Window ▸ Quick Actions ▸ Simulator.**
 2. It lists your **runtime** shortcuts (whatever your game added via
    `QuickActions.Add`) and any **static** shortcuts. Click one → it raises
-   `QuickActions.Performed` with that id **exactly like a real tap**, so your
+   `QuickActions.Performed` with that id **exactly as a real tap does**, so your
    routing/handler code runs (`LastPerformed` updates too).
 3. Two modes, just like a device:
    - **In Play Mode** → delivered immediately (a *warm* tap).
@@ -185,7 +185,7 @@ specific feedback to fix and resubmit.
 | Symptom | Cause / fix |
 |---|---|
 | `QuickActions` type not found / Demo won't compile | `QUICKACTIONS_ENABLED` define missing (step A5) — add it for that platform |
-| Nothing happens in the Editor Play mode | Expected — shortcuts only exist on a device (Part B) |
+| Nothing happens in the Editor Play mode | Expected — the OS menu only exists on a device (Part B). Use the Simulator (step A7) to test tap handling in-Editor |
 | Long-press shows no shortcuts | Did you press "Add 3 shortcuts" first? Android < 7.1 (API 25) isn't supported |
 | Buyer imported the store asset and "nothing works" | You shipped the **gated** version — make it always-on for the store (step C0) |
 | iOS build but can't run | Needs a Mac + Xcode + a signing team (step B2) |

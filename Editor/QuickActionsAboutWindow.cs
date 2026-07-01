@@ -4,7 +4,7 @@ using UnityEngine;
 namespace Playground.QuickActions.Editor
 {
     /// <summary>
-    /// Small in-Editor reference window (Window ▸ Quick Actions) with a
+    /// Small in-Editor reference window (Window ▸ Quick Actions ▸ About) with a
     /// copy-pasteable quick-start and a link to the README. Purely informational —
     /// quick actions themselves are created at runtime from your own scripts.
     /// </summary>
@@ -29,7 +29,9 @@ void Start()
         subtitle: ""Start fresh"", icon: IconType.Add));
 }";
 
-        [MenuItem("Window/Quick Actions")]
+        // Must be a leaf under the submenu — "Window/Quick Actions" itself can't be
+        // both this command and the parent of ".../Simulator" (Unity menu conflict).
+        [MenuItem("Window/Quick Actions/About")]
         private static void Open()
         {
             var window = GetWindow<QuickActionsAboutWindow>(true, "Quick Actions");
