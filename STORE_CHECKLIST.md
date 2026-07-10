@@ -27,11 +27,13 @@ The package is currently **dev-only gated** behind `QUICKACTIONS_ENABLED`; a
 buyer who imports it without the define gets an inert package. Decide (see
 GETTING_STARTED §C0 and README "Dev-only"):
 
-- [ ] **Either** produce a de-gated (always-on) build for the store,
-- [ ] **or** keep the gate and sell it explicitly as a dev-only tool — the
-      listing already states the define requirement prominently
-      (`store~/listing/description.md` "One switch to turn it on"); keep that
-      section if you keep the gate.
+- [x] **DECIDED (2026-07-10): keep the gate** — sold explicitly as a dev-only
+      tool. The listing states the define requirement prominently
+      (`store~/listing/description.md` "One switch to turn it on"), README leads
+      Install with it, and GETTING_STARTED calls it the #1 gotcha. Do NOT remove
+      that section from the listing.
+- ~~Either produce a de-gated (always-on) build for the store~~ (rejected — the
+  zero-prod-footprint gate is the product's differentiator).
 
 ## 0b. Cost & account (the "is it free?" answer)
 
