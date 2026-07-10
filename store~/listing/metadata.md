@@ -15,7 +15,7 @@ Fill these into the Publisher portal package draft. Long-form copy is in
 | **Render pipelines** | Built-in, URP, HDRP (no rendering — all compatible) |
 | **Scripting backends** | Mono + IL2CPP |
 | **Platforms** | iOS 9+, Android 7.1+ (API 25) |
-| **Price** | Free or paid (min $4.99) — your call |
+| **Price** | **Free** (decided; may switch to paid ≥ $4.99 later) |
 | **License** | Extension Asset / MIT source included |
 
 ## Key images (from `store~/`)

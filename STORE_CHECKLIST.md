@@ -57,7 +57,8 @@ All copy is prepared in [`store~/listing/`](./store~/listing/) — paste verbati
 - [x] **Summary:** [`summary.txt`](./store~/listing/summary.txt)
 - [x] **Description:** [`description.md`](./store~/listing/description.md)
 - [x] **Tags / keywords:** [`tags.txt`](./store~/listing/tags.txt)
-- [ ] **Price:** decide free vs paid (≥ $4.99) — your call.
+- [x] **Price:** **FREE** (decided 2026-07-10; can switch to paid ≥ $4.99 later
+      after reviews accumulate).
 
 ## 3. Marketing images (generated → `store~/`)
 
