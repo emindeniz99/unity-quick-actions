@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace Playground.QuickActions.Internal
+namespace EminDeniz99.QuickActions.Internal
 {
     /// <summary>
     /// JsonUtility cannot (de)serialize a top-level array, so the shortcut set

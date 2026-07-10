@@ -1,4 +1,4 @@
-package com.playground.quickactions;
+package com.emindeniz99.quickactions;
 
 import android.app.Activity;
 import android.content.Intent;

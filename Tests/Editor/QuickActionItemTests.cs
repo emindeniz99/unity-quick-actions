@@ -1,7 +1,7 @@
 using NUnit.Framework;
-using Playground.QuickActions;
+using EminDeniz99.QuickActions;
 
-namespace Playground.QuickActions.Tests
+namespace EminDeniz99.QuickActions.Tests
 {
     [TestFixture]
     public class QuickActionItemTests

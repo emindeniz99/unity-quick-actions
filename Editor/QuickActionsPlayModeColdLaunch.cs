@@ -1,7 +1,7 @@
 using UnityEditor;
 using UnityEngine;
 
-namespace Playground.QuickActions.Editor
+namespace EminDeniz99.QuickActions.Editor
 {
     /// <summary>
     /// Backs the Simulator's "cold launch": clicking a shortcut while NOT in Play

@@ -1,9 +1,9 @@
 {
-    "name": "Playground.QuickActions.Editor.Android",
-    "rootNamespace": "Playground.QuickActions.Editor",
+    "name": "EminDeniz99.QuickActions.Editor.Android",
+    "rootNamespace": "EminDeniz99.QuickActions.Editor",
     "references": [
-        "Playground.QuickActions",
-        "Playground.QuickActions.Editor"
+        "EminDeniz99.QuickActions",
+        "EminDeniz99.QuickActions.Editor"
     ],
     "includePlatforms": [
         "Editor"

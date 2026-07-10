@@ -2,14 +2,14 @@
 // compiles when iOS is the active build target and UnityEditor.iOS.Xcode exists.
 using System.Collections.Generic;
 using System.IO;
-using Playground.QuickActions;
+using EminDeniz99.QuickActions;
 using UnityEditor;
 using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
 using UnityEditor.iOS.Xcode;
 using UnityEngine;
 
-namespace Playground.QuickActions.Editor
+namespace EminDeniz99.QuickActions.Editor
 {
     /// <summary>
     /// Writes the static shortcuts from <see cref="QuickActionsSettings"/> into the

@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!-- Compile-only check of the Demo sample against the Runtime. Confirms the
        sample's use of the API resolves (incl. the QuickActions type vs the
-       Playground.QuickActions namespace from the DemoSample sub-namespace). -->
+       EminDeniz99.QuickActions namespace from the DemoSample sub-namespace). -->
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <LangVersion>9.0</LangVersion>

@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace Playground.QuickActions.Internal
+namespace EminDeniz99.QuickActions.Internal
 {
     /// <summary>
     /// Platform abstraction behind the public <see cref="QuickActions"/> facade.

@@ -1,4 +1,4 @@
-package com.playground.quickactions;
+package com.emindeniz99.quickactions;
 
 import android.app.Activity;
 import android.content.Context;
@@ -26,12 +26,12 @@ import java.util.List;
  */
 public final class QuickActionsBridge {
 
-    public static final String EXTRA_ACTION_ID = "com.playground.quickactions.ACTION_ID";
+    public static final String EXTRA_ACTION_ID = "com.emindeniz99.quickactions.ACTION_ID";
 
     // Static shortcuts declared in res/xml cannot carry intent extras, so their id
     // is encoded as the intent action suffix: ACTION_PREFIX + "<id>". Keep in sync
     // with the Android build post-processor.
-    public static final String ACTION_PREFIX = "com.playground.quickactions.PERFORM.";
+    public static final String ACTION_PREFIX = "com.emindeniz99.quickactions.PERFORM.";
 
     // Names of bundled drawables looked up for IconType values (index = enum int).
     // Index 0 (None) is intentionally empty. Provide drawables named

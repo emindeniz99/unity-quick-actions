@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using UnityEngine;
 
-namespace Playground.QuickActions.Internal
+namespace EminDeniz99.QuickActions.Internal
 {
     /// <summary>
     /// iOS bridge. Talks to the Objective-C++ layer in

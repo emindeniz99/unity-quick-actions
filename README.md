@@ -151,7 +151,7 @@ Constraints only work for managed code, **not** native plugins):
 
    ```csharp
    #if QUICKACTIONS_ENABLED
-   using Playground.QuickActions;
+   using EminDeniz99.QuickActions;
    ...
    QuickActions.Add(new QuickActionItem("new_game", "New Game"));
    #endif
@@ -192,7 +192,7 @@ tap (warm taps still arrive).
 
 ```csharp
 using System.Collections.Generic;
-using Playground.QuickActions;
+using EminDeniz99.QuickActions;
 using UnityEngine;
 
 public class ShortcutRouter : MonoBehaviour

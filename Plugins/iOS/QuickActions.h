@@ -1,7 +1,7 @@
 #ifndef QUICKACTIONS_H
 #define QUICKACTIONS_H
 
-// C API consumed from C# (Playground.QuickActions.Internal.IOSQuickActionsBridge)
+// C API consumed from C# (EminDeniz99.QuickActions.Internal.IOSQuickActionsBridge)
 // via DllImport("__Internal"). The implementation lives in QuickActions.mm,
 // which also installs the UnityAppController hooks. This header is informational;
 // the .mm does not depend on it.

@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace Playground.QuickActions.Internal
+namespace EminDeniz99.QuickActions.Internal
 {
     /// <summary>
     /// No-op bridge used in the Editor and on unsupported platforms so the public

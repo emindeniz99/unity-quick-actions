@@ -15,12 +15,12 @@ using UnityEditor;
 using UnityEditor.Android;
 using UnityEditor.Build;
 
-namespace Playground.QuickActions.Editor.NativeGate
+namespace EminDeniz99.QuickActions.Editor.NativeGate
 {
     internal sealed class QuickActionsTrampolineStripperAndroid : IPostGenerateGradleAndroidProject
     {
         private const string AndroidNs = "http://schemas.android.com/apk/res/android";
-        private const string TrampolineClass = "com.playground.quickactions.QuickActionsTrampolineActivity";
+        private const string TrampolineClass = "com.emindeniz99.quickactions.QuickActionsTrampolineActivity";
         // The source manifest authors the fully-qualified name, so the merged manifest
         // normally keeps it. Also accept the relative `.QuickActionsTrampolineActivity`
         // shorthand so the gate can't silently fail to strip if the name is ever

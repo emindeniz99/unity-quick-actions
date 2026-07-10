@@ -54,9 +54,9 @@ just use `v0.1.0`.)
 
 - The package name `com.emindeniz99.quick-actions` is author-scoped so it's
   globally unique on OpenUPM. It is independent of the C# namespace and asmdef
-  names (`Playground.QuickActions`), which stay as-is — the UPM name and the code
+  names (`EminDeniz99.QuickActions`), which stay as-is — the UPM name and the code
   namespace don't have to match. (The Android Java package
-  `com.playground.quickactions` is also independent and unchanged.)
+  `com.emindeniz99.quickactions` is also independent and unchanged.)
 - OpenUPM only serves the package's runtime/editor content; `Samples~/`,
   `Tests/`, and dev tooling are handled normally by UPM (`Samples~` imported
   on demand, `Tests` excluded from consumer builds).

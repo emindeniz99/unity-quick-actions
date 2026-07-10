@@ -10,7 +10,7 @@
     <Nullable>disable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
-    <AssemblyName>Playground.QuickActions.Tests</AssemblyName>
+    <AssemblyName>EminDeniz99.QuickActions.Tests</AssemblyName>
     <IsPackable>false</IsPackable>
     <DefineConstants>UNITY_EDITOR;UNITY_2022_3_OR_NEWER;QUICKACTIONS_ENABLED</DefineConstants>
   </PropertyGroup>

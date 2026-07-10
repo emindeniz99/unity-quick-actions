@@ -3,10 +3,10 @@
 // guard its call sites the same way your own game code does. See the README.
 #if QUICKACTIONS_ENABLED
 using System.Collections.Generic;
-using Playground.QuickActions;
+using EminDeniz99.QuickActions;
 using UnityEngine;
 
-namespace Playground.QuickActions.DemoSample
+namespace EminDeniz99.QuickActions.DemoSample
 {
     /// <summary>
     /// Minimal on-screen demo for the Quick Actions package. Attach to a GameObject

@@ -62,7 +62,7 @@ Do this for **each platform tab** you'll build (Android / iOS). Press Enter, the
 **Apply**. Wait for the recompile.
 
 > If you skip this, the package compiles to nothing: the Demo is inert (its code
-> is `#if`-guarded away) and any unguarded `using Playground.QuickActions;` in
+> is `#if`-guarded away) and any unguarded `using EminDeniz99.QuickActions;` in
 > YOUR scripts errors — that's expected, just add the define.
 
 ### A6. Import the Demo

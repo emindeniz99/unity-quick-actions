@@ -1,9 +1,9 @@
 using NUnit.Framework;
-using Playground.QuickActions;
-using Playground.QuickActions.Internal;
+using EminDeniz99.QuickActions;
+using EminDeniz99.QuickActions.Internal;
 using UnityEngine;
 
-namespace Playground.QuickActions.Tests
+namespace EminDeniz99.QuickActions.Tests
 {
     /// <summary>
     /// Verifies the JSON contract the native layers parse. Uses the real

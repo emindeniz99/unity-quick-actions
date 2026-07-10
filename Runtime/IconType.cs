@@ -1,4 +1,4 @@
-namespace Playground.QuickActions
+namespace EminDeniz99.QuickActions
 {
     /// <summary>
     /// Built-in icon for a quick action.

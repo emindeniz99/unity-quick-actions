@@ -1,6 +1,6 @@
 using System;
 
-namespace Playground.QuickActions
+namespace EminDeniz99.QuickActions
 {
     /// <summary>
     /// One home-screen quick action — an item revealed by long-pressing the app

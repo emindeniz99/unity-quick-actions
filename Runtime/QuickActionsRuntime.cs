@@ -1,7 +1,7 @@
 using System.Collections;
 using UnityEngine;
 
-namespace Playground.QuickActions
+namespace EminDeniz99.QuickActions
 {
     /// <summary>
     /// Hidden, auto-created singleton that funnels native "a quick action was

@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Playground.QuickActions.Internal;
+using EminDeniz99.QuickActions.Internal;
 using UnityEngine;
 
-namespace Playground.QuickActions
+namespace EminDeniz99.QuickActions
 {
     /// <summary>
     /// Public entry point for home-screen quick actions on iOS and Android — the

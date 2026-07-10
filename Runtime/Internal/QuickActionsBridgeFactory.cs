@@ -1,4 +1,4 @@
-namespace Playground.QuickActions.Internal
+namespace EminDeniz99.QuickActions.Internal
 {
     /// <summary>
     /// Picks the right <see cref="IQuickActionsBridge"/> for the build target.

@@ -1,12 +1,8 @@
 {
-    "name": "Playground.QuickActions.Editor",
-    "rootNamespace": "Playground.QuickActions.Editor",
-    "references": [
-        "Playground.QuickActions"
-    ],
-    "includePlatforms": [
-        "Editor"
-    ],
+    "name": "EminDeniz99.QuickActions",
+    "rootNamespace": "EminDeniz99.QuickActions",
+    "references": [],
+    "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
     "overrideReferences": false,

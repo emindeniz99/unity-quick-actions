@@ -35,7 +35,7 @@ the one-minute setup.
 ## Dead-simple usage
 
 ```csharp
-using Playground.QuickActions;
+using EminDeniz99.QuickActions;
 
 void Awake()
 {

@@ -56,13 +56,13 @@ projects/quick-actions-unity/
       AndroidQuickActionsBridge.cs   # #if UNITY_ANDROID AndroidJavaObject
       NullQuickActionsBridge.cs      # Editor / unsupported = no-op
       QuickActionList.cs             # JsonUtility wrapper
-    Playground.QuickActions.asmdef
+    EminDeniz99.QuickActions.asmdef
   Editor/
     QuickActionsSettings.cs            # ScriptableObject: static shortcut list (Project Settings)
     QuickActionsSettingsProvider.cs    # IMGUI Project Settings page
     iOS/QuickActionsBuildPostProcessoriOS.cs      # PBXProject + Info.plist UIApplicationShortcutItems
     Android/QuickActionsBuildPostProcessorAndroid.cs  # shortcuts.xml + manifest meta-data + trampoline
-    Playground.QuickActions.Editor.asmdef
+    EminDeniz99.QuickActions.Editor.asmdef
   Plugins/
     iOS/ QuickActions.h  QuickActions.mm
     Android/ QuickActionsBridge.java  QuickActionsTrampolineActivity.java
@@ -75,7 +75,7 @@ platform flags for `.mm`/`.java`, `AssemblyDefinitionImporter` for asmdefs.
 ## Public API (final shape)
 
 ```csharp
-namespace Playground.QuickActions {
+namespace EminDeniz99.QuickActions {
   public static class QuickActions {
     public static bool IsSupported { get; }
     public static event Action<string> ShortcutTriggered;     // action id

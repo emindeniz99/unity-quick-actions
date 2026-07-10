@@ -1,6 +1,6 @@
 {
-    "name": "Playground.QuickActions.Editor.NativeGate",
-    "rootNamespace": "Playground.QuickActions.Editor.NativeGate",
+    "name": "EminDeniz99.QuickActions.Editor.NativeGate",
+    "rootNamespace": "EminDeniz99.QuickActions.Editor.NativeGate",
     "references": [],
     "includePlatforms": [
         "Editor"

@@ -1,9 +1,10 @@
 {
-    "name": "Playground.QuickActions.Editor.iOS",
-    "rootNamespace": "Playground.QuickActions.Editor",
+    "name": "EminDeniz99.QuickActions.Tests",
+    "rootNamespace": "EminDeniz99.QuickActions.Tests",
     "references": [
-        "Playground.QuickActions",
-        "Playground.QuickActions.Editor"
+        "EminDeniz99.QuickActions",
+        "UnityEngine.TestRunner",
+        "UnityEditor.TestRunner"
     ],
     "includePlatforms": [
         "Editor"
@@ -12,11 +13,11 @@
     "allowUnsafeCode": false,
     "overrideReferences": true,
     "precompiledReferences": [
-        "UnityEditor.iOS.Extensions.Xcode.dll"
+        "nunit.framework.dll"
     ],
-    "autoReferenced": true,
+    "autoReferenced": false,
     "defineConstraints": [
-        "UNITY_IOS",
+        "UNITY_INCLUDE_TESTS",
         "QUICKACTIONS_ENABLED"
     ],
     "versionDefines": [],

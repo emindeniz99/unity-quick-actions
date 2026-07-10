@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace Playground.QuickActions.Internal
+namespace EminDeniz99.QuickActions.Internal
 {
     /// <summary>
     /// Android bridge. Calls the static helpers in
@@ -12,7 +12,7 @@ namespace Playground.QuickActions.Internal
     /// </summary>
     internal sealed class AndroidQuickActionsBridge : IQuickActionsBridge
     {
-        private const string BridgeClass = "com.playground.quickactions.QuickActionsBridge";
+        private const string BridgeClass = "com.emindeniz99.quickactions.QuickActionsBridge";
 
         private static AndroidJavaObject CurrentActivity()
         {

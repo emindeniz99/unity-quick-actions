@@ -5,12 +5,12 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using System.Xml;
-using Playground.QuickActions;
+using EminDeniz99.QuickActions;
 using UnityEditor;
 using UnityEditor.Android;
 using UnityEngine;
 
-namespace Playground.QuickActions.Editor
+namespace EminDeniz99.QuickActions.Editor
 {
     /// <summary>
     /// Bakes the static shortcuts from <see cref="QuickActionsSettings"/> into the
@@ -25,8 +25,8 @@ namespace Playground.QuickActions.Editor
     internal sealed class QuickActionsBuildPostProcessorAndroid : IPostGenerateGradleAndroidProject
     {
         private const string AndroidNs = "http://schemas.android.com/apk/res/android";
-        private const string ActionPrefix = "com.playground.quickactions.PERFORM.";
-        private const string TrampolineClass = "com.playground.quickactions.QuickActionsTrampolineActivity";
+        private const string ActionPrefix = "com.emindeniz99.quickactions.PERFORM.";
+        private const string TrampolineClass = "com.emindeniz99.quickactions.QuickActionsTrampolineActivity";
         private const string ShortcutsResource = "quickactions_shortcuts";
 
         public int callbackOrder => 100;

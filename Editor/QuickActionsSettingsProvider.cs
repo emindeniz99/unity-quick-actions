@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 
-namespace Playground.QuickActions.Editor
+namespace EminDeniz99.QuickActions.Editor
 {
     /// <summary>
     /// Adds a <b>Project Settings ▸ Quick Actions</b> page for editing the static

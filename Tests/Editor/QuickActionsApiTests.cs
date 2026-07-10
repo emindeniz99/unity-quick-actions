@@ -1,9 +1,9 @@
 using System.Collections.Generic;
 using NUnit.Framework;
-using Playground.QuickActions;
-using Playground.QuickActions.Internal;
+using EminDeniz99.QuickActions;
+using EminDeniz99.QuickActions.Internal;
 
-namespace Playground.QuickActions.Tests
+namespace EminDeniz99.QuickActions.Tests
 {
     /// <summary>
     /// White-box tests for the <see cref="QuickActions"/> facade's in-memory list

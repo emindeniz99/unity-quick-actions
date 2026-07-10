@@ -169,7 +169,7 @@ def make_shot2():
     d = ImageDraw.Draw(img)
     banner(d, w, "One simple C# API", "Add, remove, and react to taps")
     code = [
-        ("using Playground.QuickActions;", MUTE),
+        ("using EminDeniz99.QuickActions;", MUTE),
         ("", INK),
         ("QuickActions.Performed += id => Route(id);", INK),
         ("", INK),

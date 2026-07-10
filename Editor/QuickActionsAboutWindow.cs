@@ -1,7 +1,7 @@
 using UnityEditor;
 using UnityEngine;
 
-namespace Playground.QuickActions.Editor
+namespace EminDeniz99.QuickActions.Editor
 {
     /// <summary>
     /// Small in-Editor reference window (Window ▸ Quick Actions ▸ About) with a
@@ -14,7 +14,7 @@ namespace Playground.QuickActions.Editor
             "https://github.com/emindeniz99/playground/tree/main/projects/quick-actions-unity";
 
         private const string Snippet =
-@"using Playground.QuickActions;
+@"using EminDeniz99.QuickActions;
 
 void Awake()
 {

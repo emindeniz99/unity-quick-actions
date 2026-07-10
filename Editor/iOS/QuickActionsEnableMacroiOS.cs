@@ -11,7 +11,7 @@ using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
 using UnityEditor.iOS.Xcode;
 
-namespace Playground.QuickActions.Editor
+namespace EminDeniz99.QuickActions.Editor
 {
     internal sealed class QuickActionsEnableMacroiOS : IPostprocessBuildWithReport
     {

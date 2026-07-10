@@ -1,7 +1,7 @@
 using UnityEditor;
 using UnityEngine;
 
-namespace Playground.QuickActions.Editor
+namespace EminDeniz99.QuickActions.Editor
 {
     /// <summary>
     /// <b>Window ▸ Quick Actions ▸ Simulator.</b> Lists the registered runtime and

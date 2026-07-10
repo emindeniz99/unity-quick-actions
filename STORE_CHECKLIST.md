@@ -101,7 +101,7 @@ All sizes are ✅ pre-built by `python3 tools/gen_store_images.py`. See
       long-press the icon shows the demo's shortcuts; tapping routes correctly
       (cold + warm). This is the one step that needs real hardware.
 - [ ] No use of another publisher's assets; all art (`store~/`) is original.
-- [ ] Unique root namespace (`Playground.QuickActions`) and asmdef names.
+- [ ] Unique root namespace (`EminDeniz99.QuickActions`) and asmdef names.
 - [ ] Demo lives under `Samples~/` and imports cleanly via the package page.
 
 ## 6. Submit

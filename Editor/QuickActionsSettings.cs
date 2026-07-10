@@ -1,10 +1,10 @@
 using System.Collections.Generic;
 using System.IO;
-using Playground.QuickActions;
+using EminDeniz99.QuickActions;
 using UnityEditor;
 using UnityEngine;
 
-namespace Playground.QuickActions.Editor
+namespace EminDeniz99.QuickActions.Editor
 {
     /// <summary>
     /// Project-level configuration for <b>static</b> quick actions — shortcuts
