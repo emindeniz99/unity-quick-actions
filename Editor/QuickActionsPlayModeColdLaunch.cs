@@ -25,8 +25,13 @@ namespace Playground.QuickActions.Editor
                 SessionState.EraseString(QuickActions.EditorColdLaunchKey);
             EditorApplication.playModeStateChanged += state =>
             {
-                if (state == PlayModeStateChange.EnteredEditMode)
-                    SessionState.EraseString(QuickActions.EditorColdLaunchKey);
+                if (state != PlayModeStateChange.EnteredEditMode)
+                    return;
+                SessionState.EraseString(QuickActions.EditorColdLaunchKey);
+                // With domain reload disabled, statics survive play exit — drop the
+                // finished session's Performed subscribers (their MonoBehaviour
+                // targets are destroyed) so they can't leak into the next session.
+                QuickActions.EditorClearPerformedSubscribers();
             };
         }
 

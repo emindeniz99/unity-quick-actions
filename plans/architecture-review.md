@@ -2,7 +2,7 @@
 
 A high-altitude review of the package's structure, abstractions, control/data
 flow, and the trade-offs behind them — distinct from the line-level bug review
-(those fixes are already in). Dev-facing; excluded from the shipped package.
+(those fixes are already in). Dev-facing; excluded from the .unitypackage (visible in a UPM install).
 
 > **Resolution status:** All seven weaknesses below have been **addressed**.
 > W1 (OS read-back reconcile), W2 (single pull delivery channel), W3 (platform
@@ -92,7 +92,7 @@ drains the queue → `Performed`. (The original push design is analysed as W2.)
   new bridge + one factory branch.
 - Single, narrow extension seam (`IQuickActionsBridge`) for new capabilities.
 - Main-thread-only delivery; no background-thread event hazards.
-- Managed logic is unit-testable without Unity (33 headless-passing tests; 35 authored, 2 Unity-only).
+- Managed logic is unit-testable without Unity (the full NUnit suite runs headless via stubs; two serialization tests are Unity-only).
 - Native memory ownership is explicit (malloc ↔ native free).
 
 ## 6. Weaknesses / risks (severity · recommendation)

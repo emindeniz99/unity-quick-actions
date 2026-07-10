@@ -8,7 +8,7 @@ exercised.
 **Legend — Verified by:**
 `unit` = headless NUnit (`dotnet test`, 33 tests) · `unity-test` = Unity Test
 Runner only (JsonUtility) · `static` = compiles in the stub harness (7 configs) ·
-`review` = human/agent code review (7 rounds + a 15-unit workflow) ·
+`review` = human/agent code review (multiple adversarial rounds + a 15-unit workflow; see git log) ·
 `device` = **requires a real Unity Editor + device — NOT done here**.
 
 ## 1. Runtime API (managed) — fully testable, GREEN
@@ -71,8 +71,8 @@ Runner only (JsonUtility) · `static` = compiles in the stub harness (7 configs)
 - **Headless gate (closable here): GREEN.** `tools/verify.sh` → **VERIFY: PASS** —
   7 C# configs compile, **33 unit tests pass**, Java compiles, every asset has a
   stable `.meta`. Every managed feature has a dedicated, intent-encoding test
-  (Rule 9). Reviewed one-by-one across 7 rounds + a 15-unit adversarial workflow
-  (32 findings raised, 26 fixed/closed, 6 rejected, **0 P0 ship-blockers**).
+  (Rule 9). Reviewed one-by-one across repeated adversarial rounds + a 15-unit workflow
+  (every confirmed finding fixed or explicitly documented; **0 P0 ship-blockers**).
 - **Device gate (NOT closable in this container): OPEN.** Everything marked
   ⏳ above needs a licensed Unity (2022.3 LTS **and** Unity 6) + an iOS device
   (via macOS/Xcode) + an Android API-25+ device. This environment is headless

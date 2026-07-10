@@ -1,1 +1,0 @@
-Home-screen quick actions (the long-press app-icon shortcuts) for iOS and Android. Create them at runtime or bake them into the build, and get a callback when one is tapped — one C# API, zero native edits, Unity 2022 LTS to Unity 6.

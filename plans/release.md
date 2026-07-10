@@ -1,4 +1,4 @@
-# Release plan & readiness analysis — Quick Actions for iOS & Android
+# Release plan & readiness analysis — Home-Screen Quick Actions (iOS & Android)
 
 Deep assessment of where the package stands versus a shippable Asset Store
 product, and the path to launch. Companion to
@@ -14,10 +14,10 @@ product, and the path to launch. Companion to
 | Cross-version Android | ✅ done | trampoline avoids `UnityPlayerActivity`/`GameActivity` divergence |
 | C# compiles | ✅ verified | `dotnet` build, 7 configs, 0 warnings |
 | Android plugin compiles | ✅ verified | `javac` vs SDK stubs |
-| Unit tests | ✅ 33 passing (dotnet) + 2 Unity-only = 35 authored | `dotnet test` (list logic, validity, equality, icon pin, dispatch, reconcile, ordering, drain, last-performed) |
+| Unit tests | ✅ full suite passing (`dotnet test` via verify.sh; +2 Unity-only) | `dotnet test` (list logic, validity, equality, icon pin, dispatch, reconcile, ordering, drain, last-performed) |
 | Self code-review | ✅ done | 8-angle review; all confirmed bugs fixed |
 | Docs | ✅ done | README, CHANGELOG, ROADMAP, plans, per-folder READMEs |
-| Store images | ✅ generated | `store/` at exact required sizes |
+| Store images | ✅ generated | `store~/` at exact required sizes |
 | Store checklist | ✅ done | `STORE_CHECKLIST.md` |
 | iOS `.mm` compiled | ⚠️ review-only | no Apple SDK on Linux — compiles in Unity on macOS |
 | Real-Unity import/compile | ⚠️ blocked | editor installed (`/opt/unity`) but license-gated |
@@ -57,7 +57,7 @@ Legend: ✅ verified here · ⚠️ needs a licensed/real Unity · ⛔ needs har
 
 **Phase D — submit:**
 - Bump to `1.0.0` (package.json + CHANGELOG) if device-validated.
-- Export clean `.unitypackage` (exclude `.verify/ tools/ plans/ store/`).
+- Export clean `.unitypackage` (exclude `.verify/ tools/ plans/ store~/`).
 - Create publisher account, fill metadata + images, upload, submit for review.
 
 ## Risk register

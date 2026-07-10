@@ -35,7 +35,7 @@ just use `v0.1.0`.)
 
    ```yaml
    name: com.emindeniz99.quick-actions
-   displayName: Quick Actions for iOS & Android
+   displayName: Home-Screen Quick Actions
    repoUrl: https://github.com/emindeniz99/playground
    gitTagPrefix: quick-actions/v              # matches the tag scheme above
    minVersion: 0.1.0

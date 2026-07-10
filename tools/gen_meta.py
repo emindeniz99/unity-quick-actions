@@ -15,7 +15,7 @@ Routing:
   * everything else (.md,.json,.unity,.txt,...) -> DefaultImporter
 
 Skips: the package root, any `*~` directory (e.g. Samples~) — Unity ignores
-those — hidden dirs (incl. `.verify/`), the `store/` and `dist/` collateral
+those — hidden dirs (incl. `.verify/`), the `store~/` and `dist~/` collateral
 dirs, and existing `.meta` files.
 """
 import hashlib
@@ -174,10 +174,10 @@ def main() -> int:
     created = 0
     for root, dirs, files in os.walk(PKG):
         # Skip hidden/ignored dirs (Unity ignores names ending with ~ or starting .)
-        # and the store/ marketing folder (publishing collateral, not package content).
+        # (the store~/dist~ collateral dirs are covered by the ~ rule).
         dirs[:] = [d for d in dirs
                    if not d.endswith("~") and not d.startswith(".")
-                   and d not in ("store", "dist")]
+                   ]
 
         for d in dirs:
             abs_dir = os.path.join(root, d)

@@ -138,10 +138,14 @@ namespace Playground.QuickActions
         /// <summary>
         /// Mirrors a real process restart when Enter Play Mode Options disable domain
         /// reload: in the Editor, statics survive play sessions, but on a device every
-        /// launch starts clean — without this, a simulated tap's LastPerformed, the
-        /// in-memory list, and stale Performed subscribers (targeting destroyed
-        /// MonoBehaviours) would leak into the next play session. SubsystemRegistration
+        /// launch starts clean — without this, a simulated tap's LastPerformed and the
+        /// in-memory list would leak into the next play session. SubsystemRegistration
         /// runs before BeforeSceneLoad, so this cannot race the cold-launch seeder.
+        /// Note: Performed subscribers are deliberately NOT wiped here — a wipe in an
+        /// entry phase could race a legitimate same-phase user subscription (order
+        /// within a RuntimeInitialize phase is undefined). Stale subscribers from the
+        /// previous session are instead cleared on play EXIT (see
+        /// <see cref="EditorClearPerformedSubscribers"/>).
         /// </summary>
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void EditorResetForPlaySession()
@@ -152,8 +156,16 @@ namespace Playground.QuickActions
             _loaded = false;
             _loading = false;
             _bridge = null;
-            Performed = null;
+            LoggingEnable = false;
         }
+
+        /// <summary>
+        /// Called by the Editor assembly when Play Mode exits (EnteredEditMode), so
+        /// that — with domain reload disabled — subscribers targeting the finished
+        /// session's (now destroyed) MonoBehaviours can't leak into the next session.
+        /// Safe at exit: nothing legitimate subscribes between sessions.
+        /// </summary>
+        internal static void EditorClearPerformedSubscribers() => Performed = null;
 
         /// <summary>
         /// Editor Simulator entry point for a <b>warm</b> tap (app already running):

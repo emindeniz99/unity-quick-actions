@@ -1,0 +1,1 @@
+Home-screen quick actions (long-press app-icon shortcuts) for iOS & Android. Add at runtime or bake into the build, get a tap callback — one C# API, zero native edits, Unity 2022 LTS to Unity 6.

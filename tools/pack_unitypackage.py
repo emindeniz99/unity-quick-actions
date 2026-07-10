@@ -12,9 +12,9 @@ so scene/script references stay intact. This lets us ship the legacy
 drag-into-the-Editor format alongside the modern UPM package.
 
 Layout: package content is remapped under Assets/QuickActions/. Dev folders
-(.verify, tools, plans, store, Tests) and package.json are excluded.
+(.verify, tools, plans, store~, Tests) and package.json are excluded.
 
-Run: python3 tools/pack_unitypackage.py  ->  dist/QuickActions.unitypackage
+Run: python3 tools/pack_unitypackage.py  ->  dist~/QuickActions.unitypackage
 """
 import hashlib
 import io
@@ -23,7 +23,7 @@ import re
 import tarfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUT_DIR = os.path.join(ROOT, "dist")
+OUT_DIR = os.path.join(ROOT, "dist~")
 OUT = os.path.join(OUT_DIR, "QuickActions.unitypackage")
 ASSET_ROOT = "Assets/QuickActions"
 

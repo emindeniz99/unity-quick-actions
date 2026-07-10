@@ -1,9 +1,8 @@
-# Quick Actions for iOS & Android (Unity)
+# Home-Screen Quick Actions for iOS & Android (Unity)
 
 Home-screen **quick actions** for Unity games — the shortcuts revealed when a
-user long-presses your app icon. A clean-room, MIT-licensed equivalent of the
-"Quick Actions for iOS and Android" Asset Store package, targeting **Unity 2022
-LTS and newer** (including Unity 6).
+user long-presses your app icon. A clean-room, MIT-licensed implementation
+targeting **Unity 2022 LTS and newer** (including Unity 6).
 
 | Platform | Mechanism | Min OS |
 |----------|-----------|--------|
@@ -24,7 +23,13 @@ LTS and newer** (including Unity 6).
 
 ## Install
 
-> New here / haven't cloned it yet? See **[`GETTING_STARTED.md`](./GETTING_STARTED.md)**
+> **⚠️ After installing — one required step:** add `QUICKACTIONS_ENABLED` to
+> **Project Settings ▸ Player ▸ Scripting Define Symbols**. The package is
+> deliberately inert without it (that's its dev-only safety design — see
+> [Dev-only](#dev-only--excluding-it-completely-from-production-builds)).
+
+> New here / haven't cloned it yet? See
+> **[GETTING_STARTED](https://github.com/emindeniz99/playground/blob/main/projects/quick-actions-unity/GETTING_STARTED.md)**
 > for a full walkthrough: clone → test in a fresh project → run on a device →
 > publish to the Asset Store.
 
@@ -47,7 +52,7 @@ https://github.com/emindeniz99/playground.git?path=projects/quick-actions-unity#
 ```
 
 (The tag is prefixed `quick-actions/v…` because this is a monorepo — see
-[`plans/openupm.md`](./plans/openupm.md). No tags exist yet; the default-branch
+[`plans/openupm.md`](https://github.com/emindeniz99/playground/blob/main/projects/quick-actions-unity/plans/openupm.md). No tags exist yet; the default-branch
 URL above works in the meantime.)
 
 This is the best fit for the **dev-only** workflow: the package lives read-only
@@ -81,11 +86,11 @@ package under `dependencies`:
 ```
 
 OpenUPM gives version management and update notifications in Package Manager.
-(Publishing it there is a one-time setup — see [`plans/openupm.md`](./plans/openupm.md).)
+(Publishing it there is a one-time setup — see [`plans/openupm.md`](https://github.com/emindeniz99/playground/blob/main/projects/quick-actions-unity/plans/openupm.md).)
 
 ### 3. Drag-and-drop `.unitypackage` (classic)
 
-Drag [`dist/QuickActions.unitypackage`](./dist/QuickActions.unitypackage) into an
+Drag [`dist~/QuickActions.unitypackage`](https://github.com/emindeniz99/playground/raw/main/projects/quick-actions-unity/dist~/QuickActions.unitypackage) into an
 open Editor (or *Assets ▸ Import Package ▸ Custom Package…*). It installs under
 `Assets/QuickActions/`. Rebuild any time with `python3 tools/pack_unitypackage.py`
 (no Unity needed). This is also what Asset Store buyers get. Note: it lands in
@@ -103,7 +108,7 @@ or:
 ---
 
 After installing, import the **Demo** sample from the package page to try it on a
-device. More on packaging/export: [`tools/export-unitypackage.md`](./tools/export-unitypackage.md).
+device. More on packaging/export: [`tools/export-unitypackage.md`](https://github.com/emindeniz99/playground/blob/main/projects/quick-actions-unity/tools/export-unitypackage.md).
 
 ## Dev-only — excluding it completely from production builds
 
@@ -155,7 +160,7 @@ Constraints only work for managed code, **not** native plugins):
 For a **guaranteed-zero** prod (no dead class either), don't ship the package in
 the prod project at all — e.g. install it as a UPM Git dependency only on your
 dev branch/manifest. Want it **always-on** (e.g. an Asset Store release)? Remove
-the `defineConstraints` from the asmdefs (or flip `tools/gen_meta.py`), drop the
+the `defineConstraints` from the asmdefs, drop the
 `#if QUICKACTIONS_ENABLED` from the `.mm`, and delete the two gate post-processors.
 
 > The native gating edits the generated Xcode/Gradle project and can't be
@@ -177,7 +182,7 @@ the `defineConstraints` from the asmdefs (or flip `tools/gen_meta.py`), drop the
 
 ## Usage
 
-No setup, prefab, or `Init()` call is needed — call the static `QuickActions`
+No setup beyond the define — no prefab or `Init()` call; use the static `QuickActions`
 API and the tap event pump self-initializes. Subscribe to `Performed` from a
 script **in your first scene** (in `Awake`/`OnEnable` for safety): the
 cold-launch tap is delivered one frame after startup — after the first scene's
@@ -323,14 +328,14 @@ The package is type-checked and compiled without Unity via a stub-based harness:
 
 ```bash
 tools/setup.sh     # install dotnet + JDK (once; pre-baked in the devcontainer)
-tools/verify.sh    # .meta gen + C# compile (7 configs) + 33 unit tests + Android plugin
+tools/verify.sh    # .meta gen + C# compile (7 configs) + unit tests + Android plugin
 ```
 
 `verify.sh` runs the unit tests via `dotnet test`; the same tests (plus
 JsonUtility serialization tests) run in Unity's **Test Runner** from
-`Tests/Editor/`. See [`.verify/README.md`](./.verify/README.md). A green run
+`Tests/Editor/`. See [`.verify/README.md`](https://github.com/emindeniz99/playground/blob/main/projects/quick-actions-unity/.verify/README.md). A green run
 proves everything compiles and the logic tests pass; on-device behaviour is
-validated with the procedure in [`plans/mvp.md`](./plans/mvp.md) (iOS/Android
+validated with the procedure in [`plans/mvp.md`](https://github.com/emindeniz99/playground/blob/main/projects/quick-actions-unity/plans/mvp.md) (iOS/Android
 quick actions can't run in the Editor or on Linux).
 
 ## Notes / learnings

@@ -12,8 +12,9 @@ commit that ships it.
 - **Static shortcut custom icons (iOS file icons)** — `UIApplicationShortcutItemIconFile`
   with an asset-catalog template image (Android already supports a drawable via
   `AndroidDrawable`; iOS static currently supports only system `IconType` glyphs).
-- **`.unitypackage` export automation** — a batch-mode Unity script so CI can
-  emit the classic-format artifact (currently a documented manual step).
+- **`.unitypackage` export in CI** — `tools/pack_unitypackage.py` already builds
+  the classic artifact without Unity; remaining: run it in CI and attach the
+  output to releases.
 - **Automated device CI** — drive an iOS simulator / Android emulator to assert
   cold + warm delivery end-to-end.
 - **Localization** — per-locale titles/subtitles.

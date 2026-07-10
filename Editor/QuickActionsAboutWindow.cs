@@ -40,7 +40,7 @@ void Start()
 
         private void OnGUI()
         {
-            EditorGUILayout.LabelField("Quick Actions for iOS & Android", EditorStyles.boldLabel);
+            EditorGUILayout.LabelField("Home-Screen Quick Actions (iOS & Android)", EditorStyles.boldLabel);
             EditorGUILayout.LabelField(
                 "Home-screen shortcuts (long-press the app icon). Create them at " +
                 "runtime; the OS keeps them across launches.",

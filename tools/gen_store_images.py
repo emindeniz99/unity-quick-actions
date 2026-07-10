@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Generate Asset Store marketing images and example shortcut icons.
 
-Outputs to store/ at the exact sizes the Unity Asset Store requires:
+Outputs to store~/ at the exact sizes the Unity Asset Store requires:
   icon 160x160, card 420x280, cover 1950x1300, social 1200x630,
   screenshots 2400x1600 (>=1200 wide). Plus example shortcut drawables.
 
@@ -13,7 +13,7 @@ import os
 from PIL import Image, ImageDraw, ImageFont
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUT = os.path.join(ROOT, "store")
+OUT = os.path.join(ROOT, "store~")
 ICONS = os.path.join(OUT, "example-shortcut-icons")
 FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 FONT_B = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"

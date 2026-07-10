@@ -1,4 +1,4 @@
-# Quick Actions for iOS & Android
+# Home-Screen Quick Actions (iOS & Android)
 
 **Add the long-press app-icon shortcuts players already expect — in minutes,
 from one C# API.**
@@ -22,6 +22,15 @@ Objective-C, no Java, no editing the generated Xcode/Gradle projects.
   `UnityPlayerActivity` → `UnityPlayerGameActivity` change on Android.
 • **Full source included** — readable C#, Objective-C++ and Java. No black-box
   DLLs. Unit-tested and documented.
+
+## One switch to turn it on
+
+The package is **opt-in by design**: add the `QUICKACTIONS_ENABLED` scripting
+define (Project Settings ▸ Player ▸ Scripting Define Symbols) and everything
+activates. Without the define the package stays **completely out of your build** —
+that's a feature: keep it in your dev build profile only, and your production
+builds are guaranteed to contain zero of its code. The included README covers
+the one-minute setup.
 
 ## Dead-simple usage
 
@@ -51,8 +60,8 @@ Actions** and they're baked into the build automatically.
 • Static shortcut configuration (Project Settings) with iOS & Android build
   post-processors
 • Native plugins with full source (iOS `.mm`, Android `.java`)
-• A ready-to-run demo scene
-• Unit tests and a complete README
+• A ready-to-run demo scene + an in-Editor tap Simulator (test without a device)
+• A complete README (the full unit-test suite lives in the open-source repo)
 
 ## Compatibility
 

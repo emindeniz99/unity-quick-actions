@@ -5,7 +5,7 @@ Fill these into the Publisher portal package draft. Long-form copy is in
 
 | Field | Value |
 |-------|-------|
-| **Title** | Quick Actions for iOS & Android |
+| **Title** | Home-Screen Quick Actions (iOS & Android) |
 | **Category** | Tools ▸ Integration |
 | **Summary** | See [`summary.txt`](./summary.txt) |
 | **Description** | See [`description.md`](./description.md) |
@@ -18,16 +18,16 @@ Fill these into the Publisher portal package draft. Long-form copy is in
 | **Price** | Free or paid (min $4.99) — your call |
 | **License** | Extension Asset / MIT source included |
 
-## Key images (from `store/`)
+## Key images (from `store~/`)
 
-- Icon `store/icon.png` (160×160)
-- Card `store/card.png` (420×280)
-- Cover `store/cover.png` (1950×1300)
-- Social `store/social.png` (1200×630)
-- Screenshots `store/screenshot-1..3.png` (2400×1600)
+- Icon `store~/icon.png` (160×160)
+- Card `store~/card.png` (420×280)
+- Cover `store~/cover.png` (1950×1300)
+- Social `store~/social.png` (1200×630)
+- Screenshots `store~/screenshot-1..3.png` (2400×1600)
 
 ## Package upload
 
-Upload `dist/QuickActions.unitypackage` (built by
+Upload `dist~/QuickActions.unitypackage` (built by
 `tools/pack_unitypackage.py`). It installs the package under
 `Assets/QuickActions/`.

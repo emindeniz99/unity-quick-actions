@@ -36,7 +36,7 @@ cd playground/projects/quick-actions-unity
 ### A2. (Optional, no Unity needed) Sanity-check it compiles
 ```bash
 tools/setup.sh    # one-time: installs dotnet + JDK if missing
-tools/verify.sh   # → VERIFY: PASS  (compiles C#, runs 33 tests, compiles Java)
+tools/verify.sh   # → VERIFY: PASS  (compiles C#, runs the unit tests, compiles Java)
 ```
 This proves the code is healthy before you even open Unity.
 
@@ -47,7 +47,7 @@ In **Unity Hub ▸ New project ▸ 3D (URP or Built-in, doesn't matter)**. Name 
 ### A4. Install the package into the test project
 **Window ▸ Package Manager ▸ + ▸ Add package from disk…** and pick
 `projects/quick-actions-unity/package.json`.
-(Alternative: drag `dist/QuickActions.unitypackage` into the Project window — it
+(Alternative: drag `dist~/QuickActions.unitypackage` into the Project window — it
 lands under `Assets/QuickActions/`.)
 
 ### A5. ⚠️ Turn the package ON (the #1 gotcha)
@@ -61,11 +61,12 @@ QUICKACTIONS_ENABLED
 Do this for **each platform tab** you'll build (Android / iOS). Press Enter, then
 **Apply**. Wait for the recompile.
 
-> If you skip this, the Demo won't compile and `using Playground.QuickActions;`
-> will error — that's expected, just add the define.
+> If you skip this, the package compiles to nothing: the Demo is inert (its code
+> is `#if`-guarded away) and any unguarded `using Playground.QuickActions;` in
+> YOUR scripts errors — that's expected, just add the define.
 
 ### A6. Import the Demo
-Package Manager ▸ select **Quick Actions for iOS & Android** ▸ **Samples** tab ▸
+Package Manager ▸ select **Home-Screen Quick Actions** ▸ **Samples** tab ▸
 **Import** next to "Demo". It copies into `Assets/Samples/…/Demo`.
 (If you used the `.unitypackage`, the demo is at `Assets/QuickActions/Example`.)
 
@@ -141,9 +142,9 @@ Right now the package is **dev-only gated** — a buyer who imports it and doesn
 set `QUICKACTIONS_ENABLED` sees **nothing**, which is bad UX for a paid asset.
 For a store release you almost certainly want it **always-on**:
 
-- Remove `defineConstraints: ["QUICKACTIONS_ENABLED"]` from the asmdefs (or flip
-  it in `tools/gen_meta.py` and regenerate), drop the `#if QUICKACTIONS_ENABLED`
-  from `Plugins/iOS/QuickActions.mm`, and delete the two gate post-processors
+- Remove `defineConstraints: ["QUICKACTIONS_ENABLED"]` from the asmdefs, drop
+  the `#if QUICKACTIONS_ENABLED` from `Plugins/iOS/QuickActions.mm`, and delete
+  the two gate post-processors
   (`Editor/iOS/QuickActionsEnableMacroiOS.cs`, `Editor/NativeGate/…StripperAndroid.cs`).
 - See the **"Want it always-on?"** note in [`README.md`](./README.md#dev-only--excluding-it-completely-from-production-builds).
 
@@ -162,14 +163,14 @@ that I could not do for you (no Unity/devices in the build environment).
 ### C3. Build the upload package
 - Easiest: install **Asset Store Publishing Tools** from the Asset Store (search
   it in the Package Manager / Asset Store), which adds an uploader window in Unity.
-- Or upload the prebuilt `dist/QuickActions.unitypackage` (rebuild any time with
+- Or upload the prebuilt `dist~/QuickActions.unitypackage` (rebuild any time with
   `python3 tools/pack_unitypackage.py`). Make sure it reflects your gated/always-on choice.
 
 ### C4. Fill the listing (everything is pre-written)
 In the publisher portal, create a draft package and paste from
-[`store/listing/`](./store/listing/): `metadata.md` (title/category/version),
+[`store~/listing/`](./store~/listing/): `metadata.md` (title/category/version),
 `summary.txt`, `description.md`, `tags.txt`. Upload the images from
-[`store/`](./store/) (icon 160×160, card 420×280, cover 1950×1300, screenshots).
+[`store~/`](./store~/) (icon 160×160, card 420×280, cover 1950×1300, screenshots).
 **Replace at least one screenshot with a real on-device long-press capture** —
 the current ones are mockups and the store prefers in-context shots.
 
@@ -184,7 +185,7 @@ specific feedback to fix and resubmit.
 
 | Symptom | Cause / fix |
 |---|---|
-| `QuickActions` type not found / Demo won't compile | `QUICKACTIONS_ENABLED` define missing (step A5) — add it for that platform |
+| `QuickActions` type not found in your scripts / Demo inert | `QUICKACTIONS_ENABLED` define missing (step A5) — add it for that platform |
 | Nothing happens in the Editor Play mode | Expected — the OS menu only exists on a device (Part B). Use the Simulator (step A7) to test tap handling in-Editor |
 | Long-press shows no shortcuts | Did you press "Add 3 shortcuts" first? Android < 7.1 (API 25) isn't supported |
 | Buyer imported the store asset and "nothing works" | You shipped the **gated** version — make it always-on for the store (step C0) |
