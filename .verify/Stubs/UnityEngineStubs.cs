@@ -100,6 +100,13 @@ namespace UnityEngine
 
     public class GUIStyle { }
 
+    public class GUIContent
+    {
+        public string text;
+        public GUIContent() { }
+        public GUIContent(string text) { this.text = text; }
+    }
+
     public class GUILayoutOption { }
 
     public static class GUILayout

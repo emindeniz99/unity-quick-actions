@@ -20,13 +20,12 @@ once in a real Editor to confirm before submitting to the store.)
 ## What to include / exclude
 
 Ship only the package itself. **Include:** `Runtime/`, `Editor/`, `Plugins/`,
-`Samples~/`, `package.json`, `README.md`, `CHANGELOG.md`, `LICENSE.md`,
-`ROADMAP.md`. **Exclude** the dev/publishing collateral: `.verify/`, `tools/`,
-`plans/`, `store~/`, `dist~/`, `Tests/`, `STORE_CHECKLIST.md` (`.verify/` is already
-hidden from Unity; the others must be left out of the exported selection).
-(The `tools/pack_unitypackage.py` script in Option 0 already applies exactly
-this include/exclude split, and additionally drops `package.json` since the
-classic `Assets/` layout doesn't use it.)
+`Samples~/`, `README.md`, `CHANGELOG.md`, `LICENSE.md`, `ROADMAP.md`.
+**Exclude** the dev/publishing collateral: `.verify/`, `tools/`, `plans/`,
+`store~/`, `dist~/`, `Tests/`, `STORE_CHECKLIST.md`, and `package.json` (the
+classic `Assets/` layout doesn't use a UPM manifest). `.verify/` and the `~`
+dirs are already hidden from Unity; the others must be left out of the exported
+selection. (`tools/pack_unitypackage.py` in Option 0 applies exactly this split.)
 
 ## Option A — Unity Editor (GUI)
 
@@ -49,6 +48,6 @@ With the package copied to `Assets/QuickActions/` inside a throwaway project:
 file preserves the `.meta` GUIDs shipped here, so scene/script references stay
 intact.
 
-> Note: `.unitypackage` is a binary archive and cannot be generated without a
-> Unity install (none is present in this repo's CI container). This is a
-> documented manual/CI step, tracked in `ROADMAP.md`.
+> Note: Options A/B need a Unity install; Option 0 does not (the format is a
+> gzip tar of GUID-named entries, which `pack_unitypackage.py` writes directly).
+> Attaching the Option 0 artifact to releases from CI is tracked in `ROADMAP.md`.

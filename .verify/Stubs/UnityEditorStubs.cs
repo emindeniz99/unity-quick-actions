@@ -9,7 +9,7 @@ namespace UnityEditor
     {
         public Vector2 minSize;
         public Vector2 maxSize;
-        public string titleContent;
+        public GUIContent titleContent;
         public static T GetWindow<T>() where T : EditorWindow => CreateInstance<T>();
         public static T GetWindow<T>(bool utility, string title) where T : EditorWindow => CreateInstance<T>();
         public void Show() { }

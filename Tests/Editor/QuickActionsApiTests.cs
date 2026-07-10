@@ -349,8 +349,10 @@ namespace Playground.QuickActions.Tests
         [Test]
         public void Dispatch_RaisesPerformedExactlyOnce()
         {
-            // The runtime's _ready gate + idempotent drain exist to deliver each tap
-            // once; assert the count, not just the last id (which can't see a double-fire).
+            // Scope: one Dispatch call = exactly one Performed invocation (count, not
+            // just last-id, so a double-fire regression is visible). The queue-drain
+            // exactly-once guarantee has its own test:
+            // Drain_DeliversBufferedIdsInOrderExactlyOnce.
             var count = 0;
             void Handler(string id) => count++;
             QuickActions.Performed += Handler;
