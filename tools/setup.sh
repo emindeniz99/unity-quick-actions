@@ -21,7 +21,7 @@ echo "setup: refreshing apt index..."
 $SUDO apt-get update -y
 
 pkgs=""
-[ "$need_dotnet" = "1" ] && pkgs="$pkgs dotnet-sdk-8.0"
+[ "$need_dotnet" = "1" ] && pkgs="$pkgs dotnet-sdk-10.0"
 [ "$need_jdk" = "1" ] && pkgs="$pkgs default-jdk-headless"
 
 echo "setup: installing$pkgs"

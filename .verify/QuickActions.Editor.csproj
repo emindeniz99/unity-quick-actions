@@ -2,7 +2,7 @@
   <!-- Compile-only verification of the Editor + Runtime (editor) code path.
        Uses the UnityEngine/UnityEditor stubs in Stubs/. Not a real build. -->
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <LangVersion>9.0</LangVersion>
     <Nullable>disable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>

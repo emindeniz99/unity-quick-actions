@@ -302,6 +302,9 @@ order) and logs the rest. Keep your most important shortcuts first.
 
 ## Security: a shortcut tap is not an authenticated action
 
+> Found a vulnerability? Please report it privately — see
+> [SECURITY.md](https://github.com/emindeniz99/playground/blob/main/projects/quick-actions-unity/SECURITY.md).
+
 Treat the id from `Performed` / `LastPerformed` as a **navigation hint, not an
 authorization**. On Android the trampoline activity must be `exported` for the
 launcher to start it, so another app on the device could fire the same intent and

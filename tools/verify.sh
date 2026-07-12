@@ -48,8 +48,8 @@ echo "== 4/4  Java compile (Android SDK stubs) =="
 if command -v javac >/dev/null 2>&1; then
   TMP="$(mktemp -d)"
   mkdir -p "$TMP/out"
-  if javac -d "$TMP/out" $(find "$VERIFY/JavaStubs" -name '*.java') 2>"$TMP/stub.err"; then
-    if javac -d "$TMP/out" -cp "$TMP/out" "$ROOT"/Plugins/Android/*.java 2>"$TMP/plugin.err"; then
+  if javac --release 11 -d "$TMP/out" $(find "$VERIFY/JavaStubs" -name '*.java') 2>"$TMP/stub.err"; then
+    if javac --release 11 -d "$TMP/out" -cp "$TMP/out" "$ROOT"/Plugins/Android/*.java 2>"$TMP/plugin.err"; then
       echo "Android plugin compiles OK"
     else
       echo "!! Android plugin failed:"; cat "$TMP/plugin.err"; fail=1

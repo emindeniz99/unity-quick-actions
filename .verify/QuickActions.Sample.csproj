@@ -3,7 +3,7 @@
        sample's use of the API resolves (incl. the QuickActions type vs the
        EminDeniz99.QuickActions namespace from the DemoSample sub-namespace). -->
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <LangVersion>9.0</LangVersion>
     <Nullable>disable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>

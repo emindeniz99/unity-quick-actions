@@ -3,7 +3,7 @@
        ABSENT — mirroring the real ungated asmdef, which must compile and run when
        the package define is off. Catches any accidental dependency on a gated type. -->
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <LangVersion>9.0</LangVersion>
     <Nullable>disable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
