@@ -14,7 +14,7 @@ tests green, full source + docs.
 
 ⏳ **Needs your account / hardware (can't be automated):**
 1. Create the free publisher account + accept the agreement.
-2. Open the package in a **licensed** Unity (2021.3 min + 6.3 LTS; smoke 2022.3 + 6.0) and confirm a
+2. Open the package in **each** licensed Unity line (2021.3, 2022.3, 6.0, 6.3) and confirm a
    clean import; switch to iOS/Android targets.
 3. **Device test** (Android device; iOS via macOS/Xcode) + one real screenshot.
 4. Set the price to **Free** (decided 2026-07-10 — see §2), upload
@@ -94,7 +94,7 @@ All sizes are ✅ pre-built by `python3 tools/gen_store_images.py`. See
 ## 5. Technical review gates (do before upload)
 
 - [ ] Imports into a fresh **2021.3 LTS** project (the claimed minimum) with **zero console
-      errors/warnings**; repeat on **6.3 LTS** (full) and **2022.3 + 6.0** (smoke).
+      errors/warnings**; repeat the FULL check on **2022.3, 6.0 LTS and 6.3 LTS** (all claimed lines get the same bar).
 - [ ] `tools/verify.sh` is green (compile + unit tests + Android plugin).
 - [ ] Switch build target to **iOS** and **Android** → Editor still compiles
       (confirms the asmdef extension-DLL references resolve — see ROADMAP).

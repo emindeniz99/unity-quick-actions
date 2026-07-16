@@ -32,9 +32,9 @@ Legend: ✅ verified here · ⚠️ needs a licensed/real Unity · ⛔ needs har
    device (Xcode) and an Android device (API 25+); confirm long-press shows the
    shortcuts and taps route on cold + warm starts, for both dynamic and static.
    Everything else is verified statically; this is the one thing stubs can't cover.
-2. **Real-Unity compile pass.** Open the package in a licensed 2021.3 LTS (min), 6.3 LTS, and a
-   Unity 6 editor; confirm zero console errors, and that switching to iOS/Android
-   targets resolves the editor-extension DLL references (asmdef
+2. **Real-Unity compile pass.** Open the package in each claimed line (2021.3,
+   2022.3, 6.0, 6.3); confirm zero console errors, and that switching to
+   iOS/Android targets resolves the editor-extension DLL references (asmdef
    `precompiledReferences`). High confidence it's correct; needs confirmation.
 3. **Real screenshot.** Swap the mockup `screenshot-1` for an on-device shot.
 4. **Version decision.** Ship as `0.1.0` (honest pre-device) or cut `1.0.0`
@@ -47,7 +47,7 @@ Legend: ✅ verified here · ⚠️ needs a licensed/real Unity · ⛔ needs har
 
 **Phase B — real Unity (needs your license, ~1–2 h):**
 - Activate Unity Personal (free) — see `tools/install-unity-linux.md` §3.
-- Open package in 2021.3 LTS (min) + 6.3 LTS (smoke 2022.3/6.0); fix any console issue.
+- Open package in each claimed line (2021.3, 2022.3, 6.0, 6.3); fix any console issue.
 - Switch to iOS and Android targets; confirm compile.
 - Run the Test Runner (EditMode) — the same tests + `SerializationTests`.
 

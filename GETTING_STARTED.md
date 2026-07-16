@@ -155,7 +155,7 @@ Go to <https://publisher.unity.com>, sign in with your Unity ID, create a
 **Publisher profile**, fill payout (PayPal/bank), and accept the Provider Agreement.
 
 ### C2. Validate the package in a real Unity (the device gate)
-Before uploading, do a full device pass (Part B) on **2021.3 LTS** (the minimum) and **Unity 6.3 LTS**, plus an import/compile smoke on **2022.3** and **6.0**,
+Before uploading, do the FULL pass (Part B, device included) on **each supported line: 2021.3 LTS, 2022.3 LTS, Unity 6.0 LTS and 6.3 LTS** — we claim them all, so we validate them all —
 with **zero console errors/warnings**. This is the one thing that must pass and
 that I could not do for you (no Unity/devices in the build environment).
 

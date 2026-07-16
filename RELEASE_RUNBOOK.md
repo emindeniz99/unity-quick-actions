@@ -11,11 +11,18 @@ The condensed, day-of sequence. Details live in
 - [ ] `cd playground/projects/quick-actions-unity && tools/setup.sh && tools/verify.sh`
       → expect **`VERIFY: PASS`** (if not, stop: the checkout is broken, nothing
       else will work — re-clone or ask for help).
-- [ ] Install **Unity Hub** + **Unity 2021.3 LTS** (min) and **6.3 LTS** with **Android Build Support** (add 2022.3 + 6.0 for the smoke pass)
+- [ ] Install **Unity Hub** + all four editors: **2021.3 LTS, 2022.3 LTS, 6.0 LTS, 6.3 LTS**, each with **Android Build Support**
       (+ iOS Build Support if on a Mac). *(GS §0)*
 - [ ] Phone ready: Android 7.1+ with **USB debugging** enabled.
 
-## Phase 1 — Editor smoke test (30 min)
+> **Matrix rule:** we claim four Unity lines, so all four get the FULL bar —
+> repeat **Phases 1–3** (and Phase 4 on a Mac) in **each** editor: 2021.3,
+> 2022.3, 6.0, 6.3. One testbed project per editor version (don't upgrade one
+> project through versions — that tests migration, not fresh installs). Budget
+> roughly half a day per line; start with 2021.3 (the minimum, most likely to
+> surface an API gap) and finish with 6.3 (the longest-lived target).
+
+## Phase 1 — Editor smoke test (30 min per editor)
 
 - [ ] Unity Hub ▸ New 3D project `QuickActionsTestbed`; open it.
 - [ ] Package Manager ▸ + ▸ *Add package from disk…* ▸ this folder's `package.json`.
