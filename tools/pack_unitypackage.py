@@ -16,6 +16,7 @@ Layout: package content is remapped under Assets/QuickActions/. Dev folders
 
 Run: python3 tools/pack_unitypackage.py  ->  dist~/QuickActions.unitypackage
 """
+import gzip
 import hashlib
 import io
 import os
@@ -116,7 +117,10 @@ def main():
     files, folders = collect()
     os.makedirs(OUT_DIR, exist_ok=True)
 
-    with tarfile.open(OUT, "w:gz") as tar:
+    # Deterministic output: gzip normally stamps the compression TIME into its
+    # header, so rebuilding identical content still changed the bytes (churning
+    # git). mtime=0 makes the artifact reproducible — same input, same bytes.
+    with gzip.GzipFile(OUT, "wb", mtime=0) as gz, tarfile.open(fileobj=gz, mode="w") as tar:
         # folder entries (so Unity makes stable-GUID folders)
         for folder in folders:
             guid = folder_guid(folder)
