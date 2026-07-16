@@ -66,7 +66,9 @@ Actions** and they're baked into the build automatically.
 ## Compatibility
 
 • Unity **2021.3 LTS or newer**, including Unity 6
-• **iOS 9+** and **Android 7.1+ (API 25)**
+• **iOS 9+** and **Android 7.1+ (API 25)** — on older devices every call is a
+  guarded, crash-free no-op (`IsPlatformSupported` tells you), and the plugin
+  imposes no `minSdk` on your game
 • Mono and IL2CPP; Built-in, URP and HDRP (no rendering involved)
 • iOS shortcuts require building on macOS with Xcode (standard for any iOS Unity
   project)

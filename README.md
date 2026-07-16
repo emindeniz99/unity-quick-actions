@@ -9,6 +9,12 @@ targeting **Unity 2021 LTS and newer** (including Unity 6).
 | iOS | `UIApplicationShortcutItem` (dynamic) | iOS 9 |
 | Android | `ShortcutManager` dynamic shortcuts | API 25 (Android 7.1) |
 
+Below those minimums the package is a **safe no-op** — every native call is
+guarded (`SDK_INT < 25` returns early; the plugin manifest imposes no `minSdk`
+on your game), so nothing crashes: `IsPlatformSupported` reports `false`, the OS
+just never shows shortcuts. One iOS nuance: on iOS 9–12 the menu needed 3D Touch
+hardware; iOS 13+ opens it with a plain long-press on every device.
+
 - **Runtime (dynamic) API** — add/remove shortcuts from C#; the OS keeps them across launches.
 - **Static shortcuts** — configure shortcuts in **Project Settings ▸ Quick
   Actions**; build post-processors bake them into `Info.plist` (iOS) and
@@ -228,7 +234,7 @@ public class ShortcutRouter : MonoBehaviour
 
 | Member | Purpose |
 |--------|---------|
-| `bool IsPlatformSupported` | True on a supported device; false in-Editor (calls are safe no-ops there — use the [Simulator](#test-in-the-editor--no-device-needed) to test taps). |
+| `bool IsPlatformSupported` | True on a supported device; false in-Editor **and on Android < 7.1 / API 25** (all calls are safe no-ops there — in-Editor, use the [Simulator](#test-in-the-editor--no-device-needed)). |
 | `bool LoggingEnable` | Toggle `Debug.Log` tracing. |
 | `event Action<string> Performed` | Tapped action id (main thread; includes cold launch). |
 | `string LastPerformed` | Id the app was last launched/resumed from, or null. |
