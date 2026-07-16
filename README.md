@@ -159,9 +159,11 @@ Constraints only work for managed code, **not** native plugins):
 
 For a **guaranteed-zero** prod (no dead class either), don't ship the package in
 the prod project at all — e.g. install it as a UPM Git dependency only on your
-dev branch/manifest. Want it **always-on** (e.g. an Asset Store release)? Remove
-the `defineConstraints` from the asmdefs, drop the
-`#if QUICKACTIONS_ENABLED` from the `.mm`, and delete the two gate post-processors.
+dev branch/manifest. Prefer it **always-on** in your own fork (no define, active
+on import)? Remove the `defineConstraints` from the asmdefs, drop the
+`#if QUICKACTIONS_ENABLED` from the `.mm`, and delete the two gate post-processors
+— the gate is this package's default and its point, but the conversion is three
+mechanical steps if your project wants the opposite trade-off.
 
 > The native gating edits the generated Xcode/Gradle project and can't be
 > exercised by the stub harness — verify it once in a real build. Concretely, in a

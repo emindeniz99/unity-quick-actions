@@ -29,7 +29,7 @@ otherwise).
   authenticated action** (the Android trampoline is an exported activity; any
   app on the device can synthesize a tap id). See README ▸ "Security". Don't
   wire shortcut ids to destructive or privileged operations.
-- Dev-tooling dependencies (NUnit / test SDK / CI actions / Pillow for
-  marketing images) never ship to consumers; they are updated via Dependabot
-  (see `.github/dependabot.yml`) with a release-age cooldown as
-  malicious-release mitigation.
+- Dev-tooling dependencies never ship to consumers. The NuGet test packages and
+  GitHub Actions are updated via Dependabot (see `.github/dependabot.yml`) with
+  a release-age cooldown as malicious-release mitigation; Pillow (marketing
+  images only) is provisioned by the devcontainer and updated manually.

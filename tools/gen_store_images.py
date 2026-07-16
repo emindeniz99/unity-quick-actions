@@ -10,6 +10,7 @@ real on-device captures before publishing (the store rejects pure Editor shots).
 Run: python3 tools/gen_store_images.py
 """
 import os
+import sys
 from PIL import Image, ImageDraw, ImageFont
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -150,6 +151,13 @@ def banner(d, w, title, sub):
 
 
 def make_shot1():
+    # screenshot-1 is the designated REAL on-device capture slot: once the user
+    # has replaced it (per RELEASE_RUNBOOK), never clobber it with the mockup
+    # again unless explicitly forced with --force.
+    target = os.path.join(OUT, "screenshot-1.png")
+    if os.path.exists(target) and "--force" not in sys.argv:
+        print("skip screenshot-1.png (exists; pass --force to regenerate the mockup)")
+        return
     w, h = 2400, 1600
     img = vgrad(w, h, (16, 20, 28), (10, 12, 16))
     d = ImageDraw.Draw(img)

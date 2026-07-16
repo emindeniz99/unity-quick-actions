@@ -40,9 +40,10 @@ The condensed, day-of sequence. Details live in
 - [ ] Tap one → app foregrounds, log shows `Performed '<id>'` (**warm**).
 - [ ] Force-close app → long-press → tap a shortcut → app **cold-launches** and
       still logs the id.
-- [ ] 📸 **Take the long-press screenshot now** → replace
-      `store~/screenshot-1.png` → rerun `python3 tools/gen_store_images.py` if you
-      want the framed variants refreshed.
+- [ ] 📸 **Take the long-press screenshot now** → save it over
+      `store~/screenshot-1.png`. ⚠️ Do **not** run `gen_store_images.py`
+      afterwards — it regenerates placeholders (it now skips an existing
+      screenshot-1 unless you pass `--force`, but don't tempt it).
 - [ ] *(Optional but recommended)* Project Settings ▸ Quick Actions → add one
       **static** shortcut → rebuild → it exists on first launch before pressing
       anything.

@@ -17,7 +17,8 @@ tests green, full source + docs.
 2. Open the package in a **licensed** Unity (2022.3 LTS + Unity 6) and confirm a
    clean import; switch to iOS/Android targets.
 3. **Device test** (Android device; iOS via macOS/Xcode) + one real screenshot.
-4. Pick a price, upload `dist~/QuickActions.unitypackage`, submit for review.
+4. Set the price to **Free** (decided 2026-07-10 — see §2), upload
+   `dist~/QuickActions.unitypackage`, submit for review.
 
 ---
 

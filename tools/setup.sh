@@ -6,7 +6,9 @@
 set -e
 
 need_dotnet=0; need_jdk=0
-command -v dotnet >/dev/null 2>&1 || need_dotnet=1
+# Capability check, not just presence: the harness targets net10.0, so an old
+# dotnet without a 10.x SDK must trigger an install.
+{ command -v dotnet >/dev/null 2>&1 && dotnet --list-sdks 2>/dev/null | grep -q '^10\.'; } || need_dotnet=1
 command -v javac  >/dev/null 2>&1 || need_jdk=1
 
 if [ "$need_dotnet" = "0" ] && [ "$need_jdk" = "0" ]; then

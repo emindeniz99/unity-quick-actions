@@ -137,19 +137,18 @@ in [`PRODUCTION_READINESS.md`](./PRODUCTION_READINESS.md).)
 > Detailed checklist with paste-ready text/images: [`STORE_CHECKLIST.md`](./STORE_CHECKLIST.md).
 > Publishing is **free** (you keep 70%, Unity takes 30%; price free or ≥ $4.99).
 
-### C0. ⚠️ Decide: gated or always-on for the store
-Right now the package is **dev-only gated** — a buyer who imports it and doesn't
-set `QUICKACTIONS_ENABLED` sees **nothing**, which is bad UX for a paid asset.
-For a store release you almost certainly want it **always-on**:
+### C0. ✅ Gate decision — already made (2026-07-10): the gate STAYS
+This package ships to the store **as a dev-only gated tool** — that's its
+differentiator (guaranteed-zero production footprint), and the listing sells it
+that way: the description leads with the **"One switch to turn it on"** section
+and the README leads Install with the define. Nothing to decide on release day;
+just **don't remove that section** from the listing.
 
-- Remove `defineConstraints: ["QUICKACTIONS_ENABLED"]` from the asmdefs, drop
-  the `#if QUICKACTIONS_ENABLED` from `Plugins/iOS/QuickActions.mm`, and delete
-  the two gate post-processors
-  (`Editor/iOS/QuickActionsEnableMacroiOS.cs`, `Editor/NativeGate/…StripperAndroid.cs`).
-- See the **"Want it always-on?"** note in [`README.md`](./README.md#dev-only--excluding-it-completely-from-production-builds).
-
-Keep the gated version only if you're selling it explicitly as a *dev-only* tool
-and say so loudly in the listing. **Pick this before you build the upload.**
+> *Fork note:* if you (or a fork) ever want an always-on build instead, the
+> conversion recipe lives in README ▸
+> ["Dev-only"](./README.md#dev-only--excluding-it-completely-from-production-builds)
+> (remove the asmdef `defineConstraints`, drop the `.mm` `#if`, delete the two
+> gate post-processors).
 
 ### C1. Create a publisher account
 Go to <https://publisher.unity.com>, sign in with your Unity ID, create a
@@ -164,7 +163,7 @@ that I could not do for you (no Unity/devices in the build environment).
 - Easiest: install **Asset Store Publishing Tools** from the Asset Store (search
   it in the Package Manager / Asset Store), which adds an uploader window in Unity.
 - Or upload the prebuilt `dist~/QuickActions.unitypackage` (rebuild any time with
-  `python3 tools/pack_unitypackage.py`). Make sure it reflects your gated/always-on choice.
+  `python3 tools/pack_unitypackage.py`).
 
 ### C4. Fill the listing (everything is pre-written)
 In the publisher portal, create a draft package and paste from
@@ -188,7 +187,7 @@ specific feedback to fix and resubmit.
 | `QuickActions` type not found in your scripts / Demo inert | `QUICKACTIONS_ENABLED` define missing (step A5) — add it for that platform |
 | Nothing happens in the Editor Play mode | Expected — the OS menu only exists on a device (Part B). Use the Simulator (step A7) to test tap handling in-Editor |
 | Long-press shows no shortcuts | Did you press "Add 3 shortcuts" first? Android < 7.1 (API 25) isn't supported |
-| Buyer imported the store asset and "nothing works" | You shipped the **gated** version — make it always-on for the store (step C0) |
+| Buyer says "imported it and nothing works" | Expected for the dev-only design — point them to the define step (the listing and README lead with it) |
 | iOS build but can't run | Needs a Mac + Xcode + a signing team (step B2) |
 
 Other docs: [`README.md`](./README.md) (API + install) ·

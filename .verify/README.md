@@ -35,7 +35,7 @@ procedure in [`../plans/mvp.md`](../plans/mvp.md).
 
 ## Web sessions / CI
 
-The repo's `.devcontainer/Dockerfile` bakes in `dotnet-sdk-8.0` and a headless
+The repo's `.devcontainer/Dockerfile` bakes in `dotnet-sdk-10.0` and a headless
 JDK, so Claude Code on the web can run `tools/verify.sh` with no setup. On a
 plain machine, run `tools/setup.sh` once first.
 

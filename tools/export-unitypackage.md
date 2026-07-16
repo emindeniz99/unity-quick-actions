@@ -19,13 +19,15 @@ once in a real Editor to confirm before submitting to the store.)
 
 ## What to include / exclude
 
-Ship only the package itself. **Include:** `Runtime/`, `Editor/`, `Plugins/`,
-`Samples~/`, `README.md`, `CHANGELOG.md`, `LICENSE.md`, `ROADMAP.md`.
-**Exclude** the dev/publishing collateral: `.verify/`, `tools/`, `plans/`,
-`store~/`, `dist~/`, `Tests/`, `STORE_CHECKLIST.md`, and `package.json` (the
-classic `Assets/` layout doesn't use a UPM manifest). `.verify/` and the `~`
-dirs are already hidden from Unity; the others must be left out of the exported
-selection. (`tools/pack_unitypackage.py` in Option 0 applies exactly this split.)
+Ship only the package itself — the list is **include-only**, so new root files
+are excluded by default. **Include exactly:** `Runtime/`, `Editor/`, `Plugins/`,
+`Samples~/`, and the four root docs `README.md`, `CHANGELOG.md`, `LICENSE.md`,
+`ROADMAP.md`. **Everything else stays out** — `.verify/`, `tools/`, `plans/`,
+`store~/`, `dist~/`, `Tests/`, `package.json` (the classic `Assets/` layout
+doesn't use a UPM manifest), and all other root docs (`STORE_CHECKLIST.md`,
+`GETTING_STARTED.md`, `PRODUCTION_READINESS.md`, `SECURITY.md`,
+`RELEASE_RUNBOOK.md`, …). (`tools/pack_unitypackage.py` in Option 0 applies
+exactly this split via its INCLUDE_DIRS/INCLUDE_FILES lists.)
 
 ## Option A — Unity Editor (GUI)
 
