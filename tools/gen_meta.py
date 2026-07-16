@@ -177,6 +177,7 @@ def main() -> int:
         # (the store~/dist~ collateral dirs are covered by the ~ rule).
         dirs[:] = [d for d in dirs
                    if not d.endswith("~") and not d.startswith(".")
+                   and d != "__pycache__"  # python bytecode cache; gitignored, never an asset
                    ]
 
         for d in dirs:
