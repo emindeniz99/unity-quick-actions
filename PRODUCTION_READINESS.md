@@ -74,14 +74,14 @@ Runner only (JsonUtility) · `static` = compiles in the stub harness (7 configs)
   (Rule 9). Reviewed one-by-one across repeated adversarial rounds + a 15-unit workflow
   (every confirmed finding fixed or explicitly documented; **0 P0 ship-blockers**).
 - **Device gate (NOT closable in this container): OPEN.** Everything marked
-  ⏳ above needs a licensed Unity (2022.3 LTS **and** Unity 6) + an iOS device
+  ⏳ above needs a licensed Unity (2021.3 LTS min, 6.3 LTS; smoke 2022.3/6.0) + an iOS device
   (via macOS/Xcode) + an Android API-25+ device. This environment is headless
   Linux with no Unity license, so native/build/on-device behavior is reviewed
   and compiled but **not executed**. This is the one true blocker to a `1.0.0`
   "production-ready" stamp.
 
 ### Exact remaining steps to close the device gate
-1. Open the package in 2022.3 LTS and Unity 6; switch to iOS + Android targets →
+1. Open the package in 2021.3 LTS (min) and 6.3 LTS — smoke 2022.3 and 6.0; switch to iOS + Android targets →
    confirm 0 console errors and that the gated Editor asmdefs' `precompiledReferences`
    resolve.
 2. Dev build (define ON) + prod build (define OFF) on each platform; diff the

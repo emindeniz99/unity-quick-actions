@@ -18,7 +18,7 @@ Objective-C, no Java, no editing the generated Xcode/Gradle projects.
   id on every tap, including the cold launch that started the app.
 • **Zero native edits** — the iOS app delegate is hooked automatically; Android
   uses a lightweight trampoline activity merged in for you.
-• **Future-proof** — works on Unity 2022 LTS through Unity 6, surviving the
+• **Future-proof** — works on Unity 2021 LTS through Unity 6, surviving the
   `UnityPlayerActivity` → `UnityPlayerGameActivity` change on Android.
 • **Full source included** — readable C#, Objective-C++ and Java. No black-box
   DLLs. Unit-tested and documented.
@@ -65,7 +65,7 @@ Actions** and they're baked into the build automatically.
 
 ## Compatibility
 
-• Unity **2022.3 LTS or newer**, including Unity 6
+• Unity **2021.3 LTS or newer**, including Unity 6
 • **iOS 9+** and **Android 7.1+ (API 25)**
 • Mono and IL2CPP; Built-in, URP and HDRP (no rendering involved)
 • iOS shortcuts require building on macOS with Xcode (standard for any iOS Unity

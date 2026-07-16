@@ -46,7 +46,7 @@ With the package copied to `Assets/QuickActions/` inside a throwaway project:
   -logFile -
 ```
 
-`$UNITY` is the path to a 2022.3 LTS (or newer) Unity executable. The exported
+`$UNITY` is the path to a 2021.3 LTS (or newer) Unity executable. The exported
 file preserves the `.meta` GUIDs shipped here, so scene/script references stay
 intact.
 

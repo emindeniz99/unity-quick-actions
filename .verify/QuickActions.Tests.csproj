@@ -12,7 +12,7 @@
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <AssemblyName>EminDeniz99.QuickActions.Tests</AssemblyName>
     <IsPackable>false</IsPackable>
-    <DefineConstants>UNITY_EDITOR;UNITY_2022_3_OR_NEWER;QUICKACTIONS_ENABLED</DefineConstants>
+    <DefineConstants>UNITY_EDITOR;UNITY_2021_3_OR_NEWER;QUICKACTIONS_ENABLED</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.7.0" />

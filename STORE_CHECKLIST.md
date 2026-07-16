@@ -14,7 +14,7 @@ tests green, full source + docs.
 
 ⏳ **Needs your account / hardware (can't be automated):**
 1. Create the free publisher account + accept the agreement.
-2. Open the package in a **licensed** Unity (2022.3 LTS + Unity 6) and confirm a
+2. Open the package in a **licensed** Unity (2021.3 min + 6.3 LTS; smoke 2022.3 + 6.0) and confirm a
    clean import; switch to iOS/Android targets.
 3. **Device test** (Android device; iOS via macOS/Xcode) + one real screenshot.
 4. Set the price to **Free** (decided 2026-07-10 — see §2), upload
@@ -93,8 +93,8 @@ All sizes are ✅ pre-built by `python3 tools/gen_store_images.py`. See
 
 ## 5. Technical review gates (do before upload)
 
-- [ ] Imports into a fresh **2022.3 LTS** project with **zero console
-      errors/warnings**; repeat on **Unity 6**.
+- [ ] Imports into a fresh **2021.3 LTS** project (the claimed minimum) with **zero console
+      errors/warnings**; repeat on **6.3 LTS** (full) and **2022.3 + 6.0** (smoke).
 - [ ] `tools/verify.sh` is green (compile + unit tests + Android plugin).
 - [ ] Switch build target to **iOS** and **Android** → Editor still compiles
       (confirms the asmdef extension-DLL references resolve — see ROADMAP).
@@ -110,7 +110,7 @@ All sizes are ✅ pre-built by `python3 tools/gen_store_images.py`. See
 - [ ] Install **Asset Store Publishing tools** (Publisher portal → "Create new
       package" → use the Unity Editor uploader / Asset Store Tools package).
 - [ ] Create the draft package in the portal, attach metadata + images.
-- [ ] Upload the clean `.unitypackage` for the supported Unity version(s).
+- [ ] Upload the clean `.unitypackage` **from a 2021.3 editor** — the upload editor version becomes the listing's minimum.
 - [ ] Set price/availability and **Submit for review**.
 - [ ] Review is manual (typically several business days to ~2 weeks). Expect a
       pass or a decline with specific feedback to address and resubmit.

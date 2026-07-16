@@ -2,7 +2,7 @@
 
 Home-screen **quick actions** for Unity games — the shortcuts revealed when a
 user long-presses your app icon. A clean-room, MIT-licensed implementation
-targeting **Unity 2022 LTS and newer** (including Unity 6).
+targeting **Unity 2021 LTS and newer** (including Unity 6).
 
 | Platform | Mechanism | Min OS |
 |----------|-----------|--------|
@@ -18,7 +18,7 @@ targeting **Unity 2022 LTS and newer** (including Unity 6).
 - **Zero native edits** — the iOS app delegate is hooked at load via the ObjC
   runtime; the Android trampoline activity is merged in from a plugin manifest.
 - **Version-proof Android** — a trampoline activity instead of subclassing
-  Unity's activity, so it works on both `UnityPlayerActivity` (2022) and
+  Unity's activity, so it works on both `UnityPlayerActivity` (2021/2022) and
   `UnityPlayerGameActivity` (6+).
 
 ## Install
@@ -140,12 +140,13 @@ Constraints only work for managed code, **not** native plugins):
 
 **To use it in your dev build:**
 
-1. Add `QUICKACTIONS_ENABLED` to your **Scripting Define Symbols**. Recommended
-   setup: keep it **on in the Editor** (Project Settings ▸ Player) and rely on a
-   prod **Build Profile** that omits it — Build Profile defines override the
-   Player setting at build time, so prod stays clean while the Editor compiles
-   the package (this also avoids the "missing script" note on the settings asset,
-   see below). Per-profile defines are a Unity 2022.3/6 Build Profiles feature.
+1. Add `QUICKACTIONS_ENABLED` to your **Scripting Define Symbols**. On **Unity 6**
+   the cleanest setup is: keep it **on in the Editor** (Project Settings ▸ Player)
+   and rely on a prod **Build Profile** that omits it — per-profile defines
+   override the Player setting at build time (this also avoids the "missing
+   script" note on the settings asset, see below). On **2021/2022 LTS** (no Build
+   Profiles) the equivalent is removing the define from the Player settings — or
+   passing it via your CI/build script — before cutting the prod build.
 2. Guard your own call sites so your game still compiles when the define is off
    and the `QuickActions` type doesn't exist:
 
@@ -345,7 +346,7 @@ quick actions can't run in the Editor or on Linux).
 
 ## Notes / learnings
 
-- Min Unity is 2022.3 LTS. The dynamic native hooks avoid editing generated
+- Min Unity is 2021.3 LTS (NamedBuildTarget, our newest Editor API, ships in 2021.2). The dynamic native hooks avoid editing generated
   `UnityAppController` / `UnityPlayerActivity`; only **static** shortcuts need
   build post-processors (Info.plist / shortcuts.xml).
 - The iOS `.mm` is compiled by Unity against the real SDK; here it's reviewed

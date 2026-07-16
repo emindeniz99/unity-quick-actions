@@ -11,7 +11,7 @@ The condensed, day-of sequence. Details live in
 - [ ] `cd playground/projects/quick-actions-unity && tools/setup.sh && tools/verify.sh`
       → expect **`VERIFY: PASS`** (if not, stop: the checkout is broken, nothing
       else will work — re-clone or ask for help).
-- [ ] Install **Unity Hub** + **Unity 2022.3 LTS** with **Android Build Support**
+- [ ] Install **Unity Hub** + **Unity 2021.3 LTS** (min) and **6.3 LTS** with **Android Build Support** (add 2022.3 + 6.0 for the smoke pass)
       (+ iOS Build Support if on a Mac). *(GS §0)*
 - [ ] Phone ready: Android 7.1+ with **USB debugging** enabled.
 
@@ -72,7 +72,7 @@ The condensed, day-of sequence. Details live in
       section — the gate is the product), `tags.txt`.
 - [ ] Upload images from `store~/` (icon/card/cover/social + screenshots incl.
       your real one).
-- [ ] Upload `dist~/QuickActions.unitypackage` (via Asset Store Publishing Tools).
+- [ ] Upload `dist~/QuickActions.unitypackage` via Asset Store Publishing Tools **from the 2021.3 editor** (upload version = listed minimum).
 - [ ] Price: **Free**. Submit for review. (Review: days → ~2 weeks.)
 
 ## Phase 6 — stamp the release (10 min, back in the repo)

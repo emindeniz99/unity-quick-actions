@@ -118,7 +118,7 @@ def make_cover():
         "Long-press the app icon → shortcuts",
         "Dynamic at runtime + static in build",
         "One C# API · no native edits",
-        "Unity 2022 LTS → Unity 6",
+        "Unity 2021 LTS → Unity 6",
     ]):
         text(d, (330, 430 + i * 78), "•  " + s, f(FONT, 40), MUTE)
     phone_mock(d, 1320, 360, 470, 820, [

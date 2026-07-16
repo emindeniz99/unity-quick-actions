@@ -9,7 +9,7 @@
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <OutputType>Library</OutputType>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
-    <DefineConstants>UNITY_IOS;UNITY_2022_3_OR_NEWER;QUICKACTIONS_ENABLED</DefineConstants>
+    <DefineConstants>UNITY_IOS;UNITY_2021_3_OR_NEWER;QUICKACTIONS_ENABLED</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Stubs/**/*.cs" />

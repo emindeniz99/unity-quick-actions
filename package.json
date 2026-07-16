@@ -2,8 +2,8 @@
   "name": "com.emindeniz99.quick-actions",
   "version": "0.1.0",
   "displayName": "Home-Screen Quick Actions",
-  "description": "Home-screen quick actions (the shortcuts revealed by long-pressing the app icon) for Unity, on iOS (UIApplicationShortcutItem) and Android (ShortcutManager). Create and remove shortcuts at runtime and get a callback with the action id on launch or resume. Zero native edits required. Unity 2022 LTS and newer (incl. Unity 6).",
-  "unity": "2022.3",
+  "description": "Home-screen quick actions (the shortcuts revealed by long-pressing the app icon) for Unity, on iOS (UIApplicationShortcutItem) and Android (ShortcutManager). Create and remove shortcuts at runtime and get a callback with the action id on launch or resume. Zero native edits required. Unity 2021 LTS and newer (incl. Unity 6).",
+  "unity": "2021.3",
   "keywords": [
     "ios",
     "android",

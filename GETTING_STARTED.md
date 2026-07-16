@@ -13,7 +13,7 @@ to the Unity Asset Store**.
 
 | For | Install |
 |---|---|
-| Everything | [Unity Hub](https://unity.com/download) + a **Unity 2022.3 LTS** editor (Unity 6 also works) |
+| Everything | [Unity Hub](https://unity.com/download) + a **Unity 2021.3 LTS** editor (2022.3 and Unity 6.x also supported) |
 | Android testing | The **Android Build Support** module (add it in Unity Hub ▸ the editor ▸ ⚙ Add Modules). Works on Windows/macOS/Linux. |
 | iOS testing | A **Mac** with **Xcode**, plus the **iOS Build Support** module. (iOS cannot be built from Windows/Linux.) |
 | A test device | Android phone (Android 7.1 / API 25+) **or** iPhone. Quick actions do **not** appear in the Editor or on a plain simulator — you need a real long-press on a device. |
@@ -155,7 +155,7 @@ Go to <https://publisher.unity.com>, sign in with your Unity ID, create a
 **Publisher profile**, fill payout (PayPal/bank), and accept the Provider Agreement.
 
 ### C2. Validate the package in a real Unity (the device gate)
-Before uploading, do the device tests in Part B on **both** 2022.3 LTS and Unity 6,
+Before uploading, do a full device pass (Part B) on **2021.3 LTS** (the minimum) and **Unity 6.3 LTS**, plus an import/compile smoke on **2022.3** and **6.0**,
 with **zero console errors/warnings**. This is the one thing that must pass and
 that I could not do for you (no Unity/devices in the build environment).
 
