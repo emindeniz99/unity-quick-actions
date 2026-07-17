@@ -235,7 +235,16 @@ extern "C" {
 void _QuickActions_SetShortcuts(const char *json) {
     NSString *value = json != NULL ? [NSString stringWithUTF8String:json] : @"";
     QARunOnMain(^{
-        [UIApplication sharedApplication].shortcutItems = QABuildItems(value);
+        // Replace only OUR items: keep any host / other-plugin dynamic shortcuts
+        // (unmarked) and append our current set. A plain assignment would wipe the
+        // host's live UIApplicationShortcutItems on the first Add/RemoveById — mirror
+        // the marker-scoped RemoveAll and read-back paths.
+        UIApplication *app = [UIApplication sharedApplication];
+        NSMutableArray<UIApplicationShortcutItem *> *merged = [NSMutableArray array];
+        for (UIApplicationShortcutItem *item in app.shortcutItems)
+            if (!QAIsOurShortcut(item)) [merged addObject:item];
+        [merged addObjectsFromArray:QABuildItems(value)];
+        app.shortcutItems = merged;
     });
 }
 

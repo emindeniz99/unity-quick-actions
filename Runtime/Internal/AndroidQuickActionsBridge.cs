@@ -12,6 +12,9 @@ namespace EminDeniz99.QuickActions.Internal
     /// </summary>
     internal sealed class AndroidQuickActionsBridge : IQuickActionsBridge
     {
+        // Resolved by name over JNI. In a MINIFIED build R8 can rename/strip this
+        // non-manifest class; ship a keep rule then — see the README "Known limits —
+        // Android minification (R8/ProGuard)".
         private const string BridgeClass = "com.emindeniz99.quickactions.QuickActionsBridge";
 
         private static AndroidJavaObject CurrentActivity()
@@ -32,7 +35,11 @@ namespace EminDeniz99.QuickActions.Internal
 
         public IList<QuickActionItem> SetShortcuts(IList<QuickActionItem> items)
         {
-            if (!IsPlatformSupported) return items; // can't confirm — accept-all
+            // Below API 25 ShortcutManager doesn't exist, so nothing is installed. Report
+            // an empty accepted set (not accept-all) so the facade prunes its list and
+            // GetAll()/IsAdded() don't claim shortcuts the OS never received — matching
+            // IsPlatformSupported=false and the documented no-op behaviour.
+            if (!IsPlatformSupported) return new List<QuickActionItem>();
             var json = JsonUtility.ToJson(new QuickActionList(items));
             string applied;
             try

@@ -349,6 +349,23 @@ namespace EminDeniz99.QuickActions.Tests
         }
 
         [Test]
+        public void EmptyAcceptedSet_PrunesEverything()
+        {
+            // A bridge that accepts nothing (empty, non-null result) must leave the public
+            // API reporting no shortcuts. This is the contract the Android API<25 path
+            // relies on: SetShortcuts returns an empty accepted set there (not accept-all),
+            // so GetAll()/IsAdded() don't claim shortcuts the OS never installed.
+            QuickActions.OverrideBridgeForTesting(new CapBridge(0));
+            try
+            {
+                Assert.IsTrue(QuickActions.Add(Item("a"))); // accepted into the set before the OS trim
+                Assert.IsEmpty(QuickActions.GetAll());       // ...but the OS kept none
+                Assert.IsFalse(QuickActions.IsAdded("a"));
+            }
+            finally { QuickActions.OverrideBridgeForTesting(null); }
+        }
+
+        [Test]
         public void GetAll_ReturnsCopy_NotInternalList()
         {
             QuickActions.Add(Item("a"));

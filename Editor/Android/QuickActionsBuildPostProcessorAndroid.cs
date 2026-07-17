@@ -253,22 +253,42 @@ namespace EminDeniz99.QuickActions.Editor
             if (activity == null)
                 return false;
 
+            // Scan the launcher's android.app.shortcuts meta-data: ours (our resource)
+            // and/or a host's (a different resource). Collect both before mutating so we
+            // can resolve an Append-build state that has BOTH.
+            XmlElement ours = null;
+            XmlElement host = null;
             foreach (XmlElement meta in activity.GetElementsByTagName("meta-data"))
             {
                 if (meta.GetAttribute("name", AndroidNs) != "android.app.shortcuts")
                     continue;
-                var resource = meta.GetAttribute("resource", AndroidNs);
-                if (resource == "@xml/" + ShortcutsResource)
-                    return true; // already ours — idempotent (Append re-runs)
-                // A host app / another plugin owns the single shortcuts slot; injecting
-                // ours would clobber it, so warn loudly rather than silently ship none.
+                if (meta.GetAttribute("resource", AndroidNs) == "@xml/" + ShortcutsResource)
+                    ours = meta;
+                else
+                    host = meta;
+            }
+
+            if (host != null)
+            {
+                // A host app / another plugin owns the single shortcuts slot. Drop any
+                // stale meta-data WE injected on a prior build first, so the manifest
+                // isn't left with two android.app.shortcuts resources (invalid — Android
+                // allows one per activity), then warn rather than silently ship none.
+                if (ours != null)
+                {
+                    ours.ParentNode.RemoveChild(ours);
+                    doc.Save(manifestPath);
+                }
                 Debug.LogWarning(
                     $"[QuickActions] The launcher activity already declares android.app.shortcuts " +
-                    $"(resource={resource}); the configured static shortcuts were NOT injected " +
+                    $"(resource={host.GetAttribute("resource", AndroidNs)}); the configured static shortcuts were NOT injected " +
                     $"(Android allows only one shortcuts resource per activity). Merge them into " +
-                    $"{resource} manually, or register them at runtime with QuickActions.Add(...).");
+                    $"that resource manually, or register them at runtime with QuickActions.Add(...).");
                 return false;
             }
+
+            if (ours != null)
+                return true; // already ours — idempotent (Append re-runs)
 
             var element = doc.CreateElement("meta-data");
             SetAndroidAttr(doc, element, "name", "android.app.shortcuts");
