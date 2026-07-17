@@ -30,13 +30,43 @@ namespace EminDeniz99.QuickActions.Internal
             }
         }
 
-        public void SetShortcuts(IList<QuickActionItem> items)
+        public IList<QuickActionItem> SetShortcuts(IList<QuickActionItem> items)
         {
-            if (!IsPlatformSupported) return;
+            if (!IsPlatformSupported) return items; // can't confirm — accept-all
             var json = JsonUtility.ToJson(new QuickActionList(items));
-            using (var bridge = new AndroidJavaClass(BridgeClass))
-            using (var activity = CurrentActivity())
-                bridge.CallStatic("setShortcuts", activity, json);
+            string applied;
+            try
+            {
+                using (var bridge = new AndroidJavaClass(BridgeClass))
+                using (var activity = CurrentActivity())
+                    // Java trims to the OS cap and returns the ids it APPLIED (null on a
+                    // failed/rate-limited write). We deliberately use this return value,
+                    // NOT a separate getDynamicShortcuts() read-back: a read after a failed
+                    // write reflects the stale prior set and would make us prune (delete)
+                    // just-added shortcuts.
+                    applied = bridge.CallStatic<string>("setShortcuts", activity, json);
+            }
+            catch (AndroidJavaException e)
+            {
+                Debug.LogWarning("[QuickActions] SetShortcuts failed: " + e.Message);
+                return items; // couldn't confirm — accept-all, prune nothing
+            }
+
+            // Null/empty = the write did not land — accept-all so the facade never drops
+            // items on a transient failure (a later first-access reconcile still corrects).
+            if (string.IsNullOrEmpty(applied)) return items;
+
+            var appliedIds = new HashSet<string>();
+            foreach (var s in QuickActionList.Parse(applied))
+                if (s != null) appliedIds.Add(s.Id);
+
+            // Return the subset of the *input* (caller's own objects, icons intact), in
+            // input order, whose ids the OS actually applied (trimmed set).
+            var accepted = new List<QuickActionItem>();
+            foreach (var it in items)
+                if (it != null && appliedIds.Contains(it.Id))
+                    accepted.Add(it);
+            return accepted;
         }
 
         public void RemoveAll()

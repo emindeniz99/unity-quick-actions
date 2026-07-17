@@ -318,13 +318,13 @@ If you add more shortcuts than the OS shows (iOS caps at 4 total; Android at lea
 lets the OS pick; Android keeps the **first** N you added (by insertion order) and
 logs the rest. Keep your most important shortcuts first.
 
-One consequence: when the overflow is trimmed, the **managed** list still contains
-the surplus items, so `GetAll()` / `IsAdded()` report them as added even though the
-OS didn't keep them. This self-corrects on the next launch, when the list is
-reconciled with the OS's actual dynamic shortcuts. Stay within the platform cap to
-avoid the discrepancy. (It's a deliberate simplicity trade-off: the alternative —
-querying the device's per-activity cap on every `Add` — would couple the managed
-API to device-specific limits and lose the icons you supplied.)
+The **managed** list stays consistent with what the OS accepted: when Android trims
+the overflow, those ids are pruned from the managed list in the same call, so
+`GetAll()` / `IsAdded()` reflect what's actually on the device (they don't
+over-report), while the icons you supplied are preserved for the shortcuts that were
+kept. `Add` still returns `true` for a surplus item — the request was accepted into
+the set before the OS trim — but a subsequent `GetAll()` / `IsAdded()` shows the
+trim. Keep the set within the platform cap so nothing is silently dropped.
 
 ## Security: a shortcut tap is not an authenticated action
 

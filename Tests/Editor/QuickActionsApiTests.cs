@@ -205,6 +205,66 @@ namespace EminDeniz99.QuickActions.Tests
         }
 
         [Test]
+        public void AddList_BeyondOsCap_PrunesSurplusAndPreservesIconsOfAccepted()
+        {
+            // WHY: this is Codex review #5 — when the OS trims dynamic shortcuts to its
+            // cap, GetAll()/IsAdded() must reflect what the device kept (not over-report
+            // the surplus), immediately, without waiting for a relaunch reconcile. The
+            // icon assertion is load-bearing: it proves the kept items are the caller's
+            // own objects (icons intact), not an icon-less device read-back.
+            QuickActions.OverrideBridgeForTesting(new CapBridge(2));
+            try
+            {
+                QuickActions.AddList(new List<QuickActionItem>
+                {
+                    new QuickActionItem("a", "Alpha", null, IconType.Add),
+                    Item("b"),
+                    Item("c"),
+                });
+                CollectionAssert.AreEqual(new[] { "a", "b" }, QuickActions.GetAll().ConvertAll(i => i.Id));
+                Assert.IsFalse(QuickActions.IsAdded("c"), "surplus beyond the cap must not be over-reported");
+                Assert.AreEqual(IconType.Add, QuickActions.GetById("a").Icon, "kept item must keep its supplied icon");
+            }
+            finally { QuickActions.OverrideBridgeForTesting(null); }
+        }
+
+        [Test]
+        public void Add_BeyondOsCap_ReflectsWhatOsKept()
+        {
+            // The single-Add path (each Add calls Push and prunes), complementing the batch.
+            QuickActions.OverrideBridgeForTesting(new CapBridge(2));
+            try
+            {
+                QuickActions.Add(Item("a"));
+                QuickActions.Add(Item("b"));
+                QuickActions.Add(Item("c"));
+                CollectionAssert.AreEqual(new[] { "a", "b" }, QuickActions.GetAll().ConvertAll(i => i.Id));
+                Assert.IsFalse(QuickActions.IsAdded("c"));
+            }
+            finally { QuickActions.OverrideBridgeForTesting(null); }
+        }
+
+        [Test]
+        public void AcceptAllBridge_DoesNotPrune()
+        {
+            // Guards against an over-eager prune: a bridge that accepts everything (returns
+            // the input reference) must never drop anything, even past the typical cap.
+            var fake = new FakeBridge();
+            QuickActions.OverrideBridgeForTesting(fake);
+            try
+            {
+                QuickActions.AddList(new List<QuickActionItem>
+                {
+                    Item("a"), Item("b"), Item("c"), Item("d"), Item("e"), Item("f"),
+                });
+                CollectionAssert.AreEqual(
+                    new[] { "a", "b", "c", "d", "e", "f" },
+                    QuickActions.GetAll().ConvertAll(i => i.Id));
+            }
+            finally { QuickActions.OverrideBridgeForTesting(null); }
+        }
+
+        [Test]
         public void GetAll_ReturnsCopy_NotInternalList()
         {
             QuickActions.Add(Item("a"));
@@ -435,11 +495,12 @@ namespace EminDeniz99.QuickActions.Tests
             public readonly List<QuickActionItem> Shortcuts = new List<QuickActionItem>();
             public int SetCount;
             public bool IsPlatformSupported => true;
-            public void SetShortcuts(IList<QuickActionItem> items)
+            public IList<QuickActionItem> SetShortcuts(IList<QuickActionItem> items)
             {
                 SetCount++;
                 Shortcuts.Clear();
                 Shortcuts.AddRange(items);
+                return items; // accept-all (same reference) — facade prunes nothing
             }
             public void RemoveAll() => Shortcuts.Clear();
             public string GetLastPerformed() => null;
@@ -454,7 +515,7 @@ namespace EminDeniz99.QuickActions.Tests
             private readonly Queue<string> _pending;
             public QueueBridge(IEnumerable<string> ids) => _pending = new Queue<string>(ids);
             public bool IsPlatformSupported => true;
-            public void SetShortcuts(IList<QuickActionItem> items) { }
+            public IList<QuickActionItem> SetShortcuts(IList<QuickActionItem> items) => items;
             public void RemoveAll() { }
             public string GetLastPerformed() => null;
             public void ResetLastPerformed() { }
@@ -468,7 +529,7 @@ namespace EminDeniz99.QuickActions.Tests
             public string Last;
             public int ResetCount;
             public bool IsPlatformSupported => true;
-            public void SetShortcuts(IList<QuickActionItem> items) { }
+            public IList<QuickActionItem> SetShortcuts(IList<QuickActionItem> items) => items;
             public void RemoveAll() { }
             public string GetLastPerformed() => Last;
             public void ResetLastPerformed() { Last = null; ResetCount++; }
@@ -481,10 +542,11 @@ namespace EminDeniz99.QuickActions.Tests
         {
             private readonly List<QuickActionItem> _shortcuts = new List<QuickActionItem>();
             public bool IsPlatformSupported => true;
-            public void SetShortcuts(IList<QuickActionItem> items)
+            public IList<QuickActionItem> SetShortcuts(IList<QuickActionItem> items)
             {
                 _shortcuts.Clear();
                 _shortcuts.AddRange(items);
+                return items;
             }
             public void RemoveAll() => throw new System.InvalidOperationException("native failure");
             public string GetLastPerformed() => null;
@@ -497,7 +559,7 @@ namespace EminDeniz99.QuickActions.Tests
         {
             public int GetShortcutsCalls;
             public bool IsPlatformSupported => true;
-            public void SetShortcuts(IList<QuickActionItem> items) { }
+            public IList<QuickActionItem> SetShortcuts(IList<QuickActionItem> items) => items;
             public void RemoveAll() { }
             public string GetLastPerformed() => null;
             public void ResetLastPerformed() { }
@@ -508,6 +570,32 @@ namespace EminDeniz99.QuickActions.Tests
                 QuickActions.IsAdded("reentry"); // re-enter during load
                 return new List<QuickActionItem>();
             }
+        }
+
+        // Models the Android OS cap: keeps only the first `_cap` items and returns
+        // exactly that trimmed subset as a NEW list (not the input reference), so the
+        // facade actually prunes. GetShortcuts() is intentionally empty to prove the
+        // prune relies solely on the SetShortcuts RETURN, never a device read-back.
+        private sealed class CapBridge : IQuickActionsBridge
+        {
+            private readonly int _cap;
+            public readonly List<QuickActionItem> Shortcuts = new List<QuickActionItem>();
+            public CapBridge(int cap) => _cap = cap;
+            public bool IsPlatformSupported => true;
+            public IList<QuickActionItem> SetShortcuts(IList<QuickActionItem> items)
+            {
+                var accepted = new List<QuickActionItem>();
+                for (var i = 0; i < items.Count && i < _cap; i++)
+                    accepted.Add(items[i]);
+                Shortcuts.Clear();
+                Shortcuts.AddRange(accepted);
+                return accepted;
+            }
+            public void RemoveAll() => Shortcuts.Clear();
+            public string GetLastPerformed() => null;
+            public void ResetLastPerformed() { }
+            public string ConsumePendingPerformed() => null;
+            public IList<QuickActionItem> GetShortcuts() => new List<QuickActionItem>();
         }
     }
 }

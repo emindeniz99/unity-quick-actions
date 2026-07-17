@@ -9,7 +9,9 @@ namespace EminDeniz99.QuickActions.Internal
     internal sealed class NullQuickActionsBridge : IQuickActionsBridge
     {
         public bool IsPlatformSupported => false;
-        public void SetShortcuts(IList<QuickActionItem> items) { }
+        // Accept-all: return the same reference so the facade prunes nothing (there
+        // is no OS to trim, and the editor list must stay intact).
+        public IList<QuickActionItem> SetShortcuts(IList<QuickActionItem> items) => items;
         public void RemoveAll() { }
         public string GetLastPerformed() => null;
         public void ResetLastPerformed() { }

@@ -14,8 +14,15 @@ namespace EminDeniz99.QuickActions.Internal
         /// <summary>True when the OS supports quick actions (false in-Editor).</summary>
         bool IsPlatformSupported { get; }
 
-        /// <summary>Replace the OS shortcut set with exactly these items.</summary>
-        void SetShortcuts(IList<QuickActionItem> items);
+        /// <summary>
+        /// Push these items to the OS and return the subset it actually accepted —
+        /// the same input <see cref="QuickActionItem"/> objects (icons intact), in
+        /// input order. Platforms with no cap return the input list <b>unchanged
+        /// (same reference = accept-all)</b>; Android returns only the items whose
+        /// ids survived the OS dynamic-shortcut cap, so the managed layer can prune
+        /// the surplus and keep <see cref="QuickActions.GetAll"/>/<see cref="QuickActions.IsAdded"/> honest.
+        /// </summary>
+        IList<QuickActionItem> SetShortcuts(IList<QuickActionItem> items);
 
         /// <summary>Remove all shortcuts from the OS.</summary>
         void RemoveAll();

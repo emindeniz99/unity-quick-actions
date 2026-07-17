@@ -21,9 +21,13 @@ namespace EminDeniz99.QuickActions.Internal
 
         public bool IsPlatformSupported => true;
 
-        public void SetShortcuts(IList<QuickActionItem> items)
+        public IList<QuickActionItem> SetShortcuts(IList<QuickActionItem> items)
         {
             _QuickActions_SetShortcuts(JsonUtility.ToJson(new QuickActionList(items)));
+            // iOS has no dynamic-shortcut cap (it just shows the first ~4) and its
+            // native write is async on the main thread, so accept-all is both correct
+            // and avoids racing the write with a read-back.
+            return items;
         }
 
         public void RemoveAll() => _QuickActions_RemoveAll();

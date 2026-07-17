@@ -51,10 +51,18 @@ public final class QuickActionsBridge {
     private QuickActionsBridge() {
     }
 
-    public static void setShortcuts(Activity activity, String json) {
-        if (activity == null || Build.VERSION.SDK_INT < 25) return;
+    /**
+     * Replace the dynamic shortcuts with the given set (trimming to the OS cap).
+     * Returns a {@code {"items":[{"Id":..}]}} payload listing exactly the ids that
+     * were APPLIED, or {@code null} when the write did not land (parse error, OS
+     * rejection/throw, or background rate-limiting). The managed layer prunes its
+     * list only from a non-null result, so a failed write never causes it to drop
+     * just-added shortcuts by misreading a stale device state.
+     */
+    public static String setShortcuts(Activity activity, String json) {
+        if (activity == null || Build.VERSION.SDK_INT < 25) return null;
         ShortcutManager manager = activity.getSystemService(ShortcutManager.class);
-        if (manager == null) return;
+        if (manager == null) return null;
 
         List<ShortcutInfo> shortcuts = new ArrayList<>();
         try {
@@ -70,7 +78,7 @@ public final class QuickActionsBridge {
             }
         } catch (Exception e) {
             android.util.Log.w("QuickActions", "Failed to parse shortcuts json", e);
-            return;
+            return null;
         }
 
         // The OS cap covers manifest (static) + dynamic shortcuts combined, so
@@ -103,9 +111,37 @@ public final class QuickActionsBridge {
                         + budget + " of " + shortcuts.size() + " (static/manifest shortcuts share the cap)");
                 shortcuts = new ArrayList<>(shortcuts.subList(0, budget));
             }
-            manager.setDynamicShortcuts(shortcuts);
+            // setDynamicShortcuts returns false when background rate-limiting blocks the
+            // update — the write did NOT land, so report a no-op (null) rather than the
+            // set we hoped to apply.
+            if (!manager.setDynamicShortcuts(shortcuts)) {
+                android.util.Log.w("QuickActions", "setDynamicShortcuts was rate-limited; shortcuts not updated");
+                return null;
+            }
+            return appliedIdsJson(shortcuts);
         } catch (RuntimeException e) {
             android.util.Log.w("QuickActions", "setDynamicShortcuts failed", e);
+            return null;
+        }
+    }
+
+    // Serialize the ids we actually applied as {"items":[{"Id":..}]} so the managed
+    // layer can prune its list to exactly this set. Returns null if it can't build the
+    // payload (better to report a no-op than risk pruning to a wrong set).
+    private static String appliedIdsJson(List<ShortcutInfo> shortcuts) {
+        try {
+            JSONArray items = new JSONArray();
+            for (ShortcutInfo s : shortcuts) {
+                JSONObject o = new JSONObject();
+                o.put("Id", s.getId());
+                items.put(o);
+            }
+            JSONObject root = new JSONObject();
+            root.put("items", items);
+            return root.toString();
+        } catch (Exception e) {
+            android.util.Log.w("QuickActions", "Failed to build applied-ids json", e);
+            return null;
         }
     }
 

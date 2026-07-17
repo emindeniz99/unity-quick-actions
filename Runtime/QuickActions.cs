@@ -205,12 +205,14 @@ namespace EminDeniz99.QuickActions
         /// is already added; returns true on success.
         /// </summary>
         /// <remarks>
-        /// The OS limits how many dynamic shortcuts are shown (iOS ~4 total; Android
-        /// at least 5, shared with any static shortcuts). If you add more than fit,
-        /// the surplus is not displayed on the device; the managed list still lists
-        /// them (so <see cref="GetAll"/>/<see cref="IsAdded"/> report them) until the
-        /// next launch reconciles the list with what the OS actually kept. Keep the
-        /// set within the platform cap to avoid this. See the README "Known limits".
+        /// The OS limits how many dynamic shortcuts it keeps (iOS shows ~4; Android
+        /// caps at least 5, shared with any static shortcuts). On Android, surplus
+        /// beyond the cap is dropped by the OS and immediately removed from the
+        /// managed list too, so <see cref="GetAll"/>/<see cref="IsAdded"/> reflect
+        /// what the device actually kept (they do not over-report). <c>Add</c> still
+        /// returns true — the item was accepted into the set before the OS trim — but
+        /// a subsequent <see cref="GetAll"/>/<see cref="IsAdded"/> shows the trim.
+        /// iOS keeps the full array (no cap). See the README "Known limits".
         /// </remarks>
         /// <exception cref="ArgumentNullException">The item is null.</exception>
         public static bool Add(QuickActionItem item)
@@ -362,7 +364,23 @@ namespace EminDeniz99.QuickActions
 #endif
         }
 
-        private static void Push() => Bridge.SetShortcuts(_items);
+        private static void Push()
+        {
+            var accepted = Bridge.SetShortcuts(_items);
+            // null = defensive keep-all; same reference = accept-all (Null/iOS and the
+            // Android can't-confirm path) — nothing was trimmed, so nothing to prune.
+            if (accepted == null || ReferenceEquals(accepted, _items))
+                return;
+
+            // The OS trimmed some ids to fit its cap. Prune the surplus from the
+            // authoritative list in place, keeping the surviving original objects
+            // (icons intact) and their insertion order, so GetAll()/IsAdded() no
+            // longer over-report shortcuts the OS never accepted.
+            var keep = new HashSet<string>();
+            foreach (var it in accepted)
+                if (it != null) keep.Add(it.Id);
+            _items.RemoveAll(it => !keep.Contains(it.Id));
+        }
 
         private static void Log(string message)
         {

@@ -6,7 +6,7 @@ for production. Honest status — nothing marked "ready" that wasn't actually
 exercised.
 
 **Legend — Verified by:**
-`unit` = headless NUnit (`dotnet test`, 33 tests) · `unity-test` = Unity Test
+`unit` = headless NUnit (`dotnet test`, 36 tests) · `unity-test` = Unity Test
 Runner only (JsonUtility) · `static` = compiles in the stub harness (7 configs) ·
 `review` = human/agent code review (multiple adversarial rounds + a 15-unit workflow; see git log) ·
 `device` = **requires a real device — NOT done here** ·
@@ -77,10 +77,12 @@ builds (define ON → dll present; OFF → zero trace).
 ## Sign-off
 
 - **Headless gate (closable here): GREEN.** `tools/verify.sh` → **VERIFY: PASS** —
-  7 C# configs compile, **33 unit tests pass**, Java compiles, every asset has a
+  7 C# configs compile, **36 unit tests pass**, Java compiles, every asset has a
   stable `.meta`. Every managed feature has a dedicated, intent-encoding test
   (Rule 9). Reviewed one-by-one across repeated adversarial rounds + a 15-unit workflow
   (every confirmed finding fixed or explicitly documented; **0 P0 ship-blockers**).
+  (The `35/35` real-editor runs below predate the 3 cap-reconcile tests added
+  2026-07-17; a fresh Unity run would now report 38/38 — not re-run in-editor since.)
 - **Real-Editor gate (2022.3): CLOSED IN-CONTAINER 2026-07-17** via a licensed
   Unity 2022.3.9f1 (student Pro `.ulf`): package imports with **0 console
   errors**, **Unity Test Runner 35/35**, both menus registered, the managed
