@@ -1,6 +1,9 @@
 // Removes the QuickActions trampoline <activity> from the generated Android
 // manifest when QUICKACTIONS_ENABLED is NOT set, so the package is inert in a
-// production build (the trampoline can no longer be launched).
+// production build (the trampoline can no longer be launched). With the define
+// off the gated QuickActionsTrampolineInjectorAndroid never runs, so normally
+// there is nothing to strip — this is defense in depth against a stale entry
+// (e.g. one hand-copied into a custom main manifest).
 //
 // This assembly is deliberately NOT gated by QUICKACTIONS_ENABLED (it must run
 // when the define is OFF). It only depends on UNITY_ANDROID. Note: the trampoline
@@ -21,10 +24,10 @@ namespace EminDeniz99.QuickActions.Editor.NativeGate
     {
         private const string AndroidNs = "http://schemas.android.com/apk/res/android";
         private const string TrampolineClass = "com.emindeniz99.quickactions.QuickActionsTrampolineActivity";
-        // The source manifest authors the fully-qualified name, so the merged manifest
-        // normally keeps it. Also accept the relative `.QuickActionsTrampolineActivity`
-        // shorthand so the gate can't silently fail to strip if the name is ever
-        // shortened (fail-safe: prefer over-matching to leaving a live trampoline).
+        // The injector authors the fully-qualified name. Also accept the relative
+        // `.QuickActionsTrampolineActivity` shorthand so the gate can't silently
+        // fail to strip if a hand-authored entry uses the short form (fail-safe:
+        // prefer over-matching to leaving a live trampoline).
         private const string TrampolineClassShort = ".QuickActionsTrampolineActivity";
 
         public int callbackOrder => 90;

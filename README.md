@@ -10,7 +10,7 @@ targeting **Unity 2021 LTS and newer** (including Unity 6).
 | Android | `ShortcutManager` dynamic shortcuts | API 25 (Android 7.1) |
 
 Below those minimums the package is a **safe no-op** — every native call is
-guarded (`SDK_INT < 25` returns early; the plugin manifest imposes no `minSdk`
+guarded (`SDK_INT < 25` returns early; the package imposes no `minSdk`
 on your game), so nothing crashes: `IsPlatformSupported` reports `false`, the OS
 just never shows shortcuts. One iOS nuance: on iOS 9–12 the menu needed 3D Touch
 hardware; iOS 13+ opens it with a plain long-press on every device.
@@ -22,7 +22,8 @@ hardware; iOS 13+ opens it with a plain long-press on every device.
 - **Tap callback** — `Performed` event + `LastPerformed` for cold launches —
   identical for static and dynamic shortcuts.
 - **Zero native edits** — the iOS app delegate is hooked at load via the ObjC
-  runtime; the Android trampoline activity is merged in from a plugin manifest.
+  runtime; the Android trampoline activity is injected into the generated
+  Gradle manifest by a build post-processor.
 - **Version-proof Android** — a trampoline activity instead of subclassing
   Unity's activity, so it works on both `UnityPlayerActivity` (2021/2022) and
   `UnityPlayerGameActivity` (6+).
@@ -134,15 +135,20 @@ Constraints only work for managed code, **not** native plugins):
   generated Xcode project — but only runs when the define is set. With the define
   off, the macro is never added and the `.mm` compiles to **nothing**: no `+load`
   swizzle, no symbols. **Zero** iOS behaviour.
-- **Android native** — an *ungated* post-processor
-  (`Editor/NativeGate/QuickActionsTrampolineStripperAndroid`) removes the
-  trampoline `<activity>` from the generated manifest when the define is off, so
-  the trampoline can't be launched (the package is **inert**). One caveat: the
-  trampoline `.java` still compiles into the APK as a small dead, unreachable
-  class — Unity can't conditionally exclude a loose native source. For a
-  *literally*-zero Android footprint, keep the package out of the prod project
-  (see below). Both post-processors edit the **build output**, so they work for
-  read-only UPM packages.
+- **Android native** — a post-processor in the *gated* `Editor.Android`
+  assembly (`QuickActionsTrampolineInjectorAndroid`) injects the trampoline
+  `<activity>` into the generated Gradle manifest — Unity never merges a loose
+  `AndroidManifest.xml` from inside a UPM package, so build-time injection is
+  the mechanism, and it only runs when the define is set. With the define off
+  nothing is injected, and an *ungated* post-processor
+  (`Editor/NativeGate/QuickActionsTrampolineStripperAndroid`) additionally
+  strips any pre-existing entry (defense in depth), so the trampoline can't be
+  launched (the package is **inert**). One caveat: the trampoline `.java` still
+  compiles into the APK as a small dead, unreachable class — Unity can't
+  conditionally exclude a loose native source. For a *literally*-zero Android
+  footprint, keep the package out of the prod project (see below). All these
+  post-processors edit the **build output**, so they work for read-only UPM
+  packages.
 
 **To use it in your dev build:**
 
@@ -176,8 +182,8 @@ mechanical steps if your project wants the opposite trade-off.
 > exercised by the stub harness — verify it once in a real build. Concretely, in a
 > **prod build (define off)**: the generated Xcode project should contain **no**
 > `QUICKACTIONS_ENABLED` (grep the `.pbxproj`) and the merged Android manifest
-> should contain **no** `QuickActionsTrampolineActivity` (it's stripped). In a
-> **dev build (define on)** both are present.
+> should contain **no** `QuickActionsTrampolineActivity` (never injected, and
+> stripped if stale). In a **dev build (define on)** both are present.
 
 > **Static-shortcuts caveat when toggling the define.** If you configured static
 > shortcuts (Project Settings ▸ Quick Actions), the `QuickActionsSettings.asset`

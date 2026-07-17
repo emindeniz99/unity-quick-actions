@@ -43,8 +43,10 @@ The stub harness compiles the C#/Java but can't confirm Unity-only wiring:
   iOS: `QuickActionsEnableMacroiOS` (gated) adds `QUICKACTIONS_ENABLED=1` to the
   Xcode `UnityFramework` target only when enabled, and `QuickActions.mm` is
   wrapped in `#if QUICKACTIONS_ENABLED` — verify a prod build's Xcode project has
-  no `QuickActions` symbols. Android: `QuickActionsTrampolineStripperAndroid`
-  (ungated) removes the trampoline `<activity>` when the define is off — verify
+  no `QuickActions` symbols. Android: `QuickActionsTrampolineInjectorAndroid`
+  (gated) injects the trampoline `<activity>` only when the define is on, and
+  `QuickActionsTrampolineStripperAndroid` (ungated) strips any stale entry when
+  it is off — verify
   the prod manifest has no `QuickActionsTrampolineActivity` (the `.java` dead
   class remains; literally-zero needs the package excluded from the prod project).
   Detection uses `PlayerSettings.GetScriptingDefineSymbols`; confirm it reflects

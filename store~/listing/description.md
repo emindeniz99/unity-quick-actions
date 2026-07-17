@@ -17,7 +17,7 @@ Objective-C, no Java, no editing the generated Xcode/Gradle projects.
 • **Tap callback that just works** — a `Performed` event fires with your action
   id on every tap, including the cold launch that started the app.
 • **Zero native edits** — the iOS app delegate is hooked automatically; Android
-  uses a lightweight trampoline activity merged in for you.
+  uses a lightweight trampoline activity injected into the build for you.
 • **Future-proof** — works on Unity 2021 LTS through Unity 6, surviving the
   `UnityPlayerActivity` → `UnityPlayerGameActivity` change on Android.
 • **Full source included** — readable C#, Objective-C++ and Java. No black-box

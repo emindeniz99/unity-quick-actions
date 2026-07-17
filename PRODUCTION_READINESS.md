@@ -49,7 +49,7 @@ player builds.
 | iOS P/Invoke signatures + string malloc/free pairing | static + review | ✅ compiles & reviewed; **device**: real Apple-SDK compile of `.mm` |
 | iOS `UnityAppController` swizzle + cold/warm capture | review | ⏳ **device** — never run against UIKit |
 | Android JNI bridge + `ShortcutManager` + manifest-collision guard + JNI-safe reads | static + review | ✅ Java compiles (SDK stubs) & reviewed; **device**: real `ShortcutManager` |
-| Android trampoline (version-proof, foreground task) | review | ⏳ **device** — Unity 2022 `UnityPlayerActivity` **and** Unity 6 `GameActivity` |
+| Android trampoline (version-proof, foreground task) | review + **editor-2022.3** (declared in a real APK — see §4 injector row) | ⏳ **device** — tap behavior on Unity 2022 `UnityPlayerActivity` **and** Unity 6 `GameActivity` |
 | Cold + warm delivery end-to-end | review | ⏳ **device** — both OSes, multiple buffered taps |
 
 ## 4. Editor / build-time features (Unity-only)
@@ -58,6 +58,7 @@ player builds.
 |---|---|---|
 | Static shortcuts → iOS `Info.plist` (`PBXProject`/`PlistDocument`) | static + review | ⏳ **Unity** — real extension DLLs + a build |
 | Static shortcuts → Android `res/xml` + strings + meta-data (escaping, real `applicationId`) | static + review | ⏳ **Unity** — real Gradle project |
+| Trampoline `<activity>` injector (`QuickActionsTrampolineInjectorAndroid`, gated) | static + review + **editor-2022.3 REAL APK** | ✅ **build-proven 2026-07-17**: real Gradle dev build (define ON) → `aapt dump xmltree` shows the trampoline `<activity>` with exported/translucent/taskAffinity=""/excludeFromRecents/noHistory. (The injector exists because a real build proved Unity does **not** merge a loose `AndroidManifest.xml` from inside a UPM package — the pre-fix dev APK had no trampoline at all.) |
 | Project Settings ▸ Quick Actions UI (+ asset create, dup-id warning) | static + review | ⏳ **Unity** — Editor GUI |
 | Editor Simulator (warm tap + Play-Mode cold-launch seed, play-session state reset) | unit + static + review + **editor-2022.3** (both `Window ▸ Quick Actions ▸ Simulator/About` menus execute) | ⏳ interactive Play-Mode flow still manual |
 
@@ -67,7 +68,7 @@ player builds.
 |---|---|---|
 | Managed: gated asmdefs, define-OFF compiles to nothing | static + review + **editor-2022.3 REAL BUILDS** | ✅ **build-proven 2026-07-17**: define ON → `EminDeniz99.QuickActions.dll` in the Linux player; define OFF → zero package trace in the entire build output (`grep -ri quickactions` = 0 hits) |
 | iOS: `.mm` `#if`-wrapped + macro injector (idempotent) | review | ⏳ **device** — diff a prod Xcode project for `QUICKACTIONS_ENABLED` (expect none) |
-| Android: trampoline `<activity>` stripped when OFF | review | ⏳ **device** — diff a prod manifest for `QuickActionsTrampolineActivity` (expect none) |
+| Android: trampoline `<activity>` absent when OFF (never injected + stripper defense-in-depth) | review + **editor-2022.3 REAL APK** | ✅ **build-proven 2026-07-17**: real prod Gradle build (define OFF) → `aapt dump xmltree` shows **no** trampoline `<activity>`, **no** `EminDeniz99.QuickActions.dll`, **zero** `quickactions` files in the APK. Only the dead trampoline `.java` remains as ~4 unreachable strings in `classes.dex` (documented; needs package exclusion for literally-zero). |
 
 ## Sign-off
 
@@ -78,16 +79,24 @@ player builds.
   (every confirmed finding fixed or explicitly documented; **0 P0 ship-blockers**).
 - **Real-Editor gate (2022.3): CLOSED IN-CONTAINER 2026-07-17** via a licensed
   Unity 2022.3.9f1 (student Pro `.ulf`): package imports with **0 console
-  errors**, **Unity Test Runner 35/35**, both menus registered, and the managed
+  errors**, **Unity Test Runner 35/35**, both menus registered, the managed
   QUICKACTIONS_ENABLED gate proven in **real player builds** (ON → assembly
-  present; OFF → zero trace). Still open below: Android/iOS target passes and
-  the other editor lines.
+  present; OFF → zero trace), and the **Android target end-to-end** — a real
+  Gradle build produced a **dev APK** (define ON) whose merged manifest carries
+  the trampoline `<activity>` and whose assets carry the managed dll, and a
+  **prod APK** (define OFF) with **no** trampoline `<activity>`, **no** managed
+  dll, and **zero** `quickactions` files (only the dead `.java` as ~4
+  unreachable dex strings). This surfaced and fixed a real shipping bug: Unity
+  does not merge a loose UPM-package `AndroidManifest.xml`, so the trampoline is
+  now injected by a gated build post-processor. Still open below: iOS target
+  pass (macOS-only) and the other editor lines.
 - **Device gate (NOT closable in this container): OPEN.** Everything marked
   ⏳ above needs each claimed Unity line (2021.3, 2022.3, 6.0, 6.3 — full pass on all) + an iOS device
   (via macOS/Xcode) + an Android API-25+ device. The container now has a
-  licensed 2022.3.9f1 (see above), so the remaining gaps are the Android/iOS
-  target-specific passes, the other editor lines, and physical-device taps —
-  the true blockers to a `1.0.0` "production-ready" stamp.
+  licensed 2022.3.9f1 (see above) with the Android target passes closed, so the
+  remaining gaps are the iOS target-specific pass, the other three editor lines,
+  and physical-device taps — the true blockers to a `1.0.0` "production-ready"
+  stamp.
 
 ### Exact remaining steps to close the device gate
 1. Open the package in EACH claimed line (2021.3, 2022.3, 6.0, 6.3); switch to iOS + Android targets →

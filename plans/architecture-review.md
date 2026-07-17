@@ -29,7 +29,7 @@ flow, and the trade-offs behind them — distinct from the line-level bug review
      │ · UnityAppController  │  │ QuickActionsTrampolineActivity.java │
      │   swizzle (+load)     │  │ · ShortcutManager dynamic shortcuts │
      │ · UIApplication       │  │ · trampoline records tapped id      │
-     │   .shortcutItems      │  │ · AndroidManifest.xml (merged)      │
+     │   .shortcutItems      │  │ · <activity> injected at build time │
      └───────────────────────┘  └─────────────────────────────────────┘
 
    QuickActionsRuntime (MonoBehaviour, auto-created)  ← native tap notifications

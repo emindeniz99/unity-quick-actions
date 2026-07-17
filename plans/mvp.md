@@ -118,8 +118,9 @@ finishes; C# reads it via `OnApplicationFocus(true)` poll and on startup.
 - **Android** `IPostGenerateGradleAndroidProject`: emit
   `unityLibrary/src/main/res/xml/quickactions_shortcuts.xml`, add
   `<meta-data android:name="android.app.shortcuts" .../>` to the launcher
-  activity and declare `QuickActionsTrampolineActivity` in the merged
-  `AndroidManifest.xml`.
+  activity and inject the `QuickActionsTrampolineActivity` `<activity>` into
+  the generated `AndroidManifest.xml` (Unity never merges a loose manifest from
+  inside a UPM package, so build-time injection is the mechanism).
 
 ## Verification (no Unity in this container — run these in your project)
 

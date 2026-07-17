@@ -15,7 +15,9 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   swizzling (no AppDelegate edits).
 - Android implementation via `ShortcutManager` dynamic shortcuts plus a
   trampoline activity that works on both `UnityPlayerActivity` and
-  `UnityPlayerGameActivity`.
+  `UnityPlayerGameActivity`. The trampoline `<activity>` is injected into the
+  generated Gradle manifest by a gated build post-processor (Unity never merges
+  a loose `AndroidManifest.xml` from inside a UPM package).
 - `IconType` system-icon enum, Editor *About* window, and a Demo sample.
 - **Editor Simulator** (*Window ▸ Quick Actions ▸ Simulator*): lists the runtime
   and static shortcuts and fires a tap (raises `Performed`, updates `LastPerformed`)
@@ -44,7 +46,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   gate via define constraints) are gated at the build-output level: the iOS
   `.mm` is wrapped in `#if QUICKACTIONS_ENABLED` and a gated post-processor adds
   that macro to the Xcode project only when enabled (so it compiles to nothing in
-  prod); an ungated post-processor strips the trampoline `<activity>` from the
-  Android manifest when disabled. With the define off there is zero C# and no iOS
+  prod); the Android trampoline `<activity>` is only injected by a gated
+  post-processor when enabled, and an ungated post-processor additionally strips
+  any stale entry when disabled. With the define off there is zero C# and no iOS
   swizzle (the trampoline `.java` remains a dead, unreachable class). Add the
   define to a dev Build Profile to use it. See README "Dev-only".
