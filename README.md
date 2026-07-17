@@ -252,8 +252,8 @@ public class ShortcutRouter : MonoBehaviour
 | `event Action<string> Performed` | Tapped action id (main thread; includes cold launch). |
 | `string LastPerformed` | Id the app was last launched/resumed from, or null. |
 | `void ResetLastPerformed()` | Clear `LastPerformed`. |
-| `bool Add(QuickActionItem)` | Add one; false if invalid or id already added. |
-| `void AddList(IList<QuickActionItem>)` | Add several in one OS update. |
+| `bool Add(QuickActionItem)` | Add one; false if invalid, id already added, or the OS set couldn't be read / the OS rejected the write (transient — retry later). |
+| `void AddList(IList<QuickActionItem>)` | Add several in one OS update (same transient no-op cases as `Add`). |
 | `List<QuickActionItem> GetAll()` | Snapshot of the currently installed dynamic actions (OS-reconciled). |
 | `QuickActionItem GetById(string)` | Lookup by id. |
 | `bool Remove(QuickActionItem)` / `RemoveById(string)` | Remove one. |
@@ -315,8 +315,8 @@ startup (cold) and on regained focus (warm) — no `UnitySendMessage`. The C# la
 owns the authoritative list and pushes the full set to the OS on every change;
 on first access it **reconciles** that list with the shortcuts the OS already has
 (from a previous session), so `GetAll()`/`IsAdded()` are accurate across launches
-(icons excepted; on Android a reconciled item with no subtitle reports its title
-as the subtitle, since the OS stores only the long label).
+(icons excepted; a reconciled item with no subtitle reports an empty subtitle
+on both platforms — Android leaves the OS long label unset for it).
 
 ### Known limits — the OS shortcut cap
 
@@ -393,7 +393,7 @@ The package is type-checked and compiled without Unity via a stub-based harness:
 
 ```bash
 tools/setup.sh     # install dotnet + JDK (once; pre-baked in the devcontainer)
-tools/verify.sh    # .meta gen + C# compile (7 configs) + unit tests + Android plugin
+tools/verify.sh    # .meta gen + C# compile (8 configs) + unit tests + Android plugin
 ```
 
 `verify.sh` runs the unit tests via `dotnet test`; the same tests (plus

@@ -32,9 +32,12 @@ The stub harness compiles the C#/Java but can't confirm Unity-only wiring:
   the focus poll (performAction precedes didBecomeActive), and that static
   shortcuts.xml taps round-trip the action-encoded id. Confirm iOS cold + warm
   on a device via Xcode.
-- Consider hardening the exported trampoline (it must be `exported` for the
-  launcher to start it, but another app could fire a `PERFORM.<id>` action —
-  low impact, only spoofs an in-app shortcut id).
+- Trampoline spoof-hardening SHIPPED (the trampoline now validates the tapped
+  id against the OS's registered shortcuts before recording it). Residual: an
+  id belonging to a genuinely REGISTERED shortcut (e.g. a static/manifest id)
+  can still be spoofed by another app — low impact, only triggers an in-app
+  route for a shortcut the app really has; verify the validation path on
+  device.
 - **CI limitation:** the stub harness compiles the post-processors (incl. an
   isolated per-platform pass) but cannot validate the asmdef `precompiledReferences`
   resolving to the real extension DLLs — that is Unity-only. Confirm in a real
@@ -49,8 +52,11 @@ The stub harness compiles the C#/Java but can't confirm Unity-only wiring:
   it is off — verify
   the prod manifest has no `QuickActionsTrampolineActivity` (the `.java` dead
   class remains; literally-zero needs the package excluded from the prod project).
-  Detection uses `PlayerSettings.GetScriptingDefineSymbols`; confirm it reflects
-  per-Build-Profile defines on Unity 6.
+  Both ungated cleanups gate on compile-time `#if QUICKACTIONS_ENABLED` (the
+  same truth as the gated injectors), with a stale-assembly coherence check
+  that FAILS the build if the define was removed without a script recompile.
+  On Unity 6, confirm a dev Build Profile carrying the define builds
+  coherently (the check reads Player Settings plus the active profile).
 - **Settings-asset orphan when the define is off:** `QuickActionsSettings` (the
   static-shortcuts ScriptableObject) lives in the gated Editor assembly, so a
   project that has a `QuickActionsSettings.asset` and is opened with

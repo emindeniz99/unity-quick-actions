@@ -150,7 +150,7 @@ intent donation, `.unitypackage` export, automated device CI.
   asset + iOS `Info.plist` and Android `shortcuts.xml`/manifest post-processors,
   with the trampoline decoding an action-encoded id for XML shortcuts.
 - **Unity-free CI verification** (`.verify/` + `tools/verify.sh`): the C#
-  compiles against UnityEngine/UnityEditor stubs (7 configs) and the Android
+  compiles against UnityEngine/UnityEditor stubs (8 configs) and the Android
   plugin against Android SDK stubs; toolchain baked into the devcontainer. This
   replaces the "structural lint only" plan with real compilation. The iOS `.mm`
   remains review-only (no Apple SDK on Linux).

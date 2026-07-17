@@ -159,8 +159,10 @@ under `LoggingEnable` (it does).
 - **Memory:** one persistent GameObject; native strings freed correctly; no
   closures capturing large scopes. ✔
 - **Security:** the Android trampoline is `exported` (required so the launcher can
-  start it) → another app could fire a `PERFORM.<id>` action and spoof an in-app
-  shortcut tap. Low impact (only triggers an in-app route). Noted in ROADMAP. ⚠
+  start it) → another app could fire a `PERFORM.<id>` action. Mitigated: the
+  trampoline validates the id against the OS's registered shortcuts before
+  recording it. Residual: ids of genuinely registered shortcuts can still be
+  spoofed (low impact — only triggers an in-app route). ✔
 - **Extensibility:** new capability → extend `IQuickActionsBridge` + impls +
   facade; new platform → new bridge + factory branch. The seam is correct. ✔
 - **Testability:** managed logic fully testable headless; native + post-processors
