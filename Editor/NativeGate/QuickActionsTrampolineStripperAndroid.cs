@@ -29,6 +29,8 @@ namespace EminDeniz99.QuickActions.Editor.NativeGate
         // fail to strip if a hand-authored entry uses the short form (fail-safe:
         // prefer over-matching to leaving a live trampoline).
         private const string TrampolineClassShort = ".QuickActionsTrampolineActivity";
+        private const string ShortcutsResource = "quickactions_shortcuts";
+        private const string StringsResource = "quickactions_strings";
 
         public int callbackOrder => 90;
 
@@ -43,24 +45,49 @@ namespace EminDeniz99.QuickActions.Editor.NativeGate
             foreach (var module in modules)
             {
                 var manifestPath = Path.Combine(module, "src", "main", "AndroidManifest.xml");
-                if (!File.Exists(manifestPath))
-                    continue;
-
-                var doc = new XmlDocument();
-                doc.Load(manifestPath);
-                var removed = false;
-                foreach (var activity in doc.GetElementsByTagName("activity").Cast<XmlElement>().ToList())
+                if (File.Exists(manifestPath))
                 {
-                    var name = activity.GetAttribute("name", AndroidNs);
-                    if (name == TrampolineClass || name == TrampolineClassShort)
+                    var doc = new XmlDocument();
+                    doc.Load(manifestPath);
+                    var removed = false;
+                    foreach (var activity in doc.GetElementsByTagName("activity").Cast<XmlElement>().ToList())
                     {
-                        activity.ParentNode.RemoveChild(activity);
-                        removed = true;
+                        var name = activity.GetAttribute("name", AndroidNs);
+                        if (name == TrampolineClass || name == TrampolineClassShort)
+                        {
+                            activity.ParentNode.RemoveChild(activity);
+                            removed = true;
+                        }
                     }
+                    // Also drop our static-shortcuts meta-data so a reused/exported
+                    // project can't still advertise package shortcuts whose intents
+                    // target the trampoline we just removed. Only OUR entry
+                    // (resource == @xml/quickactions_shortcuts) — never the host app's.
+                    foreach (var meta in doc.GetElementsByTagName("meta-data").Cast<XmlElement>().ToList())
+                    {
+                        if (meta.GetAttribute("name", AndroidNs) == "android.app.shortcuts" &&
+                            meta.GetAttribute("resource", AndroidNs) == "@xml/" + ShortcutsResource)
+                        {
+                            meta.ParentNode.RemoveChild(meta);
+                            removed = true;
+                        }
+                    }
+                    if (removed)
+                        doc.Save(manifestPath);
                 }
-                if (removed)
-                    doc.Save(manifestPath);
+
+                // Delete our generated (uniquely named) shortcut resources too.
+                SafeDelete(Path.Combine(module, "src", "main", "res", "xml", ShortcutsResource + ".xml"));
+                SafeDelete(Path.Combine(module, "src", "main", "res", "values", StringsResource + ".xml"));
             }
+        }
+
+        private static void SafeDelete(string filePath)
+        {
+            if (!File.Exists(filePath))
+                return;
+            try { File.Delete(filePath); }
+            catch { /* best-effort cleanup; leaving a stale file is non-fatal here */ }
         }
     }
 }

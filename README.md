@@ -311,9 +311,20 @@ on first access it **reconciles** that list with the shortcuts the OS already ha
 (icons excepted; on Android a reconciled item with no subtitle reports its title
 as the subtitle, since the OS stores only the long label).
 
-If you add more shortcuts than the OS shows (iOS caps at 4 total), the overflow is
-dropped: iOS lets the OS pick; Android keeps the **first** N you added (by insertion
-order) and logs the rest. Keep your most important shortcuts first.
+### Known limits — the OS shortcut cap
+
+If you add more shortcuts than the OS shows (iOS caps at 4 total; Android at least
+5, shared with any static shortcuts), the overflow is dropped on the device: iOS
+lets the OS pick; Android keeps the **first** N you added (by insertion order) and
+logs the rest. Keep your most important shortcuts first.
+
+One consequence: when the overflow is trimmed, the **managed** list still contains
+the surplus items, so `GetAll()` / `IsAdded()` report them as added even though the
+OS didn't keep them. This self-corrects on the next launch, when the list is
+reconciled with the OS's actual dynamic shortcuts. Stay within the platform cap to
+avoid the discrepancy. (It's a deliberate simplicity trade-off: the alternative —
+querying the device's per-activity cap on every `Add` — would couple the managed
+API to device-specific limits and lose the icons you supplied.)
 
 ## Security: a shortcut tap is not an authenticated action
 

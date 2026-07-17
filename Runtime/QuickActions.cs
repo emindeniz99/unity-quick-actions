@@ -204,6 +204,14 @@ namespace EminDeniz99.QuickActions
         /// item is invalid or an action with the same <see cref="QuickActionItem.Id"/>
         /// is already added; returns true on success.
         /// </summary>
+        /// <remarks>
+        /// The OS limits how many dynamic shortcuts are shown (iOS ~4 total; Android
+        /// at least 5, shared with any static shortcuts). If you add more than fit,
+        /// the surplus is not displayed on the device; the managed list still lists
+        /// them (so <see cref="GetAll"/>/<see cref="IsAdded"/> report them) until the
+        /// next launch reconciles the list with what the OS actually kept. Keep the
+        /// set within the platform cap to avoid this. See the README "Known limits".
+        /// </remarks>
         /// <exception cref="ArgumentNullException">The item is null.</exception>
         public static bool Add(QuickActionItem item)
         {

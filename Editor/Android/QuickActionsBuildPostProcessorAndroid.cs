@@ -3,6 +3,7 @@
 // extension exists.
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Xml;
 using EminDeniz99.QuickActions;
@@ -28,14 +29,14 @@ namespace EminDeniz99.QuickActions.Editor
         private const string ActionPrefix = "com.emindeniz99.quickactions.PERFORM.";
         private const string TrampolineClass = "com.emindeniz99.quickactions.QuickActionsTrampolineActivity";
         private const string ShortcutsResource = "quickactions_shortcuts";
+        private const string StringsResource = "quickactions_strings";
 
         public int callbackOrder => 100;
 
         public void OnPostGenerateGradleAndroidProject(string path)
         {
             var settings = QuickActionsSettings.GetOrNull();
-            if (settings == null || settings.StaticShortcuts.Count == 0)
-                return;
+            var hasShortcuts = settings != null && settings.StaticShortcuts.Count > 0;
 
             // The launcher activity (MAIN/LAUNCHER) may live in the unityLibrary
             // module (given here) or the sibling launcher module. Resources and the
@@ -54,7 +55,17 @@ namespace EminDeniz99.QuickActions.Editor
             }
             if (manifestPath == null)
             {
-                Debug.LogWarning("[QuickActions] No launcher activity found; skipping static shortcuts.");
+                if (hasShortcuts)
+                    Debug.LogWarning("[QuickActions] No launcher activity found; skipping static shortcuts.");
+                return;
+            }
+
+            if (!hasShortcuts)
+            {
+                // No static shortcuts configured. A reused/exported Gradle project may
+                // still hold the res files + meta-data a previous build wrote; remove
+                // them so stale long-press shortcuts don't ship. (Parity with iOS.)
+                RemoveGeneratedShortcuts(moduleDir, manifestPath);
                 return;
             }
 
@@ -62,6 +73,52 @@ namespace EminDeniz99.QuickActions.Editor
             WriteResources(moduleDir, settings, appId);
             InjectMetaData(manifestPath);
             Debug.Log($"[QuickActions] Wrote {settings.StaticShortcuts.Count} static shortcut(s) to the Android project.");
+        }
+
+        // Removes the generated shortcut resources and the launcher meta-data so a
+        // reused build directory doesn't keep shipping shortcuts after they're all
+        // removed from the settings (mirrors the iOS post-processor's stale-plist clear).
+        internal static void RemoveGeneratedShortcuts(string moduleDir, string manifestPath)
+        {
+            var removedMeta = RemoveShortcutsMetaData(manifestPath);
+            var xml = Path.Combine(moduleDir, "src", "main", "res", "xml", ShortcutsResource + ".xml");
+            var strings = Path.Combine(moduleDir, "src", "main", "res", "values", StringsResource + ".xml");
+            var removedFiles = SafeDelete(xml) | SafeDelete(strings);
+            if (removedMeta || removedFiles)
+                Debug.Log("[QuickActions] Cleared stale static-shortcut output (no static shortcuts configured).");
+        }
+
+        // Removes the android.app.shortcuts meta-data from the launcher activity.
+        // Returns true if anything was removed. Shared shape with the ungated stripper.
+        internal static bool RemoveShortcutsMetaData(string manifestPath)
+        {
+            if (!File.Exists(manifestPath))
+                return false;
+            var doc = new XmlDocument();
+            doc.Load(manifestPath);
+            var removed = false;
+            foreach (var meta in doc.GetElementsByTagName("meta-data").Cast<XmlElement>().ToList())
+            {
+                // Only remove OUR meta-data (resource == @xml/quickactions_shortcuts);
+                // never touch a host app's own android.app.shortcuts declaration.
+                if (meta.GetAttribute("name", AndroidNs) == "android.app.shortcuts" &&
+                    meta.GetAttribute("resource", AndroidNs) == "@xml/" + ShortcutsResource)
+                {
+                    meta.ParentNode.RemoveChild(meta);
+                    removed = true;
+                }
+            }
+            if (removed)
+                doc.Save(manifestPath);
+            return removed;
+        }
+
+        internal static bool SafeDelete(string filePath)
+        {
+            if (!File.Exists(filePath))
+                return false;
+            try { File.Delete(filePath); return true; }
+            catch { return false; }
         }
 
         // The static intent targets the trampoline by explicit package+class, so it
@@ -166,7 +223,7 @@ namespace EminDeniz99.QuickActions.Editor
             strings.AppendLine("</resources>");
 
             File.WriteAllText(Path.Combine(xmlDir, ShortcutsResource + ".xml"), shortcuts.ToString());
-            File.WriteAllText(Path.Combine(valuesDir, "quickactions_strings.xml"), strings.ToString());
+            File.WriteAllText(Path.Combine(valuesDir, StringsResource + ".xml"), strings.ToString());
         }
 
         private static void InjectMetaData(string manifestPath)
