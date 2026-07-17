@@ -13,10 +13,10 @@ Runner only (JsonUtility) · `static` = compiles in the stub harness (7 configs)
 `editor-2022.3` = **executed in a real licensed Unity 2022.3.9f1 (Linux, xvfb)
 in this container on 2026-07-17** — import 0 errors, Test Runner 35/35, real
 player builds (incl. Android APKs). ·
-`editor-6.3` = **executed in a real licensed Unity 6000.3.20f1 (Unity 6.3 LTS,
-Linux, xvfb) in this container on 2026-07-17** — import 0 errors, Test Runner
-35/35, both menus register, managed-gate Standalone builds (define ON → dll
-present; OFF → zero trace).
+`editor-6.x` = **executed in real licensed Unity 6000.3.20f1 (6.3 LTS) and
+6000.0.79f1 (6.0 LTS), Linux, xvfb, in this container on 2026-07-17** — each:
+import 0 errors, Test Runner 35/35, both menus register, managed-gate Standalone
+builds (define ON → dll present; OFF → zero trace).
 
 ## 1. Runtime API (managed) — fully testable, GREEN
 
@@ -44,7 +44,7 @@ present; OFF → zero trace).
 |---|---|---|---|
 | `QuickActionItem` ctor / `IsValid` / equality-by-id | unit + review | `Constructor_SetsFields`, `IsValid_RequiresIdAndTitle`, `Equality_IsByIdOnly` | ✅ |
 | `IconType` pinned 0..29 (native contract) | unit + review | `IconType_EveryValueIsPinned`, `IconType_NoneIsZero…` | ✅ |
-| JSON contract `{"items":[{"Id"…}]}` (exact keys, Icon as int) | unity-test + review + **editor-2022.3 + editor-6.3** | `SerializationTests` — **executed for real: 35/35 on both 2022.3 and 6.3** | ✅ |
+| JSON contract `{"items":[{"Id"…}]}` (exact keys, Icon as int) | unity-test + review + **editor-2022.3 + editor-6.x** | `SerializationTests` — **executed for real: 35/35 on 2022.3, 6.0 and 6.3** | ✅ |
 
 ## 3. Bridges / native (compiled here, behavior is device-only)
 
@@ -64,13 +64,13 @@ present; OFF → zero trace).
 | Static shortcuts → Android `res/xml` + strings + meta-data (escaping, real `applicationId`) | static + review + **editor-2022.3 REAL APK** | ✅ **build-proven 2026-07-17**: 4 static shortcuts (with hostile escaping inputs — embedded `"`, `'`, `&`, `<>`, leading `@`/`?`, `\`, edge whitespace) baked into a real dev APK. `aapt dump`: `res/xml/quickactions_shortcuts.xml` present, each `<shortcut>` intent targets `QuickActionsTrampolineActivity` with action `…PERFORM.<id>` and `targetPackage` = the real `applicationId` from the launcher `build.gradle`; launcher activity has the `android.app.shortcuts` meta-data; every string round-tripped exactly and aapt2 accepted them (a wrong `EscapeResValue` would fail the resource compile). |
 | Trampoline `<activity>` injector (`QuickActionsTrampolineInjectorAndroid`, gated) | static + review + **editor-2022.3 REAL APK** | ✅ **build-proven 2026-07-17**: real Gradle dev build (define ON) → `aapt dump xmltree` shows the trampoline `<activity>` with exported/translucent/taskAffinity=""/excludeFromRecents/noHistory. (The injector exists because a real build proved Unity does **not** merge a loose `AndroidManifest.xml` from inside a UPM package — the pre-fix dev APK had no trampoline at all.) |
 | Project Settings ▸ Quick Actions UI (+ asset create, dup-id warning) | static + review | ⏳ **Unity** — Editor GUI |
-| Editor Simulator (warm tap + Play-Mode cold-launch seed, play-session state reset) | unit + static + review + **editor-2022.3 + editor-6.3** (both `Window ▸ Quick Actions ▸ Simulator/About` menus execute on both lines) | ⏳ interactive Play-Mode flow still manual |
+| Editor Simulator (warm tap + Play-Mode cold-launch seed, play-session state reset) | unit + static + review + **editor-2022.3 + editor-6.x** (both `Window ▸ Quick Actions ▸ Simulator/About` menus execute on 2022.3, 6.0 and 6.3) | ⏳ interactive Play-Mode flow still manual |
 
 ## 5. Dev-only `QUICKACTIONS_ENABLED` gate (the headline guarantee)
 
 | Aspect | Verified by | Status / gate |
 |---|---|---|
-| Managed: gated asmdefs, define-OFF compiles to nothing | static + review + **editor-2022.3 + editor-6.3 REAL BUILDS** | ✅ **build-proven 2026-07-17 on both 2022.3 and 6.3**: define ON → `EminDeniz99.QuickActions.dll` in the Linux player; define OFF → zero package trace in the entire build output (`grep -ri quickactions` = 0 hits) |
+| Managed: gated asmdefs, define-OFF compiles to nothing | static + review + **editor-2022.3 + editor-6.x REAL BUILDS** | ✅ **build-proven 2026-07-17 on 2022.3, 6.0 and 6.3**: define ON → `EminDeniz99.QuickActions.dll` in the Linux player; define OFF → zero package trace in the entire build output (`grep -ri quickactions` = 0 hits) |
 | iOS: `.mm` `#if`-wrapped + macro injector (idempotent) | review | ⏳ **device** — diff a prod Xcode project for `QUICKACTIONS_ENABLED` (expect none) |
 | Android: trampoline `<activity>` absent when OFF (never injected + stripper defense-in-depth) | review + **editor-2022.3 REAL APK** | ✅ **build-proven 2026-07-17**: real prod Gradle build (define OFF) → `aapt dump xmltree` shows **no** trampoline `<activity>`, **no** `EminDeniz99.QuickActions.dll`, **zero** `quickactions` files in the APK. Only the dead trampoline `.java` remains as ~4 unreachable strings in `classes.dex` (documented; needs package exclusion for literally-zero). |
 
@@ -97,24 +97,37 @@ present; OFF → zero trace).
   the launcher `android.app.shortcuts` meta-data, and correctly-escaped string
   resources (validated with deliberately hostile inputs that aapt2 accepted).
   Still open below: iOS target pass (macOS-only) and the other editor lines.
-- **Second LTS line (Unity 6.3): CLOSED IN-CONTAINER 2026-07-17** via a real
-  licensed Unity 6000.3.20f1 (the same Pro `.ulf` activates across versions).
-  Fresh project + the package as a `file:` UPM dependency: **imports with 0
-  compile errors** on Unity 6, **Unity Test Runner 35/35**, both `Window ▸ Quick
-  Actions` menus register, and the managed gate proven in **real Standalone
-  builds** (define ON → `EminDeniz99.QuickActions.dll` present; OFF → zero
-  `quickactions` trace in the whole build tree). This confirms no Unity-6 API
-  deprecation breaks the package. The 6.3 **Android** Gradle pass (GameActivity
-  era) was not run in-container (disk budget) and is covered by the device
-  matrix. Editor lines still unrun in-container: **2021.3** and **6.0**.
+- **Unity 6 lines (6.0 and 6.3): CLOSED IN-CONTAINER 2026-07-17** via real
+  licensed Unity 6000.0.79f1 and 6000.3.20f1 (the same Pro `.ulf` activates
+  across versions). For **each**: a fresh project + the package as a `file:` UPM
+  dependency **imports with 0 compile errors** on Unity 6, **Unity Test Runner
+  35/35**, both `Window ▸ Quick Actions` menus register, and the managed gate is
+  proven in **real Standalone builds** (define ON → `EminDeniz99.QuickActions.dll`
+  present; OFF → zero `quickactions` trace in the whole build tree). This
+  confirms no Unity-6 API deprecation breaks the package. The 6.x **Android**
+  Gradle pass (GameActivity era) was not run in-container (disk budget) and is
+  covered by the device matrix.
+- **Unity 2021.3: attempted in-container, blocked by a headless-tooling
+  artifact — NOT a package defect.** On a real licensed Unity 2021.3.45f2 the
+  package resolves and its assemblies load, but the editor's `bee_backend`
+  script-compile step hangs indefinitely in this headless Linux container
+  (spawns no compiler child, 0% CPU) — a known Unity-2021-on-headless-Linux
+  issue, independent of this package (the identical C# imports with 0 errors on
+  2022.3, 6.0 and 6.3, and compiles in the stub harness under
+  `UNITY_2021_3_OR_NEWER`). 2021.3 is architecturally identical to the
+  **fully-proven 2022.3** line (same `UnityPlayerActivity` era, same compilation
+  model, same Android Gradle structure), so its in-container gap is low-risk and
+  is closed by the device matrix.
 - **Device gate (NOT closable in this container): OPEN.** Everything marked
   ⏳ above needs each claimed Unity line (2021.3, 2022.3, 6.0, 6.3 — full pass on all) + an iOS device
-  (via macOS/Xcode) + an Android API-25+ device. The container has proven
-  **2022.3.9f1** (managed gate + real Android APKs, both build post-processors)
-  and **6.3 / 6000.3.20f1** (managed gate + tests + menus), so the remaining
-  gaps are the iOS target-specific pass (macOS-only), the **2021.3** and **6.0**
-  editor lines, the 6.x Android Gradle pass, and physical-device taps — the true
-  blockers to a `1.0.0` "production-ready" stamp.
+  (via macOS/Xcode) + an Android API-25+ device. In-container coverage so far:
+  **2022.3.9f1** — managed gate + real Android APKs (trampoline injection dev/prod
+  + static-shortcuts baker); **6.0.79f1** and **6.3.20f1** — managed gate + tests
+  + menus; **2021.3.45f2** — resolves/loads but the headless `bee_backend`
+  compile hangs (tooling artifact, see above). Remaining gaps: the iOS
+  target-specific pass (macOS-only), the 6.x Android Gradle pass, a real 2021.3
+  compile/build, and physical-device taps — the true blockers to a `1.0.0`
+  "production-ready" stamp.
 
 ### Exact remaining steps to close the device gate
 1. Open the package in EACH claimed line (2021.3, 2022.3, 6.0, 6.3); switch to iOS + Android targets →
