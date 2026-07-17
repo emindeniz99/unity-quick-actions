@@ -216,6 +216,14 @@ namespace EminDeniz99.QuickActions.Editor
                 shortcuts.AppendLine("      android:enabled=\"true\"");
                 if (!string.IsNullOrEmpty(item.AndroidDrawable))
                     shortcuts.AppendLine($"      android:icon=\"@drawable/{Escape(item.AndroidDrawable)}\"");
+                else if (item.Icon != IconType.None)
+                    // Unlike iOS (system-icon enum) and the Android *dynamic* path, a
+                    // static res/xml shortcut can only reference a drawable resource, and
+                    // emitting an unresolved @drawable would hard-fail aapt2. Warn instead
+                    // of silently shipping no icon.
+                    Debug.LogWarning($"[QuickActions] Static shortcut '{item.Id}' has Icon={item.Icon} but no " +
+                        "AndroidDrawable; Android static shortcuts need a drawable resource name (its icon " +
+                        "will be blank). Set AndroidDrawable to a bundled drawable, or add it at runtime with QuickActions.Add(...).");
                 shortcuts.AppendLine($"      android:shortcutShortLabel=\"@string/{shortName}\"");
                 shortcuts.AppendLine($"      android:shortcutLongLabel=\"@string/{longName}\">");
                 shortcuts.AppendLine("    <intent");

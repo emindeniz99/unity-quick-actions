@@ -30,8 +30,10 @@ namespace EminDeniz99.QuickActions.Editor
                 SessionState.EraseString(QuickActions.EditorColdLaunchKey);
                 // With domain reload disabled, statics survive play exit — drop the
                 // finished session's Performed subscribers (their MonoBehaviour
-                // targets are destroyed) so they can't leak into the next session.
+                // targets are destroyed) and its in-memory shortcut state so neither
+                // leaks into the next session or the Edit-Mode Simulator window.
                 QuickActions.EditorClearPerformedSubscribers();
+                QuickActions.EditorResetAfterPlaySession();
             };
         }
 

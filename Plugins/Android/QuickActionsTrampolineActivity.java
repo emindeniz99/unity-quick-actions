@@ -2,6 +2,9 @@ package com.emindeniz99.quickactions;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.content.pm.ShortcutInfo;
+import android.content.pm.ShortcutManager;
+import android.os.Build;
 import android.os.Bundle;
 
 /**
@@ -38,7 +41,32 @@ public final class QuickActionsTrampolineActivity extends Activity {
                 actionId = action.substring(QuickActionsBridge.ACTION_PREFIX.length());
             }
         }
-        QuickActionsBridge.recordPerformed(actionId);
+        // This activity is exported (the launcher must be able to start it), so any app
+        // could launch it with an arbitrary ACTION_ID. Only record ids that correspond
+        // to a REAL registered shortcut (dynamic or static/manifest) so a background app
+        // can't spoof a "user performed X" signal into the game.
+        if (isKnownShortcut(actionId)) {
+            QuickActionsBridge.recordPerformed(actionId);
+        } else if (actionId != null) {
+            android.util.Log.w("QuickActions", "Ignored a trampoline intent for an unknown shortcut id");
+        }
+    }
+
+    private boolean isKnownShortcut(String actionId) {
+        if (actionId == null || actionId.isEmpty() || Build.VERSION.SDK_INT < 25) return false;
+        ShortcutManager manager = getSystemService(ShortcutManager.class);
+        if (manager == null) return false;
+        try {
+            for (ShortcutInfo s : manager.getDynamicShortcuts())
+                if (actionId.equals(s.getId())) return true;
+            for (ShortcutInfo s : manager.getManifestShortcuts())
+                if (actionId.equals(s.getId())) return true;
+        } catch (RuntimeException e) {
+            // Can't verify (e.g. locked device) — be conservative and drop it. A genuine
+            // launcher tap happens after unlock, so this doesn't lose real taps.
+            android.util.Log.w("QuickActions", "Could not validate shortcut id", e);
+        }
+        return false;
     }
 
     private void launchMainActivity() {

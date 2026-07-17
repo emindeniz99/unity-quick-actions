@@ -92,8 +92,15 @@ namespace EminDeniz99.QuickActions.Internal
 
         public void ResetLastPerformed()
         {
-            using (var bridge = new AndroidJavaClass(BridgeClass))
-                bridge.CallStatic("resetLastPerformed");
+            try
+            {
+                using (var bridge = new AndroidJavaClass(BridgeClass))
+                    bridge.CallStatic("resetLastPerformed");
+            }
+            catch (AndroidJavaException e)
+            {
+                Debug.LogWarning("[QuickActions] ResetLastPerformed failed: " + e.Message);
+            }
         }
 
         public string ConsumePendingPerformed() => CallStringStatic("consumePendingPerformed");
@@ -127,10 +134,22 @@ namespace EminDeniz99.QuickActions.Internal
 
         private static string CallStringStatic(string method)
         {
-            using (var bridge = new AndroidJavaClass(BridgeClass))
+            // These poll/query methods are called from the runtime drain (cold-launch
+            // coroutine + every focus/pause). Never let a JNI exception (e.g. the class
+            // stripped by R8 / not packaged) escape into that path — degrade to null,
+            // matching the guarded SetShortcuts/GetShortcuts/RemoveAll.
+            try
             {
-                var value = bridge.CallStatic<string>(method);
-                return string.IsNullOrEmpty(value) ? null : value;
+                using (var bridge = new AndroidJavaClass(BridgeClass))
+                {
+                    var value = bridge.CallStatic<string>(method);
+                    return string.IsNullOrEmpty(value) ? null : value;
+                }
+            }
+            catch (AndroidJavaException e)
+            {
+                Debug.LogWarning("[QuickActions] " + method + " failed: " + e.Message);
+                return null;
             }
         }
     }

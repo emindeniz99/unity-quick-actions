@@ -180,6 +180,24 @@ namespace EminDeniz99.QuickActions
         internal static void EditorClearPerformedSubscribers() => Performed = null;
 
         /// <summary>
+        /// Called on Play Mode EXIT to drop the finished session's in-memory shortcut
+        /// state. Without this, with domain reload disabled the list and simulated
+        /// last-performed survive into Edit Mode, so the Simulator window would list a
+        /// stopped session's runtime shortcuts (e.g. one added via <see cref="Add"/> at
+        /// runtime) as if they were live. The play-ENTER reset (EditorResetForPlaySession)
+        /// only fires on the next enter, which is too late for Edit-Mode tooling.
+        /// </summary>
+        internal static void EditorResetAfterPlaySession()
+        {
+            _editorSimulatedLastPerformed = null;
+            _editorPending.Clear();
+            _items.Clear();
+            _loaded = false;
+            _loading = false;
+            _bridge = null;
+        }
+
+        /// <summary>
         /// Editor Simulator entry point for a <b>warm</b> tap (app already running):
         /// record <paramref name="id"/> as last-performed and raise <see cref="Performed"/>
         /// immediately — the same observable result as a real native tap.

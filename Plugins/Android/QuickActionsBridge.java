@@ -106,7 +106,11 @@ public final class QuickActionsBridge {
                 }
             }
 
-            // The OS cap covers manifest (static) + dynamic shortcuts combined.
+            // The OS cap is per-activity and covers manifest (static) + dynamic shortcuts
+            // combined. getManifestShortcuts() is package-wide; a Unity app has a single
+            // main activity so this is exact. (Edge case: a host that declares manifest
+            // shortcuts on OTHER main activities would over-count here and under-fill the
+            // dynamic budget — negligible for the single-activity apps this targets.)
             int budget = manager.getMaxShortcutCountPerActivity() - (manifest == null ? 0 : manifest.size());
             if (budget < 0) budget = 0;
             if (shortcuts.size() > budget) {
@@ -219,9 +223,13 @@ public final class QuickActionsBridge {
 
         ShortcutInfo.Builder builder = new ShortcutInfo.Builder(activity, id)
                 .setShortLabel(title)
-                .setLongLabel(subtitle.isEmpty() ? title : subtitle)
                 .setRank(rank) // launchers order dynamic shortcuts by rank, not list order
                 .setIntent(intent);
+        // Leave the long label UNSET when there's no subtitle, so a cold-restart
+        // reconcile reads it back as "" (not the title) — matching iOS and the
+        // caller's original empty Subtitle.
+        if (!subtitle.isEmpty())
+            builder.setLongLabel(subtitle);
 
         Icon icon = resolveIcon(activity, item);
         if (icon != null) builder.setIcon(icon);
