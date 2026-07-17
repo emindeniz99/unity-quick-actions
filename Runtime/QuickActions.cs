@@ -180,21 +180,19 @@ namespace EminDeniz99.QuickActions
         internal static void EditorClearPerformedSubscribers() => Performed = null;
 
         /// <summary>
-        /// Called on Play Mode EXIT to drop the finished session's in-memory shortcut
-        /// state. Without this, with domain reload disabled the list and simulated
-        /// last-performed survive into Edit Mode, so the Simulator window would list a
-        /// stopped session's runtime shortcuts (e.g. one added via <see cref="Add"/> at
-        /// runtime) as if they were live. The play-ENTER reset (EditorResetForPlaySession)
-        /// only fires on the next enter, which is too late for Edit-Mode tooling.
+        /// Called on Play Mode EXIT to drop the finished session's <b>tap signals</b>
+        /// (simulated last-performed + pending queue) so they can't replay into the
+        /// next session or the Edit-Mode Simulator with domain reload disabled.
+        /// The shortcut <b>list</b> is deliberately kept: on a real device dynamic
+        /// shortcuts persist after the app quits, and keeping <c>_items</c> mirrors
+        /// that — the Simulator can list the stopped session's runtime shortcuts and
+        /// cold-launch one from Edit Mode, exactly like tapping a persisted shortcut
+        /// on a closed app.
         /// </summary>
         internal static void EditorResetAfterPlaySession()
         {
             _editorSimulatedLastPerformed = null;
             _editorPending.Clear();
-            _items.Clear();
-            _loaded = false;
-            _loading = false;
-            _bridge = null;
         }
 
         /// <summary>
@@ -232,9 +230,10 @@ namespace EminDeniz99.QuickActions
         /// <summary>
         /// Add one quick action. Returns false (without changing anything) when the
         /// item is invalid, an action with the same <see cref="QuickActionItem.Id"/>
-        /// is already added, or the current OS shortcuts could not be read (so the
-        /// package won't risk overwriting them from an unknown baseline — retry later);
-        /// returns true on success.
+        /// is already added, the current OS shortcuts could not be read (so the
+        /// package won't risk overwriting them from an unknown baseline — retry later),
+        /// or the OS rejected the write (e.g. rate-limited while backgrounded on
+        /// Android — also retry later); returns true on success.
         /// </summary>
         /// <remarks>
         /// The OS limits how many dynamic shortcuts it keeps (iOS shows ~4; Android
@@ -271,15 +270,25 @@ namespace EminDeniz99.QuickActions
                 return false;
             }
 
-            _items.Add(item.Copy()); // store a copy so a later caller mutation can't diverge our state
-            Push();
+            var copy = item.Copy(); // store a copy so a later caller mutation can't diverge our state
+            _items.Add(copy);
+            if (!Push())
+            {
+                // The OS rejected the write (e.g. rate-limited in the background). Roll
+                // back the optimistic add so queries match the device, and report the
+                // failure so the caller can retry — mirroring the failed-read contract.
+                _items.Remove(copy);
+                Log($"Add failed: the OS did not accept the update for '{item.Id}'; retry later.");
+                return false;
+            }
             Log($"Added quick action '{item.Id}'.");
             return true;
         }
 
         /// <summary>
         /// Add several quick actions in one OS update. Invalid items and ids that
-        /// already exist are skipped.
+        /// already exist are skipped. If the current OS shortcuts can't be read, or
+        /// the OS rejects the write, nothing is added (retry later).
         /// </summary>
         public static void AddList(IList<QuickActionItem> items)
         {
@@ -291,7 +300,7 @@ namespace EminDeniz99.QuickActions
                 return;
             }
 
-            var changed = false;
+            var added = new List<QuickActionItem>();
             foreach (var item in items)
             {
                 if (item == null || !item.IsValid || IsAdded(item.Id))
@@ -299,12 +308,18 @@ namespace EminDeniz99.QuickActions
                     Log($"AddList skipped an invalid or duplicate item ({item}).");
                     continue;
                 }
-                _items.Add(item.Copy()); // store a copy — see Add
-                changed = true;
+                var copy = item.Copy(); // store a copy — see Add
+                _items.Add(copy);
+                added.Add(copy);
             }
 
-            if (changed)
-                Push();
+            if (added.Count > 0 && !Push())
+            {
+                // Failed OS write — roll back every optimistic add (see Add).
+                foreach (var copy in added)
+                    _items.Remove(copy);
+                Log("AddList failed: the OS did not accept the update; nothing was added — retry later.");
+            }
         }
 
         /// <summary>Snapshot of the currently installed quick actions.</summary>
@@ -327,7 +342,11 @@ namespace EminDeniz99.QuickActions
         /// <summary>Remove a quick action. Returns true if one was removed.</summary>
         public static bool Remove(QuickActionItem item) => item != null && RemoveById(item.Id);
 
-        /// <summary>Remove the quick action with this id. Returns true if one was removed.</summary>
+        /// <summary>
+        /// Remove the quick action with this id. Returns true if one was removed;
+        /// false when there is no such id, the current OS shortcuts could not be
+        /// read, or the OS rejected the update (the action is kept — retry later).
+        /// </summary>
         public static bool RemoveById(string id)
         {
             if (string.IsNullOrEmpty(id))
@@ -338,10 +357,20 @@ namespace EminDeniz99.QuickActions
                 Log("RemoveById deferred: could not read the current shortcuts.");
                 return false;
             }
-            if (_items.RemoveAll(a => a.Id == id) == 0)
+            var index = _items.FindIndex(a => a.Id == id);
+            if (index < 0)
                 return false;
 
-            Push();
+            var removed = _items[index];
+            _items.RemoveAt(index);
+            if (!Push())
+            {
+                // Failed OS write — the device still shows the item, so put it back at
+                // its original position and report the failure (see Add).
+                _items.Insert(index, removed);
+                Log($"RemoveById failed: the OS did not accept the update for '{id}'; retry later.");
+                return false;
+            }
             Log($"Removed quick action '{id}'.");
             return true;
         }
@@ -418,22 +447,21 @@ namespace EminDeniz99.QuickActions
 #endif
         }
 
-        private static void Push()
+        private static bool Push()
         {
             var accepted = Bridge.SetShortcuts(_items);
             if (accepted == null)
             {
-                // The OS write did not land (rejected/rate-limited/errored). Our
-                // optimistic mutation to _items (Add added, RemoveById removed) may not
-                // match the device, so force a reconcile on next access rather than
-                // trusting it. Don't prune now — that would risk wiping a just-added
-                // item on a transient failure (a stale read is not authoritative).
+                // The OS write did not land (rejected/rate-limited/errored). Report the
+                // failure so the caller can roll back its optimistic mutation and return
+                // false, and force a reconcile on next access. Don't prune here — a
+                // stale read is not authoritative.
                 _loaded = false;
-                return;
+                return false;
             }
             // Same reference = accept-all (Null/iOS) — nothing was trimmed, nothing to prune.
             if (ReferenceEquals(accepted, _items))
-                return;
+                return true;
 
             // The OS trimmed some ids to fit its cap. Prune the surplus from the
             // authoritative list in place, keeping the surviving original objects
@@ -443,6 +471,7 @@ namespace EminDeniz99.QuickActions
             foreach (var it in accepted)
                 if (it != null) keep.Add(it.Id);
             _items.RemoveAll(it => !keep.Contains(it.Id));
+            return true;
         }
 
         private static void Log(string message)

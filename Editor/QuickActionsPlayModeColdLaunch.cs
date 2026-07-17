@@ -30,8 +30,10 @@ namespace EminDeniz99.QuickActions.Editor
                 SessionState.EraseString(QuickActions.EditorColdLaunchKey);
                 // With domain reload disabled, statics survive play exit — drop the
                 // finished session's Performed subscribers (their MonoBehaviour
-                // targets are destroyed) and its in-memory shortcut state so neither
-                // leaks into the next session or the Edit-Mode Simulator window.
+                // targets are destroyed) and its tap signals (simulated last-performed,
+                // pending queue) so neither replays into the next session. The shortcut
+                // LIST is kept on purpose: like a real device after the app quits, so
+                // the Simulator can still cold-launch the session's runtime shortcuts.
                 QuickActions.EditorClearPerformedSubscribers();
                 QuickActions.EditorResetAfterPlaySession();
             };

@@ -166,17 +166,47 @@ namespace EminDeniz99.QuickActions.Tests
         }
 
         [Test]
-        public void FailedWrite_ReconcilesWithOsOnNextAccess_NotTrustingOptimisticMutation()
+        public void FailedWrite_AddReturnsFalse_RollsBack_AndReconciles()
         {
-            // When the OS write fails (the bridge returns null), the facade must not
-            // trust its optimistic _items mutation; a later access reconciles with the
-            // real OS state. Here the OS holds "os1" and never receives "new".
+            // When the OS write fails (the bridge returns null), Add must report the
+            // failure (false) and roll back its optimistic mutation — the caller said
+            // "install this" and it was NOT installed, so a true here would make the
+            // shortcut silently vanish later with no signal to retry on. The OS holds
+            // "os1" and never receives "new".
             QuickActions.OverrideBridgeForTesting(new FailingSetShortcutsBridge("os1"));
             try
             {
-                QuickActions.Add(Item("new")); // write "fails" — not applied to the OS
+                Assert.IsFalse(QuickActions.Add(Item("new")), "a failed OS write must not report success");
                 CollectionAssert.AreEquivalent(new[] { "os1" }, QuickActions.GetAll().ConvertAll(i => i.Id));
                 Assert.IsFalse(QuickActions.IsAdded("new"));
+            }
+            finally { QuickActions.OverrideBridgeForTesting(null); }
+        }
+
+        [Test]
+        public void FailedWrite_RemoveByIdReturnsFalse_AndKeepsItemAtItsPosition()
+        {
+            // A failed write means the device still shows the shortcut — RemoveById
+            // must report false and keep the item (at its original position, since
+            // order feeds Android ranks) rather than claiming a removal that will
+            // silently resurrect on the next reconcile.
+            QuickActions.OverrideBridgeForTesting(new FailingSetShortcutsBridge("a", "b", "c"));
+            try
+            {
+                Assert.IsFalse(QuickActions.RemoveById("b"));
+                CollectionAssert.AreEqual(new[] { "a", "b", "c" }, QuickActions.GetAll().ConvertAll(i => i.Id));
+            }
+            finally { QuickActions.OverrideBridgeForTesting(null); }
+        }
+
+        [Test]
+        public void FailedWrite_AddListAddsNothing()
+        {
+            QuickActions.OverrideBridgeForTesting(new FailingSetShortcutsBridge("os1"));
+            try
+            {
+                QuickActions.AddList(new List<QuickActionItem> { Item("x"), Item("y") });
+                CollectionAssert.AreEquivalent(new[] { "os1" }, QuickActions.GetAll().ConvertAll(i => i.Id));
             }
             finally { QuickActions.OverrideBridgeForTesting(null); }
         }
