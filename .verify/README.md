@@ -7,7 +7,7 @@ Unity (the leading `.` means Unity ignores it) and never ships in a build.
 Run everything:
 
 ```bash
-tools/verify.sh        # gen_meta + C# compile (x8) + unit tests + Java compile
+tools/verify.sh        # gen_meta + C# compile (x8) + unit tests + Java compile + smoke
 tools/setup.sh         # one-time: install dotnet + JDK if missing
 ```
 
@@ -17,7 +17,7 @@ tools/setup.sh         # one-time: install dotnet + JDK if missing
 |-------|-----|
 | Stable `.meta` for every asset | `tools/gen_meta.py` (idempotent) |
 | Runtime + Editor C# | `dotnet build` against the UnityEngine/UnityEditor **stubs** in `Stubs/`, eight configs: `Editor`, `EditoriOS`, `EditorAndroid`, `NativeGate`, `NativeGateiOS`, `iOS`, `Android`, `Sample` — each defines the matching `UNITY_*` symbols so every `#if` branch is exercised. The `EditoriOS`/`EditorAndroid`/`NativeGate`/`NativeGateiOS` configs compile each build post-processor in isolation (mirroring the gated/ungated asmdefs; `NativeGate` is the ungated Android trampoline stripper, `NativeGateiOS` the ungated iOS gate cleanup — both compile WITHOUT `QUICKACTIONS_ENABLED`). **Caveat:** the stubs stand in for the real `UnityEditor.iOS.Xcode` / `UnityEditor.Android` extension DLLs, so asmdef `precompiledReferences` resolution is only truly validated in a real Unity build. |
-| Android plugin (Java) | `javac` against the minimal Android SDK **stubs** in `JavaStubs/`. |
+| Android plugin (Java) | `javac` against the Android SDK **stubs** in `JavaStubs/`, then the stateful smoke test in `JavaSmoke/` runs the compiled plugin against them (coexistence, budget, trampoline gate, null-vs-empty reads). |
 
 ## Why stubs
 
@@ -29,7 +29,8 @@ empty bodies, purely so the compiler can resolve and type-check our code. They
 are **not** functional and are never referenced by a real Unity build — Unity
 compiles against its own assemblies.
 
-A green run proves the package's C# and Java **compile and type-check**; it does
+A green run proves the package's C# and Java **compile and type-check** and that
+the Java layer's branch logic holds against AOSP-shaped stub semantics; it does
 not exercise runtime behaviour on a device. For that, see the on-device
 procedure in [`../plans/mvp.md`](../plans/mvp.md).
 

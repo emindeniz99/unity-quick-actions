@@ -53,13 +53,23 @@ else
 fi
 
 echo
-echo "== 4/4  Java compile (Android SDK stubs) =="
+echo "== 4/4  Java compile + smoke test (Android SDK stubs) =="
 if command -v javac >/dev/null 2>&1; then
   TMP="$(mktemp -d)"
   mkdir -p "$TMP/out"
   if javac --release 11 -d "$TMP/out" $(find "$VERIFY/JavaStubs" -name '*.java') 2>"$TMP/stub.err"; then
     if javac --release 11 -d "$TMP/out" -cp "$TMP/out" "$ROOT"/Plugins/Android/*.java 2>"$TMP/plugin.err"; then
-      echo "Android plugin compiles OK"
+      # Stateful smoke test: exercises the coexistence/budget/trampoline branches
+      # of the compiled plugin against the stateful stubs (see .verify/JavaSmoke).
+      if javac --release 11 -d "$TMP/out" -cp "$TMP/out" "$VERIFY"/JavaSmoke/*.java 2>"$TMP/smoke.err" \
+         && java -cp "$TMP/out" com.emindeniz99.quickactions.QuickActionsBridgeSmokeTest >"$TMP/smoke.out" 2>&1; then
+        echo "Android plugin compiles OK — $(tail -1 "$TMP/smoke.out")"
+      else
+        echo "!! Android smoke test failed:"
+        cat "$TMP/smoke.err" 2>/dev/null
+        cat "$TMP/smoke.out" 2>/dev/null
+        fail=1
+      fi
     else
       echo "!! Android plugin failed:"; cat "$TMP/plugin.err"; fail=1
     fi
