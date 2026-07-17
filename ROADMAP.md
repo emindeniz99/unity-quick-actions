@@ -32,6 +32,13 @@ The stub harness compiles the C#/Java but can't confirm Unity-only wiring:
   the focus poll (performAction precedes didBecomeActive), and that static
   shortcuts.xml taps round-trip the action-encoded id. Confirm iOS cold + warm
   on a device via Xcode.
+- **Host-coexistence release gate (on-device, Android):** publish a host
+  shortcut with a bitmap icon outside the package, then exercise
+  `Add`/`RemoveAll`/cold-restart reconcile and confirm the host item survives
+  untouched (icon intact, deep link works). Reboot between publish and
+  read-back to confirm the extras ownership marker persists on OEM
+  `ShortcutManager` forks — if a fork dropped extras, our items would be
+  orphaned (host items are still safe; the failure direction is host-safe).
 - Trampoline spoof-hardening SHIPPED (the trampoline now validates the tapped
   id against the OS's registered shortcuts before recording it). Residual: an
   id belonging to a genuinely REGISTERED shortcut (e.g. a static/manifest id)

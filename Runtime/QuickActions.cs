@@ -237,12 +237,14 @@ namespace EminDeniz99.QuickActions
         /// </summary>
         /// <remarks>
         /// The OS limits how many dynamic shortcuts it keeps (iOS shows ~4; Android
-        /// caps at least 5, shared with any static shortcuts). On Android, surplus
-        /// beyond the cap is dropped by the OS and immediately removed from the
-        /// managed list too, so <see cref="GetAll"/>/<see cref="IsAdded"/> reflect
+        /// caps at least 5, shared with any static shortcuts AND any dynamic
+        /// shortcuts the host app itself published outside this API). On Android,
+        /// surplus beyond the cap is dropped by the OS and immediately removed from
+        /// the managed list too, so <see cref="GetAll"/>/<see cref="IsAdded"/> reflect
         /// what the device actually kept (they do not over-report). <c>Add</c> still
-        /// returns true — the item was accepted into the set before the OS trim — but
-        /// a subsequent <see cref="GetAll"/>/<see cref="IsAdded"/> shows the trim.
+        /// returns true for a cap trim — the item was accepted into the set before
+        /// the OS trim — but a subsequent <see cref="GetAll"/>/<see cref="IsAdded"/>
+        /// shows the trim (a rejected <i>write</i> is different: that returns false).
         /// iOS keeps the full array (no cap). See the README "Known limits".
         /// </remarks>
         /// <exception cref="ArgumentNullException">The item is null.</exception>
@@ -375,7 +377,10 @@ namespace EminDeniz99.QuickActions
             return true;
         }
 
-        /// <summary>Remove every quick action.</summary>
+        /// <summary>
+        /// Remove every quick action added through this API. A host app's own OS
+        /// shortcuts (published outside this package) are untouched on both platforms.
+        /// </summary>
         public static void RemoveAll()
         {
             // Clear the OS first; only drop our in-memory state if the removal actually

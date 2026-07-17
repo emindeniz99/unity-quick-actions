@@ -57,10 +57,22 @@ public final class QuickActionsTrampolineActivity extends Activity {
         ShortcutManager manager = getSystemService(ShortcutManager.class);
         if (manager == null) return false;
         try {
+            // Dynamic ids must ALSO carry our ownership marker: under host
+            // coexistence the dynamic set contains the host app's own shortcuts,
+            // and without the marker check any app could spoof a Performed event
+            // through this exported activity using a host shortcut's id.
             for (ShortcutInfo s : manager.getDynamicShortcuts())
-                if (actionId.equals(s.getId())) return true;
+                if (actionId.equals(s.getId()) && QuickActionsBridge.isOurShortcut(s)) return true;
+            // Manifest (static) shortcuts can't carry extras, so their ids are
+            // accepted unmarked — ours are the ones the build baker declared.
             for (ShortcutInfo s : manager.getManifestShortcuts())
                 if (actionId.equals(s.getId())) return true;
+            // A shortcut the user PINNED stays launchable after it leaves the
+            // dynamic set — its tap is legitimate, don't drop it. Ours keep the
+            // marker when pinned (extras survive pinning); a pinned static id is
+            // already covered by the manifest loop above.
+            for (ShortcutInfo s : manager.getPinnedShortcuts())
+                if (actionId.equals(s.getId()) && QuickActionsBridge.isOurShortcut(s)) return true;
         } catch (RuntimeException e) {
             // Can't verify (e.g. locked device) — be conservative and drop it. A genuine
             // launcher tap happens after unlock, so this doesn't lose real taps.

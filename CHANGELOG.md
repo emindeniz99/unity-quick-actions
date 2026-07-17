@@ -18,6 +18,12 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `UnityPlayerGameActivity`. The trampoline `<activity>` is injected into the
   generated Gradle manifest by a gated build post-processor (Unity never merges
   a loose `AndroidManifest.xml` from inside a UPM package).
+- Host coexistence on both platforms: every shortcut the package creates is
+  stamped with an ownership marker (iOS `userInfo`, Android `ShortcutInfo`
+  extras), and all writes/removes/read-backs are scoped to that subset — a host
+  app's own quick actions are never absorbed, republished, or removed. Android
+  uses the additive `addDynamicShortcuts`/`removeDynamicShortcuts` APIs instead
+  of full-set replacement.
 - `IconType` system-icon enum, Editor *About* window, and a Demo sample.
 - **Editor Simulator** (*Window ▸ Quick Actions ▸ Simulator*): lists the runtime
   and static shortcuts and fires a tap (raises `Performed`, updates `LastPerformed`)

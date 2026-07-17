@@ -321,9 +321,11 @@ on both platforms — Android leaves the OS long label unset for it).
 ### Known limits — the OS shortcut cap
 
 If you add more shortcuts than the OS shows (iOS caps at 4 total; Android at least
-5, shared with any static shortcuts), the overflow is dropped on the device: iOS
+5, shared with any static shortcuts **and any dynamic shortcuts the host app itself
+published** outside this package), the overflow is dropped on the device: iOS
 lets the OS pick; Android keeps the **first** N you added (by insertion order) and
-logs the rest. Keep your most important shortcuts first.
+logs the rest (the log says how many slots host shortcuts took). Keep your most
+important shortcuts first.
 
 The **managed** list stays consistent with what the OS accepted: when Android trims
 the overflow, those ids are pruned from the managed list in the same call, so
@@ -332,6 +334,28 @@ over-report), while the icons you supplied are preserved for the shortcuts that 
 kept. `Add` still returns `true` for a surplus item — the request was accepted into
 the set before the OS trim — but a subsequent `GetAll()` / `IsAdded()` shows the
 trim. Keep the set within the platform cap so nothing is silently dropped.
+
+### Host coexistence — the package touches only its own shortcuts
+
+Every shortcut this package creates is stamped with an ownership marker (iOS:
+a `UIApplicationShortcutItemUserInfo` key; Android: a `ShortcutInfo` extras
+key — both `com.emindeniz99.quickactions.managed`). Writes, `RemoveAll()`, and
+the cold-start reconcile operate **only on that marked subset**: quick actions
+the host app published itself (its own `shortcutItems` / `ShortcutManager`
+entries, or another plugin's) are never absorbed into `GetAll()`, never
+republished with this package's intents, and never removed. Three consequences:
+
+- **The cap is shared** (Android): host shortcuts take slots from the same
+  per-activity budget, so `Add` can return `true` and the item still be pruned
+  when there is no room — the trim is logged with how many slots host items took.
+- **Coexistence is one-sided on Android**: this package uses the subset APIs
+  (`addDynamicShortcuts`/`removeDynamicShortcuts`), but a host that itself calls
+  `setDynamicShortcuts(...)` replaces the **entire** dynamic set — including this
+  package's items (they reappear on the next `Add`/push, with icons, but taps
+  in between are lost). A coexisting host should use the additive APIs too.
+- **Ordering**: this package ranks its items by your insertion order starting at
+  0; launchers interleave host items by their own ranks, so the exact combined
+  order across publishers is launcher-dependent.
 
 ### Known limits — Android build variants and static shortcuts
 
