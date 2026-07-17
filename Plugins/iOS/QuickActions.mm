@@ -168,6 +168,13 @@ static void QAPerformActionForShortcutItem(id self, SEL _cmd, UIApplication *app
         // applicationDidBecomeActive, so the focus poll drains it on resume. Only
         // OUR shortcuts — a host shortcut is left entirely to its own handler below.
         QAStorePerformed(shortcutItem.type, YES);
+    } else if (gQAOrigPerformAction == NULL) {
+        // Unmarked item with NO prior handler to chain to: in a plain Unity app
+        // nothing else can receive this tap (e.g. an Info.plist static shortcut the
+        // developer added outside this package, or an item written by a pre-marker
+        // build). Dropping it would black-hole the tap while completing YES below —
+        // deliver it best-effort through our channel, as the only consumer.
+        QAStorePerformed(shortcutItem.type, YES);
     }
     // If UnityAppController already had an implementation (a host app or another
     // native plugin), chain to it and let it own the completion handler so the
@@ -239,11 +246,22 @@ void _QuickActions_SetShortcuts(const char *json) {
         // (unmarked) and append our current set. A plain assignment would wipe the
         // host's live UIApplicationShortcutItems on the first Add/RemoveById — mirror
         // the marker-scoped RemoveAll and read-back paths.
+        NSArray<UIApplicationShortcutItem *> *ours = QABuildItems(value);
+        NSMutableSet<NSString *> *ourIds = [NSMutableSet set];
+        for (UIApplicationShortcutItem *item in ours)
+            [ourIds addObject:item.type];
         UIApplication *app = [UIApplication sharedApplication];
         NSMutableArray<UIApplicationShortcutItem *> *merged = [NSMutableArray array];
-        for (UIApplicationShortcutItem *item in app.shortcutItems)
-            if (!QAIsOurShortcut(item)) [merged addObject:item];
-        [merged addObjectsFromArray:QABuildItems(value)];
+        for (UIApplicationShortcutItem *item in app.shortcutItems) {
+            if (QAIsOurShortcut(item)) continue;            // replaced by the fresh set below
+            // Unmarked item whose type matches an id we're writing: an item persisted
+            // by a pre-marker build of this package. Adopt it (the fresh, marked copy
+            // below supersedes it) instead of keeping it as an unremovable duplicate
+            // squatting ahead of the managed set.
+            if ([ourIds containsObject:item.type]) continue;
+            [merged addObject:item];
+        }
+        [merged addObjectsFromArray:ours];
         app.shortcutItems = merged;
     });
 }

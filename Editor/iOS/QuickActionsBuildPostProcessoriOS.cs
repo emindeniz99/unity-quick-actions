@@ -55,10 +55,18 @@ namespace EminDeniz99.QuickActions.Editor
             }
 
             // Merge, don't clobber: reuse any existing array so a host app's / other
-            // plugin's entries survive; drop our own stale entries (marked) so an
-            // Append rebuild refreshes them; then append the current set.
+            // plugin's entries survive; drop our own stale entries so an Append rebuild
+            // refreshes them; then append the current set. "Ours" is the marker — plus,
+            // for entries written by a pre-marker build of this package, an UNMARKED
+            // entry whose type equals an id we are about to write (adopt it; otherwise
+            // it would duplicate the shortcut on every Append build forever).
+            var writtenIds = new HashSet<string>();
+            foreach (var item in settings.StaticShortcuts)
+                if (item != null && !string.IsNullOrEmpty(item.Id) && !string.IsNullOrEmpty(item.Title))
+                    writtenIds.Add(item.Id);
             var items = QuickActionsPlistShortcuts.GetOrCreateArray(plist);
-            items.values.RemoveAll(QuickActionsPlistShortcuts.IsOurs);
+            items.values.RemoveAll(e => QuickActionsPlistShortcuts.IsOurs(e)
+                || writtenIds.Contains(QuickActionsPlistShortcuts.TypeOf(e)));
 
             var seen = new HashSet<string>();
             var count = 0;
@@ -104,6 +112,17 @@ namespace EminDeniz99.QuickActions.Editor
             if (plist.root.values.TryGetValue(ItemsKey, out var existing) && existing is PlistElementArray arr)
                 return arr;
             return plist.root.CreateArray(ItemsKey);
+        }
+
+        // The entry's UIApplicationShortcutItemType (shortcut id), or null when the
+        // entry isn't a dict / has no type. Used to spot pre-marker entries of ours.
+        internal static string TypeOf(PlistElement entry)
+        {
+            if (!(entry is PlistElementDict dict))
+                return null;
+            return dict.values.TryGetValue("UIApplicationShortcutItemType", out var type)
+                ? type.AsString()
+                : null;
         }
 
         // True only for entries this package wrote (marked in their user info).
