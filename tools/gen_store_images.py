@@ -11,7 +11,14 @@ Run: python3 tools/gen_store_images.py
 """
 import os
 import sys
-from PIL import Image, ImageDraw, ImageFont
+try:
+    from PIL import Image, ImageDraw, ImageFont
+except ImportError:
+    sys.exit(
+        "This script needs Pillow (not a runtime dependency of the package — only for "
+        "regenerating store art). Install it with:  pip install Pillow\n"
+        "The store~/ images are already committed, so you only need this when regenerating them."
+    )
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, "store~")

@@ -7,6 +7,10 @@
 # After this, the only remaining steps need YOU: a licensed Unity (open/compile),
 # a device pass, a real screenshot, then upload via the Publisher portal.
 # See STORE_CHECKLIST.md.
+#
+# Prereqs: dotnet SDK + a JDK (see tools/setup.sh) for step 1, and Pillow
+# (pip install Pillow) for step 2's image regen. The store~/ PNGs are already
+# committed, so step 2 only matters when you actually change the art.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
