@@ -1,0 +1,20 @@
+{
+    "name": "EminDeniz99.QuickActions.Editor.NativeGate.iOS",
+    "rootNamespace": "EminDeniz99.QuickActions.Editor.NativeGate",
+    "references": [],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "UnityEditor.iOS.Extensions.Xcode.dll"
+    ],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "UNITY_IOS"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

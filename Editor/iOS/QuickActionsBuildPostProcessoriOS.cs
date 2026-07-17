@@ -43,9 +43,10 @@ namespace EminDeniz99.QuickActions.Editor
             if (settings == null || settings.StaticShortcuts.Count == 0)
             {
                 // No static shortcuts configured. On an *Append* build the plist may
-                // still hold an array a previous build wrote; remove it so stale
-                // shortcuts don't ship. (A fresh Replace build has nothing to clear.)
-                if (plist.root.values.Remove("UIApplicationShortcutItems"))
+                // still hold entries a previous build wrote; remove ONLY ours (marked)
+                // so stale package shortcuts don't ship while a host app's / another
+                // plugin's own UIApplicationShortcutItems are preserved.
+                if (QuickActionsPlistShortcuts.ClearOurEntries(plist))
                 {
                     plist.WriteToFile(plistPath);
                     Debug.Log("[QuickActions] Cleared stale UIApplicationShortcutItems (no static shortcuts configured).");
@@ -53,8 +54,12 @@ namespace EminDeniz99.QuickActions.Editor
                 return;
             }
 
-            // Replace any existing array so re-runs are idempotent.
-            var items = plist.root.CreateArray("UIApplicationShortcutItems");
+            // Merge, don't clobber: reuse any existing array so a host app's / other
+            // plugin's entries survive; drop our own stale entries (marked) so an
+            // Append rebuild refreshes them; then append the current set.
+            var items = QuickActionsPlistShortcuts.GetOrCreateArray(plist);
+            items.values.RemoveAll(QuickActionsPlistShortcuts.IsOurs);
+
             var seen = new HashSet<string>();
             var count = 0;
             foreach (var item in settings.StaticShortcuts)
@@ -71,11 +76,56 @@ namespace EminDeniz99.QuickActions.Editor
                     dict.SetString("UIApplicationShortcutItemSubtitle", item.Subtitle);
                 if (item.Icon != IconType.None)
                     dict.SetString("UIApplicationShortcutItemIconType", "UIApplicationShortcutIconType" + item.Icon);
+                // Tag our entries so a later cleanup/refresh can find exactly ours.
+                dict.CreateDict("UIApplicationShortcutItemUserInfo")
+                    .SetBoolean(QuickActionsPlistShortcuts.MarkerKey, true);
                 count++;
             }
 
             plist.WriteToFile(plistPath);
             Debug.Log($"[QuickActions] Wrote {count} static shortcut(s) to Info.plist.");
+        }
+    }
+
+    /// <summary>
+    /// Shared helpers for reading/merging our entries in the iOS
+    /// <c>UIApplicationShortcutItems</c> plist array. Our entries carry a marker in
+    /// their <c>UIApplicationShortcutItemUserInfo</c> so cleanup/refresh touches only
+    /// ours and never a host app's own shortcuts.
+    /// </summary>
+    internal static class QuickActionsPlistShortcuts
+    {
+        internal const string ItemsKey = "UIApplicationShortcutItems";
+        internal const string UserInfoKey = "UIApplicationShortcutItemUserInfo";
+        internal const string MarkerKey = "com.emindeniz99.quickactions.managed";
+
+        internal static PlistElementArray GetOrCreateArray(PlistDocument plist)
+        {
+            if (plist.root.values.TryGetValue(ItemsKey, out var existing) && existing is PlistElementArray arr)
+                return arr;
+            return plist.root.CreateArray(ItemsKey);
+        }
+
+        // True only for entries this package wrote (marked in their user info).
+        internal static bool IsOurs(PlistElement entry)
+        {
+            if (!(entry is PlistElementDict dict))
+                return false;
+            if (!dict.values.TryGetValue(UserInfoKey, out var ui) || !(ui is PlistElementDict uiDict))
+                return false;
+            return uiDict.values.TryGetValue(MarkerKey, out var marker) && marker.AsBoolean();
+        }
+
+        // Removes our marked entries, dropping the whole key if nothing else remains.
+        // Returns true if the plist changed.
+        internal static bool ClearOurEntries(PlistDocument plist)
+        {
+            if (!plist.root.values.TryGetValue(ItemsKey, out var existing) || !(existing is PlistElementArray arr))
+                return false;
+            var removed = arr.values.RemoveAll(IsOurs);
+            if (arr.values.Count == 0)
+                plist.root.values.Remove(ItemsKey);
+            return removed > 0;
         }
     }
 }

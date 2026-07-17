@@ -6,8 +6,8 @@ for production. Honest status — nothing marked "ready" that wasn't actually
 exercised.
 
 **Legend — Verified by:**
-`unit` = headless NUnit (`dotnet test`, 36 tests) · `unity-test` = Unity Test
-Runner only (JsonUtility) · `static` = compiles in the stub harness (7 configs) ·
+`unit` = headless NUnit (`dotnet test`, 39 tests) · `unity-test` = Unity Test
+Runner only (JsonUtility) · `static` = compiles in the stub harness (8 configs) ·
 `review` = human/agent code review (multiple adversarial rounds + a 15-unit workflow; see git log) ·
 `device` = **requires a real device — NOT done here** ·
 `editor-2022.3` = **executed in a real licensed Unity 2022.3.9f1 (Linux, xvfb)
@@ -71,13 +71,13 @@ builds (define ON → dll present; OFF → zero trace).
 | Aspect | Verified by | Status / gate |
 |---|---|---|
 | Managed: gated asmdefs, define-OFF compiles to nothing | static + review + **editor-2022.3 + editor-6.x REAL BUILDS** | ✅ **build-proven 2026-07-17 on 2022.3, 6.0 and 6.3**: define ON → `EminDeniz99.QuickActions.dll` in the Linux player; define OFF → zero package trace in the entire build output (`grep -ri quickactions` = 0 hits) |
-| iOS: `.mm` `#if`-wrapped + macro injector (idempotent) | review | ⏳ **device** — diff a prod Xcode project for `QUICKACTIONS_ENABLED` (expect none) |
+| iOS: `.mm` `#if`-wrapped + macro injector (gated) + ungated cleanup (macro + plist strip when OFF) | static + review | ⏳ **device** — diff a prod Xcode project for `QUICKACTIONS_ENABLED` (expect none, incl. after an Append build via `QuickActionsGateCleanupiOS`) |
 | Android: trampoline `<activity>` absent when OFF (never injected + stripper defense-in-depth) | review + **editor-2022.3 REAL APK** | ✅ **build-proven 2026-07-17**: real prod Gradle build (define OFF) → `aapt dump xmltree` shows **no** trampoline `<activity>`, **no** `EminDeniz99.QuickActions.dll`, **zero** `quickactions` files in the APK. Only the dead trampoline `.java` remains as ~4 unreachable strings in `classes.dex` (documented; needs package exclusion for literally-zero). |
 
 ## Sign-off
 
 - **Headless gate (closable here): GREEN.** `tools/verify.sh` → **VERIFY: PASS** —
-  7 C# configs compile, **36 unit tests pass**, Java compiles, every asset has a
+  8 C# configs compile, **39 unit tests pass**, Java compiles, every asset has a
   stable `.meta`. Every managed feature has a dedicated, intent-encoding test
   (Rule 9). Reviewed one-by-one across repeated adversarial rounds + a 15-unit workflow
   (every confirmed finding fixed or explicitly documented; **0 P0 ship-blockers**).

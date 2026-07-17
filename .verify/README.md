@@ -7,7 +7,7 @@ Unity (the leading `.` means Unity ignores it) and never ships in a build.
 Run everything:
 
 ```bash
-tools/verify.sh        # gen_meta + C# compile (x7) + unit tests + Java compile
+tools/verify.sh        # gen_meta + C# compile (x8) + unit tests + Java compile
 tools/setup.sh         # one-time: install dotnet + JDK if missing
 ```
 
@@ -16,7 +16,7 @@ tools/setup.sh         # one-time: install dotnet + JDK if missing
 | Check | How |
 |-------|-----|
 | Stable `.meta` for every asset | `tools/gen_meta.py` (idempotent) |
-| Runtime + Editor C# | `dotnet build` against the UnityEngine/UnityEditor **stubs** in `Stubs/`, seven configs: `Editor`, `EditoriOS`, `EditorAndroid`, `NativeGate`, `iOS`, `Android`, `Sample` — each defines the matching `UNITY_*` symbols so every `#if` branch is exercised. The `EditoriOS`/`EditorAndroid`/`NativeGate` configs compile each build post-processor in isolation (mirroring the gated asmdefs; `NativeGate` is the ungated Android trampoline stripper). **Caveat:** the stubs stand in for the real `UnityEditor.iOS.Xcode` / `UnityEditor.Android` extension DLLs, so asmdef `precompiledReferences` resolution is only truly validated in a real Unity build. |
+| Runtime + Editor C# | `dotnet build` against the UnityEngine/UnityEditor **stubs** in `Stubs/`, eight configs: `Editor`, `EditoriOS`, `EditorAndroid`, `NativeGate`, `NativeGateiOS`, `iOS`, `Android`, `Sample` — each defines the matching `UNITY_*` symbols so every `#if` branch is exercised. The `EditoriOS`/`EditorAndroid`/`NativeGate`/`NativeGateiOS` configs compile each build post-processor in isolation (mirroring the gated/ungated asmdefs; `NativeGate` is the ungated Android trampoline stripper, `NativeGateiOS` the ungated iOS gate cleanup — both compile WITHOUT `QUICKACTIONS_ENABLED`). **Caveat:** the stubs stand in for the real `UnityEditor.iOS.Xcode` / `UnityEditor.Android` extension DLLs, so asmdef `precompiledReferences` resolution is only truly validated in a real Unity build. |
 | Android plugin (Java) | `javac` against the minimal Android SDK **stubs** in `JavaStubs/`. |
 
 ## Why stubs

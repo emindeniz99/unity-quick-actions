@@ -326,6 +326,19 @@ kept. `Add` still returns `true` for a surplus item — the request was accepted
 the set before the OS trim — but a subsequent `GetAll()` / `IsAdded()` shows the
 trim. Keep the set within the platform cap so nothing is silently dropped.
 
+### Known limits — Android build variants and static shortcuts
+
+The **static** Android shortcuts baked at build time encode an explicit intent
+targeting the trampoline with your app's `applicationId` (read from the launcher
+`build.gradle`). If you ship variants that change the final package name via
+`applicationIdSuffix` or flavor-specific `applicationId`, the baked intent still
+carries the **base** id (Android does not substitute the Gradle `${applicationId}`
+placeholder inside `res/xml`), so a static shortcut in that variant's APK may target
+the wrong package. For variant builds, prefer **runtime** shortcuts
+(`QuickActions.Add(...)`) — they build the intent against the running app, so they're
+always variant-correct. (Single-`applicationId` projects — the common case — are
+unaffected.)
+
 ## Security: a shortcut tap is not an authenticated action
 
 > Found a vulnerability? Please report it privately — see

@@ -99,6 +99,7 @@ namespace UnityEditor.iOS.Xcode
         public string GetUnityFrameworkTargetGuid() => string.Empty;
         public void AddBuildProperty(string targetGuid, string name, string value) { }
         public string GetBuildPropertyForAnyConfig(string targetGuid, string name) => string.Empty;
+        public void UpdateBuildProperty(string targetGuid, string name, string[] addValues, string[] removeValues) { }
     }
 
     public class PlistDocument
@@ -108,11 +109,18 @@ namespace UnityEditor.iOS.Xcode
         public void WriteToFile(string path) { }
     }
 
-    public abstract class PlistElement { }
+    public abstract class PlistElement
+    {
+        // Mirrors UnityEditor.iOS.Xcode.PlistElement accessors used when reading a plist.
+        public string AsString() => string.Empty;
+        public bool AsBoolean() => false;
+        public PlistElementDict AsDict() => new PlistElementDict();
+        public PlistElementArray AsArray() => new PlistElementArray();
+    }
 
     public class PlistElementDict : PlistElement
     {
-        // Mirrors UnityEditor.iOS.Xcode.PlistElementDict.values (used to remove keys).
+        // Mirrors UnityEditor.iOS.Xcode.PlistElementDict.values (used to read/remove keys).
         public Dictionary<string, PlistElement> values = new Dictionary<string, PlistElement>();
         public PlistElementArray CreateArray(string key) => new PlistElementArray();
         public PlistElementDict CreateDict(string key) => new PlistElementDict();
@@ -123,6 +131,8 @@ namespace UnityEditor.iOS.Xcode
 
     public class PlistElementArray : PlistElement
     {
+        // Mirrors UnityEditor.iOS.Xcode.PlistElementArray.values (used to merge entries).
+        public List<PlistElement> values = new List<PlistElement>();
         public PlistElementDict AddDict() => new PlistElementDict();
         public void AddString(string value) { }
     }

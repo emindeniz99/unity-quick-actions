@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Mirrors the ungated Editor.NativeGate.iOS asmdef in isolation: compiles the
+       iOS gate cleanup with UNITY_IOS but WITHOUT QUICKACTIONS_ENABLED (it must run
+       when the define is off), so accidental gating or Android coupling is caught.
+       Extension-DLL resolution is Unity-only — the stubs stand in here. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <OutputType>Library</OutputType>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <DefineConstants>UNITY_EDITOR;UNITY_2021_3_OR_NEWER;UNITY_IOS</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Stubs/**/*.cs" />
+    <Compile Include="../Editor/NativeGate/iOS/**/*.cs" />
+  </ItemGroup>
+</Project>
