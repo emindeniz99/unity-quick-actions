@@ -57,7 +57,7 @@ player builds.
 | Feature | Verified by | Status / gate |
 |---|---|---|
 | Static shortcuts → iOS `Info.plist` (`PBXProject`/`PlistDocument`) | static + review | ⏳ **Unity** — real extension DLLs + a build |
-| Static shortcuts → Android `res/xml` + strings + meta-data (escaping, real `applicationId`) | static + review | ⏳ **Unity** — real Gradle project |
+| Static shortcuts → Android `res/xml` + strings + meta-data (escaping, real `applicationId`) | static + review + **editor-2022.3 REAL APK** | ✅ **build-proven 2026-07-17**: 4 static shortcuts (with hostile escaping inputs — embedded `"`, `'`, `&`, `<>`, leading `@`/`?`, `\`, edge whitespace) baked into a real dev APK. `aapt dump`: `res/xml/quickactions_shortcuts.xml` present, each `<shortcut>` intent targets `QuickActionsTrampolineActivity` with action `…PERFORM.<id>` and `targetPackage` = the real `applicationId` from the launcher `build.gradle`; launcher activity has the `android.app.shortcuts` meta-data; every string round-tripped exactly and aapt2 accepted them (a wrong `EscapeResValue` would fail the resource compile). |
 | Trampoline `<activity>` injector (`QuickActionsTrampolineInjectorAndroid`, gated) | static + review + **editor-2022.3 REAL APK** | ✅ **build-proven 2026-07-17**: real Gradle dev build (define ON) → `aapt dump xmltree` shows the trampoline `<activity>` with exported/translucent/taskAffinity=""/excludeFromRecents/noHistory. (The injector exists because a real build proved Unity does **not** merge a loose `AndroidManifest.xml` from inside a UPM package — the pre-fix dev APK had no trampoline at all.) |
 | Project Settings ▸ Quick Actions UI (+ asset create, dup-id warning) | static + review | ⏳ **Unity** — Editor GUI |
 | Editor Simulator (warm tap + Play-Mode cold-launch seed, play-session state reset) | unit + static + review + **editor-2022.3** (both `Window ▸ Quick Actions ▸ Simulator/About` menus execute) | ⏳ interactive Play-Mode flow still manual |
@@ -88,8 +88,11 @@ player builds.
   dll, and **zero** `quickactions` files (only the dead `.java` as ~4
   unreachable dex strings). This surfaced and fixed a real shipping bug: Unity
   does not merge a loose UPM-package `AndroidManifest.xml`, so the trampoline is
-  now injected by a gated build post-processor. Still open below: iOS target
-  pass (macOS-only) and the other editor lines.
+  now injected by a gated build post-processor. The **static-shortcuts baker**
+  is also build-proven: a real APK carries `res/xml/quickactions_shortcuts.xml`,
+  the launcher `android.app.shortcuts` meta-data, and correctly-escaped string
+  resources (validated with deliberately hostile inputs that aapt2 accepted).
+  Still open below: iOS target pass (macOS-only) and the other editor lines.
 - **Device gate (NOT closable in this container): OPEN.** Everything marked
   ⏳ above needs each claimed Unity line (2021.3, 2022.3, 6.0, 6.3 — full pass on all) + an iOS device
   (via macOS/Xcode) + an Android API-25+ device. The container now has a
