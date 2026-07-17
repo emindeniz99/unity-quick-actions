@@ -153,12 +153,19 @@ Constraints only work for managed code, **not** native plugins):
 **To use it in your dev build:**
 
 1. Add `QUICKACTIONS_ENABLED` to your **Scripting Define Symbols**. On **Unity 6**
-   the cleanest setup is: keep it **on in the Editor** (Project Settings ▸ Player)
-   and rely on a prod **Build Profile** that omits it — per-profile defines
-   override the Player setting at build time (this also avoids the "missing
-   script" note on the settings asset, see below). On **2021/2022 LTS** (no Build
-   Profiles) the equivalent is removing the define from the Player settings — or
-   passing it via your CI/build script — before cutting the prod build.
+   put it in a **dev Build Profile** (Build Profiles ▸ your dev profile ▸ Scripting
+   Define Symbols) and keep it **out of the shared Player Settings**. Build Profile
+   symbols are **additive** on top of Player Settings — they can *add* a symbol but
+   [cannot *remove*](https://docs.unity3d.com/6000.1/Documentation/Manual/custom-scripting-symbols.html)
+   one inherited from Player Settings — so defining it only in the dev profile means
+   prod profiles (which don't add it) build **without** it. ⚠️ Do **not** put it in
+   the shared Player Settings and expect a prod Build Profile that merely *omits* it
+   to drop it: the symbol is inherited additively and stays on, leaving the gate
+   active in the prod build. If it is in Player Settings you must **delete it there**
+   before a prod build. On **2021/2022 LTS** (no Build Profiles) add/remove it in
+   Player Settings ▸ Scripting Define Symbols — or pass it via your CI/build script —
+   before cutting the prod build. **Always verify** the built project has no
+   `QUICKACTIONS_ENABLED` (see the grep checks below); that is the only guarantee.
 2. Guard your own call sites so your game still compiles when the define is off
    and the `QuickActions` type doesn't exist:
 
@@ -338,6 +345,22 @@ the wrong package. For variant builds, prefer **runtime** shortcuts
 (`QuickActions.Add(...)`) — they build the intent against the running app, so they're
 always variant-correct. (Single-`applicationId` projects — the common case — are
 unaffected.)
+
+### Known limits — Android minification (R8/ProGuard)
+
+The C# runtime reaches the Java helper `com.emindeniz99.quickactions.QuickActionsBridge`
+**by name** over JNI. If you build a **minified** dev/QA build (Player Settings ▸
+Publishing Settings ▸ *Minify*), R8 can rename or strip that non-manifest class, and
+the JNI lookup then fails so shortcuts silently don't get set. Add a keep rule to
+`Assets/Plugins/Android/proguard-user.txt`:
+
+```proguard
+-keep class com.emindeniz99.quickactions.** { *; }
+```
+
+(The trampoline `<activity>` is kept automatically because it's declared in the
+manifest — only the JNI-only bridge needs this. Most dev builds don't enable
+minification, so this only matters if yours does.)
 
 ## Security: a shortcut tap is not an authenticated action
 
