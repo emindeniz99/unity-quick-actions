@@ -100,20 +100,28 @@ namespace EminDeniz99.QuickActions.Internal
 
         public IList<QuickActionItem> GetShortcuts()
         {
+            // Below API 25 there are genuinely no dynamic shortcuts — a real (empty)
+            // read, not a failure.
             if (!IsPlatformSupported)
                 return new List<QuickActionItem>();
             try
             {
                 using (var bridge = new AndroidJavaClass(BridgeClass))
                 using (var activity = CurrentActivity())
-                    return QuickActionList.Parse(bridge.CallStatic<string>("getShortcutsJson", activity));
+                {
+                    // Java returns null when the read itself failed (locked device etc.).
+                    // Propagate that as null so the facade doesn't treat a failed read as
+                    // an authoritative-empty set.
+                    var json = bridge.CallStatic<string>("getShortcutsJson", activity);
+                    return json == null ? null : QuickActionList.Parse(json);
+                }
             }
             catch (AndroidJavaException e)
             {
-                // Defense in depth: the Java side already guards, but never let a
-                // JNI exception escape into the facade's first-access reconcile.
+                // Defense in depth: never let a JNI exception escape the reconcile.
+                // Return null (read failed) so the facade retries rather than caching empty.
                 Debug.LogWarning("[QuickActions] GetShortcuts failed: " + e.Message);
-                return new List<QuickActionItem>();
+                return null;
             }
         }
 

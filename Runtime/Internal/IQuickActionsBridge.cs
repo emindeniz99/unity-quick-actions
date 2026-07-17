@@ -57,6 +57,9 @@ namespace EminDeniz99.QuickActions.Internal
         /// session too); static/build-time shortcuts are not included on either
         /// platform. Lets the managed layer reconcile its list after a cold start.
         /// Icons are not recoverable, so they come back as <see cref="IconType.None"/>.
+        /// Returns an empty list when the OS genuinely has none, but <c>null</c> when
+        /// the read itself <b>failed</b> (e.g. a locked device) — the facade must not
+        /// treat a failed read as an authoritative-empty set.
         /// </summary>
         IList<QuickActionItem> GetShortcuts();
     }

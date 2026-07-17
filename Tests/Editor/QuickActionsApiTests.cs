@@ -135,6 +135,37 @@ namespace EminDeniz99.QuickActions.Tests
         }
 
         [Test]
+        public void Add_WhenCurrentShortcutsCannotBeRead_DoesNotModifyTheOs()
+        {
+            // C1: a failed first read (GetShortcuts returns null) must NOT be cached as
+            // an authoritative-empty set and let Add wipe the OS's existing shortcuts.
+            var bridge = new ReadErrorBridge("A", "B"); // OS holds A,B; every read fails
+            QuickActions.OverrideBridgeForTesting(bridge);
+            try
+            {
+                Assert.IsFalse(QuickActions.Add(Item("C")), "Add must defer when the current set can't be read");
+                Assert.AreEqual(0, bridge.SetCount, "must not push a partial set (which would delete A,B)");
+                CollectionAssert.AreEquivalent(new[] { "A", "B" }, bridge.Os.ConvertAll(i => i.Id));
+            }
+            finally { QuickActions.OverrideBridgeForTesting(null); }
+        }
+
+        [Test]
+        public void FailedRead_RetriesOnNextAccess_InsteadOfCachingErroredEmpty()
+        {
+            // Once the transient read clears, a later call must reconcile with the real OS.
+            var bridge = new ReadErrorBridge("A") { FailReads = true };
+            QuickActions.OverrideBridgeForTesting(bridge);
+            try
+            {
+                Assert.IsFalse(QuickActions.Add(Item("C"))); // read fails → deferred
+                bridge.FailReads = false;                    // transient condition clears
+                CollectionAssert.AreEquivalent(new[] { "A" }, QuickActions.GetAll().ConvertAll(i => i.Id));
+            }
+            finally { QuickActions.OverrideBridgeForTesting(null); }
+        }
+
+        [Test]
         public void FailedWrite_ReconcilesWithOsOnNextAccess_NotTrustingOptimisticMutation()
         {
             // When the OS write fails (the bridge returns null), the facade must not
@@ -649,6 +680,33 @@ namespace EminDeniz99.QuickActions.Tests
             public void ResetLastPerformed() { }
             public string ConsumePendingPerformed() => null;
             public IList<QuickActionItem> GetShortcuts() => new List<QuickActionItem>();
+        }
+
+        // A bridge whose GetShortcuts read fails (returns null) — models a locked/
+        // direct-boot device. Tracks its "OS" set and how many times SetShortcuts ran,
+        // so a test can prove Add doesn't wipe the OS when the read failed.
+        private sealed class ReadErrorBridge : IQuickActionsBridge
+        {
+            public readonly List<QuickActionItem> Os = new List<QuickActionItem>();
+            public int SetCount;
+            public bool FailReads = true;
+            public ReadErrorBridge(params string[] osIds)
+            {
+                foreach (var id in osIds) Os.Add(new QuickActionItem(id, id));
+            }
+            public bool IsPlatformSupported => true;
+            public IList<QuickActionItem> SetShortcuts(IList<QuickActionItem> items)
+            {
+                SetCount++;
+                Os.Clear();
+                foreach (var i in items) Os.Add(i);
+                return items;
+            }
+            public bool RemoveAll() { Os.Clear(); return true; }
+            public string GetLastPerformed() => null;
+            public void ResetLastPerformed() { }
+            public string ConsumePendingPerformed() => null;
+            public IList<QuickActionItem> GetShortcuts() => FailReads ? null : new List<QuickActionItem>(Os);
         }
 
         // A bridge whose SetShortcuts reports failure (null) — models an OS write that

@@ -43,26 +43,38 @@ namespace EminDeniz99.QuickActions
         /// start. Static (build-time) shortcuts are not surfaced here. Marks loaded
         /// only on success, and guards against re-entrancy from the bridge call.
         /// </summary>
-        private static void EnsureLoaded()
+        /// <returns>
+        /// True when the managed set now reflects the OS (loaded, or already loaded);
+        /// false when the current OS shortcuts could not be read (so callers must not
+        /// mutate/push against an unknown baseline) or during a re-entrant load.
+        /// </returns>
+        private static bool EnsureLoaded()
         {
-            if (_loaded || _loading)
-                return;
+            if (_loaded)
+                return true;
+            if (_loading)
+                return false; // re-entrant call mid-load — not safe to treat as loaded yet
             _loading = true;
             try
             {
                 var existing = Bridge.GetShortcuts();
-                if (existing != null && existing.Count > 0)
+                if (existing == null)
+                    return false; // read FAILED — leave _loaded=false so the next access retries,
+                                  // rather than caching an errored-empty as authoritative (which
+                                  // would let the next write wipe the OS's real shortcuts).
+
+                // A non-null read is authoritative — including a genuinely-empty one, which
+                // must clear any un-acknowledged optimistic items from a prior failed write.
+                _items.Clear();
+                var seen = new HashSet<string>();
+                foreach (var item in existing)
                 {
-                    _items.Clear();
-                    var seen = new HashSet<string>();
-                    foreach (var item in existing)
-                    {
-                        // Trust nothing from the native payload: drop invalid/duplicate ids.
-                        if (item != null && item.IsValid && seen.Add(item.Id))
-                            _items.Add(item);
-                    }
+                    // Trust nothing from the native payload: drop invalid/duplicate ids.
+                    if (item != null && item.IsValid && seen.Add(item.Id))
+                        _items.Add(item);
                 }
                 _loaded = true;
+                return true;
             }
             finally
             {
@@ -201,8 +213,10 @@ namespace EminDeniz99.QuickActions
 
         /// <summary>
         /// Add one quick action. Returns false (without changing anything) when the
-        /// item is invalid or an action with the same <see cref="QuickActionItem.Id"/>
-        /// is already added; returns true on success.
+        /// item is invalid, an action with the same <see cref="QuickActionItem.Id"/>
+        /// is already added, or the current OS shortcuts could not be read (so the
+        /// package won't risk overwriting them from an unknown baseline — retry later);
+        /// returns true on success.
         /// </summary>
         /// <remarks>
         /// The OS limits how many dynamic shortcuts it keeps (iOS shows ~4; Android
@@ -219,7 +233,13 @@ namespace EminDeniz99.QuickActions
         {
             if (item == null)
                 throw new ArgumentNullException(nameof(item));
-            EnsureLoaded();
+            if (!EnsureLoaded())
+            {
+                // Couldn't read the current OS set — don't push a partial set built on an
+                // unknown baseline (that could silently wipe the user's existing shortcuts).
+                Log("Add deferred: could not read the current shortcuts; OS set left unchanged.");
+                return false;
+            }
 
             if (!item.IsValid)
             {
@@ -247,7 +267,11 @@ namespace EminDeniz99.QuickActions
         {
             if (items == null)
                 throw new ArgumentNullException(nameof(items));
-            EnsureLoaded();
+            if (!EnsureLoaded())
+            {
+                Log("AddList deferred: could not read the current shortcuts; OS set left unchanged.");
+                return;
+            }
 
             var changed = false;
             foreach (var item in items)
@@ -290,7 +314,12 @@ namespace EminDeniz99.QuickActions
         {
             if (string.IsNullOrEmpty(id))
                 return false;
-            EnsureLoaded();
+            if (!EnsureLoaded())
+            {
+                // Unknown baseline — removing + pushing could drop other live shortcuts.
+                Log("RemoveById deferred: could not read the current shortcuts.");
+                return false;
+            }
             if (_items.RemoveAll(a => a.Id == id) == 0)
                 return false;
 

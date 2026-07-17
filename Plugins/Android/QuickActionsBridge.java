@@ -171,43 +171,39 @@ public final class QuickActionsBridge {
     /**
      * The OS's current dynamic shortcuts as {"items":[...]} so the managed layer
      * can reconcile after a cold start. Icons aren't read back (reported as 0).
+     * Returns {@code null} when the read did NOT succeed (unsupported / no manager /
+     * a getDynamicShortcuts throw on a locked/direct-boot device), so the managed
+     * layer can tell "the OS is genuinely empty" from "the read failed" and avoid
+     * caching an errored-empty as the authoritative set (which would then wipe the
+     * user's real shortcuts on the next write).
      */
     public static String getShortcutsJson(Activity activity) {
-        JSONArray items = new JSONArray();
-        if (activity != null && Build.VERSION.SDK_INT >= 25) {
-            ShortcutManager manager = activity.getSystemService(ShortcutManager.class);
-            if (manager != null) {
-                try {
-                    // getDynamicShortcuts itself can throw IllegalStateException
-                    // (e.g. a locked/background device) — keep it inside the guard
-                    // so nothing crosses JNI; reconcile with whatever we collected.
-                    for (ShortcutInfo s : manager.getDynamicShortcuts()) {
-                        try {
-                            JSONObject o = new JSONObject();
-                            o.put("Id", s.getId());
-                            CharSequence shortLabel = s.getShortLabel();
-                            CharSequence longLabel = s.getLongLabel();
-                            o.put("Title", shortLabel == null ? "" : shortLabel.toString());
-                            o.put("Subtitle", longLabel == null ? "" : longLabel.toString());
-                            o.put("Icon", 0);
-                            o.put("AndroidDrawable", "");
-                            items.put(o);
-                        } catch (Exception e) {
-                            android.util.Log.w("QuickActions", "Failed to read shortcut", e);
-                        }
-                    }
-                } catch (RuntimeException e) {
-                    android.util.Log.w("QuickActions", "getDynamicShortcuts failed", e);
-                }
-            }
-        }
-        JSONObject root = new JSONObject();
+        if (activity == null || Build.VERSION.SDK_INT < 25) return null; // can't read
+        ShortcutManager manager = activity.getSystemService(ShortcutManager.class);
+        if (manager == null) return null;
         try {
+            // getDynamicShortcuts itself can throw IllegalStateException (e.g. a
+            // locked/direct-boot device); treat that as a failed read (return null),
+            // NOT an empty result — keep it inside the guard so nothing crosses JNI.
+            JSONArray items = new JSONArray();
+            for (ShortcutInfo s : manager.getDynamicShortcuts()) {
+                JSONObject o = new JSONObject();
+                o.put("Id", s.getId());
+                CharSequence shortLabel = s.getShortLabel();
+                CharSequence longLabel = s.getLongLabel();
+                o.put("Title", shortLabel == null ? "" : shortLabel.toString());
+                o.put("Subtitle", longLabel == null ? "" : longLabel.toString());
+                o.put("Icon", 0);
+                o.put("AndroidDrawable", "");
+                items.put(o);
+            }
+            JSONObject root = new JSONObject();
             root.put("items", items);
+            return root.toString();
         } catch (Exception e) {
-            return "{\"items\":[]}";
+            android.util.Log.w("QuickActions", "getShortcutsJson read failed", e);
+            return null; // failed read — signal distinctly (not empty-success)
         }
-        return root.toString();
     }
 
     private static ShortcutInfo buildShortcut(Activity activity, JSONObject item, int rank) {
