@@ -29,7 +29,18 @@ MUTE = (150, 158, 172)
 
 
 def f(path, size):
-    return ImageFont.truetype(path, size)
+    # DejaVu is present on most dev/CI images but not on minimal containers. Fall
+    # back to Pillow's bundled default (with a clear hint) instead of crashing the
+    # whole release pipeline with an opaque "cannot open resource" OSError.
+    try:
+        return ImageFont.truetype(path, size)
+    except OSError:
+        print(f"WARN: font not found at {path}; using Pillow's default. "
+              f"Install fonts-dejavu-core for the intended look.", file=sys.stderr)
+        try:
+            return ImageFont.truetype("DejaVuSans.ttf", size)  # Pillow may bundle it
+        except OSError:
+            return ImageFont.load_default()
 
 
 def vgrad(w, h, top, bot):

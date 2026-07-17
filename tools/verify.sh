@@ -14,8 +14,17 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 VERIFY="$ROOT/.verify"
 fail=0
 
-echo "== 1/4  .meta generation =="
-python3 "$ROOT/tools/gen_meta.py" || fail=1
+echo "== 1/4  .meta presence (must already be committed, not generated here) =="
+# gen_meta only CREATES missing metas and always exits 0, so running it can't
+# catch a missing/uncommitted meta. Fail if it had to create any — a committed
+# repo/UPM must ship every .meta (a fresh GUID assigned on the user's machine
+# breaks prefab/scene references that stable metas exist to protect).
+meta_out="$(python3 "$ROOT/tools/gen_meta.py")" || fail=1
+echo "$meta_out"
+if echo "$meta_out" | grep -qE 'created [1-9]'; then
+  echo "!! .meta files were missing and had to be generated — commit them (git add)."
+  fail=1
+fi
 
 echo
 echo "== 2/4  C# compile (UnityEngine/UnityEditor stubs) =="

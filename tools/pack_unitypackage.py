@@ -103,7 +103,11 @@ def collect():
     for name in INCLUDE_FILES:
         add_file(os.path.join(ROOT, name), f"{ASSET_ROOT}/{name}")
 
-    return files, sorted(folders)
+    # Sort by target path so the tar member order (and thus the gzip bytes) is
+    # deterministic regardless of os.walk's filesystem/inode ordering — os.walk
+    # does NOT sort filenames, so without this the committed dist~ artifact churns
+    # across machines despite identical source (the mtime=0 reproducibility intent).
+    return sorted(files, key=lambda t: t[0]), sorted(folders)
 
 
 def add_entry(tar, arcname, data: bytes):
