@@ -49,12 +49,15 @@ namespace EminDeniz99.QuickActions.Internal
             catch (AndroidJavaException e)
             {
                 Debug.LogWarning("[QuickActions] SetShortcuts failed: " + e.Message);
-                return items; // couldn't confirm — accept-all, prune nothing
+                return null; // write may not have landed — signal failure (facade re-syncs)
             }
 
-            // Null/empty = the write did not land — accept-all so the facade never drops
-            // items on a transient failure (a later first-access reconcile still corrects).
-            if (string.IsNullOrEmpty(applied)) return items;
+            // Null/empty = the write did not land (rejected/rate-limited/errored). Return
+            // null so the facade reconciles with the real OS state on next access rather
+            // than trusting its optimistic mutation (Add/RemoveById already changed the
+            // list); it deliberately does NOT prune here (that would risk wiping a
+            // just-added item by misreading a stale device state).
+            if (string.IsNullOrEmpty(applied)) return null;
 
             var appliedIds = new HashSet<string>();
             foreach (var s in QuickActionList.Parse(applied))

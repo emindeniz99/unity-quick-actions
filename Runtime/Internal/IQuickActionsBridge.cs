@@ -21,6 +21,9 @@ namespace EminDeniz99.QuickActions.Internal
         /// (same reference = accept-all)</b>; Android returns only the items whose
         /// ids survived the OS dynamic-shortcut cap, so the managed layer can prune
         /// the surplus and keep <see cref="QuickActions.GetAll"/>/<see cref="QuickActions.IsAdded"/> honest.
+        /// Returns <c>null</c> when the OS write did not land (rejected / rate-limited /
+        /// errored), so the facade reconciles with the real device state on next
+        /// access instead of trusting its optimistic mutation.
         /// </summary>
         IList<QuickActionItem> SetShortcuts(IList<QuickActionItem> items);
 

@@ -75,6 +75,18 @@ static char *QACopyCString(NSString *s) {
     return out;
 }
 
+// Marks the shortcuts THIS package created — dynamic items get it here, and static
+// plist entries carry the same key in their UIApplicationShortcutItemUserInfo — so
+// the app-delegate hooks below intercept ONLY ours and leave a host app's / another
+// plugin's quick actions to their own routing.
+static NSString *const kQAManagedMarkerKey = @"com.emindeniz99.quickactions.managed";
+
+static BOOL QAIsOurShortcut(UIApplicationShortcutItem *item) {
+    if (![item isKindOfClass:[UIApplicationShortcutItem class]]) return NO;
+    id marker = item.userInfo[kQAManagedMarkerKey];
+    return [marker isKindOfClass:[NSNumber class]] && [marker boolValue];
+}
+
 // Builds UIApplicationShortcutItems from {"items":[{Id,Title,Subtitle,Icon}]}.
 static NSArray<UIApplicationShortcutItem *> *QABuildItems(NSString *json) {
     NSData *data = [json dataUsingEncoding:NSUTF8StringEncoding];
@@ -110,7 +122,7 @@ static NSArray<UIApplicationShortcutItem *> *QABuildItems(NSString *json) {
                                              localizedTitle:title
                                           localizedSubtitle:subtitle
                                                        icon:icon
-                                                   userInfo:nil];
+                                                   userInfo:@{ kQAManagedMarkerKey: @YES }];
         [result addObject:shortcut];
     }
     return result;
@@ -122,10 +134,9 @@ static BOOL (*gQAOrigDidFinishLaunching)(id, SEL, UIApplication *, NSDictionary 
 
 static BOOL QADidFinishLaunching(id self, SEL _cmd, UIApplication *application, NSDictionary *launchOptions) {
     UIApplicationShortcutItem *launchItem = launchOptions[UIApplicationLaunchOptionsShortcutItemKey];
-    BOOL launchedFromShortcut = NO;
-    if ([launchItem isKindOfClass:[UIApplicationShortcutItem class]]) {
+    BOOL launchedFromOurShortcut = QAIsOurShortcut(launchItem);
+    if (launchedFromOurShortcut) {
         QAStorePerformed(launchItem.type, YES);
-        launchedFromShortcut = YES;
     }
 
     BOOL result = YES;
@@ -133,12 +144,13 @@ static BOOL QADidFinishLaunching(id self, SEL _cmd, UIApplication *application, 
         result = gQAOrigDidFinishLaunching(self, _cmd, application, launchOptions);
     }
 
-    // Returning NO when launched from a shortcut tells iOS not to also invoke
-    // performActionForShortcutItem for this same item (we already captured it).
-    // This dedup relies on the UIApplicationDelegate lifecycle, which Unity's
-    // trampoline uses by default. Under the UIScene lifecycle the cold shortcut
-    // arrives via the scene delegate instead — see ROADMAP.
-    return launchedFromShortcut ? NO : result;
+    // Return NO ONLY for OUR shortcut (we already captured it), so iOS doesn't also
+    // call performActionForShortcutItem for the same item. For a HOST shortcut we must
+    // NOT intercept — return the delegate's own result so the host's cold-launch
+    // routing (its own performActionForShortcutItem path) still runs. This dedup relies
+    // on the UIApplicationDelegate lifecycle Unity's trampoline uses by default; under
+    // the UIScene lifecycle the cold shortcut arrives via the scene delegate — see ROADMAP.
+    return launchedFromOurShortcut ? NO : result;
 }
 
 static void (*gQAOrigPerformAction)(id, SEL, UIApplication *, UIApplicationShortcutItem *, void (^)(BOOL)) = NULL;
@@ -146,9 +158,10 @@ static void (*gQAOrigPerformAction)(id, SEL, UIApplication *, UIApplicationShort
 static void QAPerformActionForShortcutItem(id self, SEL _cmd, UIApplication *application,
                                            UIApplicationShortcutItem *shortcutItem,
                                            void (^completionHandler)(BOOL)) {
-    if ([shortcutItem isKindOfClass:[UIApplicationShortcutItem class]]) {
+    if (QAIsOurShortcut(shortcutItem)) {
         // Enqueue for the single C# poll channel. This runs before
-        // applicationDidBecomeActive, so the focus poll drains it on resume.
+        // applicationDidBecomeActive, so the focus poll drains it on resume. Only
+        // OUR shortcuts — a host shortcut is left entirely to its own handler below.
         QAStorePerformed(shortcutItem.type, YES);
     }
     // If UnityAppController already had an implementation (a host app or another

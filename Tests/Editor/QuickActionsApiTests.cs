@@ -135,6 +135,22 @@ namespace EminDeniz99.QuickActions.Tests
         }
 
         [Test]
+        public void FailedWrite_ReconcilesWithOsOnNextAccess_NotTrustingOptimisticMutation()
+        {
+            // When the OS write fails (the bridge returns null), the facade must not
+            // trust its optimistic _items mutation; a later access reconciles with the
+            // real OS state. Here the OS holds "os1" and never receives "new".
+            QuickActions.OverrideBridgeForTesting(new FailingSetShortcutsBridge("os1"));
+            try
+            {
+                QuickActions.Add(Item("new")); // write "fails" — not applied to the OS
+                CollectionAssert.AreEquivalent(new[] { "os1" }, QuickActions.GetAll().ConvertAll(i => i.Id));
+                Assert.IsFalse(QuickActions.IsAdded("new"));
+            }
+            finally { QuickActions.OverrideBridgeForTesting(null); }
+        }
+
+        [Test]
         public void GetById_ReturnsIndependentCopy_MutationDoesNotAffectState()
         {
             QuickActions.Add(new QuickActionItem("a", "Alpha"));
@@ -633,6 +649,25 @@ namespace EminDeniz99.QuickActions.Tests
             public void ResetLastPerformed() { }
             public string ConsumePendingPerformed() => null;
             public IList<QuickActionItem> GetShortcuts() => new List<QuickActionItem>();
+        }
+
+        // A bridge whose SetShortcuts reports failure (null) — models an OS write that
+        // was rejected/rate-limited. GetShortcuts returns a fixed "device" state so the
+        // facade's next-access reconcile has something authoritative to sync to.
+        private sealed class FailingSetShortcutsBridge : IQuickActionsBridge
+        {
+            private readonly List<QuickActionItem> _os = new List<QuickActionItem>();
+            public FailingSetShortcutsBridge(params string[] osIds)
+            {
+                foreach (var id in osIds) _os.Add(new QuickActionItem(id, id));
+            }
+            public bool IsPlatformSupported => true;
+            public IList<QuickActionItem> SetShortcuts(IList<QuickActionItem> items) => null; // write failed
+            public bool RemoveAll() => true;
+            public string GetLastPerformed() => null;
+            public void ResetLastPerformed() { }
+            public string ConsumePendingPerformed() => null;
+            public IList<QuickActionItem> GetShortcuts() => new List<QuickActionItem>(_os);
         }
 
         // A bridge whose RemoveAll reports failure (false) WITHOUT throwing — models an

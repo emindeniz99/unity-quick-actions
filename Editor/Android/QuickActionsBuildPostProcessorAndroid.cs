@@ -154,18 +154,24 @@ namespace EminDeniz99.QuickActions.Editor
 
         private static XmlElement FindLauncherActivity(XmlDocument doc)
         {
-            foreach (XmlElement activity in doc.GetElementsByTagName("activity"))
+            // The MAIN/LAUNCHER entry can be a plain <activity> OR an <activity-alias>
+            // (aliases can own the launcher filter + meta-data). Search both, so a
+            // manifest that exposes its launcher via an alias isn't skipped.
+            foreach (var tag in new[] { "activity", "activity-alias" })
             {
-                foreach (XmlElement filter in activity.GetElementsByTagName("intent-filter"))
+                foreach (XmlElement component in doc.GetElementsByTagName(tag))
                 {
-                    var hasMain = false;
-                    var hasLauncher = false;
-                    foreach (XmlElement action in filter.GetElementsByTagName("action"))
-                        hasMain |= action.GetAttribute("name", AndroidNs) == "android.intent.action.MAIN";
-                    foreach (XmlElement category in filter.GetElementsByTagName("category"))
-                        hasLauncher |= category.GetAttribute("name", AndroidNs) == "android.intent.category.LAUNCHER";
-                    if (hasMain && hasLauncher)
-                        return activity;
+                    foreach (XmlElement filter in component.GetElementsByTagName("intent-filter"))
+                    {
+                        var hasMain = false;
+                        var hasLauncher = false;
+                        foreach (XmlElement action in filter.GetElementsByTagName("action"))
+                            hasMain |= action.GetAttribute("name", AndroidNs) == "android.intent.action.MAIN";
+                        foreach (XmlElement category in filter.GetElementsByTagName("category"))
+                            hasLauncher |= category.GetAttribute("name", AndroidNs) == "android.intent.category.LAUNCHER";
+                        if (hasMain && hasLauncher)
+                            return component;
+                    }
                 }
             }
             return null;

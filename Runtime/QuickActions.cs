@@ -374,9 +374,18 @@ namespace EminDeniz99.QuickActions
         private static void Push()
         {
             var accepted = Bridge.SetShortcuts(_items);
-            // null = defensive keep-all; same reference = accept-all (Null/iOS and the
-            // Android can't-confirm path) — nothing was trimmed, so nothing to prune.
-            if (accepted == null || ReferenceEquals(accepted, _items))
+            if (accepted == null)
+            {
+                // The OS write did not land (rejected/rate-limited/errored). Our
+                // optimistic mutation to _items (Add added, RemoveById removed) may not
+                // match the device, so force a reconcile on next access rather than
+                // trusting it. Don't prune now — that would risk wiping a just-added
+                // item on a transient failure (a stale read is not authoritative).
+                _loaded = false;
+                return;
+            }
+            // Same reference = accept-all (Null/iOS) — nothing was trimmed, nothing to prune.
+            if (ReferenceEquals(accepted, _items))
                 return;
 
             // The OS trimmed some ids to fit its cap. Prune the surplus from the
