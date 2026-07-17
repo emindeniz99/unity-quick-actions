@@ -9,7 +9,10 @@ exercised.
 `unit` = headless NUnit (`dotnet test`, 33 tests) · `unity-test` = Unity Test
 Runner only (JsonUtility) · `static` = compiles in the stub harness (7 configs) ·
 `review` = human/agent code review (multiple adversarial rounds + a 15-unit workflow; see git log) ·
-`device` = **requires a real Unity Editor + device — NOT done here**.
+`device` = **requires a real device — NOT done here** ·
+`editor-2022.3` = **executed in a real licensed Unity 2022.3.9f1 (Linux, xvfb)
+in this container on 2026-07-17** — import 0 errors, Test Runner 35/35, real
+player builds.
 
 ## 1. Runtime API (managed) — fully testable, GREEN
 
@@ -37,7 +40,7 @@ Runner only (JsonUtility) · `static` = compiles in the stub harness (7 configs)
 |---|---|---|---|
 | `QuickActionItem` ctor / `IsValid` / equality-by-id | unit + review | `Constructor_SetsFields`, `IsValid_RequiresIdAndTitle`, `Equality_IsByIdOnly` | ✅ |
 | `IconType` pinned 0..29 (native contract) | unit + review | `IconType_EveryValueIsPinned`, `IconType_NoneIsZero…` | ✅ |
-| JSON contract `{"items":[{"Id"…}]}` (exact keys, Icon as int) | unity-test + review | `SerializationTests` (literal-key asserts) | ✅ (Unity Test Runner) |
+| JSON contract `{"items":[{"Id"…}]}` (exact keys, Icon as int) | unity-test + review + **editor-2022.3** | `SerializationTests` — **executed for real: 35/35 incl. these** | ✅ |
 
 ## 3. Bridges / native (compiled here, behavior is device-only)
 
@@ -56,13 +59,13 @@ Runner only (JsonUtility) · `static` = compiles in the stub harness (7 configs)
 | Static shortcuts → iOS `Info.plist` (`PBXProject`/`PlistDocument`) | static + review | ⏳ **Unity** — real extension DLLs + a build |
 | Static shortcuts → Android `res/xml` + strings + meta-data (escaping, real `applicationId`) | static + review | ⏳ **Unity** — real Gradle project |
 | Project Settings ▸ Quick Actions UI (+ asset create, dup-id warning) | static + review | ⏳ **Unity** — Editor GUI |
-| Editor Simulator (warm tap + Play-Mode cold-launch seed, play-session state reset) | unit (seam: `EditorSimulateTap…`, `OverrideBridgeForTesting_ClearsSimulatedTapState`) + static + review | ⏳ **Unity** — manual Editor check of the window/Play-Mode flow |
+| Editor Simulator (warm tap + Play-Mode cold-launch seed, play-session state reset) | unit + static + review + **editor-2022.3** (both `Window ▸ Quick Actions ▸ Simulator/About` menus execute) | ⏳ interactive Play-Mode flow still manual |
 
 ## 5. Dev-only `QUICKACTIONS_ENABLED` gate (the headline guarantee)
 
 | Aspect | Verified by | Status / gate |
 |---|---|---|
-| Managed: gated asmdefs, define-OFF compiles to nothing | static (NativeGate define-OFF config) + review | ✅ structurally proven by the 7-config harness |
+| Managed: gated asmdefs, define-OFF compiles to nothing | static + review + **editor-2022.3 REAL BUILDS** | ✅ **build-proven 2026-07-17**: define ON → `EminDeniz99.QuickActions.dll` in the Linux player; define OFF → zero package trace in the entire build output (`grep -ri quickactions` = 0 hits) |
 | iOS: `.mm` `#if`-wrapped + macro injector (idempotent) | review | ⏳ **device** — diff a prod Xcode project for `QUICKACTIONS_ENABLED` (expect none) |
 | Android: trampoline `<activity>` stripped when OFF | review | ⏳ **device** — diff a prod manifest for `QuickActionsTrampolineActivity` (expect none) |
 
@@ -73,12 +76,18 @@ Runner only (JsonUtility) · `static` = compiles in the stub harness (7 configs)
   stable `.meta`. Every managed feature has a dedicated, intent-encoding test
   (Rule 9). Reviewed one-by-one across repeated adversarial rounds + a 15-unit workflow
   (every confirmed finding fixed or explicitly documented; **0 P0 ship-blockers**).
+- **Real-Editor gate (2022.3): CLOSED IN-CONTAINER 2026-07-17** via a licensed
+  Unity 2022.3.9f1 (student Pro `.ulf`): package imports with **0 console
+  errors**, **Unity Test Runner 35/35**, both menus registered, and the managed
+  QUICKACTIONS_ENABLED gate proven in **real player builds** (ON → assembly
+  present; OFF → zero trace). Still open below: Android/iOS target passes and
+  the other editor lines.
 - **Device gate (NOT closable in this container): OPEN.** Everything marked
   ⏳ above needs each claimed Unity line (2021.3, 2022.3, 6.0, 6.3 — full pass on all) + an iOS device
-  (via macOS/Xcode) + an Android API-25+ device. This environment is headless
-  Linux with no Unity license, so native/build/on-device behavior is reviewed
-  and compiled but **not executed**. This is the one true blocker to a `1.0.0`
-  "production-ready" stamp.
+  (via macOS/Xcode) + an Android API-25+ device. The container now has a
+  licensed 2022.3.9f1 (see above), so the remaining gaps are the Android/iOS
+  target-specific passes, the other editor lines, and physical-device taps —
+  the true blockers to a `1.0.0` "production-ready" stamp.
 
 ### Exact remaining steps to close the device gate
 1. Open the package in EACH claimed line (2021.3, 2022.3, 6.0, 6.3); switch to iOS + Android targets →
