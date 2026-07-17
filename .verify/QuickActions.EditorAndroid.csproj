@@ -16,6 +16,6 @@
   <ItemGroup>
     <Compile Include="Stubs/**/*.cs" />
     <Compile Include="../Runtime/**/*.cs" />
-    <Compile Include="../Editor/**/*.cs" Exclude="../Editor/iOS/**/*.cs" />
+    <Compile Include="../Editor/**/*.cs" Exclude="../Editor/iOS/**/*.cs;../Editor/NativeGate/iOS/**/*.cs" />
   </ItemGroup>
 </Project>

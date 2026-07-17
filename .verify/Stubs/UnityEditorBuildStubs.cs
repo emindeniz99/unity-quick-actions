@@ -60,6 +60,13 @@ namespace UnityEditor.Build
         public static readonly NamedBuildTarget iOS = default;
     }
 
+    // Thrown by the ungated gate cleanups when the define was flipped without a
+    // script recompile (stale-assembly coherence check).
+    public class BuildFailedException : Exception
+    {
+        public BuildFailedException(string message) : base(message) { }
+    }
+
     public interface IOrderedCallback { int callbackOrder { get; } }
     public interface IPostprocessBuildWithReport : IOrderedCallback
     {
@@ -120,8 +127,11 @@ namespace UnityEditor.iOS.Xcode
 
     public class PlistElementDict : PlistElement
     {
-        // Mirrors UnityEditor.iOS.Xcode.PlistElementDict.values (used to read/remove keys).
-        public Dictionary<string, PlistElement> values = new Dictionary<string, PlistElement>();
+        // Mirrors UnityEditor.iOS.Xcode.PlistElementDict.values (used to read/remove
+        // keys): the REAL member is a get-only property of interface type
+        // IDictionary<string, PlistElement> — keep the same shape so code that would
+        // not compile against the real Unity API can't slip through the stubs.
+        public IDictionary<string, PlistElement> values { get; } = new SortedDictionary<string, PlistElement>();
         public PlistElementArray CreateArray(string key) => new PlistElementArray();
         public PlistElementDict CreateDict(string key) => new PlistElementDict();
         public void SetString(string key, string value) { }
