@@ -72,7 +72,10 @@ public final class QuickActionsBridge {
                 for (int i = 0; i < items.length(); i++) {
                     JSONObject item = items.optJSONObject(i);
                     if (item == null) continue;
-                    ShortcutInfo shortcut = buildShortcut(activity, item);
+                    // Rank = position among the shortcuts we keep, so the launcher
+                    // preserves insertion-order priority (it sorts by rank, not by the
+                    // order passed to setDynamicShortcuts).
+                    ShortcutInfo shortcut = buildShortcut(activity, item, shortcuts.size());
                     if (shortcut != null) shortcuts.add(shortcut);
                 }
             }
@@ -145,15 +148,23 @@ public final class QuickActionsBridge {
         }
     }
 
-    public static void removeAll(Activity activity) {
-        if (activity == null || Build.VERSION.SDK_INT < 25) return;
+    /**
+     * Remove all dynamic shortcuts. Returns true when the OS state is now clear
+     * (including when there is nothing to remove), false when the removal failed
+     * (e.g. IllegalStateException on a locked profile) so the managed layer can
+     * keep its list instead of falsely marking itself empty.
+     */
+    public static boolean removeAll(Activity activity) {
+        if (activity == null || Build.VERSION.SDK_INT < 25) return true; // nothing to remove
         ShortcutManager manager = activity.getSystemService(ShortcutManager.class);
-        if (manager == null) return;
+        if (manager == null) return true;
         try {
             manager.removeAllDynamicShortcuts();
+            return true;
         } catch (RuntimeException e) {
             // e.g. IllegalStateException on a locked profile — never cross JNI.
             android.util.Log.w("QuickActions", "removeAllDynamicShortcuts failed", e);
+            return false;
         }
     }
 
@@ -199,7 +210,7 @@ public final class QuickActionsBridge {
         return root.toString();
     }
 
-    private static ShortcutInfo buildShortcut(Activity activity, JSONObject item) {
+    private static ShortcutInfo buildShortcut(Activity activity, JSONObject item, int rank) {
         String id = item.optString("Id", "");
         String title = item.optString("Title", "");
         if (id.isEmpty() || title.isEmpty()) return null;
@@ -213,6 +224,7 @@ public final class QuickActionsBridge {
         ShortcutInfo.Builder builder = new ShortcutInfo.Builder(activity, id)
                 .setShortLabel(title)
                 .setLongLabel(subtitle.isEmpty() ? title : subtitle)
+                .setRank(rank) // launchers order dynamic shortcuts by rank, not list order
                 .setIntent(intent);
 
         Icon icon = resolveIcon(activity, item);

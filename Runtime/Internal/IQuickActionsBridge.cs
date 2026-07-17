@@ -24,8 +24,13 @@ namespace EminDeniz99.QuickActions.Internal
         /// </summary>
         IList<QuickActionItem> SetShortcuts(IList<QuickActionItem> items);
 
-        /// <summary>Remove all shortcuts from the OS.</summary>
-        void RemoveAll();
+        /// <summary>
+        /// Remove all shortcuts from the OS. Returns true when the OS state is now
+        /// clear (including when there was nothing to remove); false when the native
+        /// removal failed, so the facade can keep its list rather than falsely
+        /// marking itself empty.
+        /// </summary>
+        bool RemoveAll();
 
         /// <summary>
         /// The id of the action the app was most recently launched or resumed

@@ -30,7 +30,7 @@ namespace EminDeniz99.QuickActions.Internal
             return items;
         }
 
-        public void RemoveAll() => _QuickActions_RemoveAll();
+        public bool RemoveAll() { _QuickActions_RemoveAll(); return true; }
 
         public string GetLastPerformed() => Consume(_QuickActions_GetLastPerformed());
 

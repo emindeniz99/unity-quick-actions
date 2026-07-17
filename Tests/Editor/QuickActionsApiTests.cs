@@ -118,6 +118,43 @@ namespace EminDeniz99.QuickActions.Tests
         }
 
         [Test]
+        public void RemoveAll_WhenBridgeReportsFailure_KeepsInMemoryState()
+        {
+            // A native remove that fails without throwing (e.g. locked profile → the
+            // bridge returns false) must NOT clear the managed list, or GetAll() would
+            // claim empty while the OS still shows shortcuts.
+            QuickActions.OverrideBridgeForTesting(new FailingRemoveAllBridge());
+            try
+            {
+                Assert.IsTrue(QuickActions.Add(Item("a")));
+                QuickActions.RemoveAll();
+                CollectionAssert.AreEquivalent(
+                    new[] { "a" }, QuickActions.GetAll().ConvertAll(i => i.Id));
+            }
+            finally { QuickActions.OverrideBridgeForTesting(null); }
+        }
+
+        [Test]
+        public void GetById_ReturnsIndependentCopy_MutationDoesNotAffectState()
+        {
+            QuickActions.Add(new QuickActionItem("a", "Alpha"));
+            var got = QuickActions.GetById("a");
+            got.Title = "Mutated";
+            got.Icon = IconType.Search;
+            Assert.AreEqual("Alpha", QuickActions.GetById("a").Title, "returned items must be independent copies");
+            Assert.AreEqual(IconType.None, QuickActions.GetById("a").Icon);
+        }
+
+        [Test]
+        public void Add_ThenMutatingCallerItem_DoesNotAffectState()
+        {
+            var item = new QuickActionItem("a", "Alpha");
+            QuickActions.Add(item);
+            item.Title = "Mutated"; // caller mutates its own object after adding
+            Assert.AreEqual("Alpha", QuickActions.GetById("a").Title, "stored items must be copies of the caller's");
+        }
+
+        [Test]
         public void GetById_ReturnsMatch_NullForMissingOrNullOrEmpty()
         {
             QuickActions.Add(Item("a", "Alpha"));
@@ -502,7 +539,7 @@ namespace EminDeniz99.QuickActions.Tests
                 Shortcuts.AddRange(items);
                 return items; // accept-all (same reference) — facade prunes nothing
             }
-            public void RemoveAll() => Shortcuts.Clear();
+            public bool RemoveAll() { Shortcuts.Clear(); return true; }
             public string GetLastPerformed() => null;
             public void ResetLastPerformed() { }
             public string ConsumePendingPerformed() => null;
@@ -516,7 +553,7 @@ namespace EminDeniz99.QuickActions.Tests
             public QueueBridge(IEnumerable<string> ids) => _pending = new Queue<string>(ids);
             public bool IsPlatformSupported => true;
             public IList<QuickActionItem> SetShortcuts(IList<QuickActionItem> items) => items;
-            public void RemoveAll() { }
+            public bool RemoveAll() => true;
             public string GetLastPerformed() => null;
             public void ResetLastPerformed() { }
             public string ConsumePendingPerformed() => _pending.Count > 0 ? _pending.Dequeue() : null;
@@ -530,7 +567,7 @@ namespace EminDeniz99.QuickActions.Tests
             public int ResetCount;
             public bool IsPlatformSupported => true;
             public IList<QuickActionItem> SetShortcuts(IList<QuickActionItem> items) => items;
-            public void RemoveAll() { }
+            public bool RemoveAll() => true;
             public string GetLastPerformed() => Last;
             public void ResetLastPerformed() { Last = null; ResetCount++; }
             public string ConsumePendingPerformed() => null;
@@ -548,7 +585,7 @@ namespace EminDeniz99.QuickActions.Tests
                 _shortcuts.AddRange(items);
                 return items;
             }
-            public void RemoveAll() => throw new System.InvalidOperationException("native failure");
+            public bool RemoveAll() => throw new System.InvalidOperationException("native failure");
             public string GetLastPerformed() => null;
             public void ResetLastPerformed() { }
             public string ConsumePendingPerformed() => null;
@@ -560,7 +597,7 @@ namespace EminDeniz99.QuickActions.Tests
             public int GetShortcutsCalls;
             public bool IsPlatformSupported => true;
             public IList<QuickActionItem> SetShortcuts(IList<QuickActionItem> items) => items;
-            public void RemoveAll() { }
+            public bool RemoveAll() => true;
             public string GetLastPerformed() => null;
             public void ResetLastPerformed() { }
             public string ConsumePendingPerformed() => null;
@@ -591,7 +628,20 @@ namespace EminDeniz99.QuickActions.Tests
                 Shortcuts.AddRange(accepted);
                 return accepted;
             }
-            public void RemoveAll() => Shortcuts.Clear();
+            public bool RemoveAll() { Shortcuts.Clear(); return true; }
+            public string GetLastPerformed() => null;
+            public void ResetLastPerformed() { }
+            public string ConsumePendingPerformed() => null;
+            public IList<QuickActionItem> GetShortcuts() => new List<QuickActionItem>();
+        }
+
+        // A bridge whose RemoveAll reports failure (false) WITHOUT throwing — models an
+        // OS remove that no-ops on a locked profile.
+        private sealed class FailingRemoveAllBridge : IQuickActionsBridge
+        {
+            public bool IsPlatformSupported => true;
+            public IList<QuickActionItem> SetShortcuts(IList<QuickActionItem> items) => items;
+            public bool RemoveAll() => false;
             public string GetLastPerformed() => null;
             public void ResetLastPerformed() { }
             public string ConsumePendingPerformed() => null;

@@ -233,7 +233,7 @@ namespace EminDeniz99.QuickActions
                 return false;
             }
 
-            _items.Add(item);
+            _items.Add(item.Copy()); // store a copy so a later caller mutation can't diverge our state
             Push();
             Log($"Added quick action '{item.Id}'.");
             return true;
@@ -257,7 +257,7 @@ namespace EminDeniz99.QuickActions
                     Log($"AddList skipped an invalid or duplicate item ({item}).");
                     continue;
                 }
-                _items.Add(item);
+                _items.Add(item.Copy()); // store a copy — see Add
                 changed = true;
             }
 
@@ -269,7 +269,8 @@ namespace EminDeniz99.QuickActions
         public static List<QuickActionItem> GetAll()
         {
             EnsureLoaded();
-            return new List<QuickActionItem>(_items);
+            // Return copies so a caller mutating the results can't change internal state.
+            return _items.ConvertAll(a => a.Copy());
         }
 
         /// <summary>The added action with this id, or null.</summary>
@@ -278,7 +279,7 @@ namespace EminDeniz99.QuickActions
             if (string.IsNullOrEmpty(id))
                 return null;
             EnsureLoaded();
-            return _items.FirstOrDefault(a => a.Id == id);
+            return _items.FirstOrDefault(a => a.Id == id)?.Copy();
         }
 
         /// <summary>Remove a quick action. Returns true if one was removed.</summary>
@@ -301,9 +302,15 @@ namespace EminDeniz99.QuickActions
         /// <summary>Remove every quick action.</summary>
         public static void RemoveAll()
         {
-            // Clear the OS first; if it throws, leave our in-memory state intact so
-            // a later access reconciles with what the OS actually still has.
-            Bridge.RemoveAll();
+            // Clear the OS first; only drop our in-memory state if the removal actually
+            // landed. If the native remove fails (throws, or reports false on a locked
+            // profile), keep the list so we don't falsely mark ourselves empty while the
+            // OS still shows shortcuts — a later access reconciles with the real state.
+            if (!Bridge.RemoveAll())
+            {
+                Log("RemoveAll: the OS removal did not succeed; keeping the in-memory list.");
+                return;
+            }
             _items.Clear();
             _loaded = true; // now authoritative — skip any later OS reconcile
             Log("Removed all quick actions.");

@@ -47,6 +47,21 @@ namespace EminDeniz99.QuickActions
 
         internal bool IsValid => !string.IsNullOrEmpty(Id) && !string.IsNullOrEmpty(Title);
 
+        /// <summary>
+        /// A field-by-field copy. The facade stores and returns copies so a caller
+        /// mutating an added item (or an item from <see cref="QuickActions.GetAll"/> /
+        /// <see cref="QuickActions.GetById"/>) can't silently change the internal set
+        /// out from under the OS state.
+        /// </summary>
+        internal QuickActionItem Copy() => new QuickActionItem
+        {
+            Id = Id,
+            Title = Title,
+            Subtitle = Subtitle,
+            Icon = Icon,
+            AndroidDrawable = AndroidDrawable,
+        };
+
         public bool Equals(QuickActionItem other) => other != null && Id == other.Id;
 
         public override bool Equals(object obj) => Equals(obj as QuickActionItem);

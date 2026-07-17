@@ -69,12 +69,20 @@ namespace EminDeniz99.QuickActions.Internal
             return accepted;
         }
 
-        public void RemoveAll()
+        public bool RemoveAll()
         {
-            if (!IsPlatformSupported) return;
-            using (var bridge = new AndroidJavaClass(BridgeClass))
-            using (var activity = CurrentActivity())
-                bridge.CallStatic("removeAll", activity);
+            if (!IsPlatformSupported) return true; // no dynamic shortcuts exist below API 25
+            try
+            {
+                using (var bridge = new AndroidJavaClass(BridgeClass))
+                using (var activity = CurrentActivity())
+                    return bridge.CallStatic<bool>("removeAll", activity);
+            }
+            catch (AndroidJavaException e)
+            {
+                Debug.LogWarning("[QuickActions] RemoveAll failed: " + e.Message);
+                return false; // couldn't remove — let the facade keep its list
+            }
         }
 
         public string GetLastPerformed() => CallStringStatic("getLastPerformed");

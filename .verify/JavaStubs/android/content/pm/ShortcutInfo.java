@@ -10,6 +10,7 @@ public class ShortcutInfo {
     public Builder setLongLabel(CharSequence s){return this;}
     public Builder setIntent(Intent i){return this;}
     public Builder setIcon(Icon i){return this;}
+    public Builder setRank(int r){return this;}
     public ShortcutInfo build(){return new ShortcutInfo();}
   }
 }

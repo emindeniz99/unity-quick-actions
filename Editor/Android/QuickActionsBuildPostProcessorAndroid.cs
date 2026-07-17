@@ -71,8 +71,8 @@ namespace EminDeniz99.QuickActions.Editor
 
             var appId = ResolveApplicationId(path);
             WriteResources(moduleDir, settings, appId);
-            InjectMetaData(manifestPath);
-            Debug.Log($"[QuickActions] Wrote {settings.StaticShortcuts.Count} static shortcut(s) to the Android project.");
+            if (InjectMetaData(manifestPath))
+                Debug.Log($"[QuickActions] Wrote {settings.StaticShortcuts.Count} static shortcut(s) to the Android project.");
         }
 
         // Removes the generated shortcut resources and the launcher meta-data so a
@@ -226,20 +226,34 @@ namespace EminDeniz99.QuickActions.Editor
             File.WriteAllText(Path.Combine(valuesDir, StringsResource + ".xml"), strings.ToString());
         }
 
-        private static void InjectMetaData(string manifestPath)
+        // Returns true when our shortcuts meta-data is present after the call (freshly
+        // injected or already ours); false when the launcher already declares a DIFFERENT
+        // android.app.shortcuts resource, in which case we warn instead of silently
+        // shipping none (Android allows only one shortcuts resource per activity).
+        private static bool InjectMetaData(string manifestPath)
         {
             var doc = new XmlDocument();
             doc.Load(manifestPath);
 
             var activity = FindLauncherActivity(doc);
             if (activity == null)
-                return;
+                return false;
 
-            // Idempotent: don't add the meta-data twice.
             foreach (XmlElement meta in activity.GetElementsByTagName("meta-data"))
             {
-                if (meta.GetAttribute("name", AndroidNs) == "android.app.shortcuts")
-                    return;
+                if (meta.GetAttribute("name", AndroidNs) != "android.app.shortcuts")
+                    continue;
+                var resource = meta.GetAttribute("resource", AndroidNs);
+                if (resource == "@xml/" + ShortcutsResource)
+                    return true; // already ours — idempotent (Append re-runs)
+                // A host app / another plugin owns the single shortcuts slot; injecting
+                // ours would clobber it, so warn loudly rather than silently ship none.
+                Debug.LogWarning(
+                    $"[QuickActions] The launcher activity already declares android.app.shortcuts " +
+                    $"(resource={resource}); the configured static shortcuts were NOT injected " +
+                    $"(Android allows only one shortcuts resource per activity). Merge them into " +
+                    $"{resource} manually, or register them at runtime with QuickActions.Add(...).");
+                return false;
             }
 
             var element = doc.CreateElement("meta-data");
@@ -247,6 +261,7 @@ namespace EminDeniz99.QuickActions.Editor
             SetAndroidAttr(doc, element, "resource", "@xml/" + ShortcutsResource);
             activity.AppendChild(element);
             doc.Save(manifestPath);
+            return true;
         }
 
         private static void SetAndroidAttr(XmlDocument doc, XmlElement element, string name, string value)

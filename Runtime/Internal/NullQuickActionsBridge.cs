@@ -12,7 +12,7 @@ namespace EminDeniz99.QuickActions.Internal
         // Accept-all: return the same reference so the facade prunes nothing (there
         // is no OS to trim, and the editor list must stay intact).
         public IList<QuickActionItem> SetShortcuts(IList<QuickActionItem> items) => items;
-        public void RemoveAll() { }
+        public bool RemoveAll() => true;
         public string GetLastPerformed() => null;
         public void ResetLastPerformed() { }
         public string ConsumePendingPerformed() => null;
