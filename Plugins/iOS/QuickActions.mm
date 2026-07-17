@@ -141,6 +141,8 @@ static BOOL QADidFinishLaunching(id self, SEL _cmd, UIApplication *application, 
     return launchedFromShortcut ? NO : result;
 }
 
+static void (*gQAOrigPerformAction)(id, SEL, UIApplication *, UIApplicationShortcutItem *, void (^)(BOOL)) = NULL;
+
 static void QAPerformActionForShortcutItem(id self, SEL _cmd, UIApplication *application,
                                            UIApplicationShortcutItem *shortcutItem,
                                            void (^completionHandler)(BOOL)) {
@@ -149,7 +151,16 @@ static void QAPerformActionForShortcutItem(id self, SEL _cmd, UIApplication *app
         // applicationDidBecomeActive, so the focus poll drains it on resume.
         QAStorePerformed(shortcutItem.type, YES);
     }
-    if (completionHandler != nil) completionHandler(YES);
+    // If UnityAppController already had an implementation (a host app or another
+    // native plugin), chain to it and let it own the completion handler so the
+    // existing warm-tap handler still runs — mirrors the didFinish path. Only
+    // complete ourselves when there was no prior implementation (avoids a
+    // double completionHandler call).
+    if (gQAOrigPerformAction != NULL) {
+        gQAOrigPerformAction(self, _cmd, application, shortcutItem, completionHandler);
+    } else if (completionHandler != nil) {
+        completionHandler(YES);
+    }
 }
 
 @interface QuickActionsAppControllerHook : NSObject
@@ -181,11 +192,16 @@ static void QAPerformActionForShortcutItem(id self, SEL _cmd, UIApplication *app
     }
 
     // Install application:performActionForShortcutItem:completionHandler:
-    // (Unity does not implement it, so add it; replace defensively if present).
+    // (Unity does not implement it, so normally we add it; if something already
+    // implements it we preserve and chain to that IMP instead of dropping it).
     SEL performSel = @selector(application:performActionForShortcutItem:completionHandler:);
     const char *performTypes = "v@:@@@?";
     Method perform = class_getInstanceMethod(cls, performSel);
     if (perform != NULL) {
+        // Preserve the existing implementation so QAPerformActionForShortcutItem
+        // can chain to it (host app / another plugin also handling quick actions).
+        gQAOrigPerformAction =
+            (void (*)(id, SEL, UIApplication *, UIApplicationShortcutItem *, void (^)(BOOL)))method_getImplementation(perform);
         class_replaceMethod(cls, performSel, (IMP)QAPerformActionForShortcutItem, method_getTypeEncoding(perform));
     } else {
         class_addMethod(cls, performSel, (IMP)QAPerformActionForShortcutItem, performTypes);

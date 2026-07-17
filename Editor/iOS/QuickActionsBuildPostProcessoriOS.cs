@@ -29,10 +29,6 @@ namespace EminDeniz99.QuickActions.Editor
             if (report.summary.platform != BuildTarget.iOS)
                 return;
 
-            var settings = QuickActionsSettings.GetOrNull();
-            if (settings == null || settings.StaticShortcuts.Count == 0)
-                return;
-
             var plistPath = Path.Combine(report.summary.outputPath, "Info.plist");
             if (!File.Exists(plistPath))
             {
@@ -42,6 +38,20 @@ namespace EminDeniz99.QuickActions.Editor
 
             var plist = new PlistDocument();
             plist.ReadFromFile(plistPath);
+
+            var settings = QuickActionsSettings.GetOrNull();
+            if (settings == null || settings.StaticShortcuts.Count == 0)
+            {
+                // No static shortcuts configured. On an *Append* build the plist may
+                // still hold an array a previous build wrote; remove it so stale
+                // shortcuts don't ship. (A fresh Replace build has nothing to clear.)
+                if (plist.root.values.Remove("UIApplicationShortcutItems"))
+                {
+                    plist.WriteToFile(plistPath);
+                    Debug.Log("[QuickActions] Cleared stale UIApplicationShortcutItems (no static shortcuts configured).");
+                }
+                return;
+            }
 
             // Replace any existing array so re-runs are idempotent.
             var items = plist.root.CreateArray("UIApplicationShortcutItems");

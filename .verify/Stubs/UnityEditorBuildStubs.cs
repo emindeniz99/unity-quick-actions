@@ -112,6 +112,8 @@ namespace UnityEditor.iOS.Xcode
 
     public class PlistElementDict : PlistElement
     {
+        // Mirrors UnityEditor.iOS.Xcode.PlistElementDict.values (used to remove keys).
+        public Dictionary<string, PlistElement> values = new Dictionary<string, PlistElement>();
         public PlistElementArray CreateArray(string key) => new PlistElementArray();
         public PlistElementDict CreateDict(string key) => new PlistElementDict();
         public void SetString(string key, string value) { }
