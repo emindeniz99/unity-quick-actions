@@ -62,3 +62,13 @@ The stub harness compiles the C#/Java but can't confirm Unity-only wiring:
   `performActionForShortcutItem`). Unity's trampoline uses the app-delegate model
   by default; if a project adopts the `UIScene` lifecycle, add a
   `windowScene:performActionForShortcutItem:` hook and queue-level dedup.
+- **iOS host-subclass cold double-delivery:** our `didFinishLaunchingWithOptions`
+  swizzle returns `NO` when the app was cold-launched from one of our shortcuts,
+  which is what tells iOS *not* to also call `performActionForShortcutItem` — so
+  the cold tap is delivered exactly once. If a host ships its own
+  `UnityAppController` subclass that overrides this selector, calls `super`, then
+  returns `YES` unconditionally (discarding our `NO`), iOS delivers the cold tap
+  twice. The fix is on the host side — such an override should return the value
+  from `[super application:didFinishLaunchingWithOptions:]`. Documented as a known
+  limitation in `Plugins/iOS/QuickActions.mm`; a future hardening could add
+  queue-level dedup so a doubled cold delivery collapses to one regardless.

@@ -150,6 +150,11 @@ static BOOL QADidFinishLaunching(id self, SEL _cmd, UIApplication *application, 
     // routing (its own performActionForShortcutItem path) still runs. This dedup relies
     // on the UIApplicationDelegate lifecycle Unity's trampoline uses by default; under
     // the UIScene lifecycle the cold shortcut arrives via the scene delegate — see ROADMAP.
+    // NOTE: if a host UnityAppController subclass overrides this selector, calls super,
+    // then returns YES unconditionally (ignoring our NO), iOS will ALSO call
+    // performActionForShortcutItem and the cold tap is delivered twice. Host subclasses
+    // should return the value from [super application:didFinishLaunchingWithOptions:].
+    // (Known limitation — see ROADMAP.)
     return launchedFromOurShortcut ? NO : result;
 }
 
@@ -236,7 +241,13 @@ void _QuickActions_SetShortcuts(const char *json) {
 
 void _QuickActions_RemoveAll(void) {
     QARunOnMain(^{
-        [UIApplication sharedApplication].shortcutItems = @[];
+        // Remove only OUR shortcuts (marked) — preserve a host app's / another
+        // plugin's dynamic UIApplicationShortcutItems instead of wiping everything.
+        UIApplication *app = [UIApplication sharedApplication];
+        NSMutableArray<UIApplicationShortcutItem *> *kept = [NSMutableArray array];
+        for (UIApplicationShortcutItem *item in app.shortcutItems)
+            if (!QAIsOurShortcut(item)) [kept addObject:item];
+        app.shortcutItems = kept;
     });
 }
 
@@ -267,6 +278,9 @@ static char *QABuildShortcutsJson(void) {
     NSArray<UIApplicationShortcutItem *> *items = [UIApplication sharedApplication].shortcutItems;
     NSMutableArray *out = [NSMutableArray array];
     for (UIApplicationShortcutItem *item in items) {
+        // Only OUR shortcuts (marked) — never absorb a host's / another plugin's items
+        // into the managed set (which a later Add would then re-stamp as ours).
+        if (!QAIsOurShortcut(item)) continue;
         [out addObject:@{
             @"Id": item.type ?: @"",
             @"Title": item.localizedTitle ?: @"",
@@ -283,11 +297,21 @@ static char *QABuildShortcutsJson(void) {
 }
 
 // Reads the dynamic shortcuts, marshalling onto the main thread (UIApplication is
-// main-thread-only) — symmetric with the QARunOnMain-guarded writers.
+// main-thread-only). Off the main thread we hop to it asynchronously and wait on a
+// bounded semaphore — NOT dispatch_sync — so that if the caller violates the
+// "call on the Unity main thread" contract while the main thread is blocked on this
+// work (e.g. Task.Result), we time out and report a failed read (NULL) instead of
+// hard-deadlocking the process.
 char *_QuickActions_GetShortcutsJson(void) {
     if ([NSThread isMainThread]) return QABuildShortcutsJson();
     __block char *result = NULL;
-    dispatch_sync(dispatch_get_main_queue(), ^{ result = QABuildShortcutsJson(); });
+    dispatch_semaphore_t sem = dispatch_semaphore_create(0);
+    dispatch_async(dispatch_get_main_queue(), ^{
+        result = QABuildShortcutsJson();
+        dispatch_semaphore_signal(sem);
+    });
+    if (dispatch_semaphore_wait(sem, dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2 * NSEC_PER_SEC))) != 0)
+        return NULL; // main thread didn't drain in time — failed read, don't hang
     return result;
 }
 

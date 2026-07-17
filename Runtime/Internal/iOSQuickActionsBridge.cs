@@ -40,8 +40,11 @@ namespace EminDeniz99.QuickActions.Internal
 
         public System.Collections.Generic.IList<QuickActionItem> GetShortcuts()
         {
+            // Native returns null on a failed read (e.g. an off-main-thread call that
+            // timed out marshalling to the main queue). Propagate null so the facade
+            // doesn't treat a failed read as an authoritative-empty set.
             var json = Consume(_QuickActions_GetShortcutsJson());
-            return QuickActionList.Parse(json);
+            return json == null ? null : QuickActionList.Parse(json);
         }
 
         // The native side hands back a malloc'd UTF-8 C string we own. Decode as
