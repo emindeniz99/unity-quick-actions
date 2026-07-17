@@ -5,8 +5,11 @@
 // there is nothing to strip — this is defense in depth against a stale entry
 // (e.g. one hand-copied into a custom main manifest).
 //
-// This assembly is deliberately NOT gated by QUICKACTIONS_ENABLED (it must run
-// when the define is OFF). It only depends on UNITY_ANDROID. Note: the trampoline
+// This assembly is NOT gated by asmdef defineConstraints (it must be present when
+// the define is OFF); instead the body is guarded by a compile-time
+// `#if QUICKACTIONS_ENABLED` so it strips only when the define is off — the exact
+// complement of the gated injector, so the two always agree. It only depends on
+// UNITY_ANDROID. Note: the trampoline
 // .java still compiles into the APK as a dead, unreachable class (~1-2 KB) —
 // Unity cannot conditionally exclude a loose native source from compilation. For
 // a literally-zero production footprint, keep the package out of the prod project
@@ -14,9 +17,7 @@
 using System.IO;
 using System.Linq;
 using System.Xml;
-using UnityEditor;
 using UnityEditor.Android;
-using UnityEditor.Build;
 
 namespace EminDeniz99.QuickActions.Editor.NativeGate
 {
@@ -36,10 +37,14 @@ namespace EminDeniz99.QuickActions.Editor.NativeGate
 
         public void OnPostGenerateGradleAndroidProject(string path)
         {
-            var defines = PlayerSettings.GetScriptingDefineSymbols(NamedBuildTarget.Android) ?? string.Empty;
-            if (defines.Split(';').Select(s => s.Trim()).Contains("QUICKACTIONS_ENABLED"))
-                return; // enabled — keep the trampoline
-
+#if QUICKACTIONS_ENABLED
+            // Gate is ON at COMPILE time — the same truth the gated injector uses. Using
+            // the compile-time define (not a runtime PlayerSettings read) keeps the
+            // stripper in lock-step with the injector across Player Settings, csc.rsp,
+            // versionDefines and Unity 6 Build Profiles, so they can never disagree and
+            // produce a manifest that advertises shortcuts targeting a stripped activity.
+            return; // enabled — keep the trampoline
+#else
             // unityLibrary (given) or the sibling launcher module may hold the manifest.
             var modules = new[] { path, Path.GetFullPath(Path.Combine(path, "..", "launcher")) };
             foreach (var module in modules)
@@ -80,6 +85,7 @@ namespace EminDeniz99.QuickActions.Editor.NativeGate
                 SafeDelete(Path.Combine(module, "src", "main", "res", "xml", ShortcutsResource + ".xml"));
                 SafeDelete(Path.Combine(module, "src", "main", "res", "values", StringsResource + ".xml"));
             }
+#endif
         }
 
         private static void SafeDelete(string filePath)

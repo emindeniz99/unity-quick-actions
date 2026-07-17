@@ -6,10 +6,13 @@
 // entries from Info.plist. A fresh "Replace" build regenerates both clean, so
 // this matters for Append/exported projects where the gate must still be inert.
 //
-// This assembly is deliberately NOT gated by QUICKACTIONS_ENABLED (it must run
-// when the define is OFF). It only depends on UNITY_IOS.
+// This assembly is NOT gated by asmdef defineConstraints (it must be present when
+// the define is OFF); instead the body is guarded by a compile-time
+// `#if QUICKACTIONS_ENABLED` so it cleans up only when the define is off — the exact
+// complement of the gated macro injector, so the two always agree (no runtime
+// PlayerSettings read that could diverge from the compile-time gate under Build
+// Profiles / csc.rsp / versionDefines). It only depends on UNITY_IOS.
 using System.IO;
-using System.Linq;
 using UnityEditor;
 using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
@@ -30,13 +33,15 @@ namespace EminDeniz99.QuickActions.Editor.NativeGate
         {
             if (report.summary.platform != BuildTarget.iOS)
                 return;
-
-            var defines = PlayerSettings.GetScriptingDefineSymbols(NamedBuildTarget.iOS) ?? string.Empty;
-            if (defines.Split(';').Select(s => s.Trim()).Contains("QUICKACTIONS_ENABLED"))
-                return; // enabled — keep the macro and shortcuts
-
+#if QUICKACTIONS_ENABLED
+            // Gate is ON at compile time (matches the gated macro injector) — keep the
+            // macro and shortcuts. See the header note on why this is compile-time, not
+            // a runtime PlayerSettings read.
+            return;
+#else
             RemoveMacro(report.summary.outputPath);
             RemoveOurPlistEntries(report.summary.outputPath);
+#endif
         }
 
         // Strip QUICKACTIONS_ENABLED=1 from the UnityFramework target so the .mm
