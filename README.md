@@ -315,8 +315,11 @@ startup (cold) and on regained focus (warm) — no `UnitySendMessage`. The C# la
 owns the authoritative list and pushes the full set to the OS on every change;
 on first access it **reconciles** that list with the shortcuts the OS already has
 (from a previous session), so `GetAll()`/`IsAdded()` are accurate across launches
-(icons excepted; a reconciled item with no subtitle reports an empty subtitle
-on both platforms — Android leaves the OS long label unset for it).
+(on iOS reconciled items report `IconType.None` — icons can't be read back;
+Android recovers the icon identity from the shortcut's extras, so its
+reconciled items keep their icons. A reconciled item with no subtitle reports
+an empty subtitle on both platforms — Android leaves the OS long label unset
+for it).
 
 ### Known limits — the OS shortcut cap
 
@@ -408,8 +411,9 @@ spoof a tap; on either platform the id is just a string the OS hands you. So:
 
 See [`ROADMAP.md`](./ROADMAP.md). Notable: per-item rasterized icons from
 `Texture2D`, pinned shortcuts, and automated device CI are not implemented.
-(OS read-back recovers ids/titles but not icons — reconciled items report
-`IconType.None`.)
+(On iOS, OS read-back recovers ids/titles but not icons — reconciled items
+report `IconType.None`; Android recovers icon identity via the shortcut's
+extras, so reconciled items keep their icons.)
 
 ## Verification
 

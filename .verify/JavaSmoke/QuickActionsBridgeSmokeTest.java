@@ -38,6 +38,8 @@ public final class QuickActionsBridgeSmokeTest {
         rateLimitReportsNull();
         emptySetSkipsAddAndStillClears();
         parseFailureReportsNull();
+        pinnedForeignIdsAreDroppedButDontShrinkBudget();
+        iconIdentityRoundTripsThroughExtras();
         trampolineAcceptsOursManifestAndPinnedOnly();
 
         System.out.println("SMOKE: " + (failures == 0 ? "PASS" : "FAIL") + " (" + checks + " checks, " + failures + " failed)");
@@ -160,6 +162,37 @@ public final class QuickActionsBridgeSmokeTest {
         ShortcutManager mgr = new ShortcutManager();
         check(QuickActionsBridge.setShortcuts(activity(mgr), "not json") == null, "unparseable payload -> null");
         check(mgr.dynamic.isEmpty(), "unparseable payload changed nothing");
+    }
+
+    private static void pinnedForeignIdsAreDroppedButDontShrinkBudget() throws Exception {
+        ShortcutManager mgr = new ShortcutManager(); // cap 4
+        ShortcutInfo hostPinned = host("share"); // pinned-only, NOT dynamic — e.g. host removed it after the user pinned it
+        mgr.pinned.add(hostPinned);
+        mgr.pinned.add(ours("ourpin", 0)); // OUR pinned id must stay writable
+
+        String applied = QuickActionsBridge.setShortcuts(activity(mgr), itemsJson("share", "a", "b", "c", "ourpin"));
+
+        // 'share' dropped (real addDynamicShortcuts would update the host's PINNED
+        // entry in place — hijack — or throw for an immutable ex-manifest pin);
+        // 'ourpin' (marked) stays; pinned-only entries don't consume the dynamic
+        // cap, so the budget is the full 4: a,b,c,ourpin all fit.
+        check(idsOf(applied).equals(List.of("a", "b", "c", "ourpin")), "foreign pinned id dropped, ours kept, budget untouched: " + applied);
+        check(!hasId(mgr.dynamic, "share"), "the foreign pinned id was never written dynamically");
+        check(containsSame(mgr.pinned, hostPinned), "the host's pinned instance is untouched");
+    }
+
+    private static void iconIdentityRoundTripsThroughExtras() throws Exception {
+        ShortcutManager mgr = new ShortcutManager();
+        String json = "{\"items\":[{\"Id\":\"i1\",\"Title\":\"T\",\"Subtitle\":\"\",\"Icon\":5,\"AndroidDrawable\":\"\"},"
+                + "{\"Id\":\"i2\",\"Title\":\"T\",\"Subtitle\":\"\",\"Icon\":0,\"AndroidDrawable\":\"my_icon\"}]}";
+        check(QuickActionsBridge.setShortcuts(activity(mgr), json) != null, "icon write lands");
+
+        // Simulate the cold start: read back and verify the icon identity survives
+        // via the marker extras (the OS itself can't read icons back) — the next
+        // push would otherwise strip the launcher-visible icons.
+        JSONArray items = new JSONObject(QuickActionsBridge.getShortcutsJson(activity(mgr))).optJSONArray("items");
+        check(items.optJSONObject(0).optInt("Icon", -1) == 5, "IconType round-trips through extras");
+        check("my_icon".equals(items.optJSONObject(1).optString("AndroidDrawable", "?")), "AndroidDrawable round-trips through extras");
     }
 
     private static void trampolineAcceptsOursManifestAndPinnedOnly() throws Exception {

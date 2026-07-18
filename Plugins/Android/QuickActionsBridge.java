@@ -40,6 +40,13 @@ public final class QuickActionsBridge {
     // own ShortcutManager entries are never absorbed, republished, or removed.
     static final String MANAGED_MARKER_KEY = "com.emindeniz99.quickactions.managed";
 
+    // Icon identity persisted alongside the marker: ShortcutManager can't read an
+    // icon back, so without these a post-cold-start push would re-publish every
+    // previously installed shortcut ICONLESS (the OS replaces same-id entries
+    // wholesale). Round-tripped by getShortcutsJson.
+    static final String EXTRA_ICON_TYPE = "com.emindeniz99.quickactions.icon";
+    static final String EXTRA_ICON_DRAWABLE = "com.emindeniz99.quickactions.drawable";
+
     // Names of bundled drawables looked up for IconType values (index = enum int).
     // Index 0 (None) is intentionally empty. Provide drawables named
     // ic_quickaction_<name> in your project to use them.
@@ -144,17 +151,32 @@ public final class QuickActionsBridge {
                     else hostIds.add(s.getId());
                 }
             }
+            // Foreign PINNED ids must be dropped too (but tracked separately —
+            // pinned-only entries don't consume the dynamic cap, so they must not
+            // shrink the budget below): addDynamicShortcuts updates a same-id
+            // PINNED entry in place (hijacking a host's pinned-only shortcut on the
+            // user's home screen), and a pinned leftover of a since-removed
+            // MANIFEST shortcut is immutable — including its id would make
+            // addDynamicShortcuts throw IllegalArgumentException up front and take
+            // the whole batch down with it.
+            java.util.HashSet<String> foreignIds = new java.util.HashSet<>(hostIds);
+            List<ShortcutInfo> pinned = manager.getPinnedShortcuts();
+            if (pinned != null) {
+                for (ShortcutInfo s : pinned) {
+                    if (!isOurShortcut(s)) foreignIds.add(s.getId());
+                }
+            }
 
-            // Drop our items whose id collides with a HOST dynamic shortcut:
-            // addDynamicShortcuts updates same-id entries IN PLACE, which would
-            // silently hijack the host's shortcut — the exact failure this
+            // Drop our items whose id collides with a HOST dynamic or pinned
+            // shortcut: addDynamicShortcuts updates same-id entries IN PLACE, which
+            // would silently hijack the host's shortcut — the exact failure this
             // marker-scoping exists to prevent.
             java.util.Iterator<ShortcutInfo> ours = shortcuts.iterator();
             while (ours.hasNext()) {
-                if (hostIds.contains(ours.next().getId())) {
+                if (foreignIds.contains(ours.next().getId())) {
                     ours.remove();
                     android.util.Log.w("QuickActions",
-                            "Dropped a dynamic shortcut whose id collides with another publisher's dynamic shortcut");
+                            "Dropped a dynamic shortcut whose id collides with another publisher's dynamic or pinned shortcut");
                 }
             }
 
@@ -253,7 +275,9 @@ public final class QuickActionsBridge {
     /**
      * The dynamic shortcuts THIS PACKAGE created (marker-scoped; a host app's own
      * shortcuts are never surfaced) as {"items":[...]} so the managed layer can
-     * reconcile after a cold start. Icons aren't read back (reported as 0).
+     * reconcile after a cold start. Icon identity is recovered from the marker
+     * extras (the OS itself can't read icons back), so a post-reconcile push
+     * re-publishes shortcuts WITH their original icons.
      * Returns {@code null} when the read did NOT succeed (unsupported / no manager /
      * a getDynamicShortcuts throw on a locked/direct-boot device), so the managed
      * layer can tell "the OS is genuinely empty" from "the read failed" and avoid
@@ -293,8 +317,13 @@ public final class QuickActionsBridge {
                 CharSequence longLabel = s.getLongLabel();
                 o.put("Title", shortLabel == null ? "" : shortLabel.toString());
                 o.put("Subtitle", longLabel == null ? "" : longLabel.toString());
-                o.put("Icon", 0);
-                o.put("AndroidDrawable", "");
+                // Icon identity comes from our extras (see EXTRA_ICON_*): the OS
+                // can't read icons back, and reporting 0 here would make the next
+                // push strip the launcher-visible icons of reconciled shortcuts.
+                PersistableBundle extras = s.getExtras();
+                o.put("Icon", extras == null ? 0 : extras.getInt(EXTRA_ICON_TYPE, 0));
+                String drawable = extras == null ? null : extras.getString(EXTRA_ICON_DRAWABLE, "");
+                o.put("AndroidDrawable", drawable == null ? "" : drawable);
                 items.put(o);
             }
             JSONObject root = new JSONObject();
@@ -319,9 +348,16 @@ public final class QuickActionsBridge {
 
         // Ownership marker (see MANAGED_MARKER_KEY): extras survive OS persistence
         // and read-backs, so every later write/remove/read can recognize this
-        // shortcut as ours across cold starts and reboots.
+        // shortcut as ours across cold starts and reboots. The icon identity rides
+        // along because the OS can't read icons back — without it, a
+        // post-cold-start push would re-publish previously installed shortcuts
+        // ICONLESS (same-id entries are replaced wholesale, not field-merged).
         PersistableBundle extras = new PersistableBundle();
         extras.putBoolean(MANAGED_MARKER_KEY, true);
+        int iconType = item.optInt("Icon", 0);
+        String iconDrawable = item.optString("AndroidDrawable", "");
+        if (iconType != 0) extras.putInt(EXTRA_ICON_TYPE, iconType);
+        if (!iconDrawable.isEmpty()) extras.putString(EXTRA_ICON_DRAWABLE, iconDrawable);
 
         ShortcutInfo.Builder builder = new ShortcutInfo.Builder(activity, id)
                 .setShortLabel(title)
