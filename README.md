@@ -444,4 +444,34 @@ quick actions can't run in the Editor or on Linux).
   build post-processors (Info.plist / shortcuts.xml).
 - The iOS `.mm` is compiled by Unity against the real SDK; here it's reviewed
   and brace/structure-checked only (no Apple SDK on Linux). The C# and Android
-  Java are fully compiled against stubs by `tools/verify.sh`.
+  Java are fully compiled against stubs by `tools/verify.sh` — and the Java is
+  also *executed* against stateful stubs (`.verify/JavaSmoke`).
+- **Unity 6 scripting defines are ADDITIVE across scopes** (csc.rsp + Player
+  Settings + Build Profile). A profile can *add* a symbol but never *remove*
+  one — so a dev-only gate must live in the **dev profile**, never in shared
+  Player Settings. Getting this backwards silently ships the gate in prod.
+- **Android `ShortcutManager` sharp edges** (verified against AOSP source):
+  `addDynamicShortcuts` updates same-id **dynamic and pinned** entries in
+  place (a same-id write can hijack another publisher's pinned shortcut), and
+  a pinned leftover of a removed manifest shortcut is **immutable** — including
+  its id throws `IllegalArgumentException` up front and takes the whole batch
+  with it. Coexisting with a host means marker extras + the additive APIs
+  (`add`/`removeDynamicShortcuts`), never full-set `setDynamicShortcuts`.
+  Extras survive OS persistence and read-backs (icons don't — persist icon
+  identity *in* the extras); removes are never rate-limited, adds are.
+- **iOS `shortcutItems` is one shared array** — coexistence needs a `userInfo`
+  marker and merge-writes. Swizzle chains must assume they can be wrapped
+  *later* by another plugin: "nobody was before me" ≠ "I am the terminal
+  handler" (check the installed IMP at call time before owning the
+  completionHandler). Returning `NO` from `didFinishLaunchingWithOptions` is
+  what dedupes a cold shortcut tap.
+- **Compile-only stubs miss contract bugs.** The classes of defect that
+  slipped past `javac` + 45 NUnit tests (in-place pinned updates, null-vs-empty
+  reads, rate-limit windows) were caught only by *running* the plugin against
+  stateful stubs and by adversarial review against the real AOSP source. Also:
+  a test that stays green when the fix is deleted is a tautology — mutation-check
+  new tests before trusting them.
+- **Failed writes must be loud:** an optimistic mutation that the OS rejected
+  has to roll back and return false (mirroring the failed-*read* contract), or
+  callers record success for a shortcut that silently evaporates on the next
+  reconcile. Distinguish "read failed" (null) from "genuinely empty" everywhere.

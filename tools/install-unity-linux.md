@@ -61,3 +61,18 @@ or the `.ulf` from a manual activation (Personal).
   that must be compiled on macOS with Xcode. The iOS post-processor and `.mm`
   here are exercised only on a macOS Unity. (This is a platform constraint, not
   a package limitation.)
+
+## 5. Licensing lessons (learned the hard way)
+
+- A **manually activated** license (`.ulf` via license.unity3d.com/manual)
+  **cannot be returned from the CLI** — `-returnlicense` only works for
+  `-username/-password`(+serial) activations. Freeing a manual seat requires a
+  **Unity support ticket** (Unity ID ▸ My Account ▸ Support, or
+  support.unity.com) quoting the machine identifiers; plan for this *before*
+  activating on a throwaway VM/container, because the seat stays bound to that
+  machine until support releases it.
+- The seat binding follows the machine fingerprint (hostname + machine-id),
+  not the disk image — deleting the VM does not free the seat.
+- Never commit the `.ulf` (it embeds the serial) and never paste the full
+  serial into logs/tickets — mask it and use its SHA1 when support asks for
+  proof.
