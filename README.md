@@ -359,6 +359,12 @@ republished with this package's intents, and never removed. Three consequences:
 - **Ordering**: this package ranks its items by your insertion order starting at
   0; launchers interleave host items by their own ranks, so the exact combined
   order across publishers is launcher-dependent.
+- **Same-id collisions**: on Android a colliding host id (dynamic **or pinned**)
+  wins — the package drops its own item with a warning rather than update the
+  host's entry in place. On iOS an unmarked same-id item is adopted as this
+  package's pre-marker leftover **only when it carries no `userInfo`**; a host
+  item with its own payload is preserved even on a collision (the id then
+  renders twice — the honest result of two publishers claiming one id).
 
 ### Known limits — Android build variants and static shortcuts
 

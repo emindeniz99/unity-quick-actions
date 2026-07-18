@@ -163,14 +163,26 @@ static void (*gQAOrigPerformAction)(id, SEL, UIApplication *, UIApplicationShort
 static void QAPerformActionForShortcutItem(id self, SEL _cmd, UIApplication *application,
                                            UIApplicationShortcutItem *shortcutItem,
                                            void (^completionHandler)(BOOL)) {
+    // Are we still the TERMINAL handler for this selector? gQAOrigPerformAction ==
+    // NULL only says nobody was installed before US at +load; a host plugin may
+    // have swizzled ON TOP of us afterwards (capturing our IMP as its "original"
+    // and chaining down with the same completionHandler). In that wrapped state
+    // the host owns routing and completion — treating ourselves as terminal would
+    // steal its taps into our queue and double-invoke the completion handler.
+    BOOL terminal = NO;
+    if (gQAOrigPerformAction == NULL) {
+        Method current = class_getInstanceMethod(object_getClass(self),
+            @selector(application:performActionForShortcutItem:completionHandler:));
+        terminal = current != NULL && method_getImplementation(current) == (IMP)QAPerformActionForShortcutItem;
+    }
     if (QAIsOurShortcut(shortcutItem)) {
         // Enqueue for the single C# poll channel. This runs before
         // applicationDidBecomeActive, so the focus poll drains it on resume. Only
         // OUR shortcuts — a host shortcut is left entirely to its own handler below.
         QAStorePerformed(shortcutItem.type, YES);
-    } else if (gQAOrigPerformAction == NULL) {
-        // Unmarked item with NO prior handler to chain to: in a plain Unity app
-        // nothing else can receive this tap (e.g. an Info.plist static shortcut the
+    } else if (terminal) {
+        // Unmarked item and we are the ONLY handler: in a plain Unity app nothing
+        // else can receive this tap (e.g. an Info.plist static shortcut the
         // developer added outside this package, or an item written by a pre-marker
         // build). Dropping it would black-hole the tap while completing YES below —
         // deliver it best-effort through our channel, as the only consumer.
@@ -178,12 +190,12 @@ static void QAPerformActionForShortcutItem(id self, SEL _cmd, UIApplication *app
     }
     // If UnityAppController already had an implementation (a host app or another
     // native plugin), chain to it and let it own the completion handler so the
-    // existing warm-tap handler still runs — mirrors the didFinish path. Only
-    // complete ourselves when there was no prior implementation (avoids a
-    // double completionHandler call).
+    // existing warm-tap handler still runs — mirrors the didFinish path. Complete
+    // ourselves only when we are the terminal handler (no prior implementation AND
+    // nobody wrapped us) — anything else risks a double completionHandler call.
     if (gQAOrigPerformAction != NULL) {
         gQAOrigPerformAction(self, _cmd, application, shortcutItem, completionHandler);
-    } else if (completionHandler != nil) {
+    } else if (terminal && completionHandler != nil) {
         completionHandler(YES);
     }
 }
@@ -254,11 +266,14 @@ void _QuickActions_SetShortcuts(const char *json) {
         NSMutableArray<UIApplicationShortcutItem *> *merged = [NSMutableArray array];
         for (UIApplicationShortcutItem *item in app.shortcutItems) {
             if (QAIsOurShortcut(item)) continue;            // replaced by the fresh set below
-            // Unmarked item whose type matches an id we're writing: an item persisted
-            // by a pre-marker build of this package. Adopt it (the fresh, marked copy
-            // below supersedes it) instead of keeping it as an unremovable duplicate
-            // squatting ahead of the managed set.
-            if ([ourIds containsObject:item.type]) continue;
+            // Unmarked item whose type matches an id we're writing AND that carries
+            // no userInfo: an item persisted by a pre-marker build of this package
+            // (those wrote none). Adopt it (the fresh, marked copy below supersedes
+            // it) instead of keeping it as an unremovable duplicate squatting ahead
+            // of the managed set. A host item with its own userInfo payload is
+            // spared even on an id collision — the id is then shown twice, which
+            // is the honest rendering of two publishers claiming one id.
+            if ([ourIds containsObject:item.type] && item.userInfo.count == 0) continue;
             [merged addObject:item];
         }
         [merged addObjectsFromArray:ours];
@@ -332,13 +347,29 @@ static char *QABuildShortcutsJson(void) {
 char *_QuickActions_GetShortcutsJson(void) {
     if ([NSThread isMainThread]) return QABuildShortcutsJson();
     __block char *result = NULL;
+    __block BOOL abandoned = NO;
+    NSObject *lock = [NSObject new];
     dispatch_semaphore_t sem = dispatch_semaphore_create(0);
     dispatch_async(dispatch_get_main_queue(), ^{
-        result = QABuildShortcutsJson();
+        char *json = QABuildShortcutsJson();
+        @synchronized (lock) {
+            // If the waiter already timed out, nobody will ever consume (or free)
+            // this buffer — free it here so a reconcile-retry loop against a wedged
+            // main thread can't leak a JSON string per attempt.
+            if (abandoned) { if (json != NULL) free(json); }
+            else result = json;
+        }
         dispatch_semaphore_signal(sem);
     });
-    if (dispatch_semaphore_wait(sem, dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2 * NSEC_PER_SEC))) != 0)
+    if (dispatch_semaphore_wait(sem, dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2 * NSEC_PER_SEC))) != 0) {
+        @synchronized (lock) {
+            abandoned = YES;
+            // The block may have stored the result between the timeout and this
+            // lock — reclaim it; we are returning NULL either way.
+            if (result != NULL) { free(result); result = NULL; }
+        }
         return NULL; // main thread didn't drain in time — failed read, don't hang
+    }
     return result;
 }
 
