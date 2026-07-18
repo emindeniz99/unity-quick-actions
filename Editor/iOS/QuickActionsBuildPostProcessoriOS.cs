@@ -58,15 +58,21 @@ namespace EminDeniz99.QuickActions.Editor
             // plugin's entries survive; drop our own stale entries so an Append rebuild
             // refreshes them; then append the current set. "Ours" is the marker — plus,
             // for entries written by a pre-marker build of this package, an UNMARKED
-            // entry whose type equals an id we are about to write (adopt it; otherwise
-            // it would duplicate the shortcut on every Append build forever).
+            // entry whose type equals an id we are about to write AND that carries no
+            // user info at all (pre-marker builds wrote none). Adopt those (otherwise
+            // they would duplicate the shortcut on every Append build forever), but
+            // spare a host entry that has its own userInfo payload even on an id
+            // collision — the id then renders twice, the honest result of two
+            // publishers claiming one id (same rule as the dynamic merge in
+            // Plugins/iOS/QuickActions.mm).
             var writtenIds = new HashSet<string>();
             foreach (var item in settings.StaticShortcuts)
                 if (item != null && !string.IsNullOrEmpty(item.Id) && !string.IsNullOrEmpty(item.Title))
                     writtenIds.Add(item.Id);
             var items = QuickActionsPlistShortcuts.GetOrCreateArray(plist);
             items.values.RemoveAll(e => QuickActionsPlistShortcuts.IsOurs(e)
-                || writtenIds.Contains(QuickActionsPlistShortcuts.TypeOf(e)));
+                || (writtenIds.Contains(QuickActionsPlistShortcuts.TypeOf(e))
+                    && !QuickActionsPlistShortcuts.HasUserInfo(e)));
 
             var seen = new HashSet<string>();
             var count = 0;
@@ -123,6 +129,17 @@ namespace EminDeniz99.QuickActions.Editor
             return dict.values.TryGetValue("UIApplicationShortcutItemType", out var type)
                 ? type.AsString()
                 : null;
+        }
+
+        // True when the entry carries ANY UIApplicationShortcutItemUserInfo. Our
+        // pre-marker builds wrote none, so "same type + no user info" identifies a
+        // legacy entry of ours; a host entry with its own payload is never adopted.
+        internal static bool HasUserInfo(PlistElement entry)
+        {
+            return entry is PlistElementDict dict
+                && dict.values.TryGetValue(UserInfoKey, out var ui)
+                && ui is PlistElementDict uiDict
+                && uiDict.values.Count > 0;
         }
 
         // True only for entries this package wrote (marked in their user info).

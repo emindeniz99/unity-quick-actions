@@ -9,6 +9,7 @@ public class ShortcutInfo {
   public CharSequence getLongLabel(){return longLabel;}
   public int getRank(){return rank;}
   public PersistableBundle getExtras(){return extras;}
+  public Intent getIntent(){return intent;}
   public static class Builder {
     private final ShortcutInfo info = new ShortcutInfo();
     public Builder(Context c,String id){info.id = id;}

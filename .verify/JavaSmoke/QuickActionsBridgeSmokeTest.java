@@ -215,7 +215,19 @@ public final class QuickActionsBridgeSmokeTest {
         check(QuickActionsBridge.consumePendingPerformed() == null, "a HOST dynamic id is rejected (spoof gate)");
 
         handle.invoke(t, new Intent().setAction(QuickActionsBridge.ACTION_PREFIX + "m1"));
-        check("m1".equals(QuickActionsBridge.consumePendingPerformed()), "a manifest id via the action-encoded path is recorded");
+        check("m1".equals(QuickActionsBridge.consumePendingPerformed()), "a manifest id via the action-encoded path is recorded (null intent = conservative accept)");
+
+        // Manifest ownership: OUR baked statics encode the id in the intent action;
+        // a host's own static shortcut carries a foreign action and must be rejected
+        // (another app could otherwise forge Performed with the host's id).
+        mgr.manifest.add(new ShortcutInfo.Builder(null, "ourstatic").setShortLabel("s")
+                .setIntent(new Intent().setAction(QuickActionsBridge.ACTION_PREFIX + "ourstatic")).build());
+        mgr.manifest.add(new ShortcutInfo.Builder(null, "hoststatic").setShortLabel("s")
+                .setIntent(new Intent().setAction("com.host.OPEN_SETTINGS")).build());
+        handle.invoke(t, new Intent().setAction(QuickActionsBridge.ACTION_PREFIX + "ourstatic"));
+        check("ourstatic".equals(QuickActionsBridge.consumePendingPerformed()), "our baked static (prefix-action intent) is recorded");
+        handle.invoke(t, new Intent().setAction(QuickActionsBridge.ACTION_PREFIX + "hoststatic"));
+        check(QuickActionsBridge.consumePendingPerformed() == null, "a host static id (foreign-action intent) is rejected");
 
         handle.invoke(t, new Intent().putExtra(QuickActionsBridge.EXTRA_ACTION_ID, "pinned"));
         check("pinned".equals(QuickActionsBridge.consumePendingPerformed()), "our PINNED id is recorded after leaving the dynamic set");

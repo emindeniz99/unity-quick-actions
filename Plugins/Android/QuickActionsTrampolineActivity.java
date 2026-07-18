@@ -63,10 +63,20 @@ public final class QuickActionsTrampolineActivity extends Activity {
             // through this exported activity using a host shortcut's id.
             for (ShortcutInfo s : manager.getDynamicShortcuts())
                 if (actionId.equals(s.getId()) && QuickActionsBridge.isOurShortcut(s)) return true;
-            // Manifest (static) shortcuts can't carry extras, so their ids are
-            // accepted unmarked — ours are the ones the build baker declared.
-            for (ShortcutInfo s : manager.getManifestShortcuts())
-                if (actionId.equals(s.getId())) return true;
+            // Manifest (static) shortcuts can't carry extras, so ownership is
+            // checked via the stored intent instead: the build baker encodes the id
+            // in the intent action (ACTION_PREFIX + id), while a host app's own
+            // static shortcuts carry their own actions — accepting those would let
+            // another app forge a Performed event with a host id through this
+            // exported activity. A null intent (some OEM read-backs) is accepted
+            // conservatively so a genuine static tap is never dropped.
+            for (ShortcutInfo s : manager.getManifestShortcuts()) {
+                if (!actionId.equals(s.getId())) continue;
+                Intent declared = s.getIntent();
+                String declaredAction = declared == null ? null : declared.getAction();
+                if (declaredAction == null || declaredAction.startsWith(QuickActionsBridge.ACTION_PREFIX))
+                    return true;
+            }
             // A shortcut the user PINNED stays launchable after it leaves the
             // dynamic set — its tap is legitimate, don't drop it. Ours keep the
             // marker when pinned (extras survive pinning); a pinned static id is

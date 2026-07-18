@@ -121,11 +121,22 @@ device pass (Part B) when you want to verify the OS-level long-press menu itself
 
 ### B3. Prove the dev-only gate (the "zero in production" promise)
 Make a **production** build with the define **removed**:
-1. Remove `QUICKACTIONS_ENABLED` from Scripting Define Symbols (that platform).
-2. Build again.
-3. Android: open the generated `…/unityLibrary/src/main/AndroidManifest.xml` (or the merged manifest) → there should be **no** `QuickActionsTrampolineActivity`.
-4. iOS: search the generated Xcode project for `QUICKACTIONS_ENABLED` → **none**; the `.mm` compiles to nothing.
-5. The shortcuts no longer appear — confirming the package is inert in prod.
+1. **First clear the dev build's shortcuts** — on Android, dynamic shortcuts
+   added with `QuickActions.Add` are persisted by the OS *per install*, and a
+   gate-off build has no managed code left to remove them (the stripper also
+   removes the trampoline they target, so they'd survive as visible-but-dead
+   entries). Either call `QuickActions.RemoveAll()` in the dev build first, or
+   **uninstall the dev build** (or clear the app's data) before installing the
+   prod build over it. A fresh install never has this problem.
+2. Remove `QUICKACTIONS_ENABLED` from Scripting Define Symbols (that platform).
+3. Build again.
+4. Android: open the generated `…/unityLibrary/src/main/AndroidManifest.xml` (or the merged manifest) → there should be **no** `QuickActionsTrampolineActivity`.
+5. iOS: search the generated Xcode project for `QUICKACTIONS_ENABLED` → **none**; the `.mm` compiles to nothing.
+6. With step 1 done, the shortcuts no longer appear — confirming the package
+   is inert in prod. (iOS persists dynamic `shortcutItems` across installs
+   too, so step 1 applies there as well; the failure mode is milder — a stale
+   iOS shortcut still just opens the app, while a stale Android one targets
+   the stripped trampoline and dies.)
 
 (Full device procedure also in [`plans/mvp.md`](./plans/mvp.md); readiness matrix
 in [`PRODUCTION_READINESS.md`](./PRODUCTION_READINESS.md).)
