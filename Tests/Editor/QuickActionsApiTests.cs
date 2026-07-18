@@ -166,16 +166,22 @@ namespace EminDeniz99.QuickActions.Tests
         }
 
         [Test]
-        public void FailedWrite_AddReturnsFalse_RollsBack_AndReconciles()
+        public void FailedWrite_AddReturnsFalse_RollsBack_KeepingInMemoryState()
         {
             // When the OS write fails (the bridge returns null), Add must report the
             // failure (false) and roll back its optimistic mutation — the caller said
             // "install this" and it was NOT installed, so a true here would make the
-            // shortcut silently vanish later with no signal to retry on. The OS holds
-            // "os1" and never receives "new".
-            QuickActions.OverrideBridgeForTesting(new FailingSetShortcutsBridge("os1"));
+            // shortcut silently vanish later with no signal to retry on. Reads are cut
+            // AFTER the failed write so the assertions can only be satisfied by the
+            // rollback itself, never masked by a reconcile. And because a failed ADD
+            // pushed a superset (nothing removed), the facade must stay loaded — the
+            // rolled-back in-memory state (icons included) still matches the device.
+            var bridge = new FailingSetShortcutsBridge("os1");
+            QuickActions.OverrideBridgeForTesting(bridge);
             try
             {
+                Assert.IsTrue(QuickActions.IsAdded("os1")); // load before cutting reads
+                bridge.FailReads = true;
                 Assert.IsFalse(QuickActions.Add(Item("new")), "a failed OS write must not report success");
                 CollectionAssert.AreEquivalent(new[] { "os1" }, QuickActions.GetAll().ConvertAll(i => i.Id));
                 Assert.IsFalse(QuickActions.IsAdded("new"));
@@ -186,13 +192,19 @@ namespace EminDeniz99.QuickActions.Tests
         [Test]
         public void FailedWrite_RemoveByIdReturnsFalse_AndKeepsItemAtItsPosition()
         {
-            // A failed write means the device still shows the shortcut — RemoveById
+            // A failed write means the device may still show the shortcut — RemoveById
             // must report false and keep the item (at its original position, since
             // order feeds Android ranks) rather than claiming a removal that will
-            // silently resurrect on the next reconcile.
-            QuickActions.OverrideBridgeForTesting(new FailingSetShortcutsBridge("a", "b", "c"));
+            // silently resurrect on the next reconcile. Reads are cut after the failed
+            // write so the order assertion observes the rollback's Insert, not a
+            // reconcile (RemoveById forces one — a failed remove pushes a subset and
+            // the device may have partially applied it).
+            var bridge = new FailingSetShortcutsBridge("a", "b", "c");
+            QuickActions.OverrideBridgeForTesting(bridge);
             try
             {
+                Assert.IsTrue(QuickActions.IsAdded("a")); // load before cutting reads
+                bridge.FailReads = true;
                 Assert.IsFalse(QuickActions.RemoveById("b"));
                 CollectionAssert.AreEqual(new[] { "a", "b", "c" }, QuickActions.GetAll().ConvertAll(i => i.Id));
             }
@@ -202,9 +214,12 @@ namespace EminDeniz99.QuickActions.Tests
         [Test]
         public void FailedWrite_AddListAddsNothing()
         {
-            QuickActions.OverrideBridgeForTesting(new FailingSetShortcutsBridge("os1"));
+            var bridge = new FailingSetShortcutsBridge("os1");
+            QuickActions.OverrideBridgeForTesting(bridge);
             try
             {
+                Assert.IsTrue(QuickActions.IsAdded("os1")); // load before cutting reads
+                bridge.FailReads = true;
                 QuickActions.AddList(new List<QuickActionItem> { Item("x"), Item("y") });
                 CollectionAssert.AreEquivalent(new[] { "os1" }, QuickActions.GetAll().ConvertAll(i => i.Id));
             }
@@ -758,10 +773,13 @@ namespace EminDeniz99.QuickActions.Tests
 
         // A bridge whose SetShortcuts reports failure (null) — models an OS write that
         // was rejected/rate-limited. GetShortcuts returns a fixed "device" state so the
-        // facade's next-access reconcile has something authoritative to sync to.
+        // facade's next-access reconcile has something authoritative to sync to; flip
+        // FailReads to make reads fail too, so a test can prove an assertion is
+        // satisfied by the CALLER'S ROLLBACK rather than masked by a reconcile.
         private sealed class FailingSetShortcutsBridge : IQuickActionsBridge
         {
             private readonly List<QuickActionItem> _os = new List<QuickActionItem>();
+            public bool FailReads;
             public FailingSetShortcutsBridge(params string[] osIds)
             {
                 foreach (var id in osIds) _os.Add(new QuickActionItem(id, id));
@@ -772,7 +790,7 @@ namespace EminDeniz99.QuickActions.Tests
             public string GetLastPerformed() => null;
             public void ResetLastPerformed() { }
             public string ConsumePendingPerformed() => null;
-            public IList<QuickActionItem> GetShortcuts() => new List<QuickActionItem>(_os);
+            public IList<QuickActionItem> GetShortcuts() => FailReads ? null : new List<QuickActionItem>(_os);
         }
 
         // A bridge whose RemoveAll reports failure (false) WITHOUT throwing — models an

@@ -369,8 +369,12 @@ namespace EminDeniz99.QuickActions
             if (!Push())
             {
                 // Failed OS write — the device still shows the item, so put it back at
-                // its original position and report the failure (see Add).
+                // its original position and report the failure (see Add). Unlike a
+                // failed ADD, a failed remove pushes a SUBSET: the Android bridge's
+                // stale-removal phase may have landed before the blocked add, so the
+                // device may no longer match — force a reconcile on next access.
                 _items.Insert(index, removed);
+                _loaded = false;
                 Log($"RemoveById failed: the OS did not accept the update for '{id}'; retry later.");
                 return false;
             }
@@ -459,10 +463,14 @@ namespace EminDeniz99.QuickActions
             if (accepted == null)
             {
                 // The OS write did not land (rejected/rate-limited/errored). Report the
-                // failure so the caller can roll back its optimistic mutation and return
-                // false, and force a reconcile on next access. Don't prune here — a
-                // stale read is not authoritative.
-                _loaded = false;
+                // failure so the caller can roll back its optimistic mutation and
+                // decide whether a reconcile is needed: Add/AddList push a SUPERSET of
+                // the OS set (nothing was removed by a fully-failed write), so their
+                // rollback restores an exactly-in-sync state and keeps the in-memory
+                // icons (a forced reconcile would discard them — on iOS permanently).
+                // RemoveById pushes a SUBSET (the Android stale-removal phase may have
+                // landed before the blocked add), so it forces the reconcile itself.
+                // Don't prune here — a stale read is not authoritative.
                 return false;
             }
             // Same reference = accept-all (Null/iOS) — nothing was trimmed, nothing to prune.
