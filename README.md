@@ -366,10 +366,9 @@ republished with this package's intents, and never removed. Three consequences:
   shortcuts are never touched.
 - **Same-id collisions**: on Android a colliding host id (dynamic **or pinned**)
   wins — the package drops its own item with a warning rather than update the
-  host's entry in place. On iOS an unmarked same-id item is adopted as this
-  package's pre-marker leftover **only when it carries no `userInfo`**; a host
-  item with its own payload is preserved even on a collision (the id then
-  renders twice — the honest result of two publishers claiming one id).
+  host's entry in place. On iOS an unmarked same-id item is always preserved
+  (the id then renders twice — the honest result of two publishers claiming
+  one id); the package never removes anything it didn't mark.
 
 ### Known limits — Android build variants and static shortcuts
 

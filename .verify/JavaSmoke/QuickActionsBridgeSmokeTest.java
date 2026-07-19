@@ -216,6 +216,15 @@ public final class QuickActionsBridgeSmokeTest {
         check(QuickActionsBridge.removeAll(activity(mgr)), "removeAll succeeds");
         check(!ourPin.isEnabled(), "removeAll disables our pinned copy");
         check(hostPin.isEnabled(), "removeAll leaves host pins alone");
+
+        // Compensating action: a re-add whose add phase is RATE-LIMITED must not
+        // leave the pin enabled — Java re-enables before the add (a disabled id
+        // can't be re-published), so a failed add re-disables it, keeping the
+        // launcher consistent with the "nothing was added" result.
+        mgr.rateLimited = true;
+        check(QuickActionsBridge.setShortcuts(activity(mgr), itemsJson("fav")) == null, "rate-limited re-add reports null");
+        check(!ourPin.isEnabled(), "failed re-add re-disables the pin (no live ghost)");
+        mgr.rateLimited = false;
     }
 
     private static void iconIdentityRoundTripsThroughExtras() throws Exception {

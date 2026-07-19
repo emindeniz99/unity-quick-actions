@@ -55,24 +55,16 @@ namespace EminDeniz99.QuickActions.Editor
             }
 
             // Merge, don't clobber: reuse any existing array so a host app's / other
-            // plugin's entries survive; drop our own stale entries so an Append rebuild
-            // refreshes them; then append the current set. "Ours" is the marker — plus,
-            // for entries written by a pre-marker build of this package, an UNMARKED
-            // entry whose type equals an id we are about to write AND that carries no
-            // user info at all (pre-marker builds wrote none). Adopt those (otherwise
-            // they would duplicate the shortcut on every Append build forever), but
-            // spare a host entry that has its own userInfo payload even on an id
-            // collision — the id then renders twice, the honest result of two
-            // publishers claiming one id (same rule as the dynamic merge in
-            // Plugins/iOS/QuickActions.mm).
-            var writtenIds = new HashSet<string>();
-            foreach (var item in settings.StaticShortcuts)
-                if (item != null && !string.IsNullOrEmpty(item.Id) && !string.IsNullOrEmpty(item.Title))
-                    writtenIds.Add(item.Id);
+            // plugin's entries survive; drop our own stale entries (the marker) so an
+            // Append rebuild refreshes them; then append the current set. Unmarked
+            // entries are kept unconditionally, even on an id collision — the id then
+            // renders twice, the honest result of two publishers claiming one id
+            // (same rule as the dynamic merge in Plugins/iOS/QuickActions.mm; no
+            // "adopt the unmarked twin" heuristic — any discriminator also matches
+            // genuine host entries, and the marker predates every release, so there
+            // is no pre-marker install to migrate).
             var items = QuickActionsPlistShortcuts.GetOrCreateArray(plist);
-            items.values.RemoveAll(e => QuickActionsPlistShortcuts.IsOurs(e)
-                || (writtenIds.Contains(QuickActionsPlistShortcuts.TypeOf(e))
-                    && !QuickActionsPlistShortcuts.HasUserInfo(e)));
+            items.values.RemoveAll(QuickActionsPlistShortcuts.IsOurs);
 
             var seen = new HashSet<string>();
             var count = 0;
@@ -118,28 +110,6 @@ namespace EminDeniz99.QuickActions.Editor
             if (plist.root.values.TryGetValue(ItemsKey, out var existing) && existing is PlistElementArray arr)
                 return arr;
             return plist.root.CreateArray(ItemsKey);
-        }
-
-        // The entry's UIApplicationShortcutItemType (shortcut id), or null when the
-        // entry isn't a dict / has no type. Used to spot pre-marker entries of ours.
-        internal static string TypeOf(PlistElement entry)
-        {
-            if (!(entry is PlistElementDict dict))
-                return null;
-            return dict.values.TryGetValue("UIApplicationShortcutItemType", out var type)
-                ? type.AsString()
-                : null;
-        }
-
-        // True when the entry carries ANY UIApplicationShortcutItemUserInfo. Our
-        // pre-marker builds wrote none, so "same type + no user info" identifies a
-        // legacy entry of ours; a host entry with its own payload is never adopted.
-        internal static bool HasUserInfo(PlistElement entry)
-        {
-            return entry is PlistElementDict dict
-                && dict.values.TryGetValue(UserInfoKey, out var ui)
-                && ui is PlistElementDict uiDict
-                && uiDict.values.Count > 0;
         }
 
         // True only for entries this package wrote (marked in their user info).

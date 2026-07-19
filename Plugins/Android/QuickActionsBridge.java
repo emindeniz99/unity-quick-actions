@@ -117,6 +117,7 @@ public final class QuickActionsBridge {
             return null;
         }
 
+        List<String> reEnableForUndo = null; // set once pins are re-enabled, for the catch path
         // The OS cap covers manifest (static) + dynamic shortcuts combined, so
         // leave room for any static ones; otherwise setDynamicShortcuts throws.
         // getManifestShortcuts/setDynamicShortcuts can throw IllegalStateException
@@ -226,13 +227,17 @@ public final class QuickActionsBridge {
 
             // Inverse migration: an id we are (re-)publishing that still has a
             // DISABLED pinned copy from an earlier removal must be re-enabled
-            // first — addDynamicShortcuts cannot resurrect a disabled pin.
+            // BEFORE the add (addDynamicShortcuts rejects a disabled id) — but if
+            // the add then fails, the pins are re-disabled below, so a failed add
+            // can't leave an enabled pin firing Performed for an id the managed
+            // layer reports absent.
             List<String> reEnable = new ArrayList<>();
             for (String id : newIds) {
                 ShortcutInfo pin = pinnedOurs.get(id);
                 if (pin != null && !pin.isEnabled()) reEnable.add(id);
             }
             if (!reEnable.isEmpty()) manager.enableShortcuts(reEnable);
+            reEnableForUndo = reEnable;
 
             // Skip the add entirely when there is nothing to add: addDynamicShortcuts
             // with an empty list still burns a rate-limit token and can return false
@@ -242,12 +247,27 @@ public final class QuickActionsBridge {
             // no-op (null) rather than the set we hoped to apply.
             if (!shortcuts.isEmpty() && !manager.addDynamicShortcuts(shortcuts)) {
                 android.util.Log.w("QuickActions", "addDynamicShortcuts was rate-limited; shortcuts not updated");
+                undoReEnable(manager, reEnable);
                 return null;
             }
             return appliedIdsJson(shortcuts);
         } catch (RuntimeException e) {
             android.util.Log.w("QuickActions", "setDynamicShortcuts failed", e);
+            undoReEnable(manager, reEnableForUndo);
             return null;
+        }
+    }
+
+    // Compensating action for a failed add: pins re-enabled in anticipation of a
+    // write that never landed go back to disabled, so the launcher state matches
+    // what the managed layer will report after its reconcile. Best-effort — this
+    // runs on paths that are already failing.
+    private static void undoReEnable(ShortcutManager manager, List<String> reEnabled) {
+        if (reEnabled == null || reEnabled.isEmpty()) return;
+        try {
+            manager.disableShortcuts(reEnabled);
+        } catch (RuntimeException e) {
+            android.util.Log.w("QuickActions", "could not re-disable pinned shortcuts after a failed add", e);
         }
     }
 
