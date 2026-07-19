@@ -163,8 +163,15 @@ Constraints only work for managed code, **not** native plugins):
    to drop it: the symbol is inherited additively and stays on, leaving the gate
    active in the prod build. If it is in Player Settings you must **delete it there**
    before a prod build. On **2021/2022 LTS** (no Build Profiles) add/remove it in
-   Player Settings ▸ Scripting Define Symbols — or pass it via your CI/build script —
-   before cutting the prod build. **Always verify** the built project has no
+   Player Settings ▸ Scripting Define Symbols before cutting the prod build.
+   ⚠️ **CI scripts: `BuildPlayerOptions.extraScriptingDefines` is NOT enough** —
+   Unity applies extra defines to the *player* compilation only, never to
+   *editor* scripts, so the gated build post-processors (Android trampoline
+   injector, iOS macro adder) would not compile and the build would contain
+   runtime code with **no** trampoline / no `QUICKACTIONS_ENABLED=1` macro.
+   Scripts must set the define in Player Settings or the active Build Profile
+   in a **prior editor invocation** (so editor scripts recompile), then build.
+   **Always verify** the built project has no
    `QUICKACTIONS_ENABLED` (see the grep checks below); that is the only guarantee.
 2. Guard your own call sites so your game still compiles when the define is off
    and the `QuickActions` type doesn't exist:

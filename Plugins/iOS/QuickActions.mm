@@ -80,6 +80,10 @@ static char *QACopyCString(NSString *s) {
 // the app-delegate hooks below intercept ONLY ours and leave a host app's / another
 // plugin's quick actions to their own routing.
 static NSString *const kQAManagedMarkerKey = @"com.emindeniz99.quickactions.managed";
+// Icon identity persisted alongside the marker (the OS can't read icons back;
+// without this, the first post-relaunch push would replace every marked item
+// ICONLESS). Mirrors the Android extras path.
+static NSString *const kQAIconKey = @"com.emindeniz99.quickactions.icon";
 
 static BOOL QAIsOurShortcut(UIApplicationShortcutItem *item) {
     if (![item isKindOfClass:[UIApplicationShortcutItem class]]) return NO;
@@ -117,12 +121,14 @@ static NSArray<UIApplicationShortcutItem *> *QABuildItems(NSString *json) {
             icon = [UIApplicationShortcutIcon iconWithType:(UIApplicationShortcutIconType)(iconNumber.integerValue - 1)];
         }
 
+        NSInteger iconValue = [iconNumber isKindOfClass:[NSNumber class]] ? iconNumber.integerValue : 0;
         UIApplicationShortcutItem *shortcut =
             [[UIApplicationShortcutItem alloc] initWithType:identifier
                                              localizedTitle:title
                                           localizedSubtitle:subtitle
                                                        icon:icon
-                                                   userInfo:@{ kQAManagedMarkerKey: @YES }];
+                                                   userInfo:@{ kQAManagedMarkerKey: @YES,
+                                                               kQAIconKey: @(iconValue) }];
         [result addObject:shortcut];
     }
     return result;
@@ -323,11 +329,14 @@ static char *QABuildShortcutsJson(void) {
         // Only OUR shortcuts (marked) — never absorb a host's / another plugin's items
         // into the managed set (which a later Add would then re-stamp as ours).
         if (!QAIsOurShortcut(item)) continue;
+        // Icon identity comes from our userInfo (see kQAIconKey): reporting 0 here
+        // would make the next push rebuild reconciled items iconless.
+        NSNumber *iconBack = item.userInfo[kQAIconKey];
         [out addObject:@{
             @"Id": item.type ?: @"",
             @"Title": item.localizedTitle ?: @"",
             @"Subtitle": item.localizedSubtitle ?: @"",
-            @"Icon": @0,
+            @"Icon": [iconBack isKindOfClass:[NSNumber class]] ? iconBack : @0,
             @"AndroidDrawable": @"",
         }];
     }

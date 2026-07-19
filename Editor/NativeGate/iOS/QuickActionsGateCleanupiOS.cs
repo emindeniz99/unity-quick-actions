@@ -74,9 +74,16 @@ namespace EminDeniz99.QuickActions.Editor.NativeGate
                 var getActive = profileType?.GetMethod("GetActiveBuildProfile",
                     System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
                 var profile = getActive?.Invoke(null, null);
-                if (profile != null &&
-                    profileType.GetProperty("scriptingDefines")?.GetValue(profile) is string[] profileDefines)
-                    return System.Array.IndexOf(profileDefines, "QUICKACTIONS_ENABLED") >= 0;
+                if (profile != null)
+                {
+                    // Unity 6 exposes scriptingDefines as a public FIELD (not a
+                    // property) — probe both so a future API change can't silently
+                    // blind this check and fail coherent dev-profile builds.
+                    object value = profileType.GetProperty("scriptingDefines")?.GetValue(profile)
+                        ?? profileType.GetField("scriptingDefines")?.GetValue(profile);
+                    if (value is string[] profileDefines)
+                        return System.Array.IndexOf(profileDefines, "QUICKACTIONS_ENABLED") >= 0;
+                }
             }
             catch (System.Exception)
             {
