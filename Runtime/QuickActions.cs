@@ -233,8 +233,10 @@ namespace EminDeniz99.QuickActions
         /// item is invalid, an action with the same <see cref="QuickActionItem.Id"/>
         /// is already added, the current OS shortcuts could not be read (so the
         /// package won't risk overwriting them from an unknown baseline — retry later),
-        /// or the OS rejected the write (e.g. rate-limited while backgrounded on
-        /// Android — also retry later); returns true on success.
+        /// the OS rejected the write (e.g. rate-limited while backgrounded on
+        /// Android — also retry later), or the OS dropped this item (the shared cap is
+        /// full, or another publisher already owns the id — see remarks); returns true
+        /// only when the action actually landed.
         /// </summary>
         /// <remarks>
         /// The OS limits how many dynamic shortcuts it keeps (iOS shows ~4; Android
@@ -242,11 +244,12 @@ namespace EminDeniz99.QuickActions
         /// shortcuts the host app itself published outside this API). On Android,
         /// surplus beyond the cap is dropped by the OS and immediately removed from
         /// the managed list too, so <see cref="GetAll"/>/<see cref="IsAdded"/> reflect
-        /// what the device actually kept (they do not over-report). <c>Add</c> still
-        /// returns true for a cap trim — the item was accepted into the set before
-        /// the OS trim — but a subsequent <see cref="GetAll"/>/<see cref="IsAdded"/>
-        /// shows the trim (a rejected <i>write</i> is different: that returns false).
-        /// iOS keeps the full array (no cap). See the README "Known limits".
+        /// what the device actually kept (they do not over-report). If the item you
+        /// add is the one that doesn't fit — the cap is already full, or another
+        /// publisher's dynamic/pinned shortcut owns that id — <c>Add</c> returns
+        /// <b>false</b>: the OS didn't install it, so reporting success would be a lie
+        /// <see cref="GetAll"/>/<see cref="IsAdded"/> immediately contradict. iOS keeps
+        /// the full array (no cap). See the README "Known limits".
         /// </remarks>
         /// <exception cref="ArgumentNullException">The item is null.</exception>
         public static bool Add(QuickActionItem item)

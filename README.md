@@ -341,9 +341,10 @@ The **managed** list stays consistent with what the OS accepted: when Android tr
 the overflow, those ids are pruned from the managed list in the same call, so
 `GetAll()` / `IsAdded()` reflect what's actually on the device (they don't
 over-report), while the icons you supplied are preserved for the shortcuts that were
-kept. `Add` still returns `true` for a surplus item — the request was accepted into
-the set before the OS trim — but a subsequent `GetAll()` / `IsAdded()` shows the
-trim. Keep the set within the platform cap so nothing is silently dropped.
+kept. If the id you add is the one that doesn't fit, `Add` returns **`false`** — the
+OS never installed it, so `GetAll()` / `IsAdded()` would immediately contradict a
+`true`. `AddList` lands the ids that fit and logs each one it had to drop. Keep the
+set within the platform cap so nothing is silently dropped.
 
 ### Host coexistence — the package touches only its own shortcuts
 
@@ -356,8 +357,9 @@ entries, or another plugin's) are never absorbed into `GetAll()`, never
 republished with this package's intents, and never removed. Three consequences:
 
 - **The cap is shared** (Android): host shortcuts take slots from the same
-  per-activity budget, so `Add` can return `true` and the item still be pruned
-  when there is no room — the trim is logged with how many slots host items took.
+  per-activity budget, so an `Add` can be refused for lack of room even when this
+  package holds fewer than the cap — it returns `false` and logs how many slots
+  host items took.
 - **Coexistence is one-sided on Android**: this package uses the subset APIs
   (`addDynamicShortcuts`/`removeDynamicShortcuts`), but a host that itself calls
   `setDynamicShortcuts(...)` replaces the **entire** dynamic set — including this
