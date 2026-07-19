@@ -21,8 +21,8 @@ namespace EminDeniz99.QuickActions
     /// first access the in-memory list is reconciled with the <b>dynamic</b>
     /// shortcuts the OS already has (from a previous session), so
     /// <see cref="GetAll"/> / <see cref="IsAdded"/> stay accurate across launches;
-    /// on iOS icons aren't recoverable (reconciled items report
-    /// <see cref="IconType.None"/>); Android recovers icon identity via extras.
+    /// icon identity survives the reconcile on both platforms (persisted in the
+    /// ownership-marker payload: Android extras, iOS userInfo).
     /// Static (build-time) shortcuts are <i>not</i> reconciled — don't reuse a
     /// static shortcut's id at runtime. The first <see cref="Add"/> therefore
     /// merges with the reconciled set; call <see cref="RemoveAll"/> first to start

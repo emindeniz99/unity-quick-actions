@@ -63,9 +63,9 @@ namespace EminDeniz99.QuickActions.Internal
         /// shortcuts are not included, and a host app's / other publisher's items
         /// are never surfaced (absorbing them would make the next push republish
         /// them with our intents). Lets the managed layer reconcile its list after
-        /// a cold start. On iOS icons are not recoverable (they come back as
-        /// <see cref="IconType.None"/>); the Android bridge recovers icon
-        /// identity from the marker extras. Returns an empty list when our subset is
+        /// a cold start. Both bridges recover icon identity from their
+        /// ownership-marker payload (Android extras, iOS userInfo) — the OS
+        /// itself can't read icons back. Returns an empty list when our subset is
         /// genuinely empty, but <c>null</c> when the read itself <b>failed</b>
         /// (e.g. a locked device) — the facade must not treat a failed read as an
         /// authoritative-empty set.

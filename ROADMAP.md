@@ -6,8 +6,8 @@ commit that ships it.
 - **Per-item rasterized icons** — accept a `Texture2D`/`Sprite` and emit a
   template `UIApplicationShortcutIcon` (iOS) and a generated drawable
   (Android), instead of only system `IconType` glyphs + named drawables. This
-  would also let iOS OS read-back recover icons (on iOS reconciled items come
-  back as `IconType.None`; Android already recovers icon identity via extras).
+  (system `IconType` identity already survives reconciles on both platforms
+  via the ownership-marker payloads; this item is about custom rasterized art).
 - **Pinned shortcuts** — `requestPinShortcut` on Android; no iOS analog.
 - **Static shortcut custom icons (iOS file icons)** — `UIApplicationShortcutItemIconFile`
   with an asset-catalog template image (Android already supports a drawable via
