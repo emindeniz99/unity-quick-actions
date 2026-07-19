@@ -12,9 +12,10 @@ extern "C" {
 
 // Replace THIS PACKAGE'S subset of UIApplication.shortcutItems from
 // {"items":[{Id,Title,Subtitle,Icon}]}. Items are stamped with a userInfo
-// marker; unmarked host/other-plugin items are preserved (except unmarked
-// items whose type matches an id being written — pre-marker leftovers of this
-// package — which are adopted/replaced).
+// marker; unmarked host/other-plugin items are always preserved — including one
+// whose type collides with an id being written, in which case the id renders
+// twice (the honest result of two publishers claiming one id). We never adopt or
+// drop an item we didn't mark.
 void _QuickActions_SetShortcuts(const char *json);
 
 // Remove the dynamic shortcut items THIS PACKAGE created (marker-scoped);

@@ -265,21 +265,17 @@ void _QuickActions_SetShortcuts(const char *json) {
         // host's live UIApplicationShortcutItems on the first Add/RemoveById — mirror
         // the marker-scoped RemoveAll and read-back paths.
         NSArray<UIApplicationShortcutItem *> *ours = QABuildItems(value);
-        NSMutableSet<NSString *> *ourIds = [NSMutableSet set];
-        for (UIApplicationShortcutItem *item in ours)
-            [ourIds addObject:item.type];
         UIApplication *app = [UIApplication sharedApplication];
         NSMutableArray<UIApplicationShortcutItem *> *merged = [NSMutableArray array];
         for (UIApplicationShortcutItem *item in app.shortcutItems) {
             if (QAIsOurShortcut(item)) continue;            // replaced by the fresh set below
-            // Unmarked item whose type matches an id we're writing AND that carries
-            // no userInfo: an item persisted by a pre-marker build of this package
-            // (those wrote none). Adopt it (the fresh, marked copy below supersedes
-            // it) instead of keeping it as an unremovable duplicate squatting ahead
-            // of the managed set. A host item with its own userInfo payload is
-            // spared even on an id collision — the id is then shown twice, which
-            // is the honest rendering of two publishers claiming one id.
-            if ([ourIds containsObject:item.type] && item.userInfo.count == 0) continue;
+            // Every unmarked item is preserved — a host app's / other plugin's live
+            // shortcut, even one whose `type` collides with an id we're writing. On a
+            // collision the id then renders twice, the honest result of two publishers
+            // claiming one id; we never adopt or drop an item we didn't mark. (This is
+            // the first release, so there is no pre-marker build of this package whose
+            // unmarked leftovers would need migrating — the static plist path in
+            // QuickActionsBuildPostProcessoriOS makes the same call.)
             [merged addObject:item];
         }
         [merged addObjectsFromArray:ours];
