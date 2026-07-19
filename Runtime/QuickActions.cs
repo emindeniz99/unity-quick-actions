@@ -287,6 +287,16 @@ namespace EminDeniz99.QuickActions
                 Log($"Add failed: the OS did not accept the update for '{item.Id}'; retry later.");
                 return false;
             }
+            if (!_items.Contains(copy))
+            {
+                // The write landed, but the OS dropped THIS id: the bridge filtered it
+                // out to fit the shared cap or because another publisher already owns
+                // that dynamic/pinned id (Push pruned it from _items to stay honest).
+                // GetAll()/IsAdded() now report it absent, so the add did not take —
+                // report failure rather than a success the caller can't observe.
+                Log($"Add failed: the OS dropped '{item.Id}' (cap reached or id owned by another publisher).");
+                return false;
+            }
             Log($"Added quick action '{item.Id}'.");
             return true;
         }
@@ -327,7 +337,14 @@ namespace EminDeniz99.QuickActions
                     _items.Remove(copy);
                 _loaded = false;
                 Log("AddList failed: the OS did not accept the update; nothing was added — retry later.");
+                return;
             }
+            // The write landed but the OS may have dropped some ids (shared cap, or an
+            // id another publisher owns); Push already pruned them from _items. Surface
+            // which ones did not take so a caller isn't left believing all were added.
+            foreach (var copy in added)
+                if (!_items.Contains(copy))
+                    Log($"AddList: the OS dropped '{copy.Id}' (cap reached or id owned by another publisher).");
         }
 
         /// <summary>Snapshot of the currently installed quick actions.</summary>

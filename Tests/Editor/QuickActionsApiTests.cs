@@ -363,9 +363,11 @@ namespace EminDeniz99.QuickActions.Tests
             QuickActions.OverrideBridgeForTesting(new CapBridge(2));
             try
             {
-                QuickActions.Add(Item("a"));
-                QuickActions.Add(Item("b"));
-                QuickActions.Add(Item("c"));
+                Assert.IsTrue(QuickActions.Add(Item("a")));
+                Assert.IsTrue(QuickActions.Add(Item("b")));
+                // "c" is past the cap, so the OS drops it — Add must report failure, not
+                // a success the caller can't observe (GetAll()/IsAdded() show it absent).
+                Assert.IsFalse(QuickActions.Add(Item("c")));
                 CollectionAssert.AreEqual(new[] { "a", "b" }, QuickActions.GetAll().ConvertAll(i => i.Id));
                 Assert.IsFalse(QuickActions.IsAdded("c"));
             }
@@ -402,8 +404,8 @@ namespace EminDeniz99.QuickActions.Tests
             QuickActions.OverrideBridgeForTesting(new CapBridge(0));
             try
             {
-                Assert.IsTrue(QuickActions.Add(Item("a"))); // accepted into the set before the OS trim
-                Assert.IsEmpty(QuickActions.GetAll());       // ...but the OS kept none
+                Assert.IsFalse(QuickActions.Add(Item("a"))); // the OS kept none, so the add did not take
+                Assert.IsEmpty(QuickActions.GetAll());        // ...nothing installed
                 Assert.IsFalse(QuickActions.IsAdded("a"));
             }
             finally { QuickActions.OverrideBridgeForTesting(null); }
