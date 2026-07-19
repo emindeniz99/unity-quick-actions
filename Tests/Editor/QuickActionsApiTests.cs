@@ -166,16 +166,15 @@ namespace EminDeniz99.QuickActions.Tests
         }
 
         [Test]
-        public void FailedWrite_AddReturnsFalse_RollsBack_KeepingInMemoryState()
+        public void FailedWrite_AddReturnsFalse_AndRollsBack()
         {
             // When the OS write fails (the bridge returns null), Add must report the
             // failure (false) and roll back its optimistic mutation — the caller said
             // "install this" and it was NOT installed, so a true here would make the
             // shortcut silently vanish later with no signal to retry on. Reads are cut
             // AFTER the failed write so the assertions can only be satisfied by the
-            // rollback itself, never masked by a reconcile. And because a failed ADD
-            // pushed a superset (nothing removed), the facade must stay loaded — the
-            // rolled-back in-memory state (icons included) still matches the device.
+            // rollback itself, never masked by a reconcile (a failed write also
+            // forces one — the push may have partially landed on Android).
             var bridge = new FailingSetShortcutsBridge("os1");
             QuickActions.OverrideBridgeForTesting(bridge);
             try
