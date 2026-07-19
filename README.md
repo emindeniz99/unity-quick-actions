@@ -359,6 +359,11 @@ republished with this package's intents, and never removed. Three consequences:
 - **Ordering**: this package ranks its items by your insertion order starting at
   0; launchers interleave host items by their own ranks, so the exact combined
   order across publishers is launcher-dependent.
+- **Pinned copies on remove** (Android): if the user pinned one of this
+  package's shortcuts, `RemoveById`/`RemoveAll` also **disable** the pinned
+  copy (the launcher greys it out — Android never lets an app delete a user's
+  pin outright). Re-adding the same id re-enables it. A host app's pinned
+  shortcuts are never touched.
 - **Same-id collisions**: on Android a colliding host id (dynamic **or pinned**)
   wins — the package drops its own item with a warning rather than update the
   host's entry in place. On iOS an unmarked same-id item is adopted as this

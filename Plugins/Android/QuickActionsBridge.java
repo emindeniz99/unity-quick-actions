@@ -160,10 +160,12 @@ public final class QuickActionsBridge {
             // addDynamicShortcuts throw IllegalArgumentException up front and take
             // the whole batch down with it.
             java.util.HashSet<String> foreignIds = new java.util.HashSet<>(hostIds);
+            java.util.HashMap<String, ShortcutInfo> pinnedOurs = new java.util.HashMap<>();
             List<ShortcutInfo> pinned = manager.getPinnedShortcuts();
             if (pinned != null) {
                 for (ShortcutInfo s : pinned) {
                     if (!isOurShortcut(s)) foreignIds.add(s.getId());
+                    else pinnedOurs.put(s.getId(), s);
                 }
             }
 
@@ -205,7 +207,32 @@ public final class QuickActionsBridge {
             for (String id : ourOsIds) {
                 if (!newIds.contains(id)) stale.add(id);
             }
+            // A user-PINNED copy of one of our shortcuts survives
+            // removeDynamicShortcuts as a live launcher icon — a "removed" id
+            // could keep firing Performed (or go dead against a stripped
+            // trampoline in a later gate-off build). Disable those pinned copies
+            // so the launcher greys them out. Ours are always mutable
+            // (manifest-origin pins can't carry the marker), so this can't hit
+            // disableShortcuts' immutable-shortcut exception. Pinned-only ours
+            // (absent from the dynamic set) count as stale too.
+            List<String> stalePinned = new ArrayList<>();
+            for (String id : pinnedOurs.keySet()) {
+                if (!newIds.contains(id) && pinnedOurs.get(id).isEnabled()) {
+                    stalePinned.add(id);
+                }
+            }
             if (!stale.isEmpty()) manager.removeDynamicShortcuts(stale);
+            if (!stalePinned.isEmpty()) manager.disableShortcuts(stalePinned);
+
+            // Inverse migration: an id we are (re-)publishing that still has a
+            // DISABLED pinned copy from an earlier removal must be re-enabled
+            // first — addDynamicShortcuts cannot resurrect a disabled pin.
+            List<String> reEnable = new ArrayList<>();
+            for (String id : newIds) {
+                ShortcutInfo pin = pinnedOurs.get(id);
+                if (pin != null && !pin.isEnabled()) reEnable.add(id);
+            }
+            if (!reEnable.isEmpty()) manager.enableShortcuts(reEnable);
 
             // Skip the add entirely when there is nothing to add: addDynamicShortcuts
             // with an empty list still burns a rate-limit token and can return false
@@ -246,7 +273,9 @@ public final class QuickActionsBridge {
 
     /**
      * Remove the dynamic shortcuts THIS PACKAGE created (marker-scoped) — a host
-     * app's own dynamic shortcuts are untouched. Returns true when our subset is
+     * app's own dynamic shortcuts are untouched. User-pinned copies of OUR
+     * shortcuts are DISABLED (greyed out by the launcher) rather than left as
+     * live ghosts; re-publishing the same id re-enables them. Returns true when our subset is
      * now clear (including when there is nothing to remove), false when the
      * removal failed (e.g. IllegalStateException on a locked profile) so the
      * managed layer can keep its list instead of falsely marking itself empty.
@@ -264,6 +293,18 @@ public final class QuickActionsBridge {
                 }
             }
             if (!ours.isEmpty()) manager.removeDynamicShortcuts(ours);
+            // User-pinned copies of OUR shortcuts survive the dynamic removal as
+            // live launcher icons — disable them so "remove all" doesn't leave
+            // tappable ghosts (the launcher greys them out; only ours, a host's
+            // pinned shortcuts are untouched, and ours are never immutable).
+            List<String> pinnedOurs = new ArrayList<>();
+            List<ShortcutInfo> pinned = manager.getPinnedShortcuts();
+            if (pinned != null) {
+                for (ShortcutInfo s : pinned) {
+                    if (isOurShortcut(s) && s.isEnabled()) pinnedOurs.add(s.getId());
+                }
+            }
+            if (!pinnedOurs.isEmpty()) manager.disableShortcuts(pinnedOurs);
             return true;
         } catch (RuntimeException e) {
             // e.g. IllegalStateException on a locked profile — never cross JNI.

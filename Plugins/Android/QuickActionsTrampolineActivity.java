@@ -80,9 +80,11 @@ public final class QuickActionsTrampolineActivity extends Activity {
             // A shortcut the user PINNED stays launchable after it leaves the
             // dynamic set — its tap is legitimate, don't drop it. Ours keep the
             // marker when pinned (extras survive pinning); a pinned static id is
-            // already covered by the manifest loop above.
+            // already covered by the manifest loop above. DISABLED pins (a
+            // removed shortcut's ghost) don't count: the launcher blocks them,
+            // so an intent with that id can only be a spoof.
             for (ShortcutInfo s : manager.getPinnedShortcuts())
-                if (actionId.equals(s.getId()) && QuickActionsBridge.isOurShortcut(s)) return true;
+                if (actionId.equals(s.getId()) && s.isEnabled() && QuickActionsBridge.isOurShortcut(s)) return true;
         } catch (RuntimeException e) {
             // Can't verify (e.g. locked device) — be conservative and drop it. A genuine
             // launcher tap happens after unlock, so this doesn't lose real taps.

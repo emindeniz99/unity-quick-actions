@@ -39,6 +39,7 @@ public final class QuickActionsBridgeSmokeTest {
         emptySetSkipsAddAndStillClears();
         parseFailureReportsNull();
         pinnedForeignIdsAreDroppedButDontShrinkBudget();
+        removedPinnedCopiesAreDisabledAndReAddReEnables();
         iconIdentityRoundTripsThroughExtras();
         trampolineAcceptsOursManifestAndPinnedOnly();
 
@@ -179,6 +180,42 @@ public final class QuickActionsBridgeSmokeTest {
         check(idsOf(applied).equals(List.of("a", "b", "c", "ourpin")), "foreign pinned id dropped, ours kept, budget untouched: " + applied);
         check(!hasId(mgr.dynamic, "share"), "the foreign pinned id was never written dynamically");
         check(containsSame(mgr.pinned, hostPinned), "the host's pinned instance is untouched");
+    }
+
+    private static void removedPinnedCopiesAreDisabledAndReAddReEnables() throws Exception {
+        ShortcutManager mgr = new ShortcutManager();
+        ShortcutInfo ourPin = ours("fav", 0);
+        ShortcutInfo hostPin = host("hpin");
+        mgr.dynamic.add(ourPin);
+        mgr.pinned.add(ourPin);   // the user pinned our shortcut
+        mgr.pinned.add(hostPin);
+
+        // Replacement set drops 'fav' -> its pinned copy must be DISABLED (not a
+        // live ghost that keeps firing Performed), host pin untouched.
+        check(QuickActionsBridge.setShortcuts(activity(mgr), itemsJson("other")) != null, "replacement write lands");
+        check(!hasId(mgr.dynamic, "fav"), "removed id left the dynamic set");
+        check(!ourPin.isEnabled(), "our removed pinned copy is disabled");
+        check(hostPin.isEnabled(), "a host pinned shortcut is never disabled");
+
+        // The trampoline must now reject the disabled pin (launcher blocks it;
+        // an intent with that id can only be a spoof).
+        QuickActionsTrampolineActivity t = new QuickActionsTrampolineActivity();
+        t.testSystemService = mgr;
+        java.lang.reflect.Method handle = QuickActionsTrampolineActivity.class.getDeclaredMethod("handleIntent", Intent.class);
+        handle.setAccessible(true);
+        handle.invoke(t, new Intent().putExtra(QuickActionsBridge.EXTRA_ACTION_ID, "fav"));
+        check(QuickActionsBridge.consumePendingPerformed() == null, "a disabled pinned id is rejected by the trampoline");
+
+        // Re-adding the id must re-enable the pinned copy (addDynamicShortcuts
+        // alone cannot resurrect a disabled pin).
+        check(QuickActionsBridge.setShortcuts(activity(mgr), itemsJson("fav")) != null, "re-add write lands");
+        check(ourPin.isEnabled(), "re-added id re-enables its pinned copy");
+        check(hasId(mgr.dynamic, "fav"), "re-added id is dynamic again");
+
+        // RemoveAll disables our pin as well; host pin still untouched.
+        check(QuickActionsBridge.removeAll(activity(mgr)), "removeAll succeeds");
+        check(!ourPin.isEnabled(), "removeAll disables our pinned copy");
+        check(hostPin.isEnabled(), "removeAll leaves host pins alone");
     }
 
     private static void iconIdentityRoundTripsThroughExtras() throws Exception {
