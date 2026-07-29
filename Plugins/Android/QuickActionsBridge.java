@@ -552,6 +552,42 @@ public final class QuickActionsBridge {
         }
     }
 
+    /**
+     * Report in-app usage of OUR shortcut with this id to the launcher's ranking
+     * predictor ({@code reportShortcutUsed}). Ownership-gated like every other
+     * call here — a host app's shortcut id is refused. Returns true when the
+     * signal was sent. Never throws across JNI.
+     */
+    public static boolean reportShortcutUsed(Activity activity, String id) {
+        if (activity == null || id == null || id.isEmpty() || Build.VERSION.SDK_INT < 25) return false;
+        ShortcutManager manager = activity.getSystemService(ShortcutManager.class);
+        if (manager == null) return false;
+        try {
+            for (ShortcutInfo s : manager.getDynamicShortcuts()) {
+                if (isOurShortcut(s) && id.equals(s.getId())) {
+                    manager.reportShortcutUsed(id);
+                    return true;
+                }
+            }
+            // A user-PINNED copy of one of OUR shortcuts is still a live, tappable
+            // launcher entry even after leaving the dynamic set (AOSP accepts usage
+            // reports for it) — mirror the trampoline's pinned-ours acceptance.
+            // The C# facade's managed-set gate refuses removed ids before reaching
+            // here; this branch serves direct Java callers and defense in depth.
+            for (ShortcutInfo s : manager.getPinnedShortcuts()) {
+                if (isOurShortcut(s) && id.equals(s.getId())) {
+                    manager.reportShortcutUsed(id);
+                    return true;
+                }
+            }
+            android.util.Log.w("QuickActions", "reportShortcutUsed: no managed dynamic or pinned shortcut with id " + id);
+            return false;
+        } catch (RuntimeException e) {
+            android.util.Log.w("QuickActions", "reportShortcutUsed failed", e);
+            return false;
+        }
+    }
+
     // ---- tap delivery (called by the trampoline activity) ----
 
     static synchronized void recordPerformed(String actionId) {

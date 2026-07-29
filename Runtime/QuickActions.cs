@@ -134,6 +134,32 @@ namespace EminDeniz99.QuickActions
         }
 
         /// <summary>
+        /// Tell the launcher the user just acted on this added quick action's
+        /// feature <b>inside the app</b> (Android
+        /// <c>ShortcutManager.reportShortcutUsed</c> — improves launcher/assistant
+        /// ranking predictions). Call it when the user reaches the same feature
+        /// through normal UI, not when a shortcut tap launched it. Returns true
+        /// when the signal was sent; false on iOS/Editor (no analog), when the id
+        /// is not a currently added action of this package (a removed-but-still-
+        /// pinned id is refused here too), or when the native call failed.
+        /// </summary>
+        public static bool ReportUsed(string id)
+        {
+            if (string.IsNullOrEmpty(id))
+                return false;
+            if (!IsAdded(id))
+            {
+                // Same ownership gate as RequestPin: only our installed shortcuts.
+                Log($"ReportUsed ignored: no added quick action with Id '{id}'.");
+                return false;
+            }
+            var reported = Bridge.ReportUsed(id);
+            if (reported)
+                Log($"Reported usage of quick action '{id}'.");
+            return reported;
+        }
+
+        /// <summary>
         /// Id of the quick action the app was most recently launched or resumed
         /// from, for this session; null otherwise.
         ///
@@ -409,6 +435,74 @@ namespace EminDeniz99.QuickActions
                 return null;
             EnsureLoaded();
             return _items.FirstOrDefault(a => a.Id == id)?.Copy();
+        }
+
+        /// <summary>
+        /// Replace the added quick action with the same <see cref="QuickActionItem.Id"/>
+        /// in place — position (and so launcher rank) preserved, one OS update, and
+        /// on Android a user-pinned copy is refreshed too (same-id entries update
+        /// in place). Returns false when the item is invalid or no action with that
+        /// id is added (nothing changes; both deterministic — use <see cref="Add"/>
+        /// for the latter), when the current OS shortcuts could not be read or the
+        /// OS rejected the write (nothing changes, the previous item is restored —
+        /// transient, retry later), or when the OS <b>dropped</b> the updated item
+        /// (the shared budget shrank since — see <see cref="Add"/>'s remarks). In
+        /// that last case the shortcut is <b>gone</b>: the push already replaced
+        /// the previous item and the OS kept neither, so
+        /// <see cref="GetAll"/>/<see cref="IsAdded"/> report it absent — re-<see cref="Add"/>
+        /// once there is room if you still want it.
+        /// </summary>
+        /// <exception cref="ArgumentNullException">The item is null.</exception>
+        public static bool Update(QuickActionItem item)
+        {
+            if (item == null)
+                throw new ArgumentNullException(nameof(item));
+            if (!EnsureLoaded())
+            {
+                Log("Update deferred: could not read the current shortcuts; OS set left unchanged.");
+                return false;
+            }
+            if (!item.IsValid)
+            {
+                Log($"Update ignored: item needs a non-empty Id and Title ({item}).");
+                return false;
+            }
+            var index = _items.FindIndex(a => a.Id == item.Id);
+            if (index < 0)
+            {
+                Log($"Update ignored: no added quick action with Id '{item.Id}' — use Add.");
+                return false;
+            }
+
+            var previous = _items[index];
+            var copy = item.Copy(); // store a copy — see Add
+            var idsBeforePush = _items.ConvertAll(a => a.Id);
+            _items[index] = copy;
+            if (!Push())
+            {
+                // Failed OS write — restore the previous item at its position and
+                // force a reconcile (see Add — same partial-landing contract).
+                _items[index] = previous;
+                _loaded = false;
+                Log($"Update failed: the OS did not accept the update for '{item.Id}'; retry later.");
+                return false;
+            }
+            // The push can also drop OTHER ids when the shared budget shrank since
+            // the last write — surface each loss like AddList does, so a caller
+            // isn't left believing an unrelated shortcut is still installed.
+            foreach (var id in idsBeforePush)
+                if (id != item.Id && !IsAdded(id))
+                    Log($"Update: the OS dropped '{id}' (cap reached or id owned by another publisher).");
+            if (!_items.Contains(copy))
+            {
+                // The write landed but the OS dropped this id (the shared budget can
+                // shrink between pushes — e.g. a host published more shortcuts since).
+                // The previous item is gone from the device too; stay honest.
+                Log($"Update failed: the OS dropped '{item.Id}' (cap reached or id owned by another publisher).");
+                return false;
+            }
+            Log($"Updated quick action '{item.Id}'.");
+            return true;
         }
 
         /// <summary>Remove a quick action. Returns true if one was removed.</summary>

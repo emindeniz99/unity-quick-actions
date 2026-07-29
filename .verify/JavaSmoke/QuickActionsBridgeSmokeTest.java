@@ -47,6 +47,7 @@ public final class QuickActionsBridgeSmokeTest {
         pinRequestIsOwnershipGated();
         maxShortcutCountIsExposed();
         adaptiveAndPinDegradeBelowApi26();
+        usageReportIsOwnershipGated();
 
         System.out.println("SMOKE: " + (failures == 0 ? "PASS" : "FAIL") + " (" + checks + " checks, " + failures + " failed)");
         if (failures != 0) System.exit(1);
@@ -388,6 +389,38 @@ public final class QuickActionsBridgeSmokeTest {
             Build.VERSION.SDK_INT = prev;
             png.delete();
         }
+    }
+
+    private static void usageReportIsOwnershipGated() throws Exception {
+        ShortcutManager mgr = new ShortcutManager();
+        mgr.dynamic.add(host("h1"));
+        check(QuickActionsBridge.setShortcuts(activity(mgr), itemsJson("mine")) != null, "usage fixture write lands");
+
+        check(QuickActionsBridge.reportShortcutUsed(activity(mgr), "mine"), "reporting OUR id reaches the launcher");
+        check(mgr.usageReports.equals(List.of("mine")), "exactly the reported id was forwarded");
+        check(!QuickActionsBridge.reportShortcutUsed(activity(mgr), "h1"),
+                "a HOST id is refused (would skew the host's launcher ranking)");
+        check(!QuickActionsBridge.reportShortcutUsed(activity(mgr), "ghost"), "an uninstalled id is refused");
+        check(mgr.usageReports.size() == 1, "refused reports never reach the launcher");
+
+        // A user-pinned copy of OURS that left the dynamic set is still a live
+        // launcher entry — AOSP accepts usage reports for it (parity with the
+        // trampoline's pinned-ours acceptance). A host pin stays refused.
+        mgr.pinned.add(ours("pinnedmine", 0));
+        mgr.pinned.add(host("hostpin"));
+        check(QuickActionsBridge.reportShortcutUsed(activity(mgr), "pinnedmine"), "OUR pinned-only id is accepted");
+        check(!QuickActionsBridge.reportShortcutUsed(activity(mgr), "hostpin"), "a host pinned id is refused");
+
+        // Locked-user throw must degrade to false, never cross JNI.
+        mgr.throwOnUsageReport = true;
+        check(!QuickActionsBridge.reportShortcutUsed(activity(mgr), "mine"), "a native throw degrades to false");
+        mgr.throwOnUsageReport = false;
+
+        // Below API 25 ShortcutManager doesn't exist — guard reports false.
+        int prev = Build.VERSION.SDK_INT;
+        Build.VERSION.SDK_INT = 24;
+        check(!QuickActionsBridge.reportShortcutUsed(activity(mgr), "mine"), "below API 25 reports false");
+        Build.VERSION.SDK_INT = prev;
     }
 
     // ---- helpers ----

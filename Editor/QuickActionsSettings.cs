@@ -25,6 +25,25 @@ namespace EminDeniz99.QuickActions.Editor
         /// <summary>The configured static shortcuts (may be empty).</summary>
         public IReadOnlyList<QuickActionItem> StaticShortcuts => staticShortcuts;
 
+        [Tooltip("PNG (preferred) or JPEG textures copied into the iOS build (app " +
+                 "target). A PNG resolves as IosTemplateImage = \"<file name without " +
+                 "extension>\"; a JPEG must include its extension (bare-name bundle " +
+                 "lookup is PNG-only). Use single-color template art (~35×35 pt).")]
+        [SerializeField]
+        private List<Texture2D> iosTemplateImages = new List<Texture2D>();
+
+        /// <summary>
+        /// Textures the iOS build post-processor copies into the generated Xcode
+        /// project's app target for use with
+        /// <see cref="QuickActionItem.IosTemplateImage"/> (and the static plist
+        /// <c>IconFile</c>). A PNG is referenced by its file name <b>without</b>
+        /// extension; a JPEG must be referenced <b>with</b> its extension —
+        /// iOS's bare-name bundle-image lookup resolves only <c>.png</c>. The
+        /// source asset must be a PNG/JPEG file on disk (not a compressed-only
+        /// format).
+        /// </summary>
+        public IReadOnlyList<Texture2D> IosTemplateImages => iosTemplateImages;
+
         /// <summary>Default location of the settings asset when auto-created.</summary>
         public const string DefaultAssetPath = "Assets/QuickActions/QuickActionsSettings.asset";
 
