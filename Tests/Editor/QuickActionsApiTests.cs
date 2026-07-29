@@ -403,8 +403,10 @@ namespace EminDeniz99.QuickActions.Tests
         {
             // WHY: callers size their shortcut sets to this number (the README tells
             // them to); it must come from the platform bridge, not a C# constant.
+            // FakeBridge reports 7 — a value no real bridge or default uses — so a
+            // facade that hardcodes the iOS 4 (or anything else) fails here.
             QuickActions.OverrideBridgeForTesting(new FakeBridge());
-            try { Assert.AreEqual(4, QuickActions.MaxShortcutCount); }
+            try { Assert.AreEqual(7, QuickActions.MaxShortcutCount); }
             finally { QuickActions.OverrideBridgeForTesting(null); }
         }
 
@@ -695,18 +697,16 @@ namespace EminDeniz99.QuickActions.Tests
             public readonly List<QuickActionItem> Shortcuts = new List<QuickActionItem>();
             public int SetCount;
             public bool IsPlatformSupported => true;
-            public int MaxShortcutCount => 4;
-            // Pin-capable, like an Android 8+ launcher: dispatches only for a
-            // shortcut it actually has (mirrors the Java ownership/presence gate)
-            // and records the id so tests can assert the request reached the OS.
+            public int MaxShortcutCount => 7; // deliberately NOT 4 (the iOS/stub default), so a
+                                              // hardcoded facade constant can't pass the surfacing test
+            // Accept-all pin recorder: it does NOT re-implement the managed-set
+            // gate (the Java layer's own gate is smoke-tested separately) — so a
+            // RequestPin that reaches the bridge for an unmanaged id shows up in
+            // PinRequests and FAILS the facade-gating test instead of being
+            // silently absorbed by a duplicate check here.
             public readonly List<string> PinRequests = new List<string>();
             public bool IsPinSupported => true;
-            public bool RequestPin(string id)
-            {
-                if (!Shortcuts.Exists(s => s.Id == id)) return false;
-                PinRequests.Add(id);
-                return true;
-            }
+            public bool RequestPin(string id) { PinRequests.Add(id); return true; }
             public IList<QuickActionItem> SetShortcuts(IList<QuickActionItem> items)
             {
                 SetCount++;

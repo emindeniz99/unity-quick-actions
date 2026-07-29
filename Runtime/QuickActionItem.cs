@@ -38,8 +38,11 @@ namespace EminDeniz99.QuickActions
         /// <summary>
         /// Optional SF Symbol name (e.g. <c>"star.fill"</c>) to use as the icon on
         /// iOS 13+, overriding <see cref="IosTemplateImage"/> and <see cref="Icon"/>.
-        /// Ignored on Android and on iOS 12 (which falls through to the next icon
-        /// source).
+        /// Ignored on Android. On iOS 12 a <b>dynamic</b> item falls through to the
+        /// next icon source at runtime; a <b>static</b> (baked) item does not — its
+        /// Info.plist entry carries only the symbol key, which iOS 12 ignores, so
+        /// it renders iconless there (use <see cref="Icon"/> or
+        /// <see cref="IosTemplateImage"/> for static items if you target iOS 12).
         /// </summary>
         public string IosSystemImage;
 
@@ -76,8 +79,11 @@ namespace EminDeniz99.QuickActions
         /// Optional app-defined string carried with the shortcut (iOS
         /// <c>userInfo</c>, Android intent extras) and restored by the cold-start
         /// reconcile. Not delivered with the tap event — read it via
-        /// <see cref="QuickActions.GetById"/> from the id
-        /// <see cref="QuickActions.Performed"/> reports.
+        /// <c>QuickActions.GetById(id)?.Payload</c> from the id
+        /// <see cref="QuickActions.Performed"/> reports. Note
+        /// <see cref="QuickActions.GetById"/> returns null for a
+        /// <b>static</b>-shortcut tap (baked items never join the runtime list and
+        /// carry no payload) and for an id removed since the tap — null-check it.
         /// </summary>
         public string Payload;
 

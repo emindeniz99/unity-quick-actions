@@ -9,11 +9,13 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Added
 
 - **SF Symbols and template-image icons on iOS**: `QuickActionItem.IosSystemImage`
-  (e.g. `"star.fill"`, iOS 13+, falls through on iOS 12) and
-  `QuickActionItem.IosTemplateImage` (bundle image name). Icon priority is
-  SF Symbol > template image > `IconType` glyph, for dynamic and static
-  (Info.plist `IconSymbolName`/`IconFile`) shortcuts alike; identity survives
-  the cold-start reconcile via the `userInfo` marker.
+  (e.g. `"star.fill"`, iOS 13+) and `QuickActionItem.IosTemplateImage` (bundle
+  image name). Icon priority is SF Symbol > template image > `IconType` glyph,
+  for dynamic and static (Info.plist `IconSymbolName`/`IconFile`) shortcuts
+  alike; identity survives the cold-start reconcile via the `userInfo` marker.
+  iOS 12: a dynamic symbol-only item falls through to the next icon source at
+  runtime; a static one renders iconless (the plist carries a single icon key —
+  see the `IosSystemImage` doc).
 - **Runtime bitmap icons on Android**: `QuickActionItem.AndroidBitmapFile`
   (absolute path to a PNG/JPEG — e.g. a `Texture2D` written with
   `EncodeToPNG()`), plus `AndroidBitmapAdaptive` for `createWithAdaptiveBitmap`
@@ -25,8 +27,9 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   (false) on iOS and in the Editor.
 - **Per-item payload**: `QuickActionItem.Payload`, an app-defined string riding
   the shortcut (iOS `userInfo`, Android extras + launch-intent extra) and
-  restored across cold starts — read it via `GetById(id).Payload` from the id
-  `Performed` reports.
+  restored across cold starts — read it via `GetById(id)?.Payload` from the id
+  `Performed` reports (null for static-shortcut taps and ids removed since —
+  static items never join the runtime list).
 - **`QuickActions.MaxShortcutCount`**: the OS shortcut budget
   (`getMaxShortcutCountPerActivity` on Android; 4 on iOS, the Home Screen
   display limit; 0 in-Editor).

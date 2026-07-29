@@ -266,7 +266,7 @@ public class ShortcutRouter : MonoBehaviour
 | `bool Remove(QuickActionItem)` / `RemoveById(string)` | Remove one. |
 | `void RemoveAll()` | Remove every action. |
 | `bool IsAdded(QuickActionItem)` / `IsAdded(string)` | Membership test. |
-| `int MaxShortcutCount` | The OS shortcut budget: Android `getMaxShortcutCountPerActivity` (shared with static + host shortcuts); iOS 4 (display limit, no OS query); 0 in-Editor. |
+| `int MaxShortcutCount` | The OS shortcut budget: Android `getMaxShortcutCountPerActivity`; iOS 4 (display limit, no OS query). Shared with static shortcuts on **both** platforms (and with host-published dynamic ones on Android), so fewer slots may be free. 0 in-Editor. |
 | `bool IsPinSupported` | True when the launcher can pin shortcuts (Android 8.0+; always false on iOS/Editor). |
 | `bool RequestPin(string)` | Ask the launcher to pin an **added** action to the home screen. True = request *dispatched* (the user still confirms in launcher UI — the OS reports no outcome). |
 
@@ -281,7 +281,7 @@ public class ShortcutRouter : MonoBehaviour
 | `AndroidBitmapFile` | Absolute path to a PNG/JPEG on device — runtime icons from a `Texture2D`: `File.WriteAllBytes(path, tex.EncodeToPNG())` under `Application.persistentDataPath` (keep the file alive; the launcher re-reads it). Beats `AndroidDrawable` and `Icon`. Ignored on iOS (no runtime-bitmap shortcut API). |
 | `AndroidBitmapAdaptive` | Install `AndroidBitmapFile` as an adaptive icon (API 26+, launcher-masked; supply safe-zone padding). |
 | `AndroidDrawable` | Drawable resource name overriding the `Icon` lookup. Ignored on iOS. |
-| `Payload` | App-defined string riding the shortcut (iOS `userInfo`, Android extras), restored across cold starts. Not pushed with the tap — read it via `GetById(id).Payload` from the id `Performed` reports. |
+| `Payload` | App-defined string riding the shortcut (iOS `userInfo`, Android extras), restored across cold starts. Not pushed with the tap — read it via `GetById(id)?.Payload` from the id `Performed` reports (`GetById` is null for a **static**-shortcut tap or an id removed since: static items never join the runtime list and carry no payload). |
 
 ### Test in the Editor — no device needed
 

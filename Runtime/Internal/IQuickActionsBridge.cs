@@ -16,10 +16,11 @@ namespace EminDeniz99.QuickActions.Internal
 
         /// <summary>
         /// How many shortcuts the OS accepts/shows for this app. Android:
-        /// <c>getMaxShortcutCountPerActivity</c> (the budget is shared with static
-        /// and host-published shortcuts — see the facade docs). iOS: 4, the Home
-        /// Screen display limit (there is no OS query; extra items are accepted but
-        /// not shown). 0 where quick actions don't exist (Editor / unsupported).
+        /// <c>getMaxShortcutCountPerActivity</c>. iOS: 4, the Home Screen display
+        /// limit (there is no OS query; extra items are accepted but not shown).
+        /// The budget is shared with static shortcuts on both platforms (and with
+        /// host-published dynamic ones on Android) — see the facade docs. 0 where
+        /// quick actions don't exist (Editor / unsupported).
         /// </summary>
         int MaxShortcutCount { get; }
 

@@ -91,11 +91,12 @@ namespace EminDeniz99.QuickActions
 
         /// <summary>
         /// How many shortcuts the OS accepts/shows for this app. Android:
-        /// <c>getMaxShortcutCountPerActivity</c> — note the budget is shared with
-        /// static (manifest) shortcuts and any dynamic shortcuts the host app
-        /// published outside this API, so fewer slots may actually be free. iOS: 4
-        /// (the Home Screen display limit; there is no OS query — extra items are
-        /// accepted but not shown). 0 in the Editor / on unsupported platforms.
+        /// <c>getMaxShortcutCountPerActivity</c>. iOS: 4 (the Home Screen display
+        /// limit; there is no OS query — extra items are accepted but not shown).
+        /// On <b>both</b> platforms the budget is shared with static (baked)
+        /// shortcuts — and on Android also with any dynamic shortcuts the host app
+        /// published outside this API — so fewer slots may actually be free for
+        /// your dynamic items. 0 in the Editor / on unsupported platforms.
         /// </summary>
         public static int MaxShortcutCount => Bridge.MaxShortcutCount;
 

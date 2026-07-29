@@ -81,9 +81,14 @@ namespace EminDeniz99.QuickActions.Editor
                 if (!string.IsNullOrEmpty(item.Subtitle))
                     dict.SetString("UIApplicationShortcutItemSubtitle", item.Subtitle);
                 // Icon priority mirrors the dynamic path (QuickActions.mm): SF Symbol
-                // > bundle template image > IconType glyph. Only one icon key is
-                // written — iOS ignores the others when several are present, so
-                // writing one keeps the plist unambiguous.
+                // > bundle template image > IconType glyph. Exactly ONE icon key is
+                // written; Apple doesn't document which key wins when several are
+                // present, so multi-key output would be undefined behavior. This
+                // means a STATIC item with IosSystemImage renders iconless on
+                // iOS 12 (which doesn't know IconSymbolName) — unlike the dynamic
+                // path, which falls through at runtime via @available. Documented
+                // in the IosSystemImage xmldoc; target iOS 12 with Icon /
+                // IosTemplateImage for static items instead.
                 if (!string.IsNullOrEmpty(item.IosSystemImage))
                     dict.SetString("UIApplicationShortcutItemIconSymbolName", item.IosSystemImage);
                 else if (!string.IsNullOrEmpty(item.IosTemplateImage))

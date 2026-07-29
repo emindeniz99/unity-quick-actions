@@ -46,6 +46,7 @@ public final class QuickActionsBridgeSmokeTest {
         payloadRoundTripsThroughExtrasAndIntent();
         pinRequestIsOwnershipGated();
         maxShortcutCountIsExposed();
+        adaptiveAndPinDegradeBelowApi26();
 
         System.out.println("SMOKE: " + (failures == 0 ? "PASS" : "FAIL") + " (" + checks + " checks, " + failures + " failed)");
         if (failures != 0) System.exit(1);
@@ -328,6 +329,8 @@ public final class QuickActionsBridgeSmokeTest {
         ShortcutInfo p1 = byId(mgr.dynamic, "p1");
         check("level=7".equals(p1.getExtras().getString(QuickActionsBridge.EXTRA_PAYLOAD, "?")),
                 "payload persisted in the marker extras");
+        check("level=7".equals(p1.getIntent().getStringExtra(QuickActionsBridge.EXTRA_PAYLOAD)),
+                "payload rides the launch intent (readable by a host-side receiver)");
         // Cold-start reconcile must hand the payload back to C# (GetById contract).
         JSONArray items = new JSONObject(QuickActionsBridge.getShortcutsJson(activity(mgr))).optJSONArray("items");
         check("level=7".equals(items.optJSONObject(0).optString("Payload", "?")),
@@ -358,6 +361,33 @@ public final class QuickActionsBridgeSmokeTest {
         mgr.maxShortcutCountPerActivity = 6;
         check(QuickActionsBridge.getMaxShortcutCount(activity(mgr)) == 6, "OS cap is exposed as-is");
         check(QuickActionsBridge.getMaxShortcutCount(null) == 0, "no activity reports 0");
+    }
+
+    private static void adaptiveAndPinDegradeBelowApi26() throws Exception {
+        // createWithAdaptiveBitmap and requestPinShortcut are API 26+; on API 25
+        // (the package's minimum, where ShortcutManager itself exists) the
+        // adaptive flag must degrade to a plain bitmap and pinning must refuse —
+        // NOT throw or dispatch. The SDK guards in QuickActionsBridge.java are the
+        // code under test here.
+        ShortcutManager mgr = new ShortcutManager();
+        java.io.File png = java.io.File.createTempFile("qa_icon25", ".png");
+        int prev = Build.VERSION.SDK_INT;
+        Build.VERSION.SDK_INT = 25;
+        try {
+            String json = "{\"items\":[{\"Id\":\"a25\",\"Title\":\"T\","
+                    + "\"AndroidBitmapFile\":\"" + png.getAbsolutePath() + "\",\"AndroidBitmapAdaptive\":true}]}";
+            check(QuickActionsBridge.setShortcuts(activity(mgr), json) != null, "API 25 write lands");
+            check(byId(mgr.dynamic, "a25").icon != null && "bitmap".equals(byId(mgr.dynamic, "a25").icon.kind),
+                    "adaptive flag degrades to a plain bitmap below API 26");
+            check(!QuickActionsBridge.isPinSupported(activity(mgr)),
+                    "pin support reports false below API 26 even on a pin-capable launcher");
+            check(!QuickActionsBridge.requestPinShortcut(activity(mgr), "a25"),
+                    "pin request is refused below API 26");
+            check(mgr.pinRequests.isEmpty(), "no refused pin request reaches the launcher");
+        } finally {
+            Build.VERSION.SDK_INT = prev;
+            png.delete();
+        }
     }
 
     // ---- helpers ----

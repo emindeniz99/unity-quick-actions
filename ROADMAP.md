@@ -26,11 +26,18 @@ The stub harness compiles the C#/Java but can't confirm Unity-only wiring:
   shortcuts.xml taps round-trip the action-encoded id. Confirm iOS cold + warm
   on a device via Xcode.
 - **v0.2 feature validation (on-device):** SF Symbol + template-image icons
-  render on iOS (incl. the iOS 12 fall-through), `AndroidBitmapFile` icons
-  render and survive a reconcile (file kept alive), the adaptive variant masks
-  correctly per launcher, `RequestPin` shows the launcher confirm sheet and the
-  pinned copy taps through, and `Payload` survives a cold-start reconcile on
-  both OSes.
+  render on iOS (incl. the iOS 12 dynamic fall-through), `AndroidBitmapFile`
+  icons render and survive a reconcile (file kept alive), the adaptive variant
+  masks correctly per launcher, `RequestPin` shows the launcher confirm sheet
+  and the pinned copy taps through, and `Payload` survives a cold-start
+  reconcile on both OSes. NOTE the iOS side of v0.2 (the .mm userInfo
+  persistence of symbol/template/payload and its read-back) has NO automated
+  coverage — the .verify harness is Java+C# only — so the iOS reconcile
+  round-trip is device-validation-only; the equivalent Android extras path is
+  smoke-tested. Also probe on device whether iOS 13+ prefers
+  `UIApplicationShortcutItemIconSymbolName` when `IconFile`/`IconType` coexist
+  in one plist entry — if it does, the static writer could emit fallback keys
+  and restore iOS 12 static-icon parity (see the post-processor comment).
 - **Host-coexistence release gate (on-device, Android):** publish a host
   shortcut with a bitmap icon outside the package, then exercise
   `Add`/`RemoveAll`/cold-restart reconcile and confirm the host item survives
