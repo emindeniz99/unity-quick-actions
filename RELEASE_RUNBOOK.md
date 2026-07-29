@@ -84,7 +84,7 @@ The condensed, day-of sequence. Details live in
 
 ## Phase 6 — stamp the release (10 min, back in the repo)
 
-- [ ] `CHANGELOG.md`: replace `Unreleased` with today's date.
+- [x] `CHANGELOG.md`: replace `Unreleased` with today's date (2026-07-29).
 - [ ] If device-validated and you're confident: bump `0.1.0` → `1.0.0` in
       `package.json` + CHANGELOG heading (else stay 0.1.0 — honest pre-1.0).
 - [ ] `git tag quick-actions/v<version> && git push origin quick-actions/v<version>`
