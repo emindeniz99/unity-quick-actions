@@ -80,7 +80,15 @@ namespace EminDeniz99.QuickActions.Editor
                 dict.SetString("UIApplicationShortcutItemTitle", item.Title);
                 if (!string.IsNullOrEmpty(item.Subtitle))
                     dict.SetString("UIApplicationShortcutItemSubtitle", item.Subtitle);
-                if (item.Icon != IconType.None)
+                // Icon priority mirrors the dynamic path (QuickActions.mm): SF Symbol
+                // > bundle template image > IconType glyph. Only one icon key is
+                // written — iOS ignores the others when several are present, so
+                // writing one keeps the plist unambiguous.
+                if (!string.IsNullOrEmpty(item.IosSystemImage))
+                    dict.SetString("UIApplicationShortcutItemIconSymbolName", item.IosSystemImage);
+                else if (!string.IsNullOrEmpty(item.IosTemplateImage))
+                    dict.SetString("UIApplicationShortcutItemIconFile", item.IosTemplateImage);
+                else if (item.Icon != IconType.None)
                     dict.SetString("UIApplicationShortcutItemIconType", "UIApplicationShortcutIconType" + item.Icon);
                 // Tag our entries so a later cleanup/refresh can find exactly ours.
                 dict.CreateDict("UIApplicationShortcutItemUserInfo")

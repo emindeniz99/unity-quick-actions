@@ -90,6 +90,49 @@ namespace EminDeniz99.QuickActions
         public static bool IsPlatformSupported => Bridge.IsPlatformSupported;
 
         /// <summary>
+        /// How many shortcuts the OS accepts/shows for this app. Android:
+        /// <c>getMaxShortcutCountPerActivity</c> — note the budget is shared with
+        /// static (manifest) shortcuts and any dynamic shortcuts the host app
+        /// published outside this API, so fewer slots may actually be free. iOS: 4
+        /// (the Home Screen display limit; there is no OS query — extra items are
+        /// accepted but not shown). 0 in the Editor / on unsupported platforms.
+        /// </summary>
+        public static int MaxShortcutCount => Bridge.MaxShortcutCount;
+
+        /// <summary>
+        /// True when the launcher can pin shortcuts to the home screen
+        /// (Android 8.0+ with a compatible launcher). Always false on iOS (no
+        /// pinned-shortcut concept) and in the Editor.
+        /// </summary>
+        public static bool IsPinSupported => Bridge.IsPinSupported;
+
+        /// <summary>
+        /// Ask the launcher to pin the added quick action with this id to the home
+        /// screen (Android 8.0+). The launcher shows its own confirm UI; the OS
+        /// reports no outcome, so true means the request was <b>dispatched</b>, not
+        /// that the user accepted it. Returns false when pinning is unsupported
+        /// (iOS/Editor), the id is not a currently added action of this package,
+        /// or the native request failed.
+        /// </summary>
+        public static bool RequestPin(string id)
+        {
+            if (string.IsNullOrEmpty(id))
+                return false;
+            if (!IsAdded(id))
+            {
+                // Only OUR currently-installed shortcuts are pinnable through this
+                // API — the Java side re-checks ownership against the live OS set.
+                Log($"RequestPin ignored: no added quick action with Id '{id}'.");
+                return false;
+            }
+            var dispatched = Bridge.RequestPin(id);
+            Log(dispatched
+                ? $"RequestPin dispatched for '{id}' (user confirms in launcher UI)."
+                : $"RequestPin failed for '{id}' (unsupported launcher or native error).");
+            return dispatched;
+        }
+
+        /// <summary>
         /// Id of the quick action the app was most recently launched or resumed
         /// from, for this session; null otherwise.
         ///

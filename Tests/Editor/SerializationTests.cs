@@ -32,6 +32,33 @@ namespace EminDeniz99.QuickActions.Tests
         }
 
         [Test]
+        public void ToJson_CarriesIconNamesAndPayload()
+        {
+            // WHY: the native layers key on these exact JSON member names
+            // (QuickActions.mm / QuickActionsBridge.java optString) — a C# rename
+            // would silently stop icons/payloads reaching the OS.
+            var list = new QuickActionList(new[]
+            {
+                new QuickActionItem("daily", "Daily Reward")
+                {
+                    IosSystemImage = "gift.fill",
+                    IosTemplateImage = "GiftTemplate",
+                    AndroidBitmapFile = "/data/gift.png",
+                    AndroidBitmapAdaptive = true,
+                    Payload = "reward=daily",
+                },
+            });
+
+            var json = JsonUtility.ToJson(list);
+
+            StringAssert.Contains("\"IosSystemImage\":\"gift.fill\"", json);
+            StringAssert.Contains("\"IosTemplateImage\":\"GiftTemplate\"", json);
+            StringAssert.Contains("\"AndroidBitmapFile\":\"/data/gift.png\"", json);
+            StringAssert.Contains("\"AndroidBitmapAdaptive\":true", json);
+            StringAssert.Contains("\"Payload\":\"reward=daily\"", json);
+        }
+
+        [Test]
         public void RoundTrip_PreservesFields()
         {
             var original = new QuickActionList(new[]

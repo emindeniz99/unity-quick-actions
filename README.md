@@ -266,9 +266,22 @@ public class ShortcutRouter : MonoBehaviour
 | `bool Remove(QuickActionItem)` / `RemoveById(string)` | Remove one. |
 | `void RemoveAll()` | Remove every action. |
 | `bool IsAdded(QuickActionItem)` / `IsAdded(string)` | Membership test. |
+| `int MaxShortcutCount` | The OS shortcut budget: Android `getMaxShortcutCountPerActivity` (shared with static + host shortcuts); iOS 4 (display limit, no OS query); 0 in-Editor. |
+| `bool IsPinSupported` | True when the launcher can pin shortcuts (Android 8.0+; always false on iOS/Editor). |
+| `bool RequestPin(string)` | Ask the launcher to pin an **added** action to the home screen. True = request *dispatched* (the user still confirms in launcher UI — the OS reports no outcome). |
 
-`QuickActionItem`: `Id` (required, unique), `Title` (required), `Subtitle`,
-`Icon` (`IconType`, iOS system glyph), `AndroidDrawable` (optional drawable name).
+`QuickActionItem` fields:
+
+| Field | Purpose |
+|-------|---------|
+| `Id` (required, unique) / `Title` (required) / `Subtitle` | Labels. `Subtitle` renders under the title on iOS and as the Android long label. |
+| `Icon` (`IconType`) | Built-in glyph catalog (29 entries, iOS system icons; Android `ic_quickaction_*` drawables). |
+| `IosSystemImage` | SF Symbol name (`"star.fill"`, iOS 13+) — beats `IosTemplateImage` and `Icon`. Ignored on Android. |
+| `IosTemplateImage` | Template-image name shipped in the Xcode bundle (single-color, ~35×35 pt) — beats `Icon`. Ignored on Android. |
+| `AndroidBitmapFile` | Absolute path to a PNG/JPEG on device — runtime icons from a `Texture2D`: `File.WriteAllBytes(path, tex.EncodeToPNG())` under `Application.persistentDataPath` (keep the file alive; the launcher re-reads it). Beats `AndroidDrawable` and `Icon`. Ignored on iOS (no runtime-bitmap shortcut API). |
+| `AndroidBitmapAdaptive` | Install `AndroidBitmapFile` as an adaptive icon (API 26+, launcher-masked; supply safe-zone padding). |
+| `AndroidDrawable` | Drawable resource name overriding the `Icon` lookup. Ignored on iOS. |
+| `Payload` | App-defined string riding the shortcut (iOS `userInfo`, Android extras), restored across cold starts. Not pushed with the tap — read it via `GetById(id).Payload` from the id `Performed` reports. |
 
 ### Test in the Editor — no device needed
 
@@ -343,8 +356,9 @@ the overflow, those ids are pruned from the managed list in the same call, so
 over-report), while the icons you supplied are preserved for the shortcuts that were
 kept. If the id you add is the one that doesn't fit, `Add` returns **`false`** — the
 OS never installed it, so `GetAll()` / `IsAdded()` would immediately contradict a
-`true`. `AddList` lands the ids that fit and logs each one it had to drop. Keep the
-set within the platform cap so nothing is silently dropped.
+`true`. `AddList` lands the ids that fit and logs each one it had to drop. Check
+`QuickActions.MaxShortcutCount` and keep the set within it so nothing is
+silently dropped (on Android the budget is shared, so fewer slots may be free).
 
 ### Host coexistence — the package touches only its own shortcuts
 
@@ -428,11 +442,13 @@ spoof a tap; on either platform the id is just a string the OS hands you. So:
 
 ## Limitations / roadmap
 
-See [`ROADMAP.md`](./ROADMAP.md). Notable: per-item rasterized icons from
-`Texture2D`, pinned shortcuts, and automated device CI are not implemented.
-(OS read-back can't recover icons natively; the package persists icon
-identity in its ownership-marker payload — Android extras, iOS `userInfo` —
-so reconciled items keep their icons on both platforms.)
+See [`ROADMAP.md`](./ROADMAP.md). Notable: automated device CI, per-locale
+titles, and an iOS `Texture2D` → asset-catalog icon pipeline are not
+implemented (iOS custom art must already be a bundle image — `IosTemplateImage`;
+Android takes runtime bitmaps via `AndroidBitmapFile`). OS read-back can't
+recover icons natively; the package persists icon identity in its
+ownership-marker payload — Android extras, iOS `userInfo` — so reconciled
+items keep their icons on both platforms.
 
 ## Verification
 

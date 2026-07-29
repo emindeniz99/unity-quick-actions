@@ -42,6 +42,10 @@ public final class QuickActionsBridgeSmokeTest {
         removedPinnedCopiesAreDisabledAndReAddReEnables();
         iconIdentityRoundTripsThroughExtras();
         trampolineAcceptsOursManifestAndPinnedOnly();
+        bitmapIconIsChosenAndFallsBackWhenUndecodable();
+        payloadRoundTripsThroughExtrasAndIntent();
+        pinRequestIsOwnershipGated();
+        maxShortcutCountIsExposed();
 
         System.out.println("SMOKE: " + (failures == 0 ? "PASS" : "FAIL") + " (" + checks + " checks, " + failures + " failed)");
         if (failures != 0) System.exit(1);
@@ -285,6 +289,75 @@ public final class QuickActionsBridgeSmokeTest {
         check(QuickActionsBridge.consumePendingPerformed() == null, "an unknown id is rejected");
 
         QuickActionsBridge.resetLastPerformed();
+    }
+
+    private static void bitmapIconIsChosenAndFallsBackWhenUndecodable() throws Exception {
+        ShortcutManager mgr = new ShortcutManager();
+        // A real temp file = decodable per the BitmapFactory stub; a missing path
+        // must fall back down the icon chain instead of erroring the whole write.
+        java.io.File png = java.io.File.createTempFile("qa_icon", ".png");
+        String json = "{\"items\":["
+                + "{\"Id\":\"b1\",\"Title\":\"T\",\"AndroidBitmapFile\":\"" + png.getAbsolutePath() + "\"},"
+                + "{\"Id\":\"b2\",\"Title\":\"T\",\"AndroidBitmapFile\":\"" + png.getAbsolutePath() + "\",\"AndroidBitmapAdaptive\":true},"
+                + "{\"Id\":\"b3\",\"Title\":\"T\",\"AndroidBitmapFile\":\"/nonexistent/qa.png\",\"Icon\":5}]}";
+        check(QuickActionsBridge.setShortcuts(activity(mgr), json) != null, "bitmap-icon write lands");
+        check(byId(mgr.dynamic, "b1").icon != null && "bitmap".equals(byId(mgr.dynamic, "b1").icon.kind),
+                "existing file becomes a bitmap icon");
+        check(byId(mgr.dynamic, "b2").icon != null && "adaptive".equals(byId(mgr.dynamic, "b2").icon.kind),
+                "adaptive flag selects createWithAdaptiveBitmap");
+        // b3: missing file falls back to the IconType catalog — but the catalog
+        // drawable isn't registered in the stub resources, so no icon results;
+        // the write itself must still land (fallback, not failure).
+        check(hasId(mgr.dynamic, "b3"), "undecodable bitmap still installs the shortcut (icon falls back)");
+        // Identity round-trips for the reconcile push.
+        JSONArray items = new JSONObject(QuickActionsBridge.getShortcutsJson(activity(mgr))).optJSONArray("items");
+        JSONObject b2 = null;
+        for (int i = 0; i < items.length(); i++)
+            if ("b2".equals(items.optJSONObject(i).optString("Id", ""))) b2 = items.optJSONObject(i);
+        check(b2 != null && png.getAbsolutePath().equals(b2.optString("AndroidBitmapFile", "?")),
+                "bitmap path round-trips through extras");
+        check(b2 != null && b2.optBoolean("AndroidBitmapAdaptive", false),
+                "adaptive flag round-trips through extras");
+        png.delete();
+    }
+
+    private static void payloadRoundTripsThroughExtrasAndIntent() throws Exception {
+        ShortcutManager mgr = new ShortcutManager();
+        String json = "{\"items\":[{\"Id\":\"p1\",\"Title\":\"T\",\"Payload\":\"level=7\"}]}";
+        check(QuickActionsBridge.setShortcuts(activity(mgr), json) != null, "payload write lands");
+        ShortcutInfo p1 = byId(mgr.dynamic, "p1");
+        check("level=7".equals(p1.getExtras().getString(QuickActionsBridge.EXTRA_PAYLOAD, "?")),
+                "payload persisted in the marker extras");
+        // Cold-start reconcile must hand the payload back to C# (GetById contract).
+        JSONArray items = new JSONObject(QuickActionsBridge.getShortcutsJson(activity(mgr))).optJSONArray("items");
+        check("level=7".equals(items.optJSONObject(0).optString("Payload", "?")),
+                "payload round-trips through the read-back");
+    }
+
+    private static void pinRequestIsOwnershipGated() throws Exception {
+        ShortcutManager mgr = new ShortcutManager();
+        mgr.dynamic.add(host("h1"));
+        check(QuickActionsBridge.setShortcuts(activity(mgr), itemsJson("mine")) != null, "pin fixture write lands");
+
+        check(QuickActionsBridge.isPinSupported(activity(mgr)), "pin support reported when the launcher supports it");
+        check(QuickActionsBridge.requestPinShortcut(activity(mgr), "mine"), "pinning OUR dynamic id dispatches");
+        check(mgr.pinRequests.equals(List.of("mine")), "exactly the requested id reached the launcher");
+
+        check(!QuickActionsBridge.requestPinShortcut(activity(mgr), "h1"),
+                "a HOST shortcut can never be pinned through this package (ownership gate)");
+        check(!QuickActionsBridge.requestPinShortcut(activity(mgr), "ghost"), "an uninstalled id is refused");
+        check(mgr.pinRequests.size() == 1, "refused requests never reach the launcher");
+
+        mgr.pinSupported = false;
+        check(!QuickActionsBridge.isPinSupported(activity(mgr)), "unsupported launcher reports false");
+        check(!QuickActionsBridge.requestPinShortcut(activity(mgr), "mine"), "unsupported launcher refuses the request");
+    }
+
+    private static void maxShortcutCountIsExposed() {
+        ShortcutManager mgr = new ShortcutManager();
+        mgr.maxShortcutCountPerActivity = 6;
+        check(QuickActionsBridge.getMaxShortcutCount(activity(mgr)) == 6, "OS cap is exposed as-is");
+        check(QuickActionsBridge.getMaxShortcutCount(null) == 0, "no activity reports 0");
     }
 
     // ---- helpers ----

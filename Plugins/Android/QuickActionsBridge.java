@@ -46,6 +46,11 @@ public final class QuickActionsBridge {
     // wholesale). Round-tripped by getShortcutsJson.
     static final String EXTRA_ICON_TYPE = "com.emindeniz99.quickactions.icon";
     static final String EXTRA_ICON_DRAWABLE = "com.emindeniz99.quickactions.drawable";
+    static final String EXTRA_ICON_BITMAP = "com.emindeniz99.quickactions.bitmap";
+    static final String EXTRA_ICON_BITMAP_ADAPTIVE = "com.emindeniz99.quickactions.bitmap_adaptive";
+    // App-defined payload string riding the marker extras (and the launch intent),
+    // restored by the cold-start reconcile like the icon identity above.
+    static final String EXTRA_PAYLOAD = "com.emindeniz99.quickactions.payload";
 
     // Names of bundled drawables looked up for IconType values (index = enum int).
     // Index 0 (None) is intentionally empty. Provide drawables named
@@ -385,6 +390,12 @@ public final class QuickActionsBridge {
                 o.put("Icon", extras == null ? 0 : extras.getInt(EXTRA_ICON_TYPE, 0));
                 String drawable = extras == null ? null : extras.getString(EXTRA_ICON_DRAWABLE, "");
                 o.put("AndroidDrawable", drawable == null ? "" : drawable);
+                String bitmap = extras == null ? null : extras.getString(EXTRA_ICON_BITMAP, "");
+                o.put("AndroidBitmapFile", bitmap == null ? "" : bitmap);
+                o.put("AndroidBitmapAdaptive",
+                        extras != null && extras.getBoolean(EXTRA_ICON_BITMAP_ADAPTIVE, false));
+                String payload = extras == null ? null : extras.getString(EXTRA_PAYLOAD, "");
+                o.put("Payload", payload == null ? "" : payload);
                 items.put(o);
             }
             JSONObject root = new JSONObject();
@@ -417,8 +428,21 @@ public final class QuickActionsBridge {
         extras.putBoolean(MANAGED_MARKER_KEY, true);
         int iconType = item.optInt("Icon", 0);
         String iconDrawable = item.optString("AndroidDrawable", "");
+        String iconBitmap = item.optString("AndroidBitmapFile", "");
+        boolean iconBitmapAdaptive = item.optBoolean("AndroidBitmapAdaptive", false);
+        String payload = item.optString("Payload", "");
         if (iconType != 0) extras.putInt(EXTRA_ICON_TYPE, iconType);
         if (!iconDrawable.isEmpty()) extras.putString(EXTRA_ICON_DRAWABLE, iconDrawable);
+        if (!iconBitmap.isEmpty()) {
+            extras.putString(EXTRA_ICON_BITMAP, iconBitmap);
+            if (iconBitmapAdaptive) extras.putBoolean(EXTRA_ICON_BITMAP_ADAPTIVE, true);
+        }
+        if (!payload.isEmpty()) {
+            extras.putString(EXTRA_PAYLOAD, payload);
+            // Also ride the launch intent so a host-side receiver could read it;
+            // the C# side reads it back via GetById (reconciled from the extras).
+            intent.putExtra(EXTRA_PAYLOAD, payload);
+        }
 
         ShortcutInfo.Builder builder = new ShortcutInfo.Builder(activity, id)
                 .setShortLabel(title)
@@ -438,6 +462,23 @@ public final class QuickActionsBridge {
     }
 
     private static Icon resolveIcon(Context context, JSONObject item) {
+        // Priority: runtime bitmap file > explicit drawable > IconType catalog.
+        // Every step falls through on failure (missing/undecodable file, unknown
+        // drawable) rather than erroring, ending at "no icon" (launcher default).
+        String bitmapFile = item.optString("AndroidBitmapFile", "");
+        if (!bitmapFile.isEmpty()) {
+            try {
+                android.graphics.Bitmap bitmap = android.graphics.BitmapFactory.decodeFile(bitmapFile);
+                if (bitmap != null) {
+                    return item.optBoolean("AndroidBitmapAdaptive", false) && Build.VERSION.SDK_INT >= 26
+                            ? Icon.createWithAdaptiveBitmap(bitmap)
+                            : Icon.createWithBitmap(bitmap);
+                }
+                android.util.Log.w("QuickActions", "Bitmap icon not decodable, falling back: " + bitmapFile);
+            } catch (RuntimeException e) {
+                android.util.Log.w("QuickActions", "Bitmap icon failed, falling back: " + bitmapFile, e);
+            }
+        }
         String drawable = item.optString("AndroidDrawable", "");
         if (drawable.isEmpty()) {
             int iconType = item.optInt("Icon", 0);
@@ -449,6 +490,66 @@ public final class QuickActionsBridge {
 
         int resId = context.getResources().getIdentifier(drawable, "drawable", context.getPackageName());
         return resId != 0 ? Icon.createWithResource(context, resId) : null;
+    }
+
+    /**
+     * The OS shortcut budget for the app's activity —
+     * {@code getMaxShortcutCountPerActivity} (shared with manifest shortcuts and
+     * any dynamic shortcuts other publishers installed). 0 when unavailable.
+     */
+    public static int getMaxShortcutCount(Activity activity) {
+        if (activity == null || Build.VERSION.SDK_INT < 25) return 0;
+        ShortcutManager manager = activity.getSystemService(ShortcutManager.class);
+        if (manager == null) return 0;
+        try {
+            return manager.getMaxShortcutCountPerActivity();
+        } catch (RuntimeException e) {
+            android.util.Log.w("QuickActions", "getMaxShortcutCount failed", e);
+            return 0;
+        }
+    }
+
+    /**
+     * True when the launcher supports pin requests ({@code
+     * isRequestPinShortcutSupported}, API 26+). Never throws across JNI.
+     */
+    public static boolean isPinSupported(Activity activity) {
+        if (activity == null || Build.VERSION.SDK_INT < 26) return false;
+        ShortcutManager manager = activity.getSystemService(ShortcutManager.class);
+        if (manager == null) return false;
+        try {
+            return manager.isRequestPinShortcutSupported();
+        } catch (RuntimeException e) {
+            android.util.Log.w("QuickActions", "isPinSupported failed", e);
+            return false;
+        }
+    }
+
+    /**
+     * Ask the launcher to pin OUR dynamic shortcut with this id (API 26+). The id
+     * must be one of the marked shortcuts currently installed — pinning is
+     * ownership-gated like every other write here, so a host app's shortcut can
+     * never be pinned through this package. Returns true when the request was
+     * DISPATCHED (the user still confirms in launcher UI; the OS reports no
+     * outcome), false otherwise. Never throws across JNI.
+     */
+    public static boolean requestPinShortcut(Activity activity, String id) {
+        if (activity == null || id == null || id.isEmpty() || Build.VERSION.SDK_INT < 26) return false;
+        ShortcutManager manager = activity.getSystemService(ShortcutManager.class);
+        if (manager == null) return false;
+        try {
+            if (!manager.isRequestPinShortcutSupported()) return false;
+            for (ShortcutInfo s : manager.getDynamicShortcuts()) {
+                if (isOurShortcut(s) && id.equals(s.getId())) {
+                    return manager.requestPinShortcut(s, null);
+                }
+            }
+            android.util.Log.w("QuickActions", "requestPinShortcut: no managed dynamic shortcut with id " + id);
+            return false;
+        } catch (RuntimeException e) {
+            android.util.Log.w("QuickActions", "requestPinShortcut failed", e);
+            return false;
+        }
     }
 
     // ---- tap delivery (called by the trampoline activity) ----

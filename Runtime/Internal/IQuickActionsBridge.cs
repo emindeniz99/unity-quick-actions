@@ -15,6 +15,31 @@ namespace EminDeniz99.QuickActions.Internal
         bool IsPlatformSupported { get; }
 
         /// <summary>
+        /// How many shortcuts the OS accepts/shows for this app. Android:
+        /// <c>getMaxShortcutCountPerActivity</c> (the budget is shared with static
+        /// and host-published shortcuts — see the facade docs). iOS: 4, the Home
+        /// Screen display limit (there is no OS query; extra items are accepted but
+        /// not shown). 0 where quick actions don't exist (Editor / unsupported).
+        /// </summary>
+        int MaxShortcutCount { get; }
+
+        /// <summary>
+        /// True when the launcher supports pinning shortcuts to the home screen
+        /// (Android 8.0+ with a compatible launcher). Always false on iOS (no
+        /// pinned-shortcut concept) and in the Editor.
+        /// </summary>
+        bool IsPinSupported { get; }
+
+        /// <summary>
+        /// Ask the launcher to pin the (already added, package-managed) shortcut
+        /// with this id. Returns true when the request was DISPATCHED — the user
+        /// still confirms/denies in launcher UI and the OS reports no outcome.
+        /// False when unsupported, the id isn't currently one of ours on the OS,
+        /// or the native call failed.
+        /// </summary>
+        bool RequestPin(string id);
+
+        /// <summary>
         /// Push these items to the OS as <b>this package's subset</b> of the dynamic
         /// shortcuts (both platforms mark their items; a host app's own shortcuts
         /// are never modified) and return the subset it actually accepted — the

@@ -38,6 +38,32 @@ namespace EminDeniz99.QuickActions.Tests
         }
 
         [Test]
+        public void Copy_PreservesEveryField()
+        {
+            // WHY: the facade stores/returns defensive copies everywhere; a field
+            // missed by Copy() silently loses that icon/payload the moment an item
+            // crosses Add/GetAll/GetById — the OS then re-renders it wrong after a
+            // reconcile push. Reflection over the public fields catches a NEW field
+            // whose author forgot to extend Copy().
+            var item = new QuickActionItem("id", "Title", "Sub", IconType.Play)
+            {
+                AndroidDrawable = "my_drawable",
+                IosSystemImage = "star.fill",
+                IosTemplateImage = "MyTemplate",
+                AndroidBitmapFile = "/data/icon.png",
+                AndroidBitmapAdaptive = true,
+                Payload = "level=7",
+            };
+
+            var copy = item.Copy();
+
+            Assert.AreNotSame(item, copy);
+            foreach (var field in typeof(QuickActionItem).GetFields())
+                Assert.AreEqual(field.GetValue(item), field.GetValue(copy),
+                    $"Copy() must preserve field '{field.Name}'");
+        }
+
+        [Test]
         public void IconType_NoneIsZero_AndOrderMatchesAppleEnum()
         {
             // The native iOS layer maps IconType value N (>0) to

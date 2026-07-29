@@ -84,6 +84,11 @@ static NSString *const kQAManagedMarkerKey = @"com.emindeniz99.quickactions.mana
 // without this, the first post-relaunch push would replace every marked item
 // ICONLESS). Mirrors the Android extras path.
 static NSString *const kQAIconKey = @"com.emindeniz99.quickactions.icon";
+// SF Symbol / template-image icon identity and the app-defined payload, persisted
+// for the same reconcile reason as kQAIconKey (keys mirror the Android extras).
+static NSString *const kQAIconSymbolKey = @"com.emindeniz99.quickactions.symbol";
+static NSString *const kQAIconTemplateKey = @"com.emindeniz99.quickactions.template";
+static NSString *const kQAPayloadKey = @"com.emindeniz99.quickactions.payload";
 
 static BOOL QAIsOurShortcut(UIApplicationShortcutItem *item) {
     if (![item isKindOfClass:[UIApplicationShortcutItem class]]) return NO;
@@ -91,7 +96,8 @@ static BOOL QAIsOurShortcut(UIApplicationShortcutItem *item) {
     return [marker isKindOfClass:[NSNumber class]] && [marker boolValue];
 }
 
-// Builds UIApplicationShortcutItems from {"items":[{Id,Title,Subtitle,Icon}]}.
+// Builds UIApplicationShortcutItems from
+// {"items":[{Id,Title,Subtitle,Icon,IosSystemImage,IosTemplateImage,Payload}]}.
 static NSArray<UIApplicationShortcutItem *> *QABuildItems(NSString *json) {
     NSData *data = [json dataUsingEncoding:NSUTF8StringEncoding];
     if (data == nil) return @[];
@@ -112,23 +118,45 @@ static NSArray<UIApplicationShortcutItem *> *QABuildItems(NSString *json) {
         if (identifier.length == 0 || title.length == 0) continue;
 
         NSString *subtitle = [item[@"Subtitle"] isKindOfClass:[NSString class]] ? item[@"Subtitle"] : nil;
+        NSString *symbol = [item[@"IosSystemImage"] isKindOfClass:[NSString class]] ? item[@"IosSystemImage"] : nil;
+        NSString *templateImage = [item[@"IosTemplateImage"] isKindOfClass:[NSString class]] ? item[@"IosTemplateImage"] : nil;
+        NSString *payload = [item[@"Payload"] isKindOfClass:[NSString class]] ? item[@"Payload"] : nil;
 
+        // Icon priority: SF Symbol (iOS 13+) > bundle template image > IconType
+        // system glyph. On iOS 12 a symbol-only item falls through to the next
+        // source rather than rendering nothing the caller can't explain.
         // IconType enum: 0 = None; 1..N map to UIApplicationShortcutIconType
         // (which starts at 0), so subtract 1. The C# enum is ordered to match.
         UIApplicationShortcutIcon *icon = nil;
+        if (symbol.length > 0) {
+            if (@available(iOS 13.0, *)) {
+                icon = [UIApplicationShortcutIcon iconWithSystemImageName:symbol];
+            }
+        }
+        if (icon == nil && templateImage.length > 0) {
+            icon = [UIApplicationShortcutIcon iconWithTemplateImageName:templateImage];
+        }
         NSNumber *iconNumber = item[@"Icon"];
-        if ([iconNumber isKindOfClass:[NSNumber class]] && iconNumber.integerValue > 0) {
+        if (icon == nil && [iconNumber isKindOfClass:[NSNumber class]] && iconNumber.integerValue > 0) {
             icon = [UIApplicationShortcutIcon iconWithType:(UIApplicationShortcutIconType)(iconNumber.integerValue - 1)];
         }
 
         NSInteger iconValue = [iconNumber isKindOfClass:[NSNumber class]] ? iconNumber.integerValue : 0;
+        NSMutableDictionary *userInfo = [NSMutableDictionary dictionaryWithDictionary:@{
+            kQAManagedMarkerKey: @YES,
+            kQAIconKey: @(iconValue),
+        }];
+        // Persist only non-empty values (userInfo requires NSSecureCoding values;
+        // absent key == empty string on read-back, matching the Android extras).
+        if (symbol.length > 0) userInfo[kQAIconSymbolKey] = symbol;
+        if (templateImage.length > 0) userInfo[kQAIconTemplateKey] = templateImage;
+        if (payload.length > 0) userInfo[kQAPayloadKey] = payload;
         UIApplicationShortcutItem *shortcut =
             [[UIApplicationShortcutItem alloc] initWithType:identifier
                                              localizedTitle:title
                                           localizedSubtitle:subtitle
                                                        icon:icon
-                                                   userInfo:@{ kQAManagedMarkerKey: @YES,
-                                                               kQAIconKey: @(iconValue) }];
+                                                   userInfo:userInfo];
         [result addObject:shortcut];
     }
     return result;
@@ -326,13 +354,20 @@ static char *QABuildShortcutsJson(void) {
         // into the managed set (which a later Add would then re-stamp as ours).
         if (!QAIsOurShortcut(item)) continue;
         // Icon identity comes from our userInfo (see kQAIconKey): reporting 0 here
-        // would make the next push rebuild reconciled items iconless.
+        // would make the next push rebuild reconciled items iconless. Same for the
+        // symbol/template names and the payload.
         NSNumber *iconBack = item.userInfo[kQAIconKey];
+        NSString *symbolBack = item.userInfo[kQAIconSymbolKey];
+        NSString *templateBack = item.userInfo[kQAIconTemplateKey];
+        NSString *payloadBack = item.userInfo[kQAPayloadKey];
         [out addObject:@{
             @"Id": item.type ?: @"",
             @"Title": item.localizedTitle ?: @"",
             @"Subtitle": item.localizedSubtitle ?: @"",
             @"Icon": [iconBack isKindOfClass:[NSNumber class]] ? iconBack : @0,
+            @"IosSystemImage": [symbolBack isKindOfClass:[NSString class]] ? symbolBack : @"",
+            @"IosTemplateImage": [templateBack isKindOfClass:[NSString class]] ? templateBack : @"",
+            @"Payload": [payloadBack isKindOfClass:[NSString class]] ? payloadBack : @"",
             @"AndroidDrawable": @"",
         }];
     }

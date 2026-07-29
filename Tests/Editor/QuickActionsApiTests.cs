@@ -375,6 +375,59 @@ namespace EminDeniz99.QuickActions.Tests
         }
 
         [Test]
+        public void RequestPin_DispatchesOnlyForAddedIds()
+        {
+            // WHY: pinning writes a live launcher icon; dispatching a pin for an id
+            // this package doesn't manage would either fail confusingly in native
+            // or (worse) pin someone else's shortcut. The facade must gate on its
+            // own managed set before touching the bridge.
+            var fake = new FakeBridge();
+            QuickActions.OverrideBridgeForTesting(fake);
+            try
+            {
+                Assert.IsFalse(QuickActions.RequestPin("ghost"), "unknown id must not reach the launcher");
+                CollectionAssert.IsEmpty(fake.PinRequests);
+
+                Assert.IsTrue(QuickActions.Add(Item("a")));
+                Assert.IsTrue(QuickActions.RequestPin("a"));
+                CollectionAssert.AreEqual(new[] { "a" }, fake.PinRequests);
+
+                Assert.IsFalse(QuickActions.RequestPin(null));
+                Assert.IsFalse(QuickActions.RequestPin(""));
+            }
+            finally { QuickActions.OverrideBridgeForTesting(null); }
+        }
+
+        [Test]
+        public void MaxShortcutCount_SurfacesTheBridgeValue()
+        {
+            // WHY: callers size their shortcut sets to this number (the README tells
+            // them to); it must come from the platform bridge, not a C# constant.
+            QuickActions.OverrideBridgeForTesting(new FakeBridge());
+            try { Assert.AreEqual(4, QuickActions.MaxShortcutCount); }
+            finally { QuickActions.OverrideBridgeForTesting(null); }
+        }
+
+        [Test]
+        public void Payload_SurvivesAddAndIsReadableById()
+        {
+            // WHY: the documented payload pattern is "Performed gives the id, read
+            // the payload via GetById" — that only works if the facade's defensive
+            // copies carry Payload through Add and back out of GetById.
+            QuickActions.OverrideBridgeForTesting(new FakeBridge());
+            try
+            {
+                var item = Item("daily");
+                item.Payload = "reward=daily&streak=3";
+                Assert.IsTrue(QuickActions.Add(item));
+
+                item.Payload = "mutated-after-add"; // must not leak into the stored copy
+                Assert.AreEqual("reward=daily&streak=3", QuickActions.GetById("daily").Payload);
+            }
+            finally { QuickActions.OverrideBridgeForTesting(null); }
+        }
+
+        [Test]
         public void AcceptAllBridge_DoesNotPrune()
         {
             // Guards against an over-eager prune: a bridge that accepts everything (returns
@@ -642,6 +695,18 @@ namespace EminDeniz99.QuickActions.Tests
             public readonly List<QuickActionItem> Shortcuts = new List<QuickActionItem>();
             public int SetCount;
             public bool IsPlatformSupported => true;
+            public int MaxShortcutCount => 4;
+            // Pin-capable, like an Android 8+ launcher: dispatches only for a
+            // shortcut it actually has (mirrors the Java ownership/presence gate)
+            // and records the id so tests can assert the request reached the OS.
+            public readonly List<string> PinRequests = new List<string>();
+            public bool IsPinSupported => true;
+            public bool RequestPin(string id)
+            {
+                if (!Shortcuts.Exists(s => s.Id == id)) return false;
+                PinRequests.Add(id);
+                return true;
+            }
             public IList<QuickActionItem> SetShortcuts(IList<QuickActionItem> items)
             {
                 SetCount++;
@@ -662,6 +727,9 @@ namespace EminDeniz99.QuickActions.Tests
             private readonly Queue<string> _pending;
             public QueueBridge(IEnumerable<string> ids) => _pending = new Queue<string>(ids);
             public bool IsPlatformSupported => true;
+            public int MaxShortcutCount => 4;
+            public bool IsPinSupported => false;
+            public bool RequestPin(string id) => false;
             public IList<QuickActionItem> SetShortcuts(IList<QuickActionItem> items) => items;
             public bool RemoveAll() => true;
             public string GetLastPerformed() => null;
@@ -676,6 +744,9 @@ namespace EminDeniz99.QuickActions.Tests
             public string Last;
             public int ResetCount;
             public bool IsPlatformSupported => true;
+            public int MaxShortcutCount => 4;
+            public bool IsPinSupported => false;
+            public bool RequestPin(string id) => false;
             public IList<QuickActionItem> SetShortcuts(IList<QuickActionItem> items) => items;
             public bool RemoveAll() => true;
             public string GetLastPerformed() => Last;
@@ -689,6 +760,9 @@ namespace EminDeniz99.QuickActions.Tests
         {
             private readonly List<QuickActionItem> _shortcuts = new List<QuickActionItem>();
             public bool IsPlatformSupported => true;
+            public int MaxShortcutCount => 4;
+            public bool IsPinSupported => false;
+            public bool RequestPin(string id) => false;
             public IList<QuickActionItem> SetShortcuts(IList<QuickActionItem> items)
             {
                 _shortcuts.Clear();
@@ -706,6 +780,9 @@ namespace EminDeniz99.QuickActions.Tests
         {
             public int GetShortcutsCalls;
             public bool IsPlatformSupported => true;
+            public int MaxShortcutCount => 4;
+            public bool IsPinSupported => false;
+            public bool RequestPin(string id) => false;
             public IList<QuickActionItem> SetShortcuts(IList<QuickActionItem> items) => items;
             public bool RemoveAll() => true;
             public string GetLastPerformed() => null;
@@ -729,6 +806,9 @@ namespace EminDeniz99.QuickActions.Tests
             public readonly List<QuickActionItem> Shortcuts = new List<QuickActionItem>();
             public CapBridge(int cap) => _cap = cap;
             public bool IsPlatformSupported => true;
+            public int MaxShortcutCount => 4;
+            public bool IsPinSupported => false;
+            public bool RequestPin(string id) => false;
             public IList<QuickActionItem> SetShortcuts(IList<QuickActionItem> items)
             {
                 var accepted = new List<QuickActionItem>();
@@ -758,6 +838,9 @@ namespace EminDeniz99.QuickActions.Tests
                 foreach (var id in osIds) Os.Add(new QuickActionItem(id, id));
             }
             public bool IsPlatformSupported => true;
+            public int MaxShortcutCount => 4;
+            public bool IsPinSupported => false;
+            public bool RequestPin(string id) => false;
             public IList<QuickActionItem> SetShortcuts(IList<QuickActionItem> items)
             {
                 SetCount++;
@@ -786,6 +869,9 @@ namespace EminDeniz99.QuickActions.Tests
                 foreach (var id in osIds) _os.Add(new QuickActionItem(id, id));
             }
             public bool IsPlatformSupported => true;
+            public int MaxShortcutCount => 4;
+            public bool IsPinSupported => false;
+            public bool RequestPin(string id) => false;
             public IList<QuickActionItem> SetShortcuts(IList<QuickActionItem> items) => null; // write failed
             public bool RemoveAll() => true;
             public string GetLastPerformed() => null;
@@ -799,6 +885,9 @@ namespace EminDeniz99.QuickActions.Tests
         private sealed class FailingRemoveAllBridge : IQuickActionsBridge
         {
             public bool IsPlatformSupported => true;
+            public int MaxShortcutCount => 4;
+            public bool IsPinSupported => false;
+            public bool RequestPin(string id) => false;
             public IList<QuickActionItem> SetShortcuts(IList<QuickActionItem> items) => items;
             public bool RemoveAll() => false;
             public string GetLastPerformed() => null;

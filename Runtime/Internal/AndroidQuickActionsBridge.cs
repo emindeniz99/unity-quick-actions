@@ -33,6 +33,59 @@ namespace EminDeniz99.QuickActions.Internal
             }
         }
 
+        public int MaxShortcutCount
+        {
+            get
+            {
+                if (!IsPlatformSupported) return 0;
+                try
+                {
+                    using (var bridge = new AndroidJavaClass(BridgeClass))
+                    using (var activity = CurrentActivity())
+                        return bridge.CallStatic<int>("getMaxShortcutCount", activity);
+                }
+                catch (AndroidJavaException e)
+                {
+                    Debug.LogWarning("[QuickActions] MaxShortcutCount failed: " + e.Message);
+                    return 0;
+                }
+            }
+        }
+
+        // requestPinShortcut is API 26+; below that pinning doesn't exist.
+        public bool IsPinSupported
+        {
+            get
+            {
+                try
+                {
+                    using (var bridge = new AndroidJavaClass(BridgeClass))
+                    using (var activity = CurrentActivity())
+                        return bridge.CallStatic<bool>("isPinSupported", activity);
+                }
+                catch (AndroidJavaException e)
+                {
+                    Debug.LogWarning("[QuickActions] IsPinSupported failed: " + e.Message);
+                    return false;
+                }
+            }
+        }
+
+        public bool RequestPin(string id)
+        {
+            try
+            {
+                using (var bridge = new AndroidJavaClass(BridgeClass))
+                using (var activity = CurrentActivity())
+                    return bridge.CallStatic<bool>("requestPinShortcut", activity, id);
+            }
+            catch (AndroidJavaException e)
+            {
+                Debug.LogWarning("[QuickActions] RequestPin failed: " + e.Message);
+                return false;
+            }
+        }
+
         public IList<QuickActionItem> SetShortcuts(IList<QuickActionItem> items)
         {
             // Below API 25 ShortcutManager doesn't exist, so nothing is installed. Report

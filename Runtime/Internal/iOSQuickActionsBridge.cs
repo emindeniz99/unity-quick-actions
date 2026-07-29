@@ -21,6 +21,14 @@ namespace EminDeniz99.QuickActions.Internal
 
         public bool IsPlatformSupported => true;
 
+        // No OS query exists; 4 is the documented Home Screen display limit (extra
+        // items are accepted by the API but never shown).
+        public int MaxShortcutCount => 4;
+
+        // iOS has no pinned-shortcut concept.
+        public bool IsPinSupported => false;
+        public bool RequestPin(string id) => false;
+
         public IList<QuickActionItem> SetShortcuts(IList<QuickActionItem> items)
         {
             _QuickActions_SetShortcuts(JsonUtility.ToJson(new QuickActionList(items)));
