@@ -29,6 +29,11 @@ namespace EminDeniz99.QuickActions.Editor
             if (report.summary.platform != BuildTarget.iOS)
                 return;
 
+            // Template-image sync runs even with no/empty settings so an Append
+            // build drops icons a previous build copied (manifest-scoped cleanup,
+            // mirroring the plist ClearOurEntries path below).
+            SyncTemplateImages(report.summary.outputPath, QuickActionsSettings.GetOrNull());
+
             var plistPath = Path.Combine(report.summary.outputPath, "Info.plist");
             if (!File.Exists(plistPath))
             {
@@ -103,6 +108,89 @@ namespace EminDeniz99.QuickActions.Editor
 
             plist.WriteToFile(plistPath);
             Debug.Log($"[QuickActions] Wrote {count} static shortcut(s) to Info.plist.");
+        }
+
+        // Copies the configured template-image textures into the generated Xcode
+        // project and adds them to the MAIN app target's resources (shortcut icons
+        // load from the app bundle, not UnityFramework). Ownership for Append-build
+        // cleanup is a manifest file listing exactly the file names we copied —
+        // never delete anything not listed there (same never-touch-host rule as
+        // the plist marker). Group-style PBX adds flatten into the bundle root, so
+        // IosTemplateImage = file name without extension.
+        private const string IconsFolder = "QuickActionsIcons";
+
+        private static void SyncTemplateImages(string buildPath, QuickActionsSettings settings)
+        {
+            var projPath = PBXProject.GetPBXProjectPath(buildPath);
+            if (string.IsNullOrEmpty(projPath) || !File.Exists(projPath))
+            {
+                if (settings != null && settings.IosTemplateImages.Count > 0)
+                    Debug.LogWarning("[QuickActions] Xcode project not found; skipping template-image icons.");
+                return;
+            }
+
+            var iconsDir = Path.Combine(buildPath, IconsFolder);
+            var manifestPath = Path.Combine(iconsDir, "quickactions_manifest.txt");
+
+            var proj = new PBXProject();
+            proj.ReadFromFile(projPath);
+
+            // Remove what WE copied last build (manifest-scoped) so renamed/removed
+            // textures don't ship stale on an Append build.
+            if (File.Exists(manifestPath))
+            {
+                foreach (var stale in File.ReadAllLines(manifestPath))
+                {
+                    if (string.IsNullOrWhiteSpace(stale))
+                        continue;
+                    var guid = proj.FindFileGuidByProjectPath(IconsFolder + "/" + stale);
+                    if (!string.IsNullOrEmpty(guid))
+                        proj.RemoveFile(guid);
+                    var stalePath = Path.Combine(iconsDir, stale);
+                    if (File.Exists(stalePath))
+                        File.Delete(stalePath);
+                }
+                File.Delete(manifestPath);
+            }
+
+            var copied = new List<string>();
+            if (settings != null && settings.IosTemplateImages.Count > 0)
+            {
+                var target = proj.GetUnityMainTargetGuid();
+                foreach (var texture in settings.IosTemplateImages)
+                {
+                    if (texture == null)
+                        continue;
+                    var assetPath = AssetDatabase.GetAssetPath(texture);
+                    var extension = Path.GetExtension(assetPath).ToLowerInvariant();
+                    if (extension != ".png" && extension != ".jpg" && extension != ".jpeg")
+                    {
+                        // iconWithTemplateImageName needs a loose image file in the
+                        // bundle; a .psd/.tga source has no such file to copy.
+                        Debug.LogWarning($"[QuickActions] Template image '{assetPath}' is not a PNG/JPEG file; skipped.");
+                        continue;
+                    }
+                    var fileName = Path.GetFileName(assetPath);
+                    if (copied.Contains(fileName))
+                    {
+                        Debug.LogWarning($"[QuickActions] Duplicate template-image file name '{fileName}'; skipped.");
+                        continue;
+                    }
+                    Directory.CreateDirectory(iconsDir);
+                    File.Copy(assetPath, Path.Combine(iconsDir, fileName), true);
+                    var fileGuid = proj.AddFile(IconsFolder + "/" + fileName, IconsFolder + "/" + fileName);
+                    proj.AddFileToBuild(target, fileGuid);
+                    copied.Add(fileName);
+                }
+            }
+
+            if (copied.Count > 0)
+            {
+                File.WriteAllLines(manifestPath, copied);
+                Debug.Log($"[QuickActions] Copied {copied.Count} template image(s) into the Xcode project.");
+            }
+
+            proj.WriteToFile(projPath);
         }
     }
 

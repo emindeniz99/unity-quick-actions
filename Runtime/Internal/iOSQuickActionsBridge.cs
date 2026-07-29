@@ -25,9 +25,10 @@ namespace EminDeniz99.QuickActions.Internal
         // items are accepted by the API but never shown).
         public int MaxShortcutCount => 4;
 
-        // iOS has no pinned-shortcut concept.
+        // iOS has no pinned-shortcut concept, and no usage-reporting analog.
         public bool IsPinSupported => false;
         public bool RequestPin(string id) => false;
+        public bool ReportUsed(string id) => false;
 
         public IList<QuickActionItem> SetShortcuts(IList<QuickActionItem> items)
         {

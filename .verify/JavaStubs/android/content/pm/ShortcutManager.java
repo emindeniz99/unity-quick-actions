@@ -41,6 +41,9 @@ public class ShortcutManager {
   public List<ShortcutInfo> getManifestShortcuts(){return new ArrayList<>(manifest);}
   public List<ShortcutInfo> getDynamicShortcuts(){return new ArrayList<>(dynamic);}
   public List<ShortcutInfo> getPinnedShortcuts(){return new ArrayList<>(pinned);}
+  // Usage-report surface: AOSP just forwards the id to the launcher's ranker.
+  public final List<String> usageReports = new ArrayList<>();
+  public void reportShortcutUsed(String id){ usageReports.add(id); }
   // Pin-request surface (API 26+). AOSP: requestPinShortcut hands the request to
   // the launcher and returns true when dispatched; the smoke test records it.
   public boolean pinSupported = true;

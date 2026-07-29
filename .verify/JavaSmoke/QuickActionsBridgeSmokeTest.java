@@ -47,6 +47,7 @@ public final class QuickActionsBridgeSmokeTest {
         pinRequestIsOwnershipGated();
         maxShortcutCountIsExposed();
         adaptiveAndPinDegradeBelowApi26();
+        usageReportIsOwnershipGated();
 
         System.out.println("SMOKE: " + (failures == 0 ? "PASS" : "FAIL") + " (" + checks + " checks, " + failures + " failed)");
         if (failures != 0) System.exit(1);
@@ -388,6 +389,19 @@ public final class QuickActionsBridgeSmokeTest {
             Build.VERSION.SDK_INT = prev;
             png.delete();
         }
+    }
+
+    private static void usageReportIsOwnershipGated() throws Exception {
+        ShortcutManager mgr = new ShortcutManager();
+        mgr.dynamic.add(host("h1"));
+        check(QuickActionsBridge.setShortcuts(activity(mgr), itemsJson("mine")) != null, "usage fixture write lands");
+
+        check(QuickActionsBridge.reportShortcutUsed(activity(mgr), "mine"), "reporting OUR id reaches the launcher");
+        check(mgr.usageReports.equals(List.of("mine")), "exactly the reported id was forwarded");
+        check(!QuickActionsBridge.reportShortcutUsed(activity(mgr), "h1"),
+                "a HOST id is refused (would skew the host's launcher ranking)");
+        check(!QuickActionsBridge.reportShortcutUsed(activity(mgr), "ghost"), "an uninstalled id is refused");
+        check(mgr.usageReports.size() == 1, "refused reports never reach the launcher");
     }
 
     // ---- helpers ----

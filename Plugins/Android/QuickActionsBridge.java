@@ -552,6 +552,31 @@ public final class QuickActionsBridge {
         }
     }
 
+    /**
+     * Report in-app usage of OUR shortcut with this id to the launcher's ranking
+     * predictor ({@code reportShortcutUsed}). Ownership-gated like every other
+     * call here — a host app's shortcut id is refused. Returns true when the
+     * signal was sent. Never throws across JNI.
+     */
+    public static boolean reportShortcutUsed(Activity activity, String id) {
+        if (activity == null || id == null || id.isEmpty() || Build.VERSION.SDK_INT < 25) return false;
+        ShortcutManager manager = activity.getSystemService(ShortcutManager.class);
+        if (manager == null) return false;
+        try {
+            for (ShortcutInfo s : manager.getDynamicShortcuts()) {
+                if (isOurShortcut(s) && id.equals(s.getId())) {
+                    manager.reportShortcutUsed(id);
+                    return true;
+                }
+            }
+            android.util.Log.w("QuickActions", "reportShortcutUsed: no managed dynamic shortcut with id " + id);
+            return false;
+        } catch (RuntimeException e) {
+            android.util.Log.w("QuickActions", "reportShortcutUsed failed", e);
+            return false;
+        }
+    }
+
     // ---- tap delivery (called by the trampoline activity) ----
 
     static synchronized void recordPerformed(String actionId) {

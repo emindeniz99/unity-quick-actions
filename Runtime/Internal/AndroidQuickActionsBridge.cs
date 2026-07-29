@@ -86,6 +86,22 @@ namespace EminDeniz99.QuickActions.Internal
             }
         }
 
+        public bool ReportUsed(string id)
+        {
+            if (!IsPlatformSupported) return false;
+            try
+            {
+                using (var bridge = new AndroidJavaClass(BridgeClass))
+                using (var activity = CurrentActivity())
+                    return bridge.CallStatic<bool>("reportShortcutUsed", activity, id);
+            }
+            catch (AndroidJavaException e)
+            {
+                Debug.LogWarning("[QuickActions] ReportUsed failed: " + e.Message);
+                return false;
+            }
+        }
+
         public IList<QuickActionItem> SetShortcuts(IList<QuickActionItem> items)
         {
             // Below API 25 ShortcutManager doesn't exist, so nothing is installed. Report

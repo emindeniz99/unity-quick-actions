@@ -3,11 +3,6 @@
 Follow-ups discussed but not shipped in v0.1.0. Delete an entry in the same
 commit that ships it.
 
-- **iOS `Texture2D` → asset-catalog icon pipeline** — v0.2 ships runtime bitmap
-  icons on Android (`AndroidBitmapFile`) and named template/SF-Symbol icons on
-  iOS, but iOS has no runtime-bitmap shortcut API: custom art must be a bundle
-  image. Remaining: a build post-processor that copies configured PNGs into the
-  Xcode project so `IosTemplateImage` art can come straight from Unity assets.
 - **Automated device CI** — drive an iOS simulator / Android emulator to assert
   cold + warm delivery end-to-end.
 - **Localization** — per-locale titles/subtitles.
@@ -30,7 +25,12 @@ The stub harness compiles the C#/Java but can't confirm Unity-only wiring:
   icons render and survive a reconcile (file kept alive), the adaptive variant
   masks correctly per launcher, `RequestPin` shows the launcher confirm sheet
   and the pinned copy taps through, and `Payload` survives a cold-start
-  reconcile on both OSes. NOTE the iOS side of v0.2 (the .mm userInfo
+  reconcile on both OSes. Also v0.3: `Update(item)` refreshes a pinned copy's
+  label/icon in place on a real launcher; `ReportUsed` influences ranking (long
+  feedback loop — just confirm no crash/no-op); and the template-image pipeline:
+  confirm a copied PNG lands in the built app bundle root (group-style PBX adds
+  flatten) and `iconWithTemplateImageName:`/`IconFile` resolve it by file name
+  on device. NOTE the iOS side of v0.2 (the .mm userInfo
   persistence of symbol/template/payload and its read-back) has NO automated
   coverage — the .verify harness is Java+C# only — so the iOS reconcile
   round-trip is device-validation-only; the equivalent Android extras path is

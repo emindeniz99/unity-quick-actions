@@ -263,12 +263,14 @@ public class ShortcutRouter : MonoBehaviour
 | `void AddList(IList<QuickActionItem>)` | Add several in one OS update (same transient no-op cases as `Add`). |
 | `List<QuickActionItem> GetAll()` | Snapshot of the currently installed dynamic actions (OS-reconciled). |
 | `QuickActionItem GetById(string)` | Lookup by id. |
+| `bool Update(QuickActionItem)` | Replace the added action with the same `Id` **in place** — list position (launcher rank) preserved, one OS update, Android user-pinned copies refresh too. False when not added (use `Add`), invalid, or the OS refused/dropped the write. |
 | `bool Remove(QuickActionItem)` / `RemoveById(string)` | Remove one. |
 | `void RemoveAll()` | Remove every action. |
 | `bool IsAdded(QuickActionItem)` / `IsAdded(string)` | Membership test. |
 | `int MaxShortcutCount` | The OS shortcut budget: Android `getMaxShortcutCountPerActivity`; iOS 4 (display limit, no OS query). Shared with static shortcuts on **both** platforms (and with host-published dynamic ones on Android), so fewer slots may be free. 0 in-Editor. |
 | `bool IsPinSupported` | True when the launcher can pin shortcuts (Android 8.0+; always false on iOS/Editor). |
 | `bool RequestPin(string)` | Ask the launcher to pin an **added** action to the home screen. True = request *dispatched* (the user still confirms in launcher UI — the OS reports no outcome). |
+| `bool ReportUsed(string)` | Tell the launcher the user reached this action's feature **in-app** (Android `reportShortcutUsed`, improves ranking predictions). Call on normal-UI usage, not on shortcut taps. False on iOS/Editor (no analog) or for a not-added id. |
 
 `QuickActionItem` fields:
 
@@ -306,7 +308,13 @@ For shortcuts that must exist on the **first** launch (before any runtime
 asset*, and add entries. At build time:
 
 - **iOS** — written into the Xcode `Info.plist` as `UIApplicationShortcutItems`
-  (`UIApplicationShortcutItemType` = your `Id`, plus title/subtitle/system icon).
+  (`UIApplicationShortcutItemType` = your `Id`, plus title/subtitle and one icon
+  key: SF Symbol > template image > system icon type). The settings page also
+  takes a **template-image texture list**: each PNG/JPEG is copied into the
+  generated Xcode project's app target, so `IosTemplateImage = "<file name
+  without extension>"` works for static *and* dynamic shortcuts with no manual
+  Xcode step (stale copies from a previous Append build are cleaned up via a
+  manifest — only files this package copied are ever touched).
 - **Android** — written to `res/xml/quickactions_shortcuts.xml` (with generated
   string resources), and the `android.app.shortcuts` meta-data is injected into
   the launcher activity. Each static intent targets the trampoline and encodes

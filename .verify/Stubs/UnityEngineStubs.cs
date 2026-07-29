@@ -131,6 +131,8 @@ namespace UnityEngine
         }
     }
 
+    public class Texture2D : Object { }
+
     public class ScriptableObject : Object
     {
         public static ScriptableObject CreateInstance(Type type) => (ScriptableObject)Activator.CreateInstance(type);

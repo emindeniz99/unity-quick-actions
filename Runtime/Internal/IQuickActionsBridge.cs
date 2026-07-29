@@ -41,6 +41,14 @@ namespace EminDeniz99.QuickActions.Internal
         bool RequestPin(string id);
 
         /// <summary>
+        /// Report in-app usage of this (package-managed) shortcut's feature to the
+        /// launcher for ranking predictions (Android
+        /// <c>reportShortcutUsed</c>). True when the signal was sent; false where
+        /// no analog exists (iOS/Editor) or the native call failed.
+        /// </summary>
+        bool ReportUsed(string id);
+
+        /// <summary>
         /// Push these items to the OS as <b>this package's subset</b> of the dynamic
         /// shortcuts (both platforms mark their items; a host app's own shortcuts
         /// are never modified) and return the subset it actually accepted — the

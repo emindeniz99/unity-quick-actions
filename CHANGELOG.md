@@ -33,6 +33,18 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **`QuickActions.MaxShortcutCount`**: the OS shortcut budget
   (`getMaxShortcutCountPerActivity` on Android; 4 on iOS, the Home Screen
   display limit; 0 in-Editor).
+- **In-place `Update(item)`**: replace the added action with the same `Id`
+  without changing its list position (launcher rank preserved), one OS update;
+  Android user-pinned copies refresh in place. Same honesty contract as `Add`
+  (false on refused/dropped writes, previous item restored on failure).
+- **`ReportUsed(id)`**: forward in-app feature usage to the launcher's ranking
+  predictor (`reportShortcutUsed`), ownership-gated like `RequestPin`; false on
+  iOS/Editor (no analog).
+- **iOS template-image pipeline**: a texture list in Project Settings ▸ Quick
+  Actions — each PNG/JPEG is copied into the generated Xcode project's app
+  target at build time, so `IosTemplateImage` art ships straight from Unity
+  assets (manifest-scoped Append-build cleanup; only files the package copied
+  are ever touched).
 - CI now packs `dist~/QuickActions.unitypackage` and uploads it as a workflow
   artifact.
 

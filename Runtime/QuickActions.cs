@@ -134,6 +134,31 @@ namespace EminDeniz99.QuickActions
         }
 
         /// <summary>
+        /// Tell the launcher the user just acted on this added quick action's
+        /// feature <b>inside the app</b> (Android
+        /// <c>ShortcutManager.reportShortcutUsed</c> — improves launcher/assistant
+        /// ranking predictions). Call it when the user reaches the same feature
+        /// through normal UI, not when a shortcut tap launched it. Returns true
+        /// when the signal was sent; false on iOS/Editor (no analog) or when the
+        /// id is not a currently added action of this package.
+        /// </summary>
+        public static bool ReportUsed(string id)
+        {
+            if (string.IsNullOrEmpty(id))
+                return false;
+            if (!IsAdded(id))
+            {
+                // Same ownership gate as RequestPin: only our installed shortcuts.
+                Log($"ReportUsed ignored: no added quick action with Id '{id}'.");
+                return false;
+            }
+            var reported = Bridge.ReportUsed(id);
+            if (reported)
+                Log($"Reported usage of quick action '{id}'.");
+            return reported;
+        }
+
+        /// <summary>
         /// Id of the quick action the app was most recently launched or resumed
         /// from, for this session; null otherwise.
         ///
@@ -409,6 +434,62 @@ namespace EminDeniz99.QuickActions
                 return null;
             EnsureLoaded();
             return _items.FirstOrDefault(a => a.Id == id)?.Copy();
+        }
+
+        /// <summary>
+        /// Replace the added quick action with the same <see cref="QuickActionItem.Id"/>
+        /// in place — position (and so launcher rank) preserved, one OS update, and
+        /// on Android a user-pinned copy is refreshed too (same-id entries update
+        /// in place). Returns false (without changing anything) when the item is
+        /// invalid, no action with that id is added (use <see cref="Add"/>), the
+        /// current OS shortcuts could not be read, the OS rejected the write, or
+        /// the OS dropped the updated item (see <see cref="Add"/>'s remarks) — all
+        /// retryable except the not-added case.
+        /// </summary>
+        /// <exception cref="ArgumentNullException">The item is null.</exception>
+        public static bool Update(QuickActionItem item)
+        {
+            if (item == null)
+                throw new ArgumentNullException(nameof(item));
+            if (!EnsureLoaded())
+            {
+                Log("Update deferred: could not read the current shortcuts; OS set left unchanged.");
+                return false;
+            }
+            if (!item.IsValid)
+            {
+                Log($"Update ignored: item needs a non-empty Id and Title ({item}).");
+                return false;
+            }
+            var index = _items.FindIndex(a => a.Id == item.Id);
+            if (index < 0)
+            {
+                Log($"Update ignored: no added quick action with Id '{item.Id}' — use Add.");
+                return false;
+            }
+
+            var previous = _items[index];
+            var copy = item.Copy(); // store a copy — see Add
+            _items[index] = copy;
+            if (!Push())
+            {
+                // Failed OS write — restore the previous item at its position and
+                // force a reconcile (see Add — same partial-landing contract).
+                _items[index] = previous;
+                _loaded = false;
+                Log($"Update failed: the OS did not accept the update for '{item.Id}'; retry later.");
+                return false;
+            }
+            if (!_items.Contains(copy))
+            {
+                // The write landed but the OS dropped this id (the shared budget can
+                // shrink between pushes — e.g. a host published more shortcuts since).
+                // The previous item is gone from the device too; stay honest.
+                Log($"Update failed: the OS dropped '{item.Id}' (cap reached or id owned by another publisher).");
+                return false;
+            }
+            Log($"Updated quick action '{item.Id}'.");
+            return true;
         }
 
         /// <summary>Remove a quick action. Returns true if one was removed.</summary>

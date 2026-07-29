@@ -15,6 +15,7 @@ namespace UnityEditor
         public static void SaveAssets() { }
         public static bool IsValidFolder(string path) => false;
         public static string CreateFolder(string parent, string newFolderName) => string.Empty;
+        public static string GetAssetPath(UnityEngine.Object assetObject) => string.Empty;
     }
 
     public static class PlayerSettings
@@ -104,6 +105,11 @@ namespace UnityEditor.iOS.Xcode
         public void ReadFromFile(string path) { }
         public void WriteToFile(string path) { }
         public string GetUnityFrameworkTargetGuid() => string.Empty;
+        public string GetUnityMainTargetGuid() => string.Empty;
+        public string AddFile(string path, string projectPath) => string.Empty;
+        public void AddFileToBuild(string targetGuid, string fileGuid) { }
+        public string FindFileGuidByProjectPath(string path) => null;
+        public void RemoveFile(string fileGuid) { }
         public void AddBuildProperty(string targetGuid, string name, string value) { }
         public string GetBuildPropertyForAnyConfig(string targetGuid, string name) => string.Empty;
         public void UpdateBuildProperty(string targetGuid, string name, string[] addValues, string[] removeValues) { }

@@ -12,6 +12,7 @@ namespace EminDeniz99.QuickActions.Internal
         public int MaxShortcutCount => 0;
         public bool IsPinSupported => false;
         public bool RequestPin(string id) => false;
+        public bool ReportUsed(string id) => false;
         // Accept-all: return the same reference so the facade prunes nothing (there
         // is no OS to trim, and the editor list must stay intact).
         public IList<QuickActionItem> SetShortcuts(IList<QuickActionItem> items) => items;
