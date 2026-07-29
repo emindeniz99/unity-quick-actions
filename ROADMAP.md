@@ -3,18 +3,11 @@
 Follow-ups discussed but not shipped in v0.1.0. Delete an entry in the same
 commit that ships it.
 
-- **Per-item rasterized icons** — accept a `Texture2D`/`Sprite` and emit a
-  template `UIApplicationShortcutIcon` (iOS) and a generated drawable
-  (Android), instead of only system `IconType` glyphs + named drawables.
-  (System `IconType` identity already survives reconciles on both platforms
-  via the ownership-marker payloads; this item is about custom rasterized art.)
-- **Pinned shortcuts** — `requestPinShortcut` on Android; no iOS analog.
-- **Static shortcut custom icons (iOS file icons)** — `UIApplicationShortcutItemIconFile`
-  with an asset-catalog template image (Android already supports a drawable via
-  `AndroidDrawable`; iOS static currently supports only system `IconType` glyphs).
-- **`.unitypackage` export in CI** — `tools/pack_unitypackage.py` already builds
-  the classic artifact without Unity; remaining: run it in CI and attach the
-  output to releases.
+- **iOS `Texture2D` → asset-catalog icon pipeline** — v0.2 ships runtime bitmap
+  icons on Android (`AndroidBitmapFile`) and named template/SF-Symbol icons on
+  iOS, but iOS has no runtime-bitmap shortcut API: custom art must be a bundle
+  image. Remaining: a build post-processor that copies configured PNGs into the
+  Xcode project so `IosTemplateImage` art can come straight from Unity assets.
 - **Automated device CI** — drive an iOS simulator / Android emulator to assert
   cold + warm delivery end-to-end.
 - **Localization** — per-locale titles/subtitles.
@@ -32,6 +25,19 @@ The stub harness compiles the C#/Java but can't confirm Unity-only wiring:
   the focus poll (performAction precedes didBecomeActive), and that static
   shortcuts.xml taps round-trip the action-encoded id. Confirm iOS cold + warm
   on a device via Xcode.
+- **v0.2 feature validation (on-device):** SF Symbol + template-image icons
+  render on iOS (incl. the iOS 12 dynamic fall-through), `AndroidBitmapFile`
+  icons render and survive a reconcile (file kept alive), the adaptive variant
+  masks correctly per launcher, `RequestPin` shows the launcher confirm sheet
+  and the pinned copy taps through, and `Payload` survives a cold-start
+  reconcile on both OSes. NOTE the iOS side of v0.2 (the .mm userInfo
+  persistence of symbol/template/payload and its read-back) has NO automated
+  coverage — the .verify harness is Java+C# only — so the iOS reconcile
+  round-trip is device-validation-only; the equivalent Android extras path is
+  smoke-tested. Also probe on device whether iOS 13+ prefers
+  `UIApplicationShortcutItemIconSymbolName` when `IconFile`/`IconType` coexist
+  in one plist entry — if it does, the static writer could emit fallback keys
+  and restore iOS 12 static-icon parity (see the post-processor comment).
 - **Host-coexistence release gate (on-device, Android):** publish a host
   shortcut with a bitmap icon outside the package, then exercise
   `Add`/`RemoveAll`/cold-restart reconcile and confirm the host item survives

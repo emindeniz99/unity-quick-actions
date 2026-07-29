@@ -22,6 +22,10 @@ public class JSONObject {
     Object v = values.get(key);
     return v instanceof Number ? ((Number) v).intValue() : defaultValue;
   }
+  public boolean optBoolean(String key, boolean defaultValue){
+    Object v = values.get(key);
+    return v instanceof Boolean ? (Boolean) v : defaultValue;
+  }
   public JSONObject put(String key, Object value) throws Exception { values.put(key, value); return this; }
   public JSONObject put(String key, int value) throws Exception { values.put(key, value); return this; }
   void write(StringBuilder b){

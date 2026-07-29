@@ -35,6 +35,58 @@ namespace EminDeniz99.QuickActions
         /// </summary>
         public string AndroidDrawable;
 
+        /// <summary>
+        /// Optional SF Symbol name (e.g. <c>"star.fill"</c>) to use as the icon on
+        /// iOS 13+, overriding <see cref="IosTemplateImage"/> and <see cref="Icon"/>.
+        /// Ignored on Android. On iOS 12 a <b>dynamic</b> item falls through to the
+        /// next icon source at runtime; a <b>static</b> (baked) item does not — its
+        /// Info.plist entry carries only the symbol key, which iOS 12 ignores, so
+        /// it renders iconless there (use <see cref="Icon"/> or
+        /// <see cref="IosTemplateImage"/> for static items if you target iOS 12).
+        /// </summary>
+        public string IosSystemImage;
+
+        /// <summary>
+        /// Optional template-image name from the app bundle / asset catalog to use
+        /// as the icon on iOS (single-color, ~35×35 pt — see Apple's Human
+        /// Interface Guidelines), overriding <see cref="Icon"/>. The image must be
+        /// shipped in the Xcode project; a missing name renders no icon. Ignored on
+        /// Android.
+        /// </summary>
+        public string IosTemplateImage;
+
+        /// <summary>
+        /// Optional absolute path to a PNG/JPEG file on the device to use as the
+        /// icon on Android, overriding <see cref="AndroidDrawable"/> and
+        /// <see cref="Icon"/>. Write it yourself, e.g.
+        /// <c>File.WriteAllBytes(path, texture.EncodeToPNG())</c> under
+        /// <c>Application.persistentDataPath</c> — the file must still exist when
+        /// the OS re-renders the shortcut (don't use a temp dir). Ignored on iOS
+        /// (<c>UIApplicationShortcutIcon</c> has no runtime-bitmap API).
+        /// </summary>
+        public string AndroidBitmapFile;
+
+        /// <summary>
+        /// When true, <see cref="AndroidBitmapFile"/> is installed as an adaptive
+        /// icon (<c>Icon.createWithAdaptiveBitmap</c>, API 26+): the launcher masks
+        /// it to its shape instead of rendering the bitmap as-is. Supply the usual
+        /// adaptive safe-zone padding in the image. No effect without
+        /// <see cref="AndroidBitmapFile"/>.
+        /// </summary>
+        public bool AndroidBitmapAdaptive;
+
+        /// <summary>
+        /// Optional app-defined string carried with the shortcut (iOS
+        /// <c>userInfo</c>, Android intent extras) and restored by the cold-start
+        /// reconcile. Not delivered with the tap event — read it via
+        /// <c>QuickActions.GetById(id)?.Payload</c> from the id
+        /// <see cref="QuickActions.Performed"/> reports. Note
+        /// <see cref="QuickActions.GetById"/> returns null for a
+        /// <b>static</b>-shortcut tap (baked items never join the runtime list and
+        /// carry no payload) and for an id removed since the tap — null-check it.
+        /// </summary>
+        public string Payload;
+
         public QuickActionItem() { }
 
         public QuickActionItem(string id, string title, string subtitle = null, IconType icon = IconType.None)
@@ -60,6 +112,11 @@ namespace EminDeniz99.QuickActions
             Subtitle = Subtitle,
             Icon = Icon,
             AndroidDrawable = AndroidDrawable,
+            IosSystemImage = IosSystemImage,
+            IosTemplateImage = IosTemplateImage,
+            AndroidBitmapFile = AndroidBitmapFile,
+            AndroidBitmapAdaptive = AndroidBitmapAdaptive,
+            Payload = Payload,
         };
 
         public bool Equals(QuickActionItem other) => other != null && Id == other.Id;

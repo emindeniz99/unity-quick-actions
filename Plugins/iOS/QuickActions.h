@@ -11,7 +11,9 @@ extern "C" {
 #endif
 
 // Replace THIS PACKAGE'S subset of UIApplication.shortcutItems from
-// {"items":[{Id,Title,Subtitle,Icon}]}. Items are stamped with a userInfo
+// {"items":[{Id,Title,Subtitle,Icon,IosSystemImage,IosTemplateImage,Payload}]}
+// (icon priority: SF Symbol on iOS 13+ > bundle template image > Icon type).
+// Items are stamped with a userInfo
 // marker; unmarked host/other-plugin items are always preserved — including one
 // whose type collides with an id being written, in which case the id renders
 // twice (the honest result of two publishers claiming one id). We never adopt or
@@ -34,7 +36,8 @@ void _QuickActions_ResetLastPerformed(void);
 char *_QuickActions_ConsumePendingPerformed(void);
 
 // The dynamic shortcut items THIS PACKAGE created (marker-scoped; host items
-// are never surfaced) as {"items":[...]} (Icon reported as 0). malloc'd; caller
+// are never surfaced) as {"items":[...]} — icon/symbol/template identity and the
+// payload recovered from the userInfo marker. malloc'd; caller
 // frees. Lets C# reconcile its list after a cold start. Returns NULL when the
 // read FAILED (an off-main-thread call that timed out marshalling to the main
 // queue) — distinct from the empty-success {"items":[]}.

@@ -4,6 +4,38 @@ All notable changes to this package are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the package adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - Unreleased
+
+### Added
+
+- **SF Symbols and template-image icons on iOS**: `QuickActionItem.IosSystemImage`
+  (e.g. `"star.fill"`, iOS 13+) and `QuickActionItem.IosTemplateImage` (bundle
+  image name). Icon priority is SF Symbol > template image > `IconType` glyph,
+  for dynamic and static (Info.plist `IconSymbolName`/`IconFile`) shortcuts
+  alike; identity survives the cold-start reconcile via the `userInfo` marker.
+  iOS 12: a dynamic symbol-only item falls through to the next icon source at
+  runtime; a static one renders iconless (the plist carries a single icon key —
+  see the `IosSystemImage` doc).
+- **Runtime bitmap icons on Android**: `QuickActionItem.AndroidBitmapFile`
+  (absolute path to a PNG/JPEG — e.g. a `Texture2D` written with
+  `EncodeToPNG()`), plus `AndroidBitmapAdaptive` for `createWithAdaptiveBitmap`
+  masking (API 26+). Falls back down the icon chain when the file is missing;
+  identity survives the reconcile via the extras marker.
+- **Pinned shortcuts (Android 8.0+)**: `QuickActions.IsPinSupported` and
+  `QuickActions.RequestPin(id)` → `requestPinShortcut`, ownership-gated so only
+  this package's currently installed shortcuts can be pinned. Honest no-op
+  (false) on iOS and in the Editor.
+- **Per-item payload**: `QuickActionItem.Payload`, an app-defined string riding
+  the shortcut (iOS `userInfo`, Android extras + launch-intent extra) and
+  restored across cold starts — read it via `GetById(id)?.Payload` from the id
+  `Performed` reports (null for static-shortcut taps and ids removed since —
+  static items never join the runtime list).
+- **`QuickActions.MaxShortcutCount`**: the OS shortcut budget
+  (`getMaxShortcutCountPerActivity` on Android; 4 on iOS, the Home Screen
+  display limit; 0 in-Editor).
+- CI now packs `dist~/QuickActions.unitypackage` and uploads it as a workflow
+  artifact.
+
 ## [0.1.0] - 2026-07-29
 
 ### Added

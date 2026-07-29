@@ -5,6 +5,9 @@ public class ShortcutInfo {
   // Field-backed so the .verify smoke test can exercise the plugin statefully.
   String id = ""; CharSequence shortLabel = ""; CharSequence longLabel; int rank; PersistableBundle extras; Intent intent;
   boolean enabled = true;
+  // Captured (not exposed by the real API) so the smoke test can assert which
+  // icon factory the plugin picked — see the Icon stub's `kind`.
+  public Icon icon;
   public String getId(){return id;}
   public CharSequence getShortLabel(){return shortLabel;}
   public CharSequence getLongLabel(){return longLabel;}
@@ -18,7 +21,7 @@ public class ShortcutInfo {
     public Builder setShortLabel(CharSequence s){info.shortLabel = s; return this;}
     public Builder setLongLabel(CharSequence s){info.longLabel = s; return this;}
     public Builder setIntent(Intent i){info.intent = i; return this;}
-    public Builder setIcon(Icon i){return this;}
+    public Builder setIcon(Icon i){info.icon = i; return this;}
     public Builder setRank(int r){info.rank = r; return this;}
     public Builder setExtras(PersistableBundle b){info.extras = b; return this;}
     public ShortcutInfo build(){return info;}

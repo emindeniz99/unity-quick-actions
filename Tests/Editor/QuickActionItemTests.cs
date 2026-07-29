@@ -38,6 +38,38 @@ namespace EminDeniz99.QuickActions.Tests
         }
 
         [Test]
+        public void Copy_PreservesEveryField()
+        {
+            // WHY: the facade stores/returns defensive copies everywhere; a field
+            // missed by Copy() silently loses that icon/payload the moment an item
+            // crosses Add/GetAll/GetById — the OS then re-renders it wrong after a
+            // reconcile push. Every public field gets a distinct NON-default value
+            // BY REFLECTION (not a hand-written arrange block), so a future field
+            // whose author forgot to extend Copy() arrives here non-default, comes
+            // back default from the copy, and fails — a hand-written arrange would
+            // leave it default on both sides and pass vacuously.
+            var item = new QuickActionItem();
+            foreach (var field in typeof(QuickActionItem).GetFields())
+            {
+                if (field.FieldType == typeof(string))
+                    field.SetValue(item, field.Name + "_value");
+                else if (field.FieldType == typeof(bool))
+                    field.SetValue(item, true);
+                else if (field.FieldType.IsEnum)
+                    field.SetValue(item, System.Enum.GetValues(field.FieldType).GetValue(2));
+                else
+                    Assert.Fail($"Field '{field.Name}' has type {field.FieldType} this test can't seed — extend the type switch.");
+            }
+
+            var copy = item.Copy();
+
+            Assert.AreNotSame(item, copy);
+            foreach (var field in typeof(QuickActionItem).GetFields())
+                Assert.AreEqual(field.GetValue(item), field.GetValue(copy),
+                    $"Copy() must preserve field '{field.Name}'");
+        }
+
+        [Test]
         public void IconType_NoneIsZero_AndOrderMatchesAppleEnum()
         {
             // The native iOS layer maps IconType value N (>0) to
