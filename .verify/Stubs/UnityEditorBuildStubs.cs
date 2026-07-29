@@ -18,6 +18,11 @@ namespace UnityEditor
         public static string GetAssetPath(UnityEngine.Object assetObject) => string.Empty;
     }
 
+    public static class FileUtil
+    {
+        public static string GetPhysicalPath(string path) => path;
+    }
+
     public static class PlayerSettings
     {
         public static string applicationIdentifier => "com.example.app";

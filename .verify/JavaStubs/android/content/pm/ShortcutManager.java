@@ -41,9 +41,15 @@ public class ShortcutManager {
   public List<ShortcutInfo> getManifestShortcuts(){return new ArrayList<>(manifest);}
   public List<ShortcutInfo> getDynamicShortcuts(){return new ArrayList<>(dynamic);}
   public List<ShortcutInfo> getPinnedShortcuts(){return new ArrayList<>(pinned);}
-  // Usage-report surface: AOSP just forwards the id to the launcher's ranker.
+  // Usage-report surface: AOSP just forwards the id to the launcher's ranker —
+  // but can throw IllegalStateException (locked user), so the smoke test can
+  // toggle that to pin the bridge's never-throws-across-JNI guarantee.
+  public boolean throwOnUsageReport = false;
   public final List<String> usageReports = new ArrayList<>();
-  public void reportShortcutUsed(String id){ usageReports.add(id); }
+  public void reportShortcutUsed(String id){
+    if (throwOnUsageReport) throw new IllegalStateException("user is locked");
+    usageReports.add(id);
+  }
   // Pin-request surface (API 26+). AOSP: requestPinShortcut hands the request to
   // the launcher and returns true when dispatched; the smoke test records it.
   public boolean pinSupported = true;

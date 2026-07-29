@@ -569,7 +569,18 @@ public final class QuickActionsBridge {
                     return true;
                 }
             }
-            android.util.Log.w("QuickActions", "reportShortcutUsed: no managed dynamic shortcut with id " + id);
+            // A user-PINNED copy of one of OUR shortcuts is still a live, tappable
+            // launcher entry even after leaving the dynamic set (AOSP accepts usage
+            // reports for it) — mirror the trampoline's pinned-ours acceptance.
+            // The C# facade's managed-set gate refuses removed ids before reaching
+            // here; this branch serves direct Java callers and defense in depth.
+            for (ShortcutInfo s : manager.getPinnedShortcuts()) {
+                if (isOurShortcut(s) && id.equals(s.getId())) {
+                    manager.reportShortcutUsed(id);
+                    return true;
+                }
+            }
+            android.util.Log.w("QuickActions", "reportShortcutUsed: no managed dynamic or pinned shortcut with id " + id);
             return false;
         } catch (RuntimeException e) {
             android.util.Log.w("QuickActions", "reportShortcutUsed failed", e);

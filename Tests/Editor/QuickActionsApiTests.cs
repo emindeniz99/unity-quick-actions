@@ -455,10 +455,66 @@ namespace EminDeniz99.QuickActions.Tests
                 Assert.IsTrue(QuickActions.Add(new QuickActionItem("a", "Original")));
                 bridge.FailWrites = true;
                 Assert.IsFalse(QuickActions.Update(new QuickActionItem("a", "Doomed")));
-                bridge.FailWrites = false; // let the forced reconcile read the OS again
-                Assert.AreEqual("Original", QuickActions.GetById("a").Title);
-                Assert.AreEqual("Original", bridge.Os.Find(i => i.Id == "a").Title,
-                    "the failed write must never have reached the OS");
+
+                // Cut reads too: the ONLY way GetById can now answer "Original" is
+                // the in-place restore itself (a reconcile is impossible), so a
+                // missing `_items[index] = previous` can't hide behind a re-read.
+                bridge.FailReads = true;
+                Assert.AreEqual("Original", QuickActions.GetById("a").Title,
+                    "the previous item must be restored in place, not recovered by a reconcile");
+
+                // And separately pin the forced reconcile (_loaded = false): hand
+                // the OS a different truth, allow reads, and the facade must adopt
+                // it — impossible if the failed Update left its cache authoritative.
+                bridge.Os.Clear();
+                bridge.Os.Add(new QuickActionItem("z", "Z"));
+                bridge.FailReads = false;
+                CollectionAssert.AreEqual(new[] { "z" }, QuickActions.GetAll().ConvertAll(i => i.Id),
+                    "a failed Update must force a reconcile with the device state");
+            }
+            finally { QuickActions.OverrideBridgeForTesting(null); }
+        }
+
+        [Test]
+        public void Update_OsDropsTheUpdatedItem_ReturnsFalseAndReportsItGone()
+        {
+            // WHY: this is Update's own "honesty contract" (same as Add's dropped
+            // branch): when the shared budget shrank between pushes — a host app
+            // published more shortcuts — the push replaces the previous item and
+            // the OS keeps neither. Update must return false and queries must show
+            // the id gone; deleting the dropped-id branch must fail THIS test.
+            var bridge = new CapBridge(2);
+            QuickActions.OverrideBridgeForTesting(bridge);
+            try
+            {
+                Assert.IsTrue(QuickActions.Add(Item("a")));
+                Assert.IsTrue(QuickActions.Add(Item("b")));
+                bridge.Cap = 1; // the host ate a slot since our last push
+                Assert.IsFalse(QuickActions.Update(new QuickActionItem("b", "Bigger B")),
+                    "an update the OS dropped must not report success");
+                Assert.IsFalse(QuickActions.IsAdded("b"), "the dropped id must read as gone");
+                CollectionAssert.AreEqual(new[] { "a" }, QuickActions.GetAll().ConvertAll(i => i.Id));
+            }
+            finally { QuickActions.OverrideBridgeForTesting(null); }
+        }
+
+        [Test]
+        public void Update_Succeeds_WhileTheOsPrunesAnotherItem()
+        {
+            // WHY: Update's success is per-ITEM, not per-push — the same shrunken
+            // budget can keep the updated item yet drop a later one. Update must
+            // return true (its item landed) while queries honestly drop the other.
+            var bridge = new CapBridge(3);
+            QuickActions.OverrideBridgeForTesting(bridge);
+            try
+            {
+                QuickActions.AddList(new List<QuickActionItem> { Item("a"), Item("b"), Item("c") });
+                bridge.Cap = 2;
+                Assert.IsTrue(QuickActions.Update(new QuickActionItem("b", "Better B")),
+                    "the updated item survived the push — that is a success");
+                CollectionAssert.AreEqual(new[] { "a", "b" }, QuickActions.GetAll().ConvertAll(i => i.Id));
+                Assert.IsFalse(QuickActions.IsAdded("c"), "the item beyond the shrunken cap is gone");
+                Assert.AreEqual("Better B", QuickActions.GetById("b").Title);
             }
             finally { QuickActions.OverrideBridgeForTesting(null); }
         }
@@ -890,15 +946,17 @@ namespace EminDeniz99.QuickActions.Tests
             }
         }
 
-        // Models the Android OS cap: keeps only the first `_cap` items and returns
+        // Models the Android OS cap: keeps only the first `Cap` items and returns
         // exactly that trimmed subset as a NEW list (not the input reference), so the
         // facade actually prunes. GetShortcuts() is intentionally empty to prove the
         // prune relies solely on the SetShortcuts RETURN, never a device read-back.
         private sealed class CapBridge : IQuickActionsBridge
         {
-            private readonly int _cap;
+            // Mutable so a test can shrink the budget BETWEEN pushes — modelling a
+            // host app publishing more shortcuts into the shared cap mid-session.
+            public int Cap;
             public readonly List<QuickActionItem> Shortcuts = new List<QuickActionItem>();
-            public CapBridge(int cap) => _cap = cap;
+            public CapBridge(int cap) => Cap = cap;
             public bool IsPlatformSupported => true;
             public int MaxShortcutCount => 4;
             public bool IsPinSupported => false;
@@ -907,7 +965,7 @@ namespace EminDeniz99.QuickActions.Tests
             public IList<QuickActionItem> SetShortcuts(IList<QuickActionItem> items)
             {
                 var accepted = new List<QuickActionItem>();
-                for (var i = 0; i < items.Count && i < _cap; i++)
+                for (var i = 0; i < items.Count && i < Cap; i++)
                     accepted.Add(items[i]);
                 Shortcuts.Clear();
                 Shortcuts.AddRange(accepted);
@@ -984,6 +1042,7 @@ namespace EminDeniz99.QuickActions.Tests
         {
             public readonly List<QuickActionItem> Os = new List<QuickActionItem>();
             public bool FailWrites;
+            public bool FailReads;
             public bool IsPlatformSupported => true;
             public int MaxShortcutCount => 4;
             public bool IsPinSupported => false;
@@ -1000,7 +1059,7 @@ namespace EminDeniz99.QuickActions.Tests
             public string GetLastPerformed() => null;
             public void ResetLastPerformed() { }
             public string ConsumePendingPerformed() => null;
-            public IList<QuickActionItem> GetShortcuts() => new List<QuickActionItem>(Os);
+            public IList<QuickActionItem> GetShortcuts() => FailReads ? null : new List<QuickActionItem>(Os);
         }
 
         // A bridge whose RemoveAll reports failure (false) WITHOUT throwing — models an

@@ -116,10 +116,36 @@ namespace EminDeniz99.QuickActions.Editor
         // cleanup is a manifest file listing exactly the file names we copied —
         // never delete anything not listed there (same never-touch-host rule as
         // the plist marker). Group-style PBX adds flatten into the bundle root, so
-        // IosTemplateImage = file name without extension.
+        // a PNG resolves as IosTemplateImage = file name without extension (a JPEG
+        // needs the extension included — bare-name bundle lookup is PNG-only).
+        //
+        // Crash-safety ordering: all disk DELETES happen only AFTER the edited
+        // pbxproj is persisted, and every per-texture failure warns + skips
+        // instead of throwing — a mid-sync failure must never strand the on-disk
+        // Xcode project referencing files that no longer exist (unfixable on
+        // later Append builds once the manifest is gone), nor abort the
+        // Info.plist static-shortcut step that runs after this.
+        //
+        // NOTE: the .verify harness compile-checks this method only (its PBX
+        // stubs are no-ops) — behavior needs a real Editor + Xcode build; see
+        // ROADMAP "v0.3 feature validation".
         private const string IconsFolder = "QuickActionsIcons";
 
         private static void SyncTemplateImages(string buildPath, QuickActionsSettings settings)
+        {
+            try
+            {
+                SyncTemplateImagesCore(buildPath, settings);
+            }
+            catch (System.Exception e)
+            {
+                // Fail loud but contained: the plist static-shortcut step (and the
+                // rest of the build) must survive an icon-sync failure.
+                Debug.LogWarning($"[QuickActions] Template-image sync failed; shortcut icons may be stale: {e.Message}");
+            }
+        }
+
+        private static void SyncTemplateImagesCore(string buildPath, QuickActionsSettings settings)
         {
             var projPath = PBXProject.GetPBXProjectPath(buildPath);
             if (string.IsNullOrEmpty(projPath) || !File.Exists(projPath))
@@ -135,24 +161,25 @@ namespace EminDeniz99.QuickActions.Editor
             var proj = new PBXProject();
             proj.ReadFromFile(projPath);
 
-            // Remove what WE copied last build (manifest-scoped) so renamed/removed
-            // textures don't ship stale on an Append build.
+            // Phase 1 — in-memory only: drop the PBX references of what WE copied
+            // last build (manifest-scoped) so renamed/removed textures don't ship
+            // stale on an Append build. No disk deletes yet.
+            var stale = new List<string>();
             if (File.Exists(manifestPath))
             {
-                foreach (var stale in File.ReadAllLines(manifestPath))
+                foreach (var name in File.ReadAllLines(manifestPath))
                 {
-                    if (string.IsNullOrWhiteSpace(stale))
+                    if (string.IsNullOrWhiteSpace(name))
                         continue;
-                    var guid = proj.FindFileGuidByProjectPath(IconsFolder + "/" + stale);
+                    stale.Add(name);
+                    var guid = proj.FindFileGuidByProjectPath(IconsFolder + "/" + name);
                     if (!string.IsNullOrEmpty(guid))
                         proj.RemoveFile(guid);
-                    var stalePath = Path.Combine(iconsDir, stale);
-                    if (File.Exists(stalePath))
-                        File.Delete(stalePath);
                 }
-                File.Delete(manifestPath);
             }
 
+            // Phase 2 — copy the current set and register it. Every failure skips
+            // the one texture (warn), never the whole sync.
             var copied = new List<string>();
             if (settings != null && settings.IosTemplateImages.Count > 0)
             {
@@ -170,27 +197,62 @@ namespace EminDeniz99.QuickActions.Editor
                         Debug.LogWarning($"[QuickActions] Template image '{assetPath}' is not a PNG/JPEG file; skipped.");
                         continue;
                     }
+                    // A texture in a non-embedded UPM package has a VIRTUAL
+                    // "Packages/..." asset path — the bytes live under
+                    // Library/PackageCache. Resolve to the physical file.
+                    var sourcePath = File.Exists(assetPath) ? assetPath : FileUtil.GetPhysicalPath(assetPath);
+                    if (string.IsNullOrEmpty(sourcePath) || !File.Exists(sourcePath))
+                    {
+                        Debug.LogWarning($"[QuickActions] Template image '{assetPath}' has no physical file; skipped.");
+                        continue;
+                    }
                     var fileName = Path.GetFileName(assetPath);
-                    if (copied.Contains(fileName))
+                    // Case-insensitive: iOS builds run on case-insensitive macOS
+                    // filesystems, where Back.png and back.png silently overwrite
+                    // each other on disk while getting two PBX references.
+                    if (copied.Exists(n => string.Equals(n, fileName, System.StringComparison.OrdinalIgnoreCase)))
                     {
                         Debug.LogWarning($"[QuickActions] Duplicate template-image file name '{fileName}'; skipped.");
                         continue;
                     }
-                    Directory.CreateDirectory(iconsDir);
-                    File.Copy(assetPath, Path.Combine(iconsDir, fileName), true);
+                    try
+                    {
+                        Directory.CreateDirectory(iconsDir);
+                        File.Copy(sourcePath, Path.Combine(iconsDir, fileName), true);
+                    }
+                    catch (System.IO.IOException e)
+                    {
+                        Debug.LogWarning($"[QuickActions] Could not copy template image '{assetPath}': {e.Message}; skipped.");
+                        continue;
+                    }
                     var fileGuid = proj.AddFile(IconsFolder + "/" + fileName, IconsFolder + "/" + fileName);
                     proj.AddFileToBuild(target, fileGuid);
                     copied.Add(fileName);
                 }
             }
 
+            // Phase 3 — persist the pbxproj FIRST, then reconcile the disk: delete
+            // only stale files that were not re-copied this build, and rewrite the
+            // manifest last. If anything above threw, disk still matches the old
+            // pbxproj and the manifest still records our files for the next run.
+            proj.WriteToFile(projPath);
+            foreach (var name in stale)
+            {
+                if (copied.Exists(n => string.Equals(n, name, System.StringComparison.OrdinalIgnoreCase)))
+                    continue;
+                var stalePath = Path.Combine(iconsDir, name);
+                if (File.Exists(stalePath))
+                    File.Delete(stalePath);
+            }
             if (copied.Count > 0)
             {
                 File.WriteAllLines(manifestPath, copied);
                 Debug.Log($"[QuickActions] Copied {copied.Count} template image(s) into the Xcode project.");
             }
-
-            proj.WriteToFile(projPath);
+            else if (File.Exists(manifestPath))
+            {
+                File.Delete(manifestPath);
+            }
         }
     }
 

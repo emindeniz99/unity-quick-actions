@@ -30,7 +30,10 @@ The stub harness compiles the C#/Java but can't confirm Unity-only wiring:
   feedback loop — just confirm no crash/no-op); and the template-image pipeline:
   confirm a copied PNG lands in the built app bundle root (group-style PBX adds
   flatten) and `iconWithTemplateImageName:`/`IconFile` resolve it by file name
-  on device. NOTE the iOS side of v0.2 (the .mm userInfo
+  on device. The pipeline (`SyncTemplateImages`) is COMPILE-CHECKED ONLY in the
+  harness — its PBX stubs are no-ops — so its behavior (manifest cleanup
+  ordering, package-path resolution, Append rebuilds) is real-Editor/Xcode
+  validation, not covered by verify.sh. NOTE the iOS side of v0.2 (the .mm userInfo
   persistence of symbol/template/payload and its read-back) has NO automated
   coverage — the .verify harness is Java+C# only — so the iOS reconcile
   round-trip is device-validation-only; the equivalent Android extras path is
