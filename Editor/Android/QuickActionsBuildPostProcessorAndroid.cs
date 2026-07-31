@@ -84,6 +84,8 @@ namespace EminDeniz99.QuickActions.Editor
             var xml = Path.Combine(moduleDir, "src", "main", "res", "xml", ShortcutsResource + ".xml");
             var strings = Path.Combine(moduleDir, "src", "main", "res", "values", StringsResource + ".xml");
             var removedFiles = SafeDelete(xml) | SafeDelete(strings);
+            foreach (var localized in GeneratedLocalizedStringFiles(moduleDir))
+                removedFiles |= SafeDelete(localized);
             if (removedMeta || removedFiles)
                 Debug.Log("[QuickActions] Cleared stale static-shortcut output (no static shortcuts configured).");
         }
@@ -111,6 +113,22 @@ namespace EminDeniz99.QuickActions.Editor
             if (removed)
                 doc.Save(manifestPath);
             return removed;
+        }
+
+        // The per-locale string files a previous build of THIS package wrote. Ours
+        // by exact file name inside a values-* directory — a host app's own
+        // values-fr/strings.xml sits in the same folder and is never touched.
+        private static IEnumerable<string> GeneratedLocalizedStringFiles(string moduleDir)
+        {
+            var resDir = Path.Combine(moduleDir, "src", "main", "res");
+            if (!Directory.Exists(resDir))
+                yield break;
+            foreach (var dir in Directory.GetDirectories(resDir, "values-*"))
+            {
+                var file = Path.Combine(dir, StringsResource + ".xml");
+                if (File.Exists(file))
+                    yield return file;
+            }
         }
 
         internal static bool SafeDelete(string filePath)
@@ -179,10 +197,23 @@ namespace EminDeniz99.QuickActions.Editor
 
         private static void WriteResources(string moduleDir, QuickActionsSettings settings, string appId)
         {
-            var xmlDir = Path.Combine(moduleDir, "src", "main", "res", "xml");
-            var valuesDir = Path.Combine(moduleDir, "src", "main", "res", "values");
+            var resDir = Path.Combine(moduleDir, "src", "main", "res");
+            var xmlDir = Path.Combine(resDir, "xml");
+            var valuesDir = Path.Combine(resDir, "values");
             Directory.CreateDirectory(xmlDir);
             Directory.CreateDirectory(valuesDir);
+
+            // Clear the per-locale files a previous build wrote before regenerating:
+            // a locale dropped from the settings must stop shipping, exactly like a
+            // dropped shortcut does (same marker-by-file-name scoping as above).
+            foreach (var stale in GeneratedLocalizedStringFiles(moduleDir))
+                SafeDelete(stale);
+
+            // qualifier ("fr", "pt-rBR", "b+zh+Hans") -> the <string> lines that
+            // locale overrides. Android resolves resources per STRING, so each file
+            // carries only what that locale actually translates and everything else
+            // falls back to the default values/ file below.
+            var localized = new SortedDictionary<string, StringBuilder>();
 
             var shortcuts = new StringBuilder();
             shortcuts.AppendLine("<?xml version=\"1.0\" encoding=\"utf-8\"?>");
@@ -210,6 +241,16 @@ namespace EminDeniz99.QuickActions.Editor
                 var subtitle = string.IsNullOrEmpty(item.Subtitle) ? item.Title : item.Subtitle;
                 strings.AppendLine($"  <string name=\"{shortName}\" formatted=\"false\">{EscapeResValue(item.Title)}</string>");
                 strings.AppendLine($"  <string name=\"{longName}\" formatted=\"false\">{EscapeResValue(subtitle)}</string>");
+                // Same two resource names, per locale: the launcher then renders a
+                // baked shortcut in the device language without the app running.
+                AppendLocalized(localized, item.LocalizedTitles, shortName, item.Id);
+                // The long label mirrors the rule above — with no base subtitle it IS
+                // the title — so an item that only translates its title must translate
+                // both resources, or one of the two labels renders in the base language.
+                var localizedLong = item.LocalizedSubtitles;
+                if ((localizedLong == null || localizedLong.Count == 0) && string.IsNullOrEmpty(item.Subtitle))
+                    localizedLong = item.LocalizedTitles;
+                AppendLocalized(localized, localizedLong, longName, item.Id);
 
                 shortcuts.AppendLine("  <shortcut");
                 shortcuts.AppendLine($"      android:shortcutId=\"{Escape(item.Id)}\"");
@@ -238,6 +279,91 @@ namespace EminDeniz99.QuickActions.Editor
 
             File.WriteAllText(Path.Combine(xmlDir, ShortcutsResource + ".xml"), shortcuts.ToString());
             File.WriteAllText(Path.Combine(valuesDir, StringsResource + ".xml"), strings.ToString());
+
+            foreach (var locale in localized)
+            {
+                var localeDir = Path.Combine(resDir, "values-" + locale.Key);
+                Directory.CreateDirectory(localeDir);
+                var file = new StringBuilder();
+                file.AppendLine("<?xml version=\"1.0\" encoding=\"utf-8\"?>");
+                file.AppendLine("<resources>");
+                file.Append(locale.Value);
+                file.AppendLine("</resources>");
+                File.WriteAllText(Path.Combine(localeDir, StringsResource + ".xml"), file.ToString());
+            }
+            if (localized.Count > 0)
+                Debug.Log($"[QuickActions] Wrote localized static-shortcut labels for {localized.Count} locale(s).");
+        }
+
+        // Adds one item's per-locale labels to the per-qualifier buckets, skipping
+        // rows the runtime resolver would skip too (blank locale/text) so the build
+        // output can't disagree with what a dynamic shortcut would render.
+        private static void AppendLocalized(IDictionary<string, StringBuilder> localized,
+            List<LocalizedText> entries, string resourceName, string id)
+        {
+            if (entries == null)
+                return;
+            foreach (var entry in entries)
+            {
+                if (entry == null || string.IsNullOrEmpty(entry.Locale) || string.IsNullOrEmpty(entry.Text))
+                    continue;
+                var qualifier = ResourceQualifier(entry.Locale);
+                if (qualifier == null)
+                {
+                    // Warn instead of emitting a directory aapt2 would reject (which
+                    // fails the whole build over one bad row).
+                    Debug.LogWarning($"[QuickActions] Static shortcut '{id}': locale '{entry.Locale}' is not a usable " +
+                        "Android resource qualifier; that translation was skipped (the base label still ships).");
+                    continue;
+                }
+                if (!localized.TryGetValue(qualifier, out var body))
+                    localized[qualifier] = body = new StringBuilder();
+                body.AppendLine($"  <string name=\"{resourceName}\" formatted=\"false\">{EscapeResValue(entry.Text)}</string>");
+            }
+        }
+
+        // Locale tag -> Android resource-directory qualifier (the part after
+        // "values-"): "fr" -> "fr", "pt-BR" -> "pt-rBR" (the classic language+region
+        // form), anything richer -> the BCP-47 form "b+zh+Hans", which is the ONLY
+        // shape aapt2 accepts for script/variant subtags (API 21+; shortcuts
+        // themselves need API 25, so that floor is never the binding constraint).
+        // Null for a tag that can't be a directory name — the caller warns and skips
+        // rather than emitting a resource folder that fails the build.
+        internal static string ResourceQualifier(string locale)
+        {
+            if (string.IsNullOrEmpty(locale))
+                return null;
+            var parts = locale.Split('-');
+            foreach (var part in parts)
+                if (part.Length == 0 || !IsAsciiAlphanumeric(part))
+                    return null;
+            var language = parts[0].ToLowerInvariant();
+            if (language.Length < 2 || language.Length > 3 || !IsAsciiAlpha(language))
+                return null;
+            if (parts.Length == 1)
+                return language;
+            if (parts.Length == 2 && parts[1].Length == 2 && IsAsciiAlpha(parts[1]))
+                return language + "-r" + parts[1].ToUpperInvariant();
+            var bcp47 = new StringBuilder("b+").Append(language);
+            for (var i = 1; i < parts.Length; i++)
+                bcp47.Append('+').Append(parts[i]);
+            return bcp47.ToString();
+        }
+
+        private static bool IsAsciiAlpha(string value)
+        {
+            foreach (var c in value)
+                if ((c < 'a' || c > 'z') && (c < 'A' || c > 'Z'))
+                    return false;
+            return true;
+        }
+
+        private static bool IsAsciiAlphanumeric(string value)
+        {
+            foreach (var c in value)
+                if ((c < 'a' || c > 'z') && (c < 'A' || c > 'Z') && (c < '0' || c > '9'))
+                    return false;
+            return true;
         }
 
         // Returns true when our shortcuts meta-data is present after the call (freshly

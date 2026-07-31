@@ -44,6 +44,7 @@ public final class QuickActionsBridgeSmokeTest {
         trampolineAcceptsOursManifestAndPinnedOnly();
         bitmapIconIsChosenAndFallsBackWhenUndecodable();
         payloadRoundTripsThroughExtrasAndIntent();
+        localizationBlobRoundTripsThroughExtras();
         pinRequestIsOwnershipGated();
         maxShortcutCountIsExposed();
         adaptiveAndPinDegradeBelowApi26();
@@ -336,6 +337,39 @@ public final class QuickActionsBridgeSmokeTest {
         JSONArray items = new JSONObject(QuickActionsBridge.getShortcutsJson(activity(mgr))).optJSONArray("items");
         check("level=7".equals(items.optJSONObject(0).optString("Payload", "?")),
                 "payload round-trips through the read-back");
+    }
+
+    private static void localizationBlobRoundTripsThroughExtras() throws Exception {
+        ShortcutManager mgr = new ShortcutManager();
+        // What C# sends after resolving for a French device: the labels are already
+        // FINAL and the blob carries the base text + tables. Java must store and
+        // return it verbatim — parsing locales here is the managed layer's job.
+        String blob = "qa14:Play8:Continue1:12:fr5:Jouer1:12:fr9:Continuer";
+        String json = new JSONObject().put("items", new JSONArray().put(new JSONObject()
+                .put("Id", "fr1").put("Title", "Jouer").put("Subtitle", "Continuer")
+                .put("L10n", blob))).toString();
+        check(QuickActionsBridge.setShortcuts(activity(mgr), json) != null, "localized write lands");
+
+        ShortcutInfo installed = byId(mgr.dynamic, "fr1");
+        check("Jouer".equals(installed.getShortLabel().toString()), "the launcher shows the RESOLVED label");
+        check(blob.equals(installed.getExtras().getString(QuickActionsBridge.EXTRA_L10N, "?")),
+                "the localization blob is persisted in the marker extras");
+
+        // Cold-start reconcile: the blob (and with it the BASE title inside it) comes
+        // back alongside the label the OS shows, which is what lets C# tell "the user
+        // switched language" from "these labels are current".
+        JSONArray items = new JSONObject(QuickActionsBridge.getShortcutsJson(activity(mgr))).optJSONArray("items");
+        check(blob.equals(items.optJSONObject(0).optString("L10n", "?")), "the blob round-trips through the read-back");
+        check("Jouer".equals(items.optJSONObject(0).optString("Title", "?")),
+                "the read-back Title is what the OS SHOWS, not the base text");
+
+        // An unlocalized item must be untouched by all of this.
+        ShortcutManager plain = new ShortcutManager();
+        check(QuickActionsBridge.setShortcuts(activity(plain), itemsJson("p1")) != null, "unlocalized write lands");
+        check(byId(plain.dynamic, "p1").getExtras().getString(QuickActionsBridge.EXTRA_L10N, "").isEmpty(),
+                "no blob extra is written for an unlocalized shortcut");
+        JSONArray plainItems = new JSONObject(QuickActionsBridge.getShortcutsJson(activity(plain))).optJSONArray("items");
+        check("".equals(plainItems.optJSONObject(0).optString("L10n", "?")), "an unlocalized shortcut reads back an empty blob");
     }
 
     private static void pinRequestIsOwnershipGated() throws Exception {

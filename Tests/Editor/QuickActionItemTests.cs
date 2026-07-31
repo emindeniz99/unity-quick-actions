@@ -57,6 +57,11 @@ namespace EminDeniz99.QuickActions.Tests
                     field.SetValue(item, true);
                 else if (field.FieldType.IsEnum)
                     field.SetValue(item, System.Enum.GetValues(field.FieldType).GetValue(2));
+                else if (field.FieldType == typeof(System.Collections.Generic.List<LocalizedText>))
+                    field.SetValue(item, new System.Collections.Generic.List<LocalizedText>
+                    {
+                        new LocalizedText(field.Name + "_locale", field.Name + "_text"),
+                    });
                 else
                     Assert.Fail($"Field '{field.Name}' has type {field.FieldType} this test can't seed — extend the type switch.");
             }
@@ -65,8 +70,30 @@ namespace EminDeniz99.QuickActions.Tests
 
             Assert.AreNotSame(item, copy);
             foreach (var field in typeof(QuickActionItem).GetFields())
-                Assert.AreEqual(field.GetValue(item), field.GetValue(copy),
-                    $"Copy() must preserve field '{field.Name}'");
+            {
+                var original = field.GetValue(item);
+                var copied = field.GetValue(copy);
+                // The per-locale tables need element-wise comparison: LocalizedText
+                // has no value equality, so AreEqual on the lists would compare
+                // references and fail a correct DEEP copy. The AreNotSame pair is
+                // the point of the check — sharing the list (or an entry) would let
+                // a caller retitle a stored item after Add/GetAll, the exact
+                // divergence Copy() exists to prevent.
+                if (original is System.Collections.Generic.List<LocalizedText> entries)
+                {
+                    var copiedEntries = (System.Collections.Generic.List<LocalizedText>)copied;
+                    Assert.AreNotSame(entries, copiedEntries, $"Copy() must not share the list in '{field.Name}'");
+                    Assert.AreEqual(entries.Count, copiedEntries.Count, $"Copy() must preserve every entry of '{field.Name}'");
+                    for (var i = 0; i < entries.Count; i++)
+                    {
+                        Assert.AreNotSame(entries[i], copiedEntries[i], $"Copy() must not share entries of '{field.Name}'");
+                        Assert.AreEqual(entries[i].Locale, copiedEntries[i].Locale, $"Copy() must preserve '{field.Name}' locales");
+                        Assert.AreEqual(entries[i].Text, copiedEntries[i].Text, $"Copy() must preserve '{field.Name}' texts");
+                    }
+                    continue;
+                }
+                Assert.AreEqual(original, copied, $"Copy() must preserve field '{field.Name}'");
+            }
         }
 
         [Test]

@@ -22,7 +22,10 @@ namespace EminDeniz99.QuickActions
     /// shortcuts the OS already has (from a previous session), so
     /// <see cref="GetAll"/> / <see cref="IsAdded"/> stay accurate across launches;
     /// icon identity survives the reconcile on both platforms (persisted in the
-    /// ownership-marker payload: Android extras, iOS userInfo).
+    /// ownership-marker payload: Android extras, iOS userInfo). That same payload
+    /// carries each item's base text and per-locale tables, so a device-language
+    /// change between launches re-renders the shortcuts on the next reconcile —
+    /// see <see cref="Locale"/>.
     /// Static (build-time) shortcuts are <i>not</i> reconciled — don't reuse a
     /// static shortcut's id at runtime. The first <see cref="Add"/> therefore
     /// merges with the reconciled set; call <see cref="RemoveAll"/> first to start
@@ -43,11 +46,19 @@ namespace EminDeniz99.QuickActions
         /// <see cref="GetAll"/> / <see cref="IsAdded"/> are accurate after a cold
         /// start. Static (build-time) shortcuts are not surfaced here. Marks loaded
         /// only on success, and guards against re-entrancy from the bridge call.
+        ///
+        /// This is also where a language change that happened while the app was NOT
+        /// running is caught: each restored item's base text and per-locale tables
+        /// come back with it, so a set still rendered in the previous locale is
+        /// re-pushed exactly once (see <see cref="Locale"/>).
         /// </summary>
         /// <returns>
-        /// True when the managed set now reflects the OS (loaded, or already loaded);
-        /// false when the current OS shortcuts could not be read (so callers must not
-        /// mutate/push against an unknown baseline) or during a re-entrant load.
+        /// True when the managed set now reflects the OS (loaded, or already loaded) —
+        /// including when the localization refresh push failed, since that changes
+        /// only the rendered language, not which ids are installed (the failure clears
+        /// <c>_loaded</c> so the next access re-checks); false when the current OS
+        /// shortcuts could not be read (so callers must not mutate/push against an
+        /// unknown baseline) or during a re-entrant load.
         /// </returns>
         private static bool EnsureLoaded()
         {
@@ -56,6 +67,7 @@ namespace EminDeniz99.QuickActions
             if (_loading)
                 return false; // re-entrant call mid-load — not safe to treat as loaded yet
             _loading = true;
+            var stale = 0;
             try
             {
                 var existing = Bridge.GetShortcuts();
@@ -71,20 +83,87 @@ namespace EminDeniz99.QuickActions
                 foreach (var item in existing)
                 {
                     // Trust nothing from the native payload: drop invalid/duplicate ids.
-                    if (item != null && item.IsValid && seen.Add(item.Id))
-                        _items.Add(item);
+                    if (item == null || !item.IsValid || !seen.Add(item.Id))
+                        continue;
+                    // What came back is what the device SHOWS — the text resolved at
+                    // the last push. Restore the base text and the per-locale tables
+                    // from the payload's blob, and count the items whose shown text no
+                    // longer matches the current locale.
+                    if (QuickActionLocalization.Restore(item, Locale))
+                        stale++;
+                    _items.Add(item);
                 }
                 _loaded = true;
-                return true;
             }
             finally
             {
                 _loading = false;
             }
+
+            if (stale > 0)
+            {
+                // The device language (or Locale) changed while the app was not
+                // running, so the launcher still renders the old language. ONE push
+                // re-renders it — the feature's core promise. Loop-safe: this runs
+                // only on a load that actually found a mismatch, _loaded is already
+                // true so the push can't re-enter the load, and the push writes the
+                // current locale's text, so the next load finds nothing stale.
+                Log($"Localization refresh: {stale} quick action(s) still rendered in another locale; re-pushing for '{Locale}'.");
+                if (!Push())
+                {
+                    _loaded = false; // the OS refused it — reconcile again next access
+                    Log("Localization refresh failed: the OS did not accept the update; the shortcuts still show the previous locale.");
+                }
+            }
+            return true;
         }
 
         /// <summary>When true, the API logs its operations through <c>Debug.Log</c>.</summary>
         public static bool LoggingEnable { get; set; }
+
+        // null = "not chosen yet" (the getter then asks the device). An explicit
+        // empty string is a caller saying "use the base text only", so the two must
+        // stay distinguishable.
+        private static string _locale;
+
+        /// <summary>
+        /// Locale used to pick each installed item's label from
+        /// <see cref="QuickActionItem.LocalizedTitles"/> /
+        /// <see cref="QuickActionItem.LocalizedSubtitles"/> — a BCP-47-ish tag
+        /// ("fr", "pt-BR"). Defaults to the device language
+        /// (<see cref="Application.systemLanguage"/> mapped to an ISO code;
+        /// languages outside the mapping answer "en").
+        ///
+        /// Assign it when the app has its own language picker: a <b>different</b>
+        /// value re-pushes the installed shortcuts immediately, so their labels
+        /// change with the rest of the UI (assigning the same value — case
+        /// differences included, since resolution ignores case — does nothing).
+        /// Items keep their base text and tables, so switching languages back and
+        /// forth always resolves from the author's original strings. Setting this
+        /// before any shortcut exists is free: the first push uses it.
+        /// </summary>
+        public static string Locale
+        {
+            get => _locale ??= QuickActionLocalization.FromSystemLanguage(Application.systemLanguage);
+            set
+            {
+                var next = value ?? string.Empty;
+                if (string.Equals(Locale, next, StringComparison.OrdinalIgnoreCase))
+                    return; // no observable difference — don't spend an OS write on it
+                _locale = next;
+                if (_items.Count == 0)
+                    return; // nothing installed yet; the next push picks this up
+                Log($"Locale set to '{next}'; re-pushing {_items.Count} quick action(s).");
+                if (!Push())
+                {
+                    // The OS refused the re-render (rate-limited, locked profile…):
+                    // the device still shows the previous locale's labels, so force a
+                    // reconcile and say so rather than leaving a silent mismatch.
+                    _loaded = false;
+                    Log("Locale change failed: the OS did not accept the update; the shortcuts still show the previous locale.");
+                }
+            }
+        }
 
         /// <summary>True on a device that supports quick actions; false in-Editor.</summary>
         public static bool IsPlatformSupported => Bridge.IsPlatformSupported;
@@ -240,6 +319,7 @@ namespace EminDeniz99.QuickActions
             _loading = false;
             _bridge = null;
             LoggingEnable = false;
+            _locale = null; // re-read the device language, like a real process start
         }
 
         /// <summary>
@@ -620,7 +700,15 @@ namespace EminDeniz99.QuickActions
 
         private static bool Push()
         {
-            var accepted = Bridge.SetShortcuts(_items);
+            // Serialize RESOLVED copies: the natives and the OS must see the final
+            // strings (they do no locale work of their own), while _items keeps the
+            // base text and the per-locale tables — mutating them here would make
+            // the next locale switch translate an already-translated label.
+            var payload = new List<QuickActionItem>(_items.Count);
+            foreach (var item in _items)
+                payload.Add(QuickActionLocalization.Resolved(item, Locale));
+
+            var accepted = Bridge.SetShortcuts(payload);
             if (accepted == null)
             {
                 // The OS write did not FULLY land (rejected/rate-limited/errored).
@@ -636,7 +724,7 @@ namespace EminDeniz99.QuickActions
                 return false;
             }
             // Same reference = accept-all (Null/iOS) — nothing was trimmed, nothing to prune.
-            if (ReferenceEquals(accepted, _items))
+            if (ReferenceEquals(accepted, payload))
                 return true;
 
             // The OS trimmed some ids to fit its cap. Prune the surplus from the

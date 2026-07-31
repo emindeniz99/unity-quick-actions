@@ -33,6 +33,9 @@ namespace EminDeniz99.QuickActions.Editor
             // build drops icons a previous build copied (manifest-scoped cleanup,
             // mirroring the plist ClearOurEntries path below).
             SyncTemplateImages(report.summary.outputPath, QuickActionsSettings.GetOrNull());
+            // Same run-always rule for the per-locale label tables: a locale removed
+            // from the settings must stop shipping on an Append build.
+            SyncLocalizedLabels(report.summary.outputPath, QuickActionsSettings.GetOrNull());
 
             var plistPath = Path.Combine(report.summary.outputPath, "Info.plist");
             if (!File.Exists(plistPath))
@@ -253,6 +256,254 @@ namespace EminDeniz99.QuickActions.Editor
             {
                 File.Delete(manifestPath);
             }
+        }
+
+        // Per-locale labels for the STATIC (baked) shortcuts. iOS localizes an
+        // Info.plist string by looking its VALUE up as a key in InfoPlist.strings, so
+        // the base title/subtitle we wrote into UIApplicationShortcutItemTitle /
+        // ...Subtitle doubles as the lookup key — there is no separate key column to
+        // invent, and an untranslated locale simply falls back to that base text.
+        //
+        // WHY a FOLDER reference and not plain file adds: a group-style PBX file add
+        // flattens into the bundle root (see SyncTemplateImages), which would collapse
+        // every locale's InfoPlist.strings onto one path. A folder reference is copied
+        // verbatim, so the bundle ends up with the <locale>.lproj/ layout iOS resolves
+        // localizations through.
+        //
+        // Ownership, crash-safety and failure handling are SyncTemplateImages' rules,
+        // unchanged: a manifest lists exactly the .lproj folders we created (nothing
+        // else is ever deleted), the edited pbxproj is persisted BEFORE any disk
+        // delete, and every per-locale failure warns and skips instead of throwing —
+        // a half-finished sync must never leave the project referencing files that
+        // are gone, nor abort the Info.plist step.
+        //
+        // NOTE: like SyncTemplateImages, the .verify harness only compile-checks this
+        // (its PBX stubs are no-ops); the copy step needs a real Editor + Xcode build.
+        private const string LocalizationFolder = "QuickActionsLocalization";
+        private const string LocalizationManifest = "quickactions_l10n_manifest.txt";
+
+        private static void SyncLocalizedLabels(string buildPath, QuickActionsSettings settings)
+        {
+            try
+            {
+                SyncLocalizedLabelsCore(buildPath, settings);
+            }
+            catch (System.Exception e)
+            {
+                // Contained like the icon sync: the static shortcuts still ship, in
+                // their base language.
+                Debug.LogWarning($"[QuickActions] Localized shortcut labels were not written; " +
+                    $"static shortcuts will render in their base language: {e.Message}");
+            }
+        }
+
+        private static void SyncLocalizedLabelsCore(string buildPath, QuickActionsSettings settings)
+        {
+            var tables = CollectLocalizedLabels(settings);
+
+            var projPath = PBXProject.GetPBXProjectPath(buildPath);
+            if (string.IsNullOrEmpty(projPath) || !File.Exists(projPath))
+            {
+                if (tables.Count > 0)
+                    Debug.LogWarning("[QuickActions] Xcode project not found; skipping localized shortcut labels.");
+                return;
+            }
+
+            var localizationDir = Path.Combine(buildPath, LocalizationFolder);
+            var manifestPath = Path.Combine(localizationDir, LocalizationManifest);
+
+            var proj = new PBXProject();
+            proj.ReadFromFile(projPath);
+
+            // Phase 1 — in-memory only: drop the PBX references of the .lproj folders
+            // WE created last build, so a locale that is gone stops shipping.
+            var stale = new List<string>();
+            if (File.Exists(manifestPath))
+            {
+                foreach (var name in File.ReadAllLines(manifestPath))
+                {
+                    if (string.IsNullOrWhiteSpace(name))
+                        continue;
+                    stale.Add(name);
+                    var guid = proj.FindFileGuidByProjectPath(LocalizationFolder + "/" + name);
+                    if (!string.IsNullOrEmpty(guid))
+                        proj.RemoveFile(guid);
+                }
+            }
+
+            // Phase 2 — write this build's tables and register them.
+            var written = new List<string>();
+            if (tables.Count > 0)
+            {
+                var target = proj.GetUnityMainTargetGuid();
+                foreach (var table in tables)
+                {
+                    var folder = table.Key + ".lproj";
+                    var projectPath = LocalizationFolder + "/" + folder;
+                    try
+                    {
+                        Directory.CreateDirectory(Path.Combine(localizationDir, folder));
+                        // UTF-8: the modern .strings encoding (Xcode reads it since
+                        // the UTF-16-only days ended), and the only one that can hold
+                        // these labels without a transcoding step.
+                        File.WriteAllText(Path.Combine(localizationDir, folder, "InfoPlist.strings"), table.Value);
+                    }
+                    catch (System.IO.IOException e)
+                    {
+                        Debug.LogWarning($"[QuickActions] Could not write '{projectPath}': {e.Message}; " +
+                            "that locale falls back to the base labels.");
+                        continue;
+                    }
+                    var guid = proj.AddFolderReference(projectPath, projectPath);
+                    if (string.IsNullOrEmpty(guid))
+                    {
+                        Debug.LogWarning($"[QuickActions] Xcode refused a folder reference for '{projectPath}'; " +
+                            "that locale falls back to the base labels.");
+                        continue;
+                    }
+                    proj.AddFileToBuild(target, guid);
+                    written.Add(folder);
+                }
+            }
+
+            // Phase 3 — persist the pbxproj FIRST, then reconcile the disk (delete
+            // only the folders we listed last build and did not rewrite this one).
+            proj.WriteToFile(projPath);
+            foreach (var name in stale)
+            {
+                // Case-insensitive like the template-image sync: iOS builds run on
+                // case-insensitive macOS filesystems, where fr.lproj and FR.lproj are
+                // one directory — matching case-sensitively here would delete the
+                // folder we just wrote.
+                if (written.Exists(n => string.Equals(n, name, System.StringComparison.OrdinalIgnoreCase)))
+                    continue;
+                var staleDir = Path.Combine(localizationDir, name);
+                if (Directory.Exists(staleDir))
+                    Directory.Delete(staleDir, true);
+            }
+            if (written.Count > 0)
+            {
+                File.WriteAllLines(manifestPath, written);
+                Debug.Log($"[QuickActions] Wrote localized static-shortcut labels for {written.Count} locale(s).");
+            }
+            else if (File.Exists(manifestPath))
+            {
+                File.Delete(manifestPath);
+            }
+        }
+
+        // locale -> InfoPlist.strings body, built from the same items (and the same
+        // validity/duplicate rules) the plist step bakes, so the two can't disagree.
+        private static SortedDictionary<string, string> CollectLocalizedLabels(QuickActionsSettings settings)
+        {
+            // Locale keys are matched case-insensitively — the runtime resolver
+            // treats "fr" and "FR" as one locale, and on the case-insensitive macOS
+            // filesystem their .lproj folders ARE one directory, so they must merge
+            // here rather than fight over it.
+            var entries = new SortedDictionary<string, Dictionary<string, string>>(
+                System.StringComparer.OrdinalIgnoreCase);
+            if (settings != null)
+            {
+                var seen = new HashSet<string>();
+                foreach (var item in settings.StaticShortcuts)
+                {
+                    if (item == null || string.IsNullOrEmpty(item.Id) || string.IsNullOrEmpty(item.Title))
+                        continue;
+                    if (!seen.Add(item.Id))
+                        continue;
+                    AddLocalizedLabels(entries, item.LocalizedTitles, item.Title, item.Id);
+                    // A subtitle the plist never wrote has no key to translate.
+                    if (!string.IsNullOrEmpty(item.Subtitle))
+                        AddLocalizedLabels(entries, item.LocalizedSubtitles, item.Subtitle, item.Id);
+                }
+            }
+
+            var tables = new SortedDictionary<string, string>(System.StringComparer.OrdinalIgnoreCase);
+            foreach (var locale in entries)
+            {
+                var body = new System.Text.StringBuilder("/* Generated by QuickActions — do not edit. */\n");
+                foreach (var pair in locale.Value)
+                    body.Append('"').Append(EscapeStringsLiteral(pair.Key)).Append("\" = \"")
+                        .Append(EscapeStringsLiteral(pair.Value)).Append("\";\n");
+                tables[locale.Key] = body.ToString();
+            }
+            return tables;
+        }
+
+        private static void AddLocalizedLabels(SortedDictionary<string, Dictionary<string, string>> entries,
+            List<LocalizedText> localized, string key, string id)
+        {
+            if (localized == null)
+                return;
+            foreach (var entry in localized)
+            {
+                // Skip exactly what the runtime resolver skips, so a static item and
+                // a dynamic one with the same table render the same way.
+                if (entry == null || string.IsNullOrEmpty(entry.Locale) || string.IsNullOrEmpty(entry.Text))
+                    continue;
+                var locale = LprojName(entry.Locale);
+                if (locale == null)
+                {
+                    Debug.LogWarning($"[QuickActions] Static shortcut '{id}': locale '{entry.Locale}' is not a usable " +
+                        ".lproj name; that translation was skipped (the base label still ships).");
+                    continue;
+                }
+                if (!entries.TryGetValue(locale, out var table))
+                    entries[locale] = table = new Dictionary<string, string>();
+                if (table.TryGetValue(key, out var existing))
+                {
+                    // The key IS the base text, so two shortcuts sharing a base label
+                    // share one entry — a conflict can only be resolved by changing
+                    // one of the base labels, so say so instead of silently picking.
+                    if (existing != entry.Text)
+                        Debug.LogWarning($"[QuickActions] Static shortcut '{id}': '{key}' already translates to " +
+                            $"'{existing}' in {locale} (two shortcuts share that base label); kept the first. " +
+                            "Give them distinct base titles to translate them differently.");
+                    continue;
+                }
+                table[key] = entry.Text;
+            }
+        }
+
+        // A .lproj folder name is the locale tag itself; keep it to characters that
+        // are safe in a directory name AND meaningful to iOS's lookup (letters,
+        // digits, '-' and '_'), starting with a letter. Null = unusable.
+        private static string LprojName(string locale)
+        {
+            if (string.IsNullOrEmpty(locale))
+                return null;
+            var first = locale[0];
+            if ((first < 'a' || first > 'z') && (first < 'A' || first > 'Z'))
+                return null;
+            foreach (var c in locale)
+            {
+                var ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
+                         || c == '-' || c == '_';
+                if (!ok)
+                    return null;
+            }
+            return locale;
+        }
+
+        // .strings literals are C-style: backslash, quote and the control characters
+        // that would end the line must be escaped or the file fails to parse (and
+        // takes every entry after it down with it).
+        private static string EscapeStringsLiteral(string value)
+        {
+            var escaped = new System.Text.StringBuilder(value.Length);
+            foreach (var c in value)
+            {
+                switch (c)
+                {
+                    case '\\': escaped.Append("\\\\"); break;
+                    case '"': escaped.Append("\\\""); break;
+                    case '\n': escaped.Append("\\n"); break;
+                    case '\r': escaped.Append("\\r"); break;
+                    case '\t': escaped.Append("\\t"); break;
+                    default: escaped.Append(c); break;
+                }
+            }
+            return escaped.ToString();
         }
     }
 

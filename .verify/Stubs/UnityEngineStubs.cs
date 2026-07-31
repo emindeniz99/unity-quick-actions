@@ -56,6 +56,9 @@ namespace UnityEngine
     public sealed class SerializeField : Attribute { }
 
     [AttributeUsage(AttributeTargets.Field)]
+    public sealed class HideInInspector : Attribute { }
+
+    [AttributeUsage(AttributeTargets.Field)]
     public sealed class TooltipAttribute : Attribute
     {
         public TooltipAttribute(string tooltip) { }
@@ -68,9 +71,25 @@ namespace UnityEngine
         public static void LogError(object message) { }
     }
 
+    // Member ORDER mirrors UnityEngine.SystemLanguage (the enum is index-based), so
+    // the package's mapping switch type-checks against the same names Unity ships.
+    public enum SystemLanguage
+    {
+        Afrikaans, Arabic, Basque, Belarusian, Bulgarian, Catalan, Chinese, Czech,
+        Danish, Dutch, English, Estonian, Faroese, Finnish, French, German, Greek,
+        Hebrew, Icelandic, Indonesian, Italian, Japanese, Korean, Latvian,
+        Lithuanian, Norwegian, Polish, Portuguese, Romanian, Russian, SerboCroatian,
+        Slovak, Slovenian, Spanish, Swedish, Thai, Turkish, Ukrainian, Vietnamese,
+        ChineseSimplified, ChineseTraditional, Unknown, Hindi
+    }
+
     public static class Application
     {
         public static void OpenURL(string url) { }
+
+        // Deterministic in the harness (the real property reads the device); tests
+        // that care about locale set QuickActions.Locale explicitly.
+        public static SystemLanguage systemLanguage => SystemLanguage.English;
     }
 
     public static class JsonUtility
