@@ -3,9 +3,12 @@
 Follow-ups discussed but not shipped in v0.1.0. Delete an entry in the same
 commit that ships it.
 
-- **Automated device CI** — drive an iOS simulator / Android emulator to assert
-  cold + warm delivery end-to-end.
-- **Localization** — per-locale titles/subtitles.
+- **Automated device CI, remaining scope** — v0.4 ships an adb-driven Android
+  smoke (`tools/device-smoke/`) and a manually-dispatched emulator workflow
+  (needs a Unity-built dev APK — no Unity license in CI). Remaining: iOS
+  simulator automation (no adb analog for shortcut taps — see the device-smoke
+  README), asserting the COLD-launch path (the smoke's tap is a warm resume),
+  and wiring the smoke into always-on CI once a Unity license (game-ci) exists.
 
 ## Validate in a real Unity Editor (license-gated; can't run here)
 
@@ -79,18 +82,22 @@ The stub harness compiles the C#/Java but can't confirm Unity-only wiring:
   `QUICKACTIONS_ENABLED` off shows it as "missing script". Harmless and reversible
   (re-enable the define), documented in README. A future cleanup could move the SO
   *type* into an always-compiled editor assembly so the asset never orphans.
-- **iOS scene lifecycle:** cold-launch dedup relies on the app-delegate model
-  (returning `NO` from `didFinishLaunchingWithOptions` suppresses the duplicate
-  `performActionForShortcutItem`). Unity's trampoline uses the app-delegate model
-  by default; if a project adopts the `UIScene` lifecycle, add a
-  `windowScene:performActionForShortcutItem:` hook and queue-level dedup.
-- **iOS host-subclass cold double-delivery:** our `didFinishLaunchingWithOptions`
-  swizzle returns `NO` when the app was cold-launched from one of our shortcuts,
-  which is what tells iOS *not* to also call `performActionForShortcutItem` — so
-  the cold tap is delivered exactly once. If a host ships its own
-  `UnityAppController` subclass that overrides this selector, calls `super`, then
-  returns `YES` unconditionally (discarding our `NO`), iOS delivers the cold tap
-  twice. The fix is on the host side — such an override should return the value
-  from `[super application:didFinishLaunchingWithOptions:]`. Documented as a known
-  limitation in `Plugins/iOS/QuickActions.mm`; a future hardening could add
-  queue-level dedup so a doubled cold delivery collapses to one regardless.
+- **iOS scene lifecycle + cold dedup (SHIPPED in v0.4 — device-validate):** the
+  package now learns the scene-delegate class from the host's
+  `UISceneConfiguration` and installs cold
+  (`scene:willConnectToSession:options:`) + warm
+  (`windowScene:performActionForShortcutItem:completionHandler:`) hooks, with a
+  consume-once cold-dedup marker that also swallows the host-subclass
+  double-delivery on the app-delegate path. NO ObjC compile harness exists:
+  first real validation is an Xcode build. On device, verify: a scene-manifest
+  app delivers cold + warm taps exactly once each; a default (no-manifest) app
+  behaves byte-identically to v0.3; a host UnityAppController subclass that
+  discards our `NO` no longer double-delivers; multi-scene-delegate-class hosts
+  get coverage only for the first class learned (documented in-code).
+- **Localization (SHIPPED in v0.4 — device-validate):** dynamic per-locale
+  titles resolve/refresh across cold starts (verify a device-language change
+  re-renders on next launch, and the refresh push tolerates rate limiting);
+  static output needs real toolchain checks — aapt2 accepts the generated
+  `values-<qualifier>/` (incl. `values-b+zh+Hans`) and iOS resolves
+  `<locale>.lproj/InfoPlist.strings` added via `AddFolderReference` (the
+  weakest link — compile-checked only).

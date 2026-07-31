@@ -45,6 +45,29 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   target at build time, so `IosTemplateImage` art ships straight from Unity
   assets (manifest-scoped Append-build cleanup; only files the package copied
   are ever touched).
+- **Per-locale titles/subtitles (localization)**:
+  `QuickActionItem.LocalizedTitles`/`LocalizedSubtitles` (`LocalizedText`
+  pairs; exact locale > language prefix > base text, case-insensitive) and
+  `QuickActions.Locale` (defaults to the device language; setting a different
+  value re-pushes so labels re-render immediately). Base text and tables
+  survive cold starts inside the ownership-marker payload, and a stale render
+  after a device-language change is refreshed with one automatic push on the
+  next launch. Static shortcuts localize too: Android `values-<qualifier>/`
+  string resources, iOS `<locale>.lproj/InfoPlist.strings`.
+- **iOS UIScene-lifecycle delivery**: when a host adopts the scene lifecycle
+  (scene manifest + scene delegate), cold and warm taps now arrive through
+  hooks the package installs on the scene-delegate class it learns from the
+  host's `UISceneConfiguration`; a default Unity project's launch path is
+  untouched. A consume-once cold-dedup marker guarantees one queue entry per
+  tap — it also fixes the documented double delivery when a host
+  `UnityAppController` subclass discards our `didFinishLaunchingWithOptions`
+  return value.
+- **Android device smoke + emulator CI (experimental)**: `tools/device-smoke/`
+  installs a dev APK, drives the demo's autotest hook, asserts the shortcuts
+  registered via `dumpsys shortcut` (scoped to the app id) and that a
+  simulated trampoline tap delivers `Performed`; a manually-dispatched
+  workflow runs it on a GitHub-hosted emulator. iOS automation is documented
+  as not shipped (no adb analog) with manual steps instead.
 - CI now packs `dist~/QuickActions.unitypackage` and uploads it as a workflow
   artifact.
 

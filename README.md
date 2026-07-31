@@ -271,6 +271,7 @@ public class ShortcutRouter : MonoBehaviour
 | `bool IsPinSupported` | True when the launcher can pin shortcuts (Android 8.0+; always false on iOS/Editor). |
 | `bool RequestPin(string)` | Ask the launcher to pin an **added** action to the home screen. True = request *dispatched* (the user still confirms in launcher UI — the OS reports no outcome). |
 | `bool ReportUsed(string)` | Tell the launcher the user reached this action's feature **in-app** (Android `reportShortcutUsed`, improves ranking predictions). Call on normal-UI usage, not on shortcut taps. False on iOS/Editor (no analog), for a not-added id, or when the native call failed. |
+| `string Locale` | The locale labels resolve against (defaults to the device language via `Application.systemLanguage`). Set it from an in-app language picker — a **different** value re-pushes the current set so the launcher re-renders immediately. A device-language change while the app was closed is caught on next launch: the cold-start reconcile detects stale labels and refreshes them with one push. |
 
 `QuickActionItem` fields:
 
@@ -284,6 +285,7 @@ public class ShortcutRouter : MonoBehaviour
 | `AndroidBitmapAdaptive` | Install `AndroidBitmapFile` as an adaptive icon (API 26+, launcher-masked; supply safe-zone padding). |
 | `AndroidDrawable` | Drawable resource name overriding the `Icon` lookup. Ignored on iOS. |
 | `Payload` | App-defined string riding the shortcut (iOS `userInfo`, Android extras), restored across cold starts. Not pushed with the tap — read it via `GetById(id)?.Payload` from the id `Performed` reports (`GetById` is null for a **static**-shortcut tap or an id removed since: static items never join the runtime list and carry no payload). |
+| `LocalizedTitles` / `LocalizedSubtitles` | Per-locale label replacements (`LocalizedText { Locale, Text }` pairs). Resolution: exact locale match > language prefix (`"pt-BR"` matches a `"pt"` entry) > base `Title`/`Subtitle`, case-insensitive. The tables survive cold starts (they ride the ownership-marker payload), so labels re-resolve after a device-language change. Works for static shortcuts too (baked as `values-<locale>/` resources on Android, `InfoPlist.strings` on iOS). |
 
 ### Test in the Editor — no device needed
 
@@ -452,13 +454,13 @@ spoof a tap; on either platform the id is just a string the OS hands you. So:
 
 ## Limitations / roadmap
 
-See [`ROADMAP.md`](./ROADMAP.md). Notable: automated device CI, per-locale
-titles, and an iOS `Texture2D` → asset-catalog icon pipeline are not
-implemented (iOS custom art must already be a bundle image — `IosTemplateImage`;
-Android takes runtime bitmaps via `AndroidBitmapFile`). OS read-back can't
-recover icons natively; the package persists icon identity in its
-ownership-marker payload — Android extras, iOS `userInfo` — so reconciled
-items keep their icons on both platforms.
+See [`ROADMAP.md`](./ROADMAP.md). Notable remaining: always-on device CI (the
+shipped adb smoke + emulator workflow are manual — no Unity license in CI —
+and cover Android warm taps only; iOS has no adb analog) and on-device
+validation of the newest native paths (UIScene hooks, localized static
+output). OS read-back can't recover icons natively; the package persists icon
+identity in its ownership-marker payload — Android extras, iOS `userInfo` — so
+reconciled items keep their icons on both platforms.
 
 ## Verification
 
@@ -471,7 +473,10 @@ tools/verify.sh    # .meta gen + C# compile (8 configs) + unit tests + Android p
 
 `verify.sh` runs the unit tests via `dotnet test`; the same tests (plus
 JsonUtility serialization tests) run in Unity's **Test Runner** from
-`Tests/Editor/`. See [`.verify/README.md`](https://github.com/emindeniz99/playground/blob/main/projects/quick-actions-unity/.verify/README.md). A green run
+`Tests/Editor/`. For a real device/emulator, `tools/device-smoke/` has an
+adb-driven Android smoke (install a dev APK → assert the demo's shortcuts
+registered → simulate a tap → assert delivery) and a manually-dispatched
+emulator CI workflow — see its README, including the honest iOS limitations. See [`.verify/README.md`](https://github.com/emindeniz99/playground/blob/main/projects/quick-actions-unity/.verify/README.md). A green run
 proves everything compiles and the logic tests pass; on-device behaviour is
 validated with the procedure in [`plans/mvp.md`](https://github.com/emindeniz99/playground/blob/main/projects/quick-actions-unity/plans/mvp.md) (iOS/Android
 quick actions can't run in the Editor or on Linux).
