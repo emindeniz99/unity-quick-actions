@@ -3,8 +3,12 @@
 
 // C API consumed from C# (EminDeniz99.QuickActions.Internal.IOSQuickActionsBridge)
 // via DllImport("__Internal"). The implementation lives in QuickActions.mm,
-// which also installs the UnityAppController hooks. This header is informational;
-// the .mm does not depend on it.
+// which also installs the UnityAppController hooks — plus, when the host adopts the
+// UIScene lifecycle and iOS routes taps to the scene delegate instead, the matching
+// hooks on the delegate class named by the scene configuration (cold:
+// scene:willConnectToSession:options:, warm:
+// windowScene:performActionForShortcutItem:completionHandler:). This header is
+// informational; the .mm does not depend on it.
 
 #ifdef __cplusplus
 extern "C" {
@@ -32,7 +36,10 @@ char *_QuickActions_GetLastPerformed(void);
 void _QuickActions_ResetLastPerformed(void);
 
 // Pull-and-clear the next queued performed id for the C# Performed event, or
-// NULL. malloc'd; caller frees via _QuickActions_FreeString.
+// NULL. malloc'd; caller frees via _QuickActions_FreeString. One tap yields one
+// entry: a cold-launch tap that iOS (or a host UnityAppController subclass) also
+// re-delivers through a warm hook before the app first becomes active is queued
+// once, while every warm tap after that first activation always enqueues.
 char *_QuickActions_ConsumePendingPerformed(void);
 
 // The dynamic shortcut items THIS PACKAGE created (marker-scoped; host items
