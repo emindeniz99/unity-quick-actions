@@ -1,0 +1,132 @@
+# Device smoke
+
+`tools/verify.sh` proves the package *compiles and behaves* headlessly (C# unit
+tests, Java against SDK stubs). It cannot prove the two things that only an OS
+can answer: whether the shortcuts really land in `ShortcutManager`, and whether
+a tap on one really comes back into the game. That is what this directory is
+for.
+
+Android has `adb`, so that half is automated: `android_device_smoke.sh`.
+iOS has no equivalent — see [iOS](#ios-no-automation-shipped) below, which
+documents the manual run instead of pretending it is covered.
+
+## `android_device_smoke.sh`
+
+```
+tools/device-smoke/android_device_smoke.sh <apk> <application-id> [adb-serial]
+```
+
+### What it needs
+
+* **A development APK of the Demo sample**, built by Unity with
+  **`QUICKACTIONS_ENABLED`** in Player Settings ▸ Scripting Define Symbols, with
+  `Samples~/Demo/QuickActionsDemo.unity` as the startup scene. Without the
+  define the package is gated off: no `EminDeniz99.QuickActions.dll`, and the
+  trampoline `<activity>` is never injected into the manifest (step 6 then fails
+  because there is nothing to start). Without the demo scene nothing publishes
+  shortcuts (step 5 fails).
+* **A device or emulator on API 25+** (`ShortcutManager` does not exist below
+  that) with `adb` on `PATH`. Pass an `adb-serial` when more than one is attached.
+
+### What it does
+
+1. Waits (bounded) for a booted device and checks its API level.
+2. `adb install -r` the APK.
+3. `pm clear` + `am force-stop` the app — the autotest hook runs in `Start`, so
+   it needs a fresh process, and clearing data drops shortcuts a previous run
+   left behind. A refused `pm clear` prints a warning and the run continues.
+4. Launches the app's resolved launcher activity with the string extra
+   `com.emindeniz99.quickactions.AUTOTEST=add3`. The Demo sample reads that
+   extra on Android and presses its own "Add 3 shortcuts" button — an adb harness
+   cannot tap IMGUI. **A launch without the extra behaves exactly as before**,
+   so this hook is inert for every real user.
+5. Polls `adb shell dumpsys shortcut` until `new_game`, `continue` and `daily`
+   appear **in this application id's section** (another app's shortcut with the
+   same id does not count).
+6. Clears logcat and starts the exported trampoline directly:
+   `am start -n <app-id>/com.emindeniz99.quickactions.QuickActionsTrampolineActivity
+   -a android.intent.action.VIEW --es com.emindeniz99.quickactions.ACTION_ID new_game`.
+   That is the same intent the launcher sends for a tap.
+7. Polls logcat for the package's own line
+   `[QuickActions] Performed quick action 'new_game'.` (the demo turns
+   `LoggingEnable` on in `Awake`).
+
+Every failure names the step that failed, prints the evidence it collected
+(dumpsys section, logcat tail) and exits non-zero. A clean run ends in a single
+`PASS:` line — nothing else prints success.
+
+Waits are bounded and overridable by environment variable:
+`POLL_INTERVAL` (seconds, default 1), `BOOT_ATTEMPTS` (120),
+`SHORTCUT_ATTEMPTS` (45), `LOG_ATTEMPTS` (30).
+
+### What it asserts — and what it does not
+
+It asserts that a `QUICKACTIONS_ENABLED` build publishes dynamic shortcuts the
+OS accepts, and that a tap intent for one of them is turned into a `Performed`
+event inside the running game. Because the id it taps is a live registered
+shortcut, it also exercises the path the trampoline's spoof gate deliberately
+**allows** (`isKnownShortcut`).
+
+It does **not** prove:
+
+* that a **launcher** renders those shortcuts, their icons, or their order —
+  that needs human eyes on a home screen;
+* the **cold-launch** delivery path: the app is already running when the tap is
+  sent, so this is the warm-resume path (`OnApplicationFocus`/`OnApplicationPause`);
+* that an **unregistered** id is *rejected* by the trampoline (the negative half
+  of the spoof gate — covered headlessly by the Java smoke test in
+  `.verify/JavaSmoke`);
+* pinning, static/manifest shortcuts, or host-app coexistence on a real device.
+
+### Local run
+
+```bash
+# 1. Build the Demo sample to an APK with QUICKACTIONS_ENABLED (Unity, dev build).
+# 2. Start an emulator or plug in a device, then:
+adb devices
+tools/device-smoke/android_device_smoke.sh ~/builds/demo.apk com.example.game
+# ...or against a specific device:
+tools/device-smoke/android_device_smoke.sh ~/builds/demo.apk com.example.game emulator-5554
+```
+
+### CI
+
+`.github/workflows/quick-actions-device-ci.yml` runs exactly this script against
+an API 30 emulator, `workflow_dispatch`-only: it takes a URL to an already-built
+APK because there is no Unity licence in CI to build one. It is **experimental**
+and deliberately not attached to push/PR.
+
+## iOS — no automation shipped
+
+There is no `adb` analog for iOS, and the gap is not one that a script can paper
+over:
+
+* A quick-action tap is delivered by **SpringBoard** to the app delegate
+  (`application:performActionForShortcutItem:` / the launch-options path). No
+  public `simctl` command triggers one, and the package uses no URL scheme, so
+  `simctl openurl` cannot stand in for a tap.
+* The home-screen long-press menu is SpringBoard UI. Reaching it programmatically
+  means an XCUITest bundle driving SpringBoard, which needs an Xcode project, a
+  macOS runner, and a Unity licence to produce the app under test — none of which
+  this repo's CI has.
+
+So the iOS half is run **by hand**:
+
+1. Build the Demo sample for iOS with `QUICKACTIONS_ENABLED` and open the
+   generated Xcode project.
+2. Run it on a simulator or device. Confirm the Xcode console shows
+   `[QuickActions]` lines (the demo enables `LoggingEnable`).
+3. Tap **Add 3 shortcuts** in the demo.
+4. Go to the home screen (Simulator: ⇧⌘H) and long-press/click-and-hold the app
+   icon. **Expected:** New Game, Continue, Daily with their icons.
+5. Tap one. **Expected (warm path):** the app returns to the foreground and the
+   console logs `[QuickActions] Performed quick action '<id>'.` with the demo's
+   on-screen log showing the same id.
+6. For the **cold** path, quit the app first (stop it in Xcode, or swipe it away
+   in the app switcher), then repeat step 5. To keep the debugger attached, set
+   Product ▸ Scheme ▸ Edit Scheme ▸ Run ▸ Launch to *Wait for the executable to
+   be launched*; otherwise read the log with Console.app / `xcrun simctl spawn
+   booted log stream --predicate 'processImagePath CONTAINS "<app>"'`.
+
+Record the outcome in `PRODUCTION_READINESS.md` (the iOS rows marked
+`device` — never run here) rather than in this file.

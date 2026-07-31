@@ -43,13 +43,17 @@ namespace EminDeniz99.QuickActions.Tests
             // WHY: the facade stores/returns defensive copies everywhere; a field
             // missed by Copy() silently loses that icon/payload the moment an item
             // crosses Add/GetAll/GetById — the OS then re-renders it wrong after a
-            // reconcile push. Every public field gets a distinct NON-default value
+            // reconcile push. Every instance field gets a distinct NON-default value
             // BY REFLECTION (not a hand-written arrange block), so a future field
             // whose author forgot to extend Copy() arrives here non-default, comes
             // back default from the copy, and fails — a hand-written arrange would
             // leave it default on both sides and pass vacuously.
+            // NonPublic is load-bearing: the wire-only `internal L10n` (and any
+            // future internal [SerializeField]) is exactly the kind of field an
+            // author forgets, and the default GetFields() binding would skip it —
+            // the guard would then pass while Copy() dropped it.
             var item = new QuickActionItem();
-            foreach (var field in typeof(QuickActionItem).GetFields())
+            foreach (var field in CopyableFields())
             {
                 if (field.FieldType == typeof(string))
                     field.SetValue(item, field.Name + "_value");
@@ -57,6 +61,11 @@ namespace EminDeniz99.QuickActions.Tests
                     field.SetValue(item, true);
                 else if (field.FieldType.IsEnum)
                     field.SetValue(item, System.Enum.GetValues(field.FieldType).GetValue(2));
+                else if (field.FieldType == typeof(System.Collections.Generic.List<LocalizedText>))
+                    field.SetValue(item, new System.Collections.Generic.List<LocalizedText>
+                    {
+                        new LocalizedText(field.Name + "_locale", field.Name + "_text"),
+                    });
                 else
                     Assert.Fail($"Field '{field.Name}' has type {field.FieldType} this test can't seed — extend the type switch.");
             }
@@ -64,10 +73,40 @@ namespace EminDeniz99.QuickActions.Tests
             var copy = item.Copy();
 
             Assert.AreNotSame(item, copy);
-            foreach (var field in typeof(QuickActionItem).GetFields())
-                Assert.AreEqual(field.GetValue(item), field.GetValue(copy),
-                    $"Copy() must preserve field '{field.Name}'");
+            foreach (var field in CopyableFields())
+            {
+                var original = field.GetValue(item);
+                var copied = field.GetValue(copy);
+                // The per-locale tables need element-wise comparison: LocalizedText
+                // has no value equality, so AreEqual on the lists would compare
+                // references and fail a correct DEEP copy. The AreNotSame pair is
+                // the point of the check — sharing the list (or an entry) would let
+                // a caller retitle a stored item after Add/GetAll, the exact
+                // divergence Copy() exists to prevent.
+                if (original is System.Collections.Generic.List<LocalizedText> entries)
+                {
+                    var copiedEntries = (System.Collections.Generic.List<LocalizedText>)copied;
+                    Assert.AreNotSame(entries, copiedEntries, $"Copy() must not share the list in '{field.Name}'");
+                    Assert.AreEqual(entries.Count, copiedEntries.Count, $"Copy() must preserve every entry of '{field.Name}'");
+                    for (var i = 0; i < entries.Count; i++)
+                    {
+                        Assert.AreNotSame(entries[i], copiedEntries[i], $"Copy() must not share entries of '{field.Name}'");
+                        Assert.AreEqual(entries[i].Locale, copiedEntries[i].Locale, $"Copy() must preserve '{field.Name}' locales");
+                        Assert.AreEqual(entries[i].Text, copiedEntries[i].Text, $"Copy() must preserve '{field.Name}' texts");
+                    }
+                    continue;
+                }
+                Assert.AreEqual(original, copied, $"Copy() must preserve field '{field.Name}'");
+            }
         }
+
+        // Every field Copy() is responsible for: public AND non-public instance
+        // fields. Statics are excluded (they are not per-item state, and the default
+        // GetFields() binding would include them).
+        private static System.Reflection.FieldInfo[] CopyableFields() =>
+            typeof(QuickActionItem).GetFields(System.Reflection.BindingFlags.Public
+                | System.Reflection.BindingFlags.NonPublic
+                | System.Reflection.BindingFlags.Instance);
 
         [Test]
         public void IconType_NoneIsZero_AndOrderMatchesAppleEnum()

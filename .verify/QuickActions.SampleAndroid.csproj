@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- The Demo sample as it compiles ON AN ANDROID DEVICE: UNITY_ANDROID without
+       UNITY_EDITOR. QuickActions.Sample.csproj defines UNITY_EDITOR, so everything
+       behind `#if UNITY_ANDROID && !UNITY_EDITOR` — the autotest hook that
+       tools/device-smoke/android_device_smoke.sh drives, including its JNI hop —
+       is stripped there and was type-checked by no config at all: a broken hook
+       shipped green and surfaced only as a 45s smoke timeout blaming the APK.
+       Same rationale (and the same define shape) as QuickActions.Android.csproj,
+       which exists so the device-only AndroidQuickActionsBridge is compiled. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <OutputType>Library</OutputType>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <DefineConstants>UNITY_ANDROID;UNITY_2021_3_OR_NEWER;QUICKACTIONS_ENABLED</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Stubs/**/*.cs" />
+    <Compile Include="../Runtime/**/*.cs" />
+    <Compile Include="../Samples~/Demo/**/*.cs" />
+  </ItemGroup>
+</Project>

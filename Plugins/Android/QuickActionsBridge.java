@@ -52,6 +52,15 @@ public final class QuickActionsBridge {
     // restored by the cold-start reconcile like the icon identity above.
     static final String EXTRA_PAYLOAD = "com.emindeniz99.quickactions.payload";
 
+    // Per-locale titles/subtitles, encoded by the managed layer into ONE opaque
+    // string (base text + both tables). Same reason as the icon extras: a shortcut
+    // stores only the label the user sees — the string the managed layer already
+    // RESOLVED — so without this a cold start would adopt that resolved label as
+    // the item's base text and every later language change would translate from the
+    // wrong original. This class never parses it: locale logic lives in C#, and
+    // the value is written and handed back verbatim.
+    static final String EXTRA_L10N = "com.emindeniz99.quickactions.l10n";
+
     // Names of bundled drawables looked up for IconType values (index = enum int).
     // Index 0 (None) is intentionally empty. Provide drawables named
     // ic_quickaction_<name> in your project to use them.
@@ -396,6 +405,13 @@ public final class QuickActionsBridge {
                         extras != null && extras.getBoolean(EXTRA_ICON_BITMAP_ADAPTIVE, false));
                 String payload = extras == null ? null : extras.getString(EXTRA_PAYLOAD, "");
                 o.put("Payload", payload == null ? "" : payload);
+                // The labels above are what the launcher SHOWS (resolved at the last
+                // push); this blob is what lets the managed layer recover the base
+                // text + per-locale tables and notice the two disagree. Empty for an
+                // item that was never localized, whose read-back is then byte-for-byte
+                // what it was before this key existed.
+                String l10n = extras == null ? null : extras.getString(EXTRA_L10N, "");
+                o.put("L10n", l10n == null ? "" : l10n);
                 items.put(o);
             }
             JSONObject root = new JSONObject();
@@ -431,6 +447,7 @@ public final class QuickActionsBridge {
         String iconBitmap = item.optString("AndroidBitmapFile", "");
         boolean iconBitmapAdaptive = item.optBoolean("AndroidBitmapAdaptive", false);
         String payload = item.optString("Payload", "");
+        String l10n = item.optString("L10n", "");
         if (iconType != 0) extras.putInt(EXTRA_ICON_TYPE, iconType);
         if (!iconDrawable.isEmpty()) extras.putString(EXTRA_ICON_DRAWABLE, iconDrawable);
         if (!iconBitmap.isEmpty()) {
@@ -443,6 +460,9 @@ public final class QuickActionsBridge {
             // the C# side reads it back via GetById (reconciled from the extras).
             intent.putExtra(EXTRA_PAYLOAD, payload);
         }
+        // Localization blob: stored only (never parsed here) and only when the item
+        // has one, so an unlocalized shortcut's extras are unchanged by this feature.
+        if (!l10n.isEmpty()) extras.putString(EXTRA_L10N, l10n);
 
         ShortcutInfo.Builder builder = new ShortcutInfo.Builder(activity, id)
                 .setShortLabel(title)

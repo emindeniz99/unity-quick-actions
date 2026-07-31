@@ -12,7 +12,7 @@ product, and the path to launch. Companion to
 | Core feature (dynamic) | ✅ done | `QuickActions` API; iOS swizzle; Android trampoline |
 | Static shortcuts | ✅ done | Project Settings asset + iOS/Android post-processors |
 | Cross-version Android | ✅ done | trampoline avoids `UnityPlayerActivity`/`GameActivity` divergence |
-| C# compiles | ✅ verified | `dotnet` build, 8 configs, 0 warnings |
+| C# compiles | ✅ verified | `dotnet` build, 9 configs, 0 warnings |
 | Android plugin compiles | ✅ verified | `javac` vs SDK stubs |
 | Unit tests | ✅ full suite passing (`dotnet test` via verify.sh; +2 Unity-only) | `dotnet test` (list logic, validity, equality, icon pin, dispatch, reconcile, ordering, drain, last-performed) |
 | Self code-review | ✅ done | 8-angle review; all confirmed bugs fixed |

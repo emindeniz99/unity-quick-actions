@@ -254,6 +254,39 @@ namespace EminDeniz99.QuickActions.Editor
                 File.Delete(manifestPath);
             }
         }
+
+        // NO per-locale labels for the STATIC (baked) shortcuts on iOS. This is a
+        // deliberate omission, not a gap nobody got to — an implementation was written
+        // and withdrawn before release, and this note exists so it is not re-added the
+        // same way.
+        //
+        // iOS localizes an Info.plist value by looking it up as a key in
+        // <locale>.lproj/InfoPlist.strings, and the only way to get that layout out of
+        // a group-style PBX add is a FOLDER reference — which Xcode copies verbatim
+        // into the bundle root. Its output path is therefore
+        // <App>.app/<locale>.lproj/InfoPlist.strings, and BOTH components of that path
+        // are dictated by the platform: a host that localizes its own display name or
+        // usage strings (the standard Unity pattern, and exactly the population that
+        // would translate shortcut titles) emits the same path from its own folder
+        // reference or variant group. Under Xcode's build system that is a hard
+        // "Multiple commands produce …" failure; with a variant group on the host side
+        // one copy silently overwrites the other. Either way the package breaks — or
+        // silently replaces — output it does not own, which is the one thing the
+        // ownership-marker design exists to prevent, and no manifest can police a
+        // collision that happens in Copy Bundle Resources.
+        //
+        // The Android side has an escape hatch iOS does not: it writes its OWN file
+        // name (quickactions_strings.xml) inside the shared values-<qualifier>/ folder,
+        // so a host's strings.xml is never touched. Static-shortcut localization
+        // therefore ships on Android only; iOS static shortcuts render in their base
+        // language, and DYNAMIC shortcuts localize on both platforms at runtime.
+        //
+        // A safe future approach has to merge into whatever the host already has —
+        // append our keys to an existing <locale>.lproj/InfoPlist.strings (marker
+        // delimited, so cleanup stays scoped), or register with the host's variant
+        // group instead of adding a second producer — and must be validated on a real
+        // Xcode build, not compile-checked: the PBX stubs here are no-ops, which is
+        // precisely why the collision shipped unnoticed.
     }
 
     /// <summary>

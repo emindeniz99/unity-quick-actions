@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using UnityEngine;
 
 namespace EminDeniz99.QuickActions
 {
@@ -25,6 +27,21 @@ namespace EminDeniz99.QuickActions
         /// as the shortcut's long label.
         /// </summary>
         public string Subtitle;
+
+        /// <summary>
+        /// Per-locale replacements for <see cref="Title"/>. The entry matching
+        /// <see cref="QuickActions.Locale"/> — exactly, else by language prefix
+        /// (<c>"pt-BR"</c> matches a <c>"pt"</c> entry), both case-insensitively —
+        /// is what the OS shows; with no match the base <see cref="Title"/> is
+        /// used. Leave it empty in a single-language app.
+        /// </summary>
+        public List<LocalizedText> LocalizedTitles = new List<LocalizedText>();
+
+        /// <summary>
+        /// Per-locale replacements for <see cref="Subtitle"/>; resolved exactly like
+        /// <see cref="LocalizedTitles"/>.
+        /// </summary>
+        public List<LocalizedText> LocalizedSubtitles = new List<LocalizedText>();
 
         /// <summary>System icon (see <see cref="IconType"/>). Defaults to none.</summary>
         public IconType Icon = IconType.None;
@@ -87,6 +104,21 @@ namespace EminDeniz99.QuickActions
         /// </summary>
         public string Payload;
 
+        // This item's localization state (base text + both tables) encoded as one
+        // opaque string by QuickActionLocalization. It is set on the transient copy
+        // a push serializes, persisted verbatim by the natives (Android extras /
+        // iOS userInfo) and handed straight back on a cold-start read — the OS
+        // itself only stores the RESOLVED label, so without this a reconcile would
+        // adopt that label as the base text and every later language switch would
+        // translate from the wrong original.
+        // WHY hidden rather than public API: callers author LocalizedTitles /
+        // LocalizedSubtitles; this is only how those survive the round trip.
+        // [SerializeField] keeps JsonUtility (de)serializing it — Unity serializes
+        // non-public fields that carry the attribute — while it stays out of the
+        // public surface, and [HideInInspector] keeps it out of the static-shortcut
+        // list in Project Settings.
+        [SerializeField, HideInInspector] internal string L10n;
+
         public QuickActionItem() { }
 
         public QuickActionItem(string id, string title, string subtitle = null, IconType icon = IconType.None)
@@ -100,16 +132,20 @@ namespace EminDeniz99.QuickActions
         internal bool IsValid => !string.IsNullOrEmpty(Id) && !string.IsNullOrEmpty(Title);
 
         /// <summary>
-        /// A field-by-field copy. The facade stores and returns copies so a caller
-        /// mutating an added item (or an item from <see cref="QuickActions.GetAll"/> /
-        /// <see cref="QuickActions.GetById"/>) can't silently change the internal set
-        /// out from under the OS state.
+        /// A field-by-field copy, with the per-locale tables DEEP-copied. The facade
+        /// stores and returns copies so a caller mutating an added item (or an item
+        /// from <see cref="QuickActions.GetAll"/> / <see cref="QuickActions.GetById"/>)
+        /// can't silently change the internal set out from under the OS state — a
+        /// shared <see cref="LocalizedTitles"/> list would reopen exactly that hole
+        /// for every label.
         /// </summary>
         internal QuickActionItem Copy() => new QuickActionItem
         {
             Id = Id,
             Title = Title,
             Subtitle = Subtitle,
+            LocalizedTitles = CopyEntries(LocalizedTitles),
+            LocalizedSubtitles = CopyEntries(LocalizedSubtitles),
             Icon = Icon,
             AndroidDrawable = AndroidDrawable,
             IosSystemImage = IosSystemImage,
@@ -117,7 +153,22 @@ namespace EminDeniz99.QuickActions
             AndroidBitmapFile = AndroidBitmapFile,
             AndroidBitmapAdaptive = AndroidBitmapAdaptive,
             Payload = Payload,
+            L10n = L10n,
         };
+
+        // New list AND new entries: copying the list alone would still hand out the
+        // same LocalizedText objects, so a caller editing one's Text would change
+        // what the next push installs. Null entries are preserved rather than
+        // dropped, so Copy() stays a faithful copy (the resolver skips them).
+        private static List<LocalizedText> CopyEntries(List<LocalizedText> entries)
+        {
+            var copy = new List<LocalizedText>();
+            if (entries == null)
+                return copy;
+            foreach (var entry in entries)
+                copy.Add(entry == null ? null : new LocalizedText(entry.Locale, entry.Text));
+            return copy;
+        }
 
         public bool Equals(QuickActionItem other) => other != null && Id == other.Id;
 

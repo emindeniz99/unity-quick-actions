@@ -27,5 +27,13 @@
     <Compile Include="../Runtime/**/*.cs" />
     <Compile Include="../Tests/Editor/QuickActionsApiTests.cs" />
     <Compile Include="../Tests/Editor/QuickActionItemTests.cs" />
+    <!-- The Android static-shortcut resource generator plus the settings type it
+         reads. Its own asmdef is defineConstraint'ed to UNITY_ANDROID, so a Unity
+         test assembly cannot reference it without breaking on every other build
+         target — compiling the source straight into the harness assembly is the
+         only way its aapt2-breaking cases get a regression test. -->
+    <Compile Include="../Editor/QuickActionsSettings.cs" />
+    <Compile Include="../Editor/Android/QuickActionsBuildPostProcessorAndroid.cs" />
+    <Compile Include="EditorTests/**/*.cs" />
   </ItemGroup>
 </Project>

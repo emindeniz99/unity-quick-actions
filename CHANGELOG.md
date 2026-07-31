@@ -45,6 +45,42 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   target at build time, so `IosTemplateImage` art ships straight from Unity
   assets (manifest-scoped Append-build cleanup; only files the package copied
   are ever touched).
+- **Per-locale titles/subtitles (localization)**:
+  `QuickActionItem.LocalizedTitles`/`LocalizedSubtitles` (`LocalizedText`
+  pairs; exact locale > language prefix > base text, case-insensitive) and
+  `QuickActions.Locale` (defaults to the device language; setting a different
+  value re-pushes so labels re-render immediately). Base text and tables
+  survive cold starts inside the ownership-marker payload, and a stale render
+  after a device-language change is refreshed with one automatic push on the
+  next launch. **Static** (baked) shortcuts localize on Android only, via
+  generated `values-<qualifier>/` string resources written under the package's
+  own file name so a host app's `strings.xml` is never touched. iOS static
+  shortcuts render in their base language: iOS resolves Info.plist
+  localizations through `<locale>.lproj/InfoPlist.strings`, a bundle path whose
+  every component the platform dictates, so shipping one would collide with any
+  host that localizes its own display name or usage strings — a build failure
+  or a silent overwrite of output this package does not own. Dynamic shortcuts
+  localize on both platforms.
+- **iOS UIScene-lifecycle delivery**: when a host adopts the scene lifecycle
+  (scene manifest + scene delegate), cold and warm taps now arrive through
+  hooks the package installs on the scene-delegate class it learns from the
+  host's `UISceneConfiguration`; a default Unity project's launch path is
+  untouched. If the host overrides
+  `application:configurationForConnectingSceneSession:options:` in a
+  `UnityAppController` subclass, that override shadows the package's and the
+  class is instead learned from the connecting scene — which covers warm taps
+  and later connections, but may miss the first cold tap of that install
+  (calling `[super ...]` from the override avoids the gap). Not yet
+  device-validated — see ROADMAP. A consume-once cold-dedup marker guarantees one queue entry per
+  tap — it also fixes the documented double delivery when a host
+  `UnityAppController` subclass discards our `didFinishLaunchingWithOptions`
+  return value.
+- **Android device smoke + emulator CI (experimental)**: `tools/device-smoke/`
+  installs a dev APK, drives the demo's autotest hook, asserts the shortcuts
+  registered via `dumpsys shortcut` (scoped to the app id) and that a
+  simulated trampoline tap delivers `Performed`; a manually-dispatched
+  workflow runs it on a GitHub-hosted emulator. iOS automation is documented
+  as not shipped (no adb analog) with manual steps instead.
 - CI now packs `dist~/QuickActions.unitypackage` and uploads it as a workflow
   artifact.
 

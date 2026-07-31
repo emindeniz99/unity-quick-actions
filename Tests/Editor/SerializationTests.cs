@@ -59,6 +59,54 @@ namespace EminDeniz99.QuickActions.Tests
         }
 
         [Test]
+        public void ToJson_CarriesResolvedTextAndTheLocalizationBlob()
+        {
+            // WHY: the natives push "Title"/"Subtitle" straight into the OS and
+            // persist "L10n" verbatim (QuickActions.mm / QuickActionsBridge.java
+            // optString). Sending the BASE text here would render the wrong language;
+            // renaming the blob member would silently lose every translation on the
+            // next cold start (the item's base text would become the French label).
+            var authored = new QuickActionItem("new_game", "New Game", "Start fresh");
+            authored.LocalizedTitles.Add(new LocalizedText("fr", "Nouvelle partie"));
+            authored.LocalizedSubtitles.Add(new LocalizedText("fr", "Commencer"));
+
+            var json = JsonUtility.ToJson(new QuickActionList(new[]
+            {
+                QuickActionLocalization.Resolved(authored, "fr-CA"),
+            }));
+
+            StringAssert.Contains("\"Title\":\"Nouvelle partie\"", json); // matched by language prefix
+            StringAssert.Contains("\"Subtitle\":\"Commencer\"", json);
+            StringAssert.Contains("\"L10n\":", json);
+
+            // ...and the round trip a cold start makes: parse the payload back and
+            // restore the base text + tables, which must reproduce the authored item.
+            var restored = QuickActionList.Parse(json)[0];
+            Assert.IsTrue(QuickActionLocalization.Restore(restored, "en"),
+                "French labels under an English locale is exactly the stale render a refresh exists for");
+            Assert.AreEqual("New Game", restored.Title);
+            Assert.AreEqual("Start fresh", restored.Subtitle);
+            Assert.AreEqual("fr", restored.LocalizedTitles[0].Locale);
+            Assert.AreEqual("Nouvelle partie", restored.LocalizedTitles[0].Text);
+            Assert.AreEqual("Commencer", restored.LocalizedSubtitles[0].Text);
+        }
+
+        [Test]
+        public void ToJson_LeavesTheBlobEmpty_ForAnUnlocalizedItem()
+        {
+            var json = JsonUtility.ToJson(new QuickActionList(new[]
+            {
+                QuickActionLocalization.Resolved(new QuickActionItem("plain", "Plain"), "fr"),
+            }));
+
+            // Empty rather than absent (JsonUtility always emits the member) — what
+            // matters is that the natives store a NON-empty blob only, so an
+            // unlocalized shortcut persists exactly as it did before this feature.
+            StringAssert.Contains("\"L10n\":\"\"", json);
+            StringAssert.Contains("\"Title\":\"Plain\"", json);
+        }
+
+        [Test]
         public void RoundTrip_PreservesFields()
         {
             var original = new QuickActionList(new[]
