@@ -15,6 +15,11 @@
 // and install the same two hooks there. Only an app that declares a scene manifest
 // can adopt that lifecycle, and we add the configuration hook only in one — a default
 // Unity project keeps the exact app-delegate launch path it had without this package.
+// A host UnityAppController SUBCLASS that owns the configuration selector shadows that
+// hook, so a UISceneWillConnectNotification observer installs the same hooks from the
+// live scene's delegate as a fallback — covering warm taps and every later connection,
+// but NOT necessarily the first cold tap of such an install (see
+// QAInstallSceneHooksFromScene for why, and for the one-line host-side fix).
 // Both paths enqueue; C# drains the queue on first frame and on focus gain.
 // performActionForShortcutItem runs before applicationDidBecomeActive, so the
 // focus poll reliably catches a warm tap. No UnitySendMessage needed. A cold tap
@@ -384,7 +389,8 @@ static void QAScenePerformActionForShortcutItem(id self, SEL _cmd, UIWindowScene
 // a class that never receives the taps. Only the FIRST class learned is hooked: the
 // captured originals are per-selector, not per-class, so an app with several distinct
 // scene-delegate classes gets scene coverage for that one. Main thread only (UIKit
-// asks for the configuration there), which is what makes the static flag enough.
+// asks for the configuration there, and UISceneWillConnectNotification is posted
+// there), which is what makes the static flag enough.
 API_AVAILABLE(ios(13.0))
 static void QAInstallSceneHooks(Class delegateClass) {
     static BOOL installed = NO;
@@ -445,6 +451,38 @@ static UISceneConfiguration *QAConfigurationForConnectingSceneSession(
     return configuration;
 }
 
+// FALLBACK for the shape the configuration hook above cannot see: a host
+// UnityAppController SUBCLASS that implements
+// application:configurationForConnectingSceneSession:options: itself.
+// class_getInstanceMethod in +load walks UP from UnityAppController, never down, so
+// the subclass's implementation is invisible there; the IMP we add to
+// UnityAppController is then shadowed by it and QAConfigurationForConnectingSceneSession
+// never runs. IMPL_APP_CONTROLLER_SUBCLASS is Unity's only sanctioned app-delegate
+// extension point and Apple's own template puts that selector in the app delegate, so
+// this is a mainstream shape — and without a fallback it loses every scene tap silently.
+//
+// Rather than trying to hook the subclass's configuration method (we would have to
+// guess the subclass, and the returned configuration is the host's to build), learn the
+// delegate class from the SCENE ITSELF once it exists: UIKit sets scene.delegate from
+// the configuration before connecting it, so object_getClass on that delegate is the
+// same class the configuration named.
+//
+// HONEST LIMIT — this does not recover the very first COLD tap in that shape. UIKit
+// posts UISceneWillConnectNotification around the delegate's own
+// scene:willConnectToSession:options: callback, and if our observer runs after that
+// callback the hook is installed one step too late to have seen the connection
+// options that carried the shortcut. Warm taps (and every later connection, including
+// every cold tap in a subsequent launch of the same install) are covered, because the
+// hooks are in place by then. The reliable fix for the first cold tap is for such a
+// host to call [super application:configurationForConnectingSceneSession:options:],
+// which routes through the wrapper above and installs before willConnect runs.
+API_AVAILABLE(ios(13.0))
+static void QAInstallSceneHooksFromScene(UIScene *scene) {
+    id delegate = scene.delegate;
+    if (delegate == nil) return; // nothing named yet — a later connection may still name one
+    QAInstallSceneHooks(object_getClass(delegate));
+}
+
 @interface QuickActionsAppControllerHook : NSObject
 @end
 
@@ -496,6 +534,10 @@ static UISceneConfiguration *QAConfigurationForConnectingSceneSession(
     // in Info.plist is the sole way to do. A default Unity project has no manifest, so the
     // selector stays absent there and UIKit's legacy launch path is exactly what it was
     // without this package — nothing of the scene code above can run.
+    // The single gate for EVERYTHING scene-related below: an app can only adopt the
+    // UIScene lifecycle by declaring this manifest, so without it nothing here may
+    // touch the app — the legacy launch path has to stay byte-identical.
+    BOOL hasSceneManifest = [NSBundle mainBundle].infoDictionary[@"UIApplicationSceneManifest"] != nil;
     if (@available(iOS 13.0, *)) {
         SEL sceneConfigSel = @selector(application:configurationForConnectingSceneSession:options:);
         Method sceneConfig = class_getInstanceMethod(cls, sceneConfigSel);
@@ -504,7 +546,7 @@ static UISceneConfiguration *QAConfigurationForConnectingSceneSession(
                 (id (*)(id, SEL, id, id, id))method_getImplementation(sceneConfig);
             class_replaceMethod(cls, sceneConfigSel, (IMP)QAConfigurationForConnectingSceneSession,
                                 method_getTypeEncoding(sceneConfig));
-        } else if ([NSBundle mainBundle].infoDictionary[@"UIApplicationSceneManifest"] != nil) {
+        } else if (hasSceneManifest) {
             class_addMethod(cls, sceneConfigSel, (IMP)QAConfigurationForConnectingSceneSession,
                             "@@:@@@");
         }
@@ -531,6 +573,30 @@ static UISceneConfiguration *QAConfigurationForConnectingSceneSession(
                                                       usingBlock:^(NSNotification *note) {
             QAClearColdDelivered();
         }];
+        // Late-binding safety net for a host app-controller SUBCLASS that owns the
+        // scene-configuration selector, where the hook added above is shadowed and
+        // never runs — see QAInstallSceneHooksFromScene for the mechanism and for the
+        // one case it cannot recover (the FIRST cold tap of such an install).
+        // QAInstallSceneHooks is idempotent, so in the normal shape — where the
+        // configuration wrapper already installed the hooks — this is a no-op.
+        // Manifest-gated like the configuration hook, and for the same reason: in an
+        // app that did NOT adopt the scene lifecycle there is no scene delivery to
+        // rescue, and installing scene selectors on the app delegate (which is what a
+        // legacy app's scene would hand us) could change the launch path this package
+        // promises to leave alone.
+        if (hasSceneManifest) {
+            [[NSNotificationCenter defaultCenter] addObserverForName:UISceneWillConnectNotification
+                                                              object:nil
+                                                               queue:nil
+                                                          usingBlock:^(NSNotification *note) {
+                // Re-checked INSIDE the block: clang does not always carry an enclosing
+                // @available context into a block body, and this block outlives +load.
+                if (@available(iOS 13.0, *)) {
+                    if ([note.object isKindOfClass:[UIScene class]])
+                        QAInstallSceneHooksFromScene((UIScene *)note.object);
+                }
+            }];
+        }
     }
 }
 

@@ -6,8 +6,8 @@ for production. Honest status — nothing marked "ready" that wasn't actually
 exercised.
 
 **Legend — Verified by:**
-`unit` = headless NUnit (`dotnet test`, 45 tests) · `unity-test` = Unity Test
-Runner only (JsonUtility) · `static` = compiles in the stub harness (8 configs) ·
+`unit` = headless NUnit (`dotnet test`, 73 tests) · `unity-test` = Unity Test
+Runner only (JsonUtility) · `static` = compiles in the stub harness (9 configs) ·
 `review` = human/agent code review (multiple adversarial rounds + a 15-unit workflow; see git log) ·
 `device` = **requires a real device — NOT done here** ·
 `editor-2022.3` = **executed in a real licensed Unity 2022.3.9f1 (Linux, xvfb)

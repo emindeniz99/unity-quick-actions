@@ -125,7 +125,14 @@ step "1/7 wait for the device"
 poll "$BOOT_ATTEMPTS" boot_completed \
   || fail "no booted device after $((BOOT_ATTEMPTS * POLL_INTERVAL))s (serial='${SERIAL:-<default>}'). \`adb devices\` shows:
 $(adb devices || true)"
-API_LEVEL="$(adb_ shell getprop ro.build.version.sdk | tr -d '\r\n')"
+# Guarded like every other adb call: bare, `set -e` would kill the script here with
+# adb's raw status and none of the FAIL[step] context the header promises. The window
+# is real — the poll above only proves the device answered a moment ago, and a
+# cold-booted emulator can go offline between the two commands.
+API_LEVEL="$(adb_ shell getprop ro.build.version.sdk | tr -d '\r\n')" \
+  || fail "could not read ro.build.version.sdk — adb lost the device right after it
+reported boot_completed (serial='${SERIAL:-<default>}'). \`adb devices\` shows:
+$(adb devices || true)"
 echo "device ready (API $API_LEVEL)"
 # ShortcutManager itself only exists from API 25, so below that there is nothing
 # to smoke — say so instead of failing on an empty dumpsys three steps later.
@@ -160,7 +167,13 @@ adb_ shell am force-stop "$APP_ID" >/dev/null 2>&1 || true
 step "4/7 launch with the autotest extra"
 # Resolve the launcher component instead of hard-coding it: the Unity entry point
 # differs by version (UnityPlayerActivity vs UnityPlayerGameActivity).
-COMPONENT="$(adb_ shell cmd package resolve-activity --brief "$APP_ID" 2>/dev/null | tr -d '\r' | tail -n 1)"
+# Same guard as step 1, and needed more here: the 2>/dev/null that keeps a clean
+# "could not resolve" message also swallows adb's own error, so unguarded this line
+# dies with literally no output — and the `case` below, written to catch a bad
+# resolve, never runs.
+COMPONENT="$(adb_ shell cmd package resolve-activity --brief "$APP_ID" 2>/dev/null | tr -d '\r' | tail -n 1)" \
+  || fail "adb could not query the launcher activity for '$APP_ID' (device offline?). \`adb devices\` shows:
+$(adb devices || true)"
 case "$COMPONENT" in
   "$APP_ID"/*) ;;
   *) fail "could not resolve a launcher activity for '$APP_ID' (got '${COMPONENT:-<empty>}'). Is that the APK's application id?" ;;

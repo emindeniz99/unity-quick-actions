@@ -112,10 +112,6 @@ namespace UnityEditor.iOS.Xcode
         public string GetUnityFrameworkTargetGuid() => string.Empty;
         public string GetUnityMainTargetGuid() => string.Empty;
         public string AddFile(string path, string projectPath) => string.Empty;
-        // Mirrors PBXProject.AddFolderReference(path, projectPath, sourceTree =
-        // PBXSourceTree.Source) — the real API's trailing parameter is optional, so
-        // the two-argument call the localization sync makes is the same call shape.
-        public string AddFolderReference(string path, string projectPath) => string.Empty;
         public void AddFileToBuild(string targetGuid, string fileGuid) { }
         public string FindFileGuidByProjectPath(string path) => null;
         public void RemoveFile(string fileGuid) { }

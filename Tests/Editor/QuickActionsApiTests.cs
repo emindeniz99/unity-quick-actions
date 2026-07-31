@@ -991,6 +991,15 @@ namespace EminDeniz99.QuickActions.Tests
             };
             Assert.IsFalse(QuickActionLocalization.Restore(truncated, "fr"), "a corrupted blob must not claim a refresh");
             Assert.AreEqual("Shown", truncated.Title, "...and must leave the item exactly as the OS reported it");
+
+            // A length near int.MaxValue is the corruption that BREAKS a naive bounds
+            // check: "start + length" wraps negative and slips past it, and the
+            // Substring then throws straight out of GetAll/Add/IsAdded — precisely the
+            // "reject it, don't throw" contract above. 15 characters is enough.
+            var forged = new QuickActionItem("weird", "Shown") { L10n = "qa1" + int.MaxValue + ":x" };
+            Assert.IsFalse(QuickActionLocalization.Restore(forged, "fr"),
+                "a forged length must be rejected, not overflow the bounds check");
+            Assert.AreEqual("Shown", forged.Title);
         }
 
         [Test]
@@ -1013,6 +1022,255 @@ namespace EminDeniz99.QuickActions.Tests
                 Assert.AreEqual(0, fake.SetCount, "a reconcile that found nothing stale must not write");
             }
             finally { QuickActions.OverrideBridgeForTesting(null); }
+        }
+
+        // Models a device whose reads succeed and whose WRITES the OS refuses (the
+        // Android background rate limit). Reads hand back FRESH objects rebuilt from
+        // the stored set, exactly like both real bridges do (they re-parse JSON per
+        // read) — the accept-all FakeBridge hands out its own references instead, and
+        // Restore nulling L10n in place on those permanently de-localizes the fake's
+        // items, which would mask every repeat of a stale-language refresh.
+        private sealed class RefusedWriteBridge : IQuickActionsBridge
+        {
+            // What the device currently holds/renders — assertable, and the source
+            // reads are rebuilt from.
+            public readonly List<QuickActionItem> Os = new List<QuickActionItem>();
+            // Writes the OS still refuses; every SetShortcuts consumes one.
+            // int.MaxValue = "refuses for the whole test"; a FINITE count models the
+            // refuse→accept transition inside a single call (a one-off JNI /
+            // system_server failure), which is the window the AddList loss needs.
+            public int WritesToRefuse = int.MaxValue;
+            public int SetCount;
+            public bool IsPlatformSupported => true;
+            public int MaxShortcutCount => 4;
+            public bool IsPinSupported => false;
+            public bool RequestPin(string id) => false;
+            public bool ReportUsed(string id) => false;
+            public IList<QuickActionItem> SetShortcuts(IList<QuickActionItem> items)
+            {
+                SetCount++;
+                if (WritesToRefuse > 0)
+                {
+                    WritesToRefuse--;
+                    return null;
+                }
+                Os.Clear();
+                foreach (var item in items) Os.Add(item.Copy());
+                return items;
+            }
+            public bool RemoveAll() { Os.Clear(); return true; }
+            public string GetLastPerformed() => null;
+            public void ResetLastPerformed() { }
+            public string ConsumePendingPerformed() => null;
+            public IList<QuickActionItem> GetShortcuts() => Os.ConvertAll(i => i.Copy());
+        }
+
+        [Test]
+        public void RefusedRefresh_KeepsTheManagedSetAuthoritative_SoAddListDropsNothing()
+        {
+            // WHY: EnsureLoaded()==true has to mean "_items IS the set" — AddList
+            // appends optimistic copies and then calls IsAdded per item, which
+            // re-enters EnsureLoaded. If a refused refresh push left the facade
+            // un-loaded, that re-entry would reload and CLEAR the copies appended so
+            // far: they never reach the push, AddList reports no failure, and the
+            // final loop blames the OS for a loss the package caused itself.
+            var authored = new QuickActionItem("old", "Play");
+            authored.LocalizedTitles.Add(new LocalizedText("fr", "Jouer"));
+            // A French session left 'old' on the device; Locale is "en" (SetUp), so the
+            // load finds it stale. The OS refuses the next TWO writes and then accepts:
+            // the refresh push and its retry fail, AddList's own push lands — the exact
+            // refuse→accept interleaving in which the loss was reproduced.
+            var bridge = new RefusedWriteBridge { WritesToRefuse = 2 };
+            bridge.Os.Add(QuickActionLocalization.Resolved(authored, "fr"));
+            QuickActions.OverrideBridgeForTesting(bridge);
+            try
+            {
+                QuickActions.AddList(new List<QuickActionItem> { Item("a"), Item("b") });
+
+                CollectionAssert.AreEquivalent(new[] { "old", "a", "b" },
+                    bridge.Os.ConvertAll(i => i.Id),
+                    "every item of the batch must reach the OS — a reload mid-AddList would drop the earlier ones");
+                CollectionAssert.AreEquivalent(new[] { "old", "a", "b" },
+                    QuickActions.GetAll().ConvertAll(i => i.Id));
+            }
+            finally { QuickActions.OverrideBridgeForTesting(null); }
+        }
+
+        [Test]
+        public void RefusedRefresh_RetriesExactlyOnce_ThenReadsIssueNoMoreOsWrites()
+        {
+            // WHY: the refresh is a WRITE performed from the load path, and GetAll/
+            // GetById/IsAdded all load. Without a spend-once latch each read re-detects
+            // the same staleness and issues another setShortcuts — an API documented as
+            // a "Membership test" becoming one OS write per frame for a polling game,
+            // burning the very rate-limit budget that refused the push. One retry, then
+            // silence: a later successful mutation re-renders the labels anyway.
+            var authored = new QuickActionItem("play", "Play");
+            authored.LocalizedTitles.Add(new LocalizedText("fr", "Jouer"));
+            var bridge = new RefusedWriteBridge(); // refuses every write
+            bridge.Os.Add(QuickActionLocalization.Resolved(authored, "fr"));
+            QuickActions.OverrideBridgeForTesting(bridge);
+            try
+            {
+                Assert.IsTrue(QuickActions.IsAdded("play"));
+                Assert.AreEqual(1, bridge.SetCount, "the load's own refresh push");
+
+                Assert.IsTrue(QuickActions.IsAdded("play"));
+                Assert.AreEqual(2, bridge.SetCount, "the armed retry — exactly one more");
+
+                QuickActions.IsAdded("play");
+                QuickActions.GetAll();
+                QuickActions.GetById("play");
+                Assert.AreEqual(2, bridge.SetCount,
+                    "read-only calls must not keep writing once the single retry is spent");
+            }
+            finally { QuickActions.OverrideBridgeForTesting(null); }
+        }
+
+        [Test]
+        public void RefusedRefresh_IsHealedByTheNextSuccessfulMutationPush()
+        {
+            // The other half of "one retry is enough": the app keeps using the API, and
+            // the first write the OS accepts renders the current locale — so the labels
+            // heal without any read ever forcing an OS write.
+            var authored = new QuickActionItem("play", "Play");
+            authored.LocalizedTitles.Add(new LocalizedText("fr", "Jouer"));
+            // Refuse the refresh push AND its retry, then accept: only the mutation's
+            // own push is left to heal the label.
+            var bridge = new RefusedWriteBridge { WritesToRefuse = 2 };
+            bridge.Os.Add(QuickActionLocalization.Resolved(authored, "fr"));
+            QuickActions.OverrideBridgeForTesting(bridge);
+            try
+            {
+                Assert.IsTrue(QuickActions.IsAdded("play")); // the refresh push is refused
+                Assert.IsTrue(QuickActions.Add(Item("extra")));
+                Assert.AreEqual("Play", bridge.Os[0].Title,
+                    "the accepted push re-rendered the stale label for the current locale");
+            }
+            finally { QuickActions.OverrideBridgeForTesting(null); }
+        }
+
+        [Test]
+        public void Locale_SetBeforeAnythingIsLoaded_ReRendersTheDevicesShortcuts()
+        {
+            // WHY: this is the documented in-app language-picker path on a COLD start —
+            // the app restores its saved language in Awake and touches nothing else.
+            // _items is empty there because nothing has loaded yet, not because nothing
+            // is installed; conflating the two left the launcher in the old language for
+            // the whole session.
+            var authored = new QuickActionItem("play", "Play");
+            authored.LocalizedTitles.Add(new LocalizedText("fr", "Jouer"));
+            var fake = new FakeBridge();
+            fake.Shortcuts.Add(QuickActionLocalization.Resolved(authored, "en")); // device shows "Play"
+            QuickActions.OverrideBridgeForTesting(fake);
+            try
+            {
+                QuickActions.Locale = "fr";
+                Assert.AreEqual(1, fake.SetCount, "the first assignment of a session must reconcile and re-push");
+                Assert.AreEqual("Jouer", fake.Shortcuts[0].Title);
+            }
+            finally { QuickActions.OverrideBridgeForTesting(null); }
+        }
+
+        [Test]
+        public void Locale_SetWithNothingInstalled_DoesNotSpendAnOsWrite()
+        {
+            // The empty-set early return still has to hold once the reconcile has
+            // PROVEN the OS set is empty: pushing an empty payload anyway is a write
+            // that changes nothing, and on Android even an empty addDynamicShortcuts
+            // burns a rate-limit token a real update may need later.
+            var fake = new FakeBridge();
+            QuickActions.OverrideBridgeForTesting(fake);
+            try
+            {
+                Assert.IsFalse(QuickActions.IsAdded("anything")); // reconcile: the OS really is empty
+                QuickActions.Locale = "de";
+                Assert.AreEqual(0, fake.SetCount, "nothing installed — nothing to re-render");
+
+                // ...and the assignment still took effect, so the FIRST push uses it.
+                var item = new QuickActionItem("play", "Play");
+                item.LocalizedTitles.Add(new LocalizedText("de", "Spielen"));
+                Assert.IsTrue(QuickActions.Add(item));
+                Assert.AreEqual("Spielen", fake.Shortcuts[0].Title);
+            }
+            finally { QuickActions.OverrideBridgeForTesting(null); }
+        }
+
+        [Test]
+        public void Locale_WhenTheRePushIsRefused_ArmsOneRetry_AndReadsStayReadOnly()
+        {
+            // The setter's failure branch must follow the reconcile's rule: the managed
+            // set still matches the device's IDS (only the labels are stale), so keep it
+            // authoritative and spend exactly one retry — never turn reads into writes.
+            var authored = new QuickActionItem("play", "Play");
+            authored.LocalizedTitles.Add(new LocalizedText("fr", "Jouer"));
+            var bridge = new TogglingWriteBridge();
+            QuickActions.OverrideBridgeForTesting(bridge);
+            try
+            {
+                Assert.IsTrue(QuickActions.Add(authored));
+                var pushes = bridge.SetCount;
+
+                bridge.FailWrites = true;
+                QuickActions.Locale = "fr";
+                Assert.AreEqual(pushes + 1, bridge.SetCount, "the refused re-push");
+
+                QuickActions.GetAll();
+                Assert.AreEqual(pushes + 2, bridge.SetCount, "the armed retry — still refused");
+                QuickActions.GetAll();
+                QuickActions.IsAdded("play");
+                Assert.AreEqual(pushes + 2, bridge.SetCount, "and then reads stop writing");
+
+                // The retry is what a caller relies on when the rate limit lifts:
+                // allow writes, re-arm with another switch, and the labels land.
+                bridge.FailWrites = false;
+                QuickActions.Locale = "en";
+                Assert.AreEqual("Play", bridge.Os[0].Title);
+            }
+            finally { QuickActions.OverrideBridgeForTesting(null); }
+        }
+
+        [Test]
+        public void Reconcile_RefreshesAnItemWhoseOnlyStaleLabelIsItsSubtitle()
+        {
+            // WHY: Restore's staleness answer is title-mismatch OR subtitle-mismatch.
+            // An item with a locale-invariant title and a translated subtitle exercises
+            // ONLY the second half — drop it and this item keeps rendering last
+            // session's subtitle under the new locale with nothing to notice it.
+            var authored = new QuickActionItem("play", "Play", "Continue");
+            authored.LocalizedSubtitles.Add(new LocalizedText("fr", "Continuer"));
+
+            var fake = new FakeBridge();
+            fake.Shortcuts.Add(QuickActionLocalization.Resolved(authored, "fr"));
+            QuickActions.OverrideBridgeForTesting(fake);
+            try
+            {
+                Assert.AreEqual("Continue", QuickActions.GetById("play").Subtitle,
+                    "the base subtitle must come back, not the French one");
+                Assert.AreEqual(1, fake.SetCount, "a stale SUBTITLE alone must trigger the refresh push");
+                Assert.AreEqual("Continuer", authored.LocalizedSubtitles[0].Text);
+                Assert.AreEqual("Continue", fake.Shortcuts[0].Subtitle, "the launcher now shows the current locale");
+            }
+            finally { QuickActions.OverrideBridgeForTesting(null); }
+        }
+
+        [Test]
+        public void FromSystemLanguage_MapsTheDeviceLanguage_IncludingUnitysTypoedHungarian()
+        {
+            // WHY: this switch is what makes "defaults to the device language" true, and
+            // nothing else in the suite reaches it (Application.systemLanguage is a stub
+            // constant and every other test pins Locale). Hungarian is the case that was
+            // missing: Unity's member is the typo `Hugarian` (value 18) with `Hungarian`
+            // as its usable alias, so a Hungarian phone silently answered "en" and every
+            // "hu" translation was unreachable.
+            Assert.AreEqual("hu", QuickActionLocalization.FromSystemLanguage(UnityEngine.SystemLanguage.Hungarian));
+            Assert.AreEqual("fr", QuickActionLocalization.FromSystemLanguage(UnityEngine.SystemLanguage.French));
+            Assert.AreEqual("zh-Hans", QuickActionLocalization.FromSystemLanguage(UnityEngine.SystemLanguage.ChineseSimplified));
+            Assert.AreEqual("zh-Hant", QuickActionLocalization.FromSystemLanguage(UnityEngine.SystemLanguage.ChineseTraditional));
+            // Documented fallbacks, not omissions: English IS "en", and an unknown
+            // device language deliberately answers "en" too.
+            Assert.AreEqual("en", QuickActionLocalization.FromSystemLanguage(UnityEngine.SystemLanguage.English));
+            Assert.AreEqual("en", QuickActionLocalization.FromSystemLanguage(UnityEngine.SystemLanguage.Unknown));
         }
 
         private sealed class FakeBridge : IQuickActionsBridge
@@ -1224,6 +1482,7 @@ namespace EminDeniz99.QuickActions.Tests
             public readonly List<QuickActionItem> Os = new List<QuickActionItem>();
             public bool FailWrites;
             public bool FailReads;
+            public int SetCount;
             public bool IsPlatformSupported => true;
             public int MaxShortcutCount => 4;
             public bool IsPinSupported => false;
@@ -1231,6 +1490,7 @@ namespace EminDeniz99.QuickActions.Tests
             public bool ReportUsed(string id) => false;
             public IList<QuickActionItem> SetShortcuts(IList<QuickActionItem> items)
             {
+                SetCount++;
                 if (FailWrites) return null;
                 Os.Clear();
                 Os.AddRange(items);

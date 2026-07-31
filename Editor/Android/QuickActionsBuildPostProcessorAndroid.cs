@@ -213,7 +213,18 @@ namespace EminDeniz99.QuickActions.Editor
             // locale overrides. Android resolves resources per STRING, so each file
             // carries only what that locale actually translates and everything else
             // falls back to the default values/ file below.
-            var localized = new SortedDictionary<string, StringBuilder>();
+            // Case-insensitive keys because the key becomes a DIRECTORY name and the
+            // Editor runs on case-insensitive macOS/Windows filesystems, where two
+            // spellings of one qualifier ARE one directory and the second WriteAllText
+            // silently destroys the first bucket. ResourceQualifier already
+            // canonicalizes casing, so this is the belt to that braces.
+            var localized = new SortedDictionary<string, StringBuilder>(
+                System.StringComparer.OrdinalIgnoreCase);
+            // "<qualifier>/<resource name>" pairs already emitted. aapt2 HARD-FAILS the
+            // build on a duplicate <string name> under one config, so a settings list
+            // with two rows for the same locale (trivially produced by the inspector's
+            // "+" button, which clones the previous element) must not reach it.
+            var emitted = new HashSet<string>(System.StringComparer.OrdinalIgnoreCase);
 
             var shortcuts = new StringBuilder();
             shortcuts.AppendLine("<?xml version=\"1.0\" encoding=\"utf-8\"?>");
@@ -243,14 +254,14 @@ namespace EminDeniz99.QuickActions.Editor
                 strings.AppendLine($"  <string name=\"{longName}\" formatted=\"false\">{EscapeResValue(subtitle)}</string>");
                 // Same two resource names, per locale: the launcher then renders a
                 // baked shortcut in the device language without the app running.
-                AppendLocalized(localized, item.LocalizedTitles, shortName, item.Id);
+                AppendLocalized(localized, emitted, item.LocalizedTitles, shortName, item.Id);
                 // The long label mirrors the rule above — with no base subtitle it IS
                 // the title — so an item that only translates its title must translate
                 // both resources, or one of the two labels renders in the base language.
                 var localizedLong = item.LocalizedSubtitles;
                 if ((localizedLong == null || localizedLong.Count == 0) && string.IsNullOrEmpty(item.Subtitle))
                     localizedLong = item.LocalizedTitles;
-                AppendLocalized(localized, localizedLong, longName, item.Id);
+                AppendLocalized(localized, emitted, localizedLong, longName, item.Id);
 
                 shortcuts.AppendLine("  <shortcut");
                 shortcuts.AppendLine($"      android:shortcutId=\"{Escape(item.Id)}\"");
@@ -298,8 +309,11 @@ namespace EminDeniz99.QuickActions.Editor
         // Adds one item's per-locale labels to the per-qualifier buckets, skipping
         // rows the runtime resolver would skip too (blank locale/text) so the build
         // output can't disagree with what a dynamic shortcut would render.
-        private static void AppendLocalized(IDictionary<string, StringBuilder> localized,
-            List<LocalizedText> entries, string resourceName, string id)
+        // internal (like ResourceQualifier) so the harness can drive it directly:
+        // everything it guards against — duplicate resource names, colliding
+        // qualifiers — only shows up as an aapt2 error in a real Gradle build.
+        internal static void AppendLocalized(IDictionary<string, StringBuilder> localized,
+            HashSet<string> emitted, List<LocalizedText> entries, string resourceName, string id)
         {
             if (entries == null)
                 return;
@@ -316,6 +330,19 @@ namespace EminDeniz99.QuickActions.Editor
                         "Android resource qualifier; that translation was skipped (the base label still ships).");
                     continue;
                 }
+                if (!emitted.Add(qualifier + "/" + resourceName))
+                {
+                    // Two rows resolving to ONE locale for one label. Emitting both
+                    // would put two <string name="qa_short_N"> under one config and
+                    // aapt2 fails the whole build with "duplicate value for resource".
+                    // First entry wins, which is also what the runtime resolver does
+                    // (Find returns the first usable match), so a static shortcut and a
+                    // dynamic one with the same table still render the same label.
+                    Debug.LogWarning($"[QuickActions] Static shortcut '{id}': locale '{entry.Locale}' resolves to " +
+                        $"'{qualifier}', which already has a translation for this label; kept the first and skipped " +
+                        "this one. Remove the duplicate row (locales are matched case-insensitively).");
+                    continue;
+                }
                 if (!localized.TryGetValue(qualifier, out var body))
                     localized[qualifier] = body = new StringBuilder();
                 body.AppendLine($"  <string name=\"{resourceName}\" formatted=\"false\">{EscapeResValue(entry.Text)}</string>");
@@ -329,6 +356,15 @@ namespace EminDeniz99.QuickActions.Editor
         // themselves need API 25, so that floor is never the binding constraint).
         // Null for a tag that can't be a directory name — the caller warns and skips
         // rather than emitting a resource folder that fails the build.
+        //
+        // The output is CANONICALLY cased (language lower, script Title, region
+        // upper), not the caller's spelling. BCP-47 casing is conventional, not
+        // semantic — aapt2 folds "b+zh+Hans" and "b+zh+hans" to the same resource
+        // config, and the runtime resolver matches locales case-insensitively — so two
+        // spellings of one locale MUST land on one qualifier here. Left verbatim they
+        // produced two directories that are one directory on the case-insensitive
+        // filesystems Unity Editors run on, and the second write silently destroyed
+        // the first locale's labels.
         internal static string ResourceQualifier(string locale)
         {
             if (string.IsNullOrEmpty(locale))
@@ -346,8 +382,21 @@ namespace EminDeniz99.QuickActions.Editor
                 return language + "-r" + parts[1].ToUpperInvariant();
             var bcp47 = new StringBuilder("b+").Append(language);
             for (var i = 1; i < parts.Length; i++)
-                bcp47.Append('+').Append(parts[i]);
+                bcp47.Append('+').Append(CanonicalSubtag(parts[i]));
             return bcp47.ToString();
+        }
+
+        // BCP-47 subtag conventions, applied so one locale has one spelling here:
+        // 4 letters = a script subtag (Titlecase, "Hans"), 2 letters = a region
+        // subtag (uppercase, "BR"); everything else — 3-digit UN regions, variants,
+        // extensions — lowercases, which is both the convention and a no-op for digits.
+        private static string CanonicalSubtag(string part)
+        {
+            if (part.Length == 4 && IsAsciiAlpha(part))
+                return char.ToUpperInvariant(part[0]) + part.Substring(1).ToLowerInvariant();
+            if (part.Length == 2 && IsAsciiAlpha(part))
+                return part.ToUpperInvariant();
+            return part.ToLowerInvariant();
         }
 
         private static bool IsAsciiAlpha(string value)

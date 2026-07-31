@@ -174,6 +174,10 @@ namespace EminDeniz99.QuickActions.Internal
                 case SystemLanguage.Greek: return "el";
                 case SystemLanguage.Hebrew: return "he";
                 case SystemLanguage.Hindi: return "hi";
+                // Unity's member for Hungarian is the long-standing TYPO `Hugarian`
+                // (value 18); `Hungarian` is the same value under the correct spelling
+                // and is the only one that compiles (the typo is [Obsolete(error)]).
+                case SystemLanguage.Hungarian: return "hu";
                 case SystemLanguage.Icelandic: return "is";
                 case SystemLanguage.Indonesian: return "id";
                 case SystemLanguage.Italian: return "it";
@@ -259,7 +263,14 @@ namespace EminDeniz99.QuickActions.Internal
                     CultureInfo.InvariantCulture, out var length))
                 return false;
             var start = colon + 1;
-            if (start + length > blob.Length)
+            // Overflow-safe bound. `start + length > blob.Length` WRAPS negative for a
+            // forged length near int.MaxValue and then passes the guard, so Substring
+            // throws out of the cold-start reconcile — the one thing this parser exists
+            // to prevent. Subtracting instead can't overflow: `colon` is a found index,
+            // so start <= blob.Length and the remainder is never negative. (The length
+            // itself parses with NumberStyles.None, so it can't be negative today; the
+            // check keeps the bound correct if that ever loosens.)
+            if (length < 0 || length > blob.Length - start)
                 return false;
             value = blob.Substring(start, length);
             index = start + length;

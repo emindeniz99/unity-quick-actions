@@ -93,11 +93,23 @@ The stub harness compiles the C#/Java but can't confirm Unity-only wiring:
   app delivers cold + warm taps exactly once each; a default (no-manifest) app
   behaves byte-identically to v0.3; a host UnityAppController subclass that
   discards our `NO` no longer double-delivers; multi-scene-delegate-class hosts
-  get coverage only for the first class learned (documented in-code).
+  get coverage only for the first class learned (documented in-code). Also
+  verify the SUBCLASS-SHADOWED shape specifically: a host that overrides
+  `application:configurationForConnectingSceneSession:options:` without calling
+  super shadows our hook, and the `UISceneWillConnectNotification` fallback
+  installs from the live scene's delegate instead. Confirm warm taps arrive in
+  that shape, and measure whether the FIRST cold tap does — the notification may
+  be posted after the delegate's own `willConnect`, in which case that one tap
+  is lost by design (a `[super ...]` call on the host side closes it).
 - **Localization (SHIPPED in v0.4 — device-validate):** dynamic per-locale
   titles resolve/refresh across cold starts (verify a device-language change
   re-renders on next launch, and the refresh push tolerates rate limiting);
-  static output needs real toolchain checks — aapt2 accepts the generated
-  `values-<qualifier>/` (incl. `values-b+zh+Hans`) and iOS resolves
-  `<locale>.lproj/InfoPlist.strings` added via `AddFolderReference` (the
-  weakest link — compile-checked only).
+  static output needs a real toolchain check — that aapt2 accepts the generated
+  `values-<qualifier>/` directories (incl. `values-b+zh+Hans`) and resolves the
+  labels on a device set to that locale. Static localization is ANDROID-ONLY on
+  purpose: the iOS equivalent needs a `<locale>.lproj/InfoPlist.strings` in the
+  bundle root, whose path the platform fixes, so it would collide with any host
+  that localizes its own Info.plist. Adding it back requires MERGING into the
+  host's existing lproj / variant group (marker-delimited, so cleanup stays
+  scoped) and must be validated on a real Xcode build — the PBX stubs are
+  no-ops, which is exactly how the collision went unnoticed the first time.

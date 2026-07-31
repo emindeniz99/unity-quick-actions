@@ -71,16 +71,28 @@ namespace UnityEngine
         public static void LogError(object message) { }
     }
 
-    // Member ORDER mirrors UnityEngine.SystemLanguage (the enum is index-based), so
-    // the package's mapping switch type-checks against the same names Unity ships.
+    // Member NAMES and VALUES mirror UnityEngine.SystemLanguage exactly (the enum is
+    // index-based), so the package's mapping switch type-checks against the same names
+    // — and the same numbering — a real Editor has. Values are written out rather than
+    // implied: the tail is NOT alphabetical in Unity (Hindi 42 before Unknown 43), and
+    // Hungarian sits at 18 under two names, so an implicit ordering silently drifts.
     public enum SystemLanguage
     {
-        Afrikaans, Arabic, Basque, Belarusian, Bulgarian, Catalan, Chinese, Czech,
-        Danish, Dutch, English, Estonian, Faroese, Finnish, French, German, Greek,
-        Hebrew, Icelandic, Indonesian, Italian, Japanese, Korean, Latvian,
-        Lithuanian, Norwegian, Polish, Portuguese, Romanian, Russian, SerboCroatian,
-        Slovak, Slovenian, Spanish, Swedish, Thai, Turkish, Ukrainian, Vietnamese,
-        ChineseSimplified, ChineseTraditional, Unknown, Hindi
+        Afrikaans = 0, Arabic = 1, Basque = 2, Belarusian = 3, Bulgarian = 4,
+        Catalan = 5, Chinese = 6, Czech = 7, Danish = 8, Dutch = 9, English = 10,
+        Estonian = 11, Faroese = 12, Finnish = 13, French = 14, German = 15,
+        Greek = 16, Hebrew = 17,
+        // Unity ships BOTH spellings at value 18: `Hugarian` is its long-standing typo
+        // (kept for source compatibility, [Obsolete(error)] there, so nothing may
+        // reference it) and `Hungarian` is the alias real code must use. Declaring both
+        // keeps this stub honest about the ordinal slot without inviting the typo.
+        Hugarian = 18, Hungarian = 18,
+        Icelandic = 19, Indonesian = 20, Italian = 21, Japanese = 22, Korean = 23,
+        Latvian = 24, Lithuanian = 25, Norwegian = 26, Polish = 27, Portuguese = 28,
+        Romanian = 29, Russian = 30, SerboCroatian = 31, Slovak = 32, Slovenian = 33,
+        Spanish = 34, Swedish = 35, Thai = 36, Turkish = 37, Ukrainian = 38,
+        Vietnamese = 39, ChineseSimplified = 40, ChineseTraditional = 41, Hindi = 42,
+        Unknown = 43
     }
 
     public static class Application

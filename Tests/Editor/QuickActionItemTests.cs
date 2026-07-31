@@ -43,13 +43,17 @@ namespace EminDeniz99.QuickActions.Tests
             // WHY: the facade stores/returns defensive copies everywhere; a field
             // missed by Copy() silently loses that icon/payload the moment an item
             // crosses Add/GetAll/GetById — the OS then re-renders it wrong after a
-            // reconcile push. Every public field gets a distinct NON-default value
+            // reconcile push. Every instance field gets a distinct NON-default value
             // BY REFLECTION (not a hand-written arrange block), so a future field
             // whose author forgot to extend Copy() arrives here non-default, comes
             // back default from the copy, and fails — a hand-written arrange would
             // leave it default on both sides and pass vacuously.
+            // NonPublic is load-bearing: the wire-only `internal L10n` (and any
+            // future internal [SerializeField]) is exactly the kind of field an
+            // author forgets, and the default GetFields() binding would skip it —
+            // the guard would then pass while Copy() dropped it.
             var item = new QuickActionItem();
-            foreach (var field in typeof(QuickActionItem).GetFields())
+            foreach (var field in CopyableFields())
             {
                 if (field.FieldType == typeof(string))
                     field.SetValue(item, field.Name + "_value");
@@ -69,7 +73,7 @@ namespace EminDeniz99.QuickActions.Tests
             var copy = item.Copy();
 
             Assert.AreNotSame(item, copy);
-            foreach (var field in typeof(QuickActionItem).GetFields())
+            foreach (var field in CopyableFields())
             {
                 var original = field.GetValue(item);
                 var copied = field.GetValue(copy);
@@ -95,6 +99,14 @@ namespace EminDeniz99.QuickActions.Tests
                 Assert.AreEqual(original, copied, $"Copy() must preserve field '{field.Name}'");
             }
         }
+
+        // Every field Copy() is responsible for: public AND non-public instance
+        // fields. Statics are excluded (they are not per-item state, and the default
+        // GetFields() binding would include them).
+        private static System.Reflection.FieldInfo[] CopyableFields() =>
+            typeof(QuickActionItem).GetFields(System.Reflection.BindingFlags.Public
+                | System.Reflection.BindingFlags.NonPublic
+                | System.Reflection.BindingFlags.Instance);
 
         [Test]
         public void IconType_NoneIsZero_AndOrderMatchesAppleEnum()

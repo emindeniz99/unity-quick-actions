@@ -37,6 +37,16 @@ namespace EminDeniz99.QuickActions
         private static readonly List<QuickActionItem> _items = new List<QuickActionItem>();
         private static bool _loaded;
         private static bool _loading;
+        // Armed when a localization-refresh push was REFUSED by the OS. The load
+        // itself succeeded, so the managed set stays authoritative — only the labels
+        // the device renders are stale — and the next list access spends exactly ONE
+        // more push trying to fix them. It is spent whether or not that retry is
+        // accepted, and nothing re-arms it but another locale change: from then on the
+        // labels are corrected by the app's next successful Add/Update/Remove, whose
+        // push renders the current locale anyway. Without the latch every later read
+        // re-detected the same staleness and issued another OS write, turning
+        // GetAll/GetById/IsAdded into unbounded writers.
+        private static bool _refreshRetryArmed;
 
         private static IQuickActionsBridge Bridge => _bridge ??= QuickActionsBridgeFactory.Create();
 
@@ -50,20 +60,27 @@ namespace EminDeniz99.QuickActions
         /// This is also where a language change that happened while the app was NOT
         /// running is caught: each restored item's base text and per-locale tables
         /// come back with it, so a set still rendered in the previous locale is
-        /// re-pushed exactly once (see <see cref="Locale"/>).
+        /// re-pushed exactly once (see <see cref="Locale"/>) — and, if the OS refuses
+        /// that push, exactly once more on the next access and then no longer.
         /// </summary>
         /// <returns>
         /// True when the managed set now reflects the OS (loaded, or already loaded) —
-        /// including when the localization refresh push failed, since that changes
-        /// only the rendered language, not which ids are installed (the failure clears
-        /// <c>_loaded</c> so the next access re-checks); false when the current OS
+        /// including when the localization refresh push failed, since that changes only
+        /// the rendered language, not which ids are installed; false when the current OS
         /// shortcuts could not be read (so callers must not mutate/push against an
-        /// unknown baseline) or during a re-entrant load.
+        /// unknown baseline) or during a re-entrant load. A true answer therefore always
+        /// means <c>_loaded</c> is true and <c>_items</c> is the authoritative set —
+        /// <see cref="AddList"/> and <see cref="IsAdded"/> rely on that: a re-entrant
+        /// reload mid-<c>AddList</c> would clear the optimistic copies appended so far
+        /// and silently drop them from the push.
         /// </returns>
         private static bool EnsureLoaded()
         {
             if (_loaded)
+            {
+                RetryLocalizationRefresh();
                 return true;
+            }
             if (_loading)
                 return false; // re-entrant call mid-load — not safe to treat as loaded yet
             _loading = true;
@@ -111,11 +128,36 @@ namespace EminDeniz99.QuickActions
                 Log($"Localization refresh: {stale} quick action(s) still rendered in another locale; re-pushing for '{Locale}'.");
                 if (!Push())
                 {
-                    _loaded = false; // the OS refused it — reconcile again next access
-                    Log("Localization refresh failed: the OS did not accept the update; the shortcuts still show the previous locale.");
+                    // The OS refused it (rate-limited, locked profile…). The LOAD
+                    // succeeded, so _items stays authoritative and _loaded stays true —
+                    // only the rendered language is wrong. Arm one retry instead of
+                    // re-reading forever (see _refreshRetryArmed).
+                    _refreshRetryArmed = true;
+                    Log("Localization refresh failed: the OS did not accept the update; the shortcuts still show the previous locale (one retry armed).");
                 }
             }
             return true;
+        }
+
+        /// <summary>
+        /// Spend the single retry a refused localization refresh armed, if any.
+        ///
+        /// The load already succeeded and <c>_items</c> holds the base text plus both
+        /// tables, so the retry is just the push — no second OS read. The latch is
+        /// disarmed BEFORE the attempt, so this can fire at most once per arming even
+        /// if the OS refuses again: a read-only API must never become an unbounded
+        /// stream of OS writes. Nothing is lost by giving up — an accepted push from
+        /// any later mutation re-renders the labels anyway, and a
+        /// <see cref="Locale"/> change re-arms this.
+        /// </summary>
+        private static void RetryLocalizationRefresh()
+        {
+            if (!_refreshRetryArmed)
+                return;
+            _refreshRetryArmed = false;
+            Log($"Localization refresh: retrying the refused re-push for '{Locale}' (once).");
+            if (!Push())
+                Log("Localization refresh retry failed: the shortcuts keep the previous locale's labels until the next successful update.");
         }
 
         /// <summary>When true, the API logs its operations through <c>Debug.Log</c>.</summary>
@@ -138,9 +180,12 @@ namespace EminDeniz99.QuickActions
         /// value re-pushes the installed shortcuts immediately, so their labels
         /// change with the rest of the UI (assigning the same value — case
         /// differences included, since resolution ignores case — does nothing).
-        /// Items keep their base text and tables, so switching languages back and
-        /// forth always resolves from the author's original strings. Setting this
-        /// before any shortcut exists is free: the first push uses it.
+        /// This holds for the first assignment of a session too: the setter
+        /// reconciles with the OS first, so shortcuts a previous session installed
+        /// re-render even when nothing else has touched the list yet. Items keep
+        /// their base text and tables, so switching languages back and forth always
+        /// resolves from the author's original strings. With nothing installed the
+        /// assignment costs one native read and no write: the next push uses it.
         /// </summary>
         public static string Locale
         {
@@ -151,16 +196,35 @@ namespace EminDeniz99.QuickActions
                 if (string.Equals(Locale, next, StringComparison.OrdinalIgnoreCase))
                     return; // no observable difference — don't spend an OS write on it
                 _locale = next;
-                if (_items.Count == 0)
-                    return; // nothing installed yet; the next push picks this up
+                // Reconcile BEFORE deciding. On a cold start _items is empty because
+                // nothing has loaded yet, not because nothing is installed — treating
+                // those as the same thing is what made the FIRST assignment of a
+                // session (the in-app language-picker path) a silent no-op, leaving
+                // the launcher in the previous language until some other API call
+                // happened to load. The new locale is already in place above, so the
+                // load's own staleness check compares the device against it and
+                // re-renders what disagrees; nothing is left for this setter to push.
+                var alreadyLoaded = _loaded;
+                if (!EnsureLoaded())
+                {
+                    // Unknown baseline — pushing now could wipe shortcuts we never saw
+                    // (same rule as Add/RemoveById). The locale still took effect for
+                    // the next successful push.
+                    Log($"Locale set to '{next}', but the current shortcuts could not be read; the labels re-render on the next successful update.");
+                    return;
+                }
+                if (!alreadyLoaded || _items.Count == 0)
+                    return; // the reconcile above already re-rendered whatever needed it
                 Log($"Locale set to '{next}'; re-pushing {_items.Count} quick action(s).");
                 if (!Push())
                 {
                     // The OS refused the re-render (rate-limited, locked profile…):
-                    // the device still shows the previous locale's labels, so force a
-                    // reconcile and say so rather than leaving a silent mismatch.
-                    _loaded = false;
-                    Log("Locale change failed: the OS did not accept the update; the shortcuts still show the previous locale.");
+                    // the device still shows the previous locale's labels. Only the
+                    // rendered language is wrong — _items is still what the OS holds —
+                    // so arm the same single retry a refused reconcile refresh arms,
+                    // rather than dropping _loaded and making every later read a write.
+                    _refreshRetryArmed = true;
+                    Log("Locale change failed: the OS did not accept the update; the shortcuts still show the previous locale (one retry armed).");
                 }
             }
         }
@@ -317,6 +381,7 @@ namespace EminDeniz99.QuickActions
             _items.Clear();
             _loaded = false;
             _loading = false;
+            _refreshRetryArmed = false;
             _bridge = null;
             LoggingEnable = false;
             _locale = null; // re-read the device language, like a real process start
@@ -640,6 +705,7 @@ namespace EminDeniz99.QuickActions
             }
             _items.Clear();
             _loaded = true; // now authoritative — skip any later OS reconcile
+            _refreshRetryArmed = false; // nothing left to re-render
             Log("Removed all quick actions.");
         }
 
@@ -689,6 +755,7 @@ namespace EminDeniz99.QuickActions
         {
             _bridge = bridge;
             _loaded = false;
+            _refreshRetryArmed = false;
             _items.Clear();
 #if UNITY_EDITOR
             // Also drop simulated-tap state, or a Simulator click before an edit-mode

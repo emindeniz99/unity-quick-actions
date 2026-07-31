@@ -271,7 +271,7 @@ public class ShortcutRouter : MonoBehaviour
 | `bool IsPinSupported` | True when the launcher can pin shortcuts (Android 8.0+; always false on iOS/Editor). |
 | `bool RequestPin(string)` | Ask the launcher to pin an **added** action to the home screen. True = request *dispatched* (the user still confirms in launcher UI — the OS reports no outcome). |
 | `bool ReportUsed(string)` | Tell the launcher the user reached this action's feature **in-app** (Android `reportShortcutUsed`, improves ranking predictions). Call on normal-UI usage, not on shortcut taps. False on iOS/Editor (no analog), for a not-added id, or when the native call failed. |
-| `string Locale` | The locale labels resolve against (defaults to the device language via `Application.systemLanguage`). Set it from an in-app language picker — a **different** value re-pushes the current set so the launcher re-renders immediately. A device-language change while the app was closed is caught on next launch: the cold-start reconcile detects stale labels and refreshes them with one push. |
+| `string Locale` | The locale labels resolve against (defaults to the device language via `Application.systemLanguage`). Set it from an in-app language picker — a **different** value re-pushes the current set so the launcher re-renders immediately. A device-language change while the app was closed is caught on next launch: the cold-start reconcile detects stale labels and refreshes them with one push. If the OS refuses that push (Android rate-limits writes while backgrounded), the managed list stays authoritative — only the on-screen labels are stale — and exactly **one** retry is attempted on the next list call; after that the labels are fixed by your next successful `Add`/`Update`/`Remove`, so read-only calls never turn into a stream of OS writes. |
 
 `QuickActionItem` fields:
 
@@ -285,7 +285,7 @@ public class ShortcutRouter : MonoBehaviour
 | `AndroidBitmapAdaptive` | Install `AndroidBitmapFile` as an adaptive icon (API 26+, launcher-masked; supply safe-zone padding). |
 | `AndroidDrawable` | Drawable resource name overriding the `Icon` lookup. Ignored on iOS. |
 | `Payload` | App-defined string riding the shortcut (iOS `userInfo`, Android extras), restored across cold starts. Not pushed with the tap — read it via `GetById(id)?.Payload` from the id `Performed` reports (`GetById` is null for a **static**-shortcut tap or an id removed since: static items never join the runtime list and carry no payload). |
-| `LocalizedTitles` / `LocalizedSubtitles` | Per-locale label replacements (`LocalizedText { Locale, Text }` pairs). Resolution: exact locale match > language prefix (`"pt-BR"` matches a `"pt"` entry) > base `Title`/`Subtitle`, case-insensitive. The tables survive cold starts (they ride the ownership-marker payload), so labels re-resolve after a device-language change. Works for static shortcuts too (baked as `values-<locale>/` resources on Android, `InfoPlist.strings` on iOS). |
+| `LocalizedTitles` / `LocalizedSubtitles` | Per-locale label replacements (`LocalizedText { Locale, Text }` pairs). Resolution: exact locale match > language prefix (`"pt-BR"` matches a `"pt"` entry) > base `Title`/`Subtitle`, case-insensitive. The tables survive cold starts (they ride the ownership-marker payload), so labels re-resolve after a device-language change. Static (baked) shortcuts localize on **Android only** (`values-<qualifier>/` string resources); iOS static shortcuts render in their base language — see "Known limits". |
 
 ### Test in the Editor — no device needed
 
@@ -405,6 +405,27 @@ republished with this package's intents, and never removed. Three consequences:
   (the id then renders twice — the honest result of two publishers claiming
   one id); the package never removes anything it didn't mark.
 
+### Known limits — localization
+
+**Dynamic** shortcuts localize on both platforms: the label is resolved in C# at
+push time and the per-locale tables ride along in the ownership-marker payload, so
+they survive cold starts and re-render after a language change.
+
+**Static** (baked) shortcuts localize on **Android only**, via generated
+`values-<qualifier>/quickactions_strings.xml` files — the package's own file name
+inside the shared resource folders, so a host app's `strings.xml` is never touched.
+Two rows for one locale keep the first and warn (aapt2 rejects duplicate resource
+names), and locale tags are normalised to one canonical qualifier ("zh-Hans" and
+"zh-hans" are one directory).
+
+On **iOS**, static shortcuts render in their **base language**. iOS localizes an
+Info.plist value through `<locale>.lproj/InfoPlist.strings` in the bundle root — a
+path where both components are fixed by the platform — so shipping one would collide
+with any app that localizes its own display name or usage strings: a
+"Multiple commands produce…" build failure, or a silent overwrite of files the
+package doesn't own. Localize an iOS shortcut label by adding it at runtime with
+`QuickActions.Add(...)` instead.
+
 ### Known limits — Android build variants and static shortcuts
 
 The **static** Android shortcuts baked at build time encode an explicit intent
@@ -457,8 +478,8 @@ spoof a tap; on either platform the id is just a string the OS hands you. So:
 See [`ROADMAP.md`](./ROADMAP.md). Notable remaining: always-on device CI (the
 shipped adb smoke + emulator workflow are manual — no Unity license in CI —
 and cover Android warm taps only; iOS has no adb analog) and on-device
-validation of the newest native paths (UIScene hooks, localized static
-output). OS read-back can't recover icons natively; the package persists icon
+validation of the newest native paths (UIScene hooks — including the
+subclass-shadowed fallback — and the Android localized static output). OS read-back can't recover icons natively; the package persists icon
 identity in its ownership-marker payload — Android extras, iOS `userInfo` — so
 reconciled items keep their icons on both platforms.
 
@@ -468,7 +489,7 @@ The package is type-checked and compiled without Unity via a stub-based harness:
 
 ```bash
 tools/setup.sh     # install dotnet + JDK (once; pre-baked in the devcontainer)
-tools/verify.sh    # .meta gen + C# compile (8 configs) + unit tests + Android plugin
+tools/verify.sh    # .meta gen + C# compile (9 configs) + unit tests + Android plugin
 ```
 
 `verify.sh` runs the unit tests via `dotnet test`; the same tests (plus
