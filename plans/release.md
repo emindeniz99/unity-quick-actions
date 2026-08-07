@@ -72,8 +72,8 @@ Legend: ✅ verified · ⛔ needs physical hardware.
 - Bump to `1.0.0` (package.json + CHANGELOG) if device-validated.
 - Build the `.unitypackage` (`tools/release.sh`, or grab it from the
   [GitHub Release](https://github.com/emindeniz99/unity-quick-actions/releases)
-  — no tag has been pushed and no Release has been cut yet, so today the local
-  build via `python3 tools/pack_unitypackage.py` is the only way to get it).
+  — `v0.4.0` is the first release; a local `python3 tools/pack_unitypackage.py`
+  produces the same file).
 - Create publisher account, fill metadata + images, upload, submit for review.
 
 ## Risk register

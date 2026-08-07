@@ -26,7 +26,7 @@ red or unrun verify; say what failed.
   have `.meta`s (gen_meta handles that folder explicitly) — leave them.
 - **Never commit a `.unitypackage`.** It is a build output; `dist~/` is
   gitignored, `tools/pack_unitypackage.py` produces it, CI attaches it to the
-  GitHub Release (no release has been cut yet — build it locally for now).
+  GitHub Release (first one: `v0.4.0`).
 - The package is opt-in behind the `QUICKACTIONS_ENABLED` scripting define, and
   the test assembly is constrained on it plus `UNITY_INCLUDE_TESTS`. A consuming
   project also needs `"testables": ["com.emindeniz99.quick-actions"]` in its

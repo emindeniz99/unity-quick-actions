@@ -103,8 +103,7 @@ import — and `gen_meta.py` handles that folder explicitly. Don't delete them.)
 gitignored. Produce one locally with `python3 tools/pack_unitypackage.py` (or
 `tools/release.sh` for every release artifact at once); CI attaches it to the
 [GitHub Release](https://github.com/emindeniz99/unity-quick-actions/releases)
-(no release has been cut yet, so the local packer is the only source for now).
-Never add a `.unitypackage` to a commit or a PR.
+on every `v*` tag. Never add a `.unitypackage` to a commit or a PR.
 
 **Don't hand-edit generated collateral.** `store~/` PNGs come from
 `tools/gen_store_images.py`; regenerate rather than retouch.

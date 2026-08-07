@@ -39,9 +39,7 @@ the failing check is fixed first, not worked around.
 8. The release is confirmed at
    <https://github.com/emindeniz99/unity-quick-actions/releases> with the
    `.unitypackage` attached, because the install docs point downloaders there.
-   (No tag has been pushed and no Release has been cut yet, so that page is
-   empty today; until the first one exists the artifact is built locally with
-   `python3 tools/pack_unitypackage.py`.)
+   (`v0.4.0`, cut 2026-08-07, is the first one.)
 
 ## OpenUPM
 

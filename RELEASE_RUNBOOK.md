@@ -91,14 +91,15 @@ The condensed, day-of sequence. Details live in
       `tools/release.sh`) → gitignored `dist~/QuickActions.unitypackage`, or take
       the one attached to the
       [GitHub Release](https://github.com/emindeniz99/unity-quick-actions/releases)
-      — no release has been cut yet, so today that means building it locally.
+      — `v0.4.0` is the first release and carries it.
 - [ ] Price: **Free**. Submit for review. (Review: days → ~2 weeks.)
 
 ## Phase 6 — stamp the release (10 min, back in the repo)
 
 The **first public release is `v0.4.0`** — the version this repo already carries.
-Tags are plain semver (`v0.4.0`), one tag per release. No tag has been pushed and
-no GitHub Release exists yet; this phase is where the first one gets created.
+Tags are plain semver (`v0.4.0`), one tag per release. `v0.4.0` was pushed on
+2026-08-07 and CI created the Release with the `.unitypackage` attached; this
+phase is what every later release repeats.
 
 - [ ] `package.json` `version` and the top `CHANGELOG.md` heading agree, and the
       heading has a real date (no `Unreleased` left).

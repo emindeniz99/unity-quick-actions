@@ -13,8 +13,8 @@ tests green, full source + docs. The drag-and-drop `.unitypackage` is a **build
 output** — it is not committed; `tools/release.sh` writes it to the gitignored
 `dist~/`, and CI attaches the same artifact to each
 [GitHub Release](https://github.com/emindeniz99/unity-quick-actions/releases),
-so you can either build it or download it. (No release has been cut yet — there
-is nothing on that page to download today, so build it locally for now.)
+so you can either build it or download it — `v0.4.0` is the first release and
+carries the artifact.
 
 ⏳ **Needs your account / hardware (can't be automated):**
 1. Create the free publisher account + accept the agreement.

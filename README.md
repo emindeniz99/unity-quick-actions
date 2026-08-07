@@ -139,8 +139,7 @@ OpenUPM gives version management and update notifications in Package Manager.
 Download `QuickActions.unitypackage` from the
 [**Releases** page](https://github.com/emindeniz99/unity-quick-actions/releases)
 — it's a build output attached to each release by CI, not a file committed to the
-repo. (No release has been cut yet, so for now build the file locally with the
-command below.) Drag it into an open Editor (or *Assets ▸ Import Package ▸ Custom
+repo. Drag it into an open Editor (or *Assets ▸ Import Package ▸ Custom
 Package…*). It installs under `Assets/QuickActions/`. Build it yourself any time
 with `python3 tools/pack_unitypackage.py` (no Unity needed); the result lands in
 the gitignored `dist~/`. Note: it lands in `Assets/` (editable, not read-only),

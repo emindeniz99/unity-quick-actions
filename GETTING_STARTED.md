@@ -76,8 +76,7 @@ Alternatives:
   `Assets/QuickActions/`. That file is a build output, not a committed file —
   grab it from the
   [Releases page](https://github.com/emindeniz99/unity-quick-actions/releases).
-  (No release has been cut yet; until one is, build the file yourself from a
-  clone with `python3 tools/pack_unitypackage.py`.)
+  (Or build it yourself from a clone with `python3 tools/pack_unitypackage.py`.)
 
 ### A3. ⚠️ Turn the package ON (the #1 gotcha)
 The package is **opt-in**: with no define, the `QuickActions` API doesn't even
