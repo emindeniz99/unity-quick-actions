@@ -65,8 +65,7 @@ adds nothing to a build unless you turn it on in step A3.)
 ```
 https://github.com/emindeniz99/unity-quick-actions.git
 ```
-Append `#v0.4.0` to pin a version. (No tag has been cut yet, so for now the
-plain URL above is the only thing that resolves.)
+Append `#v0.4.0` to pin a version; the plain URL tracks the default branch.
 
 Alternatives:
 - **+ ▸ Add package from disk…** pointing at the `package.json` at the root of a

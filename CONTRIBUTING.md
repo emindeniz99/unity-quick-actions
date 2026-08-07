@@ -228,8 +228,7 @@ they are pushed.
 ## 7. Releases
 
 Releases are cut by the maintainer — see [`MAINTAINING.md`](./MAINTAINING.md).
-Tags are plain semver: `v0.4.0`. No tag has been cut yet, so the pin below is
-the form consumers will use once one exists. Consumers pin a version by
+Tags are plain semver: `v0.4.0` is the first. Consumers pin a version by
 appending the tag to the git URL:
 
 ```

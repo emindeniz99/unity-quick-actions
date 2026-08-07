@@ -89,8 +89,7 @@ Prefer relative links between files in this repo (`./GETTING_STARTED.md`) so
 they resolve on GitHub *and* in the Unity Package Manager. Install URL is
 `https://github.com/emindeniz99/unity-quick-actions.git` — `package.json` is at
 the repo root, so the URL carries no subfolder query suffix. Pin a version with
-`#v0.4.0`. Tags are plain semver. (No tag exists yet — the pin syntax is what
-consumers will use once one is cut.)
+`#v0.4.0`. Tags are plain semver; `v0.4.0` is the first one.
 
 Don't invent status claims. If a doc asserts something you cannot verify, leave
 it as it is rather than "improving" it.
