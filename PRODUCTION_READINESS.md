@@ -14,7 +14,9 @@ the two must not disagree.
 `unit` = headless NUnit (`dotnet test`, 73 tests) · `unity-test` = Unity Test
 Runner only (JsonUtility) · `static` = compiles in the stub harness (9 configs) ·
 `review` = code review, several adversarial rounds (see git log) ·
-`device` = **requires a real physical device — NOT done** ·
+`device` = **requires a real physical device** — Android partially done
+(2026-08-07, Moto G Play 2024: static + dynamic shortcuts render, tap delivery
+not yet captured); iOS not done. See "Exact remaining steps" below ·
 `editor-2022.3` = **executed in a real licensed Unity 2022.3.9f1 Editor
 (2026-07-17)** — import 0 errors, Test Runner 35/35 (historical count), real
 player builds (incl. Android APKs); re-run on **2022.3.62f3** — import 0
@@ -234,7 +236,28 @@ What is left is physical hardware.
    [`tools/device-smoke/`](./tools/device-smoke/README.md); iOS is manual (no
    adb analog).
 
-Until step 3 passes, ship honestly as a **`0.x` pre-device-validation release**
-(the first public one is `0.4.0` — note no git tag or GitHub Release has been
-cut yet; the `.unitypackage` can be built locally with
-`python3 tools/pack_unitypackage.py`), not `1.0.0`.
+   **Android, partially closed 2026-08-07** — Moto G Play 2024 (Android 14,
+   arm64), sideloaded APK built from `Examples~/Testbed2021` with 2021.3.45f2,
+   IL2CPP, `arm64-v8a` + `armeabi-v7a`. Confirmed on hardware:
+   - **Static shortcuts on a cold, never-opened install**: long-pressing the
+     icon straight after installing showed all three baked shortcuts. This is
+     the manifest-merge + `res/xml/quickactions_shortcuts.xml` path, which no
+     simulator or stub run had ever exercised.
+   - **Dynamic add**: "Add 3 shortcuts" and "Add 'settings'" both published.
+   - **Same-id collision, exactly as documented** at `README.md:373`: `new_game`
+     and `continue` exist in both the static and dynamic sets, and the launcher
+     kept the *manifest* entries while the dynamic duplicates were dropped —
+     the remaining slots went to the dynamic-only `daily` and `settings`, with
+     static `daily_reward` pushed out by the launcher's four-item cap.
+   - **Android renders the long label** (our `Subtitle`), not the short one, so
+     the popup reads "Start a fresh run" rather than "New Game" — `README.md:322`
+     is correct, and it is worth knowing when authoring labels for Android.
+
+   Still open on Android: **tap delivery** — a shortcut tap arriving as
+   `Performed` on a cold and on a warm launch. The device run above published
+   and rendered shortcuts but did not capture a tap. That is a few minutes with
+   `adb logcat -s Unity` or by reading the demo's on-screen log.
+
+Until step 3 passes on both platforms, ship honestly as a **`0.x`
+pre-device-validation release** (the first public one is `0.4.0`, tagged and
+released 2026-08-07 with the `.unitypackage` attached), not `1.0.0`.
