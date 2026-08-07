@@ -11,6 +11,34 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 > as its own section because each is a distinct, self-contained set of API
 > additions; read them as the package's development log.
 
+## [0.4.3] - 2026-08-07
+
+Completes the 0.4.2 packaging fix and undoes one part of it that backfired.
+
+### Fixed
+
+- **The dev folders are now hidden from Unity on *every* install path.** 0.4.2's
+  `files` allowlist is an npm concept: it governs the OpenUPM tarball and has no
+  effect on `Add package from git URL`, which the README calls the recommended
+  method. That path clones the whole repo into `Library/PackageCache`, where
+  Unity imports anything not dot-prefixed or tilde-suffixed — so 48 files
+  including all of `tools/` (shell scripts, the packer, the device-smoke
+  harness), `plans/` and `docs/` still landed in the Project window of anyone
+  following our own first instruction. Renamed to `tools~/`, `plans~/` and
+  `docs~/`; their folder `.meta` files are gone. (Deleting the `.meta` alone
+  would not have worked — Unity hides by the `~`/`.` prefix, not by absence of
+  a meta.) The maintainer-facing Markdown at the repo root — `CLAUDE.md`,
+  `RELEASE_RUNBOOK.md`, `STORE_CHECKLIST.md` and friends — is still visible on
+  that path, and stays that way on purpose: renaming those would break every
+  relative link on GitHub and on the OpenUPM package page.
+- **`LICENSE.md` is back in the `.unitypackage`.** Removing it in 0.4.2 did not
+  take the MIT grant out of the artifact — the shipped README still carries an
+  MIT badge and calls the package "MIT-licensed" in its first paragraph — it
+  only broke that badge's `./LICENSE.md` link for every customer. Dual
+  distribution is the copyright holder's right; the honest handling is to
+  disclose it in the Asset Store submission notes, which `STORE_CHECKLIST.md`
+  now requires, rather than hide the file and leave the claim dangling.
+
 ## [0.4.2] - 2026-08-07
 
 Packaging, guardrails and store-compliance. No public API change.
@@ -19,7 +47,7 @@ Packaging, guardrails and store-compliance. No public API change.
 
 - **The published package no longer carries the development repository.** There
   was no `files` allowlist, so `npm pack` shipped everything tracked — 303 files,
-  2.1 MB. Worse than the weight: `tools/`, `plans/` and `docs/` are neither
+  2.1 MB. Worse than the weight: `tools~/`, `plans~/` and `docs~/` are neither
   tilde- nor dot-prefixed **and** carry folder `.meta` files, so Unity *imported*
   them into every consuming project — a consumer's Project window contained our
   release runbook and publishing notes. Now 107 files, 465 KB, containing only
@@ -38,13 +66,13 @@ Packaging, guardrails and store-compliance. No public API change.
   and `icon.png` now carry no text, `card.png` only the title and publisher,
   `cover.png` the title plus one tag line. The feature grid also claimed
   "Unity 2022 → 6" while the package supports 2021.3.
-- `tools/gen_store_images.py` now finds a real font on macOS instead of silently
+- `tools~/gen_store_images.py` now finds a real font on macOS instead of silently
   falling back to Pillow's bitmap default, which produced art too coarse to
   upload; when nothing is found it says so loudly.
 
 ### Added
 
-- **`tools/check_frozen_strings.py`**, run by `tools/verify.sh`, pins the 13
+- **`tools~/check_frozen_strings.py`**, run by `tools~/verify.sh`, pins the 13
   identifier strings the OS persists on end-user devices — the ownership marker,
   the trampoline class name, the intent action prefix and extra, and the
   icon/payload/l10n keys — across all 24 copies in Java, Objective-C and C#.
@@ -132,7 +160,7 @@ First public release.
   tap — it also fixes the documented double delivery when a host
   `UnityAppController` subclass discards our `didFinishLaunchingWithOptions`
   return value.
-- **Android device smoke + emulator CI (experimental)**: `tools/device-smoke/`
+- **Android device smoke + emulator CI (experimental)**: `tools~/device-smoke/`
   installs a dev APK, drives the demo's autotest hook, asserts the shortcuts
   registered via `dumpsys shortcut` (scoped to the app id) and that a
   simulated trampoline tap delivers `Performed`; a manually-dispatched
@@ -231,7 +259,7 @@ First public release.
   (`UIApplicationShortcutItems`) and Android `res/xml/quickactions_shortcuts.xml` +
   launcher-activity meta-data. Static intents reuse the trampoline via an
   action-encoded id.
-- Unity-free verification harness (`.verify/`, `tools/verify.sh`): compiles the
+- Unity-free verification harness (`.verify/`, `tools~/verify.sh`): compiles the
   C# against UnityEngine/UnityEditor stubs and the Android plugin against Android
   SDK stubs. Toolchain baked into the devcontainer image.
 - Unit tests (`Tests/Editor/`): an NUnit suite for the runtime API (list
@@ -240,7 +268,7 @@ First public release.
   LastPerformed) runnable in the Unity Test Runner and via `dotnet test`; plus
   JsonUtility serialization tests.
 - Store collateral: marketing images at Asset Store sizes (`store~/`,
-  `tools/gen_store_images.py`).
+  `tools~/gen_store_images.py`).
 - **Opt-in `QUICKACTIONS_ENABLED` gate:** managed asmdefs use
   `defineConstraints: [QUICKACTIONS_ENABLED]`. Native plugins (which Unity won't
   gate via define constraints) are gated at the build-output level: the iOS

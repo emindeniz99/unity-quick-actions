@@ -14,7 +14,7 @@ drag-into-the-Editor format alongside the modern UPM package.
 Layout: package content is remapped under Assets/QuickActions/. Dev folders
 (.verify, tools, docs, store~, Tests) and package.json are excluded.
 
-Run: python3 tools/pack_unitypackage.py  ->  dist~/QuickActions.unitypackage
+Run: python3 tools~/pack_unitypackage.py  ->  dist~/QuickActions.unitypackage
 
 `dist~/` is gitignored: the .unitypackage is a build output, never a committed
 source file. CI runs this same script and attaches the result to the GitHub
@@ -45,14 +45,13 @@ INCLUDE_DIRS = [
     # project, or those few sample GUIDs would collide.
     ("Samples~/Demo", "Example"),
 ]
-# LICENSE.md is deliberately absent. This artifact is the Asset Store delivery,
-# and Store products are governed by Unity's own EULA — dropping an MIT grant
-# into the customer's project alongside it presents a reviewer with two
-# conflicting licences for one product. The source stays MIT and stays public on
-# GitHub; the store listing says so in its description. Nothing is taken away
-# from anyone: dual-licensing our own code is the copyright holder's choice, and
-# the GitHub/OpenUPM channels still ship LICENSE.md as before.
-INCLUDE_FILES = ["README.md", "CHANGELOG.md", "ROADMAP.md"]
+# LICENSE.md stays in. Dropping it (0.4.2) did not remove the MIT grant from
+# the artifact — the shipped README still carries an MIT badge and says
+# "MIT-licensed" in its first paragraph — it only broke that badge's
+# ./LICENSE.md link for every customer. Dual distribution is the copyright
+# holder's right; the honest fix is to DISCLOSE it in the store listing
+# rather than hide the file and leave the claim dangling.
+INCLUDE_FILES = ["README.md", "CHANGELOG.md", "LICENSE.md", "ROADMAP.md"]
 
 
 def guid_of_meta(meta_path):

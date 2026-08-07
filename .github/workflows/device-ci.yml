@@ -7,7 +7,7 @@ name: device smoke
 # this to push/pull_request would fail every commit for a reason that says
 # nothing about the package. Hence workflow_dispatch and nothing else.
 #
-# Runs tools/device-smoke/android_device_smoke.sh
+# Runs tools~/device-smoke/android_device_smoke.sh
 # against an emulator: shortcuts must reach ShortcutManager, and a tap on one
 # must come back into the game as a Performed event. See that script's README
 # for what the smoke asserts and what it deliberately does not.
@@ -59,4 +59,4 @@ jobs:
           api-level: 30
           arch: x86_64
           target: google_apis
-          script: tools/device-smoke/android_device_smoke.sh "$RUNNER_TEMP/quickactions-demo.apk" "$APP_ID"
+          script: tools~/device-smoke/android_device_smoke.sh "$RUNNER_TEMP/quickactions-demo.apk" "$APP_ID"

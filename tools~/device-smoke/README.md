@@ -1,6 +1,6 @@
 # Device smoke
 
-`tools/verify.sh` proves the package *compiles and behaves* headlessly (C# unit
+`tools~/verify.sh` proves the package *compiles and behaves* headlessly (C# unit
 tests, Java against SDK stubs). It cannot prove the two things that only an OS
 can answer: whether the shortcuts really land in `ShortcutManager`, and whether
 a tap on one really comes back into the game. That is what this directory is
@@ -13,7 +13,7 @@ documents the manual run instead of pretending it is covered.
 ## `android_device_smoke.sh`
 
 ```
-tools/device-smoke/android_device_smoke.sh <apk> <application-id> [adb-serial]
+tools~/device-smoke/android_device_smoke.sh <apk> <application-id> [adb-serial]
 ```
 
 ### What it needs
@@ -84,9 +84,9 @@ It does **not** prove:
 # 1. Build the Demo sample to an APK with QUICKACTIONS_ENABLED (Unity, dev build).
 # 2. Start an emulator or plug in a device, then:
 adb devices
-tools/device-smoke/android_device_smoke.sh ~/builds/demo.apk com.example.game
+tools~/device-smoke/android_device_smoke.sh ~/builds/demo.apk com.example.game
 # ...or against a specific device:
-tools/device-smoke/android_device_smoke.sh ~/builds/demo.apk com.example.game emulator-5554
+tools~/device-smoke/android_device_smoke.sh ~/builds/demo.apk com.example.game emulator-5554
 ```
 
 ### CI

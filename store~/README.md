@@ -3,7 +3,7 @@
 Publishing collateral for the Unity Asset Store. **Not** part of the importable
 package (excluded from `.meta` generation), so it ships no runtime weight.
 
-Regenerate with `python3 tools/gen_store_images.py`.
+Regenerate with `python3 tools~/gen_store_images.py`.
 
 | File | Size | Asset Store slot |
 |------|------|------------------|

@@ -46,7 +46,7 @@ hardware; iOS 13+ opens it with a plain long-press on every device.
 
 ## Status
 
-This is **0.4.2**, a pre-1.0 release. Here is exactly what has been proven and
+This is **0.4.3**, a pre-1.0 release. Here is exactly what has been proven and
 what has not — one place, no hedging. (Per-feature detail:
 [PRODUCTION_READINESS.md](./PRODUCTION_READINESS.md).)
 
@@ -124,7 +124,7 @@ https://github.com/emindeniz99/unity-quick-actions.git
 Pin a version by appending a tag, e.g.:
 
 ```
-https://github.com/emindeniz99/unity-quick-actions.git#v0.4.2
+https://github.com/emindeniz99/unity-quick-actions.git#v0.4.3
 ```
 
 (Without a tag you track the default branch. `v0.4.0` is the first tag, so
@@ -158,7 +158,7 @@ package under `dependencies`:
     }
   ],
   "dependencies": {
-    "com.emindeniz99.quick-actions": "0.4.2"
+    "com.emindeniz99.quick-actions": "0.4.3"
   }
 }
 ```
@@ -172,7 +172,7 @@ Download `QuickActions.unitypackage` from the
 — it's a build output attached to each release by CI, not a file committed to the
 repo. Drag it into an open Editor (or *Assets ▸ Import Package ▸ Custom
 Package…*). It installs under `Assets/QuickActions/`. Build it yourself any time
-with `python3 tools/pack_unitypackage.py` (no Unity needed); the result lands in
+with `python3 tools~/pack_unitypackage.py` (no Unity needed); the result lands in
 the gitignored `dist~/`. Note: it lands in `Assets/` (editable, not read-only),
 so it's less clean to fully remove than UPM.
 
@@ -188,7 +188,7 @@ or:
 ---
 
 After installing, import the **Demo** sample from the package page to try it on a
-device. More on packaging/export: [`tools/export-unitypackage.md`](./tools/export-unitypackage.md).
+device. More on packaging/export: [`tools~/export-unitypackage.md`](./tools~/export-unitypackage.md).
 
 ### Or skip the setup: open a ready-made project
 
@@ -586,8 +586,8 @@ section is only how to re-run the checks.*
 The package is type-checked and compiled without Unity via a stub-based harness:
 
 ```bash
-tools/setup.sh     # install dotnet + JDK (once)
-tools/verify.sh    # .meta gen + C# compile (9 configs) + unit tests + Android plugin
+tools~/setup.sh     # install dotnet + JDK (once)
+tools~/verify.sh    # .meta gen + C# compile (9 configs) + unit tests + Android plugin
 ```
 
 `verify.sh` compiles the C# in **9 configurations** (0 warnings), runs the **73**
@@ -597,7 +597,7 @@ Java plugin (**103** checks). Those tests (bar 4 headless-only ones) plus 5
 `Tests/Editor/` — **74** there. See [`.verify/README.md`](./.verify/README.md)
 for how the stubs work.
 
-For a real device/emulator, `tools/device-smoke/` has an adb-driven Android
+For a real device/emulator, `tools~/device-smoke/` has an adb-driven Android
 smoke (install a dev APK → assert the demo's shortcuts registered → simulate a
 tap → assert delivery) and a manually-dispatched emulator CI workflow — see its
 README, including the honest iOS limitations. A green `verify.sh` proves
@@ -614,7 +614,7 @@ behaviour, which cannot run in the Editor.
   build post-processors (Info.plist / shortcuts.xml).
 - The iOS `.mm` compiles cleanly against the real iOS SDK (ARC, arm64,
   deployment target iOS 13) with no deprecation or availability errors; the
-  cross-platform `tools/verify.sh` harness can only brace/structure-check it,
+  cross-platform `tools~/verify.sh` harness can only brace/structure-check it,
   so that compile is a separate, macOS-only step. The C# and Android Java are
   fully compiled against stubs by `verify.sh` — and the Java is also *executed*
   against stateful stubs (`.verify/JavaSmoke`).

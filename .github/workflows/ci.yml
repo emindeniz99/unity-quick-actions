@@ -1,6 +1,6 @@
 name: CI
 
-# Unity asset verified WITHOUT Unity: tools/verify.sh generates .meta files,
+# Unity asset verified WITHOUT Unity: tools~/verify.sh generates .meta files,
 # compiles the C# against UnityEngine/UnityEditor stubs (9 configs), runs the
 # NUnit suite via `dotnet test`, and compiles the Android plugin against Android
 # SDK stubs. The iOS .mm and on-device behaviour still need a real Unity build
@@ -36,9 +36,9 @@ jobs:
           distribution: temurin
           java-version: "17"
       - name: Verify (meta + 9 C# configs + unit tests + Android plugin)
-        run: tools/verify.sh
+        run: tools~/verify.sh
       - name: Pack .unitypackage (reproducible, no Unity needed)
-        run: python3 tools/pack_unitypackage.py
+        run: python3 tools~/pack_unitypackage.py
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: QuickActions.unitypackage
@@ -61,7 +61,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Pack .unitypackage
-        run: python3 tools/pack_unitypackage.py
+        run: python3 tools~/pack_unitypackage.py
       # `gh` is preinstalled on the runner, so this needs no third-party action.
       # The tag reaches the shell through env, never an inline ${{ }} expansion.
       # Works whether or not the Release already exists: created from the UI

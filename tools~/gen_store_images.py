@@ -7,7 +7,7 @@ Outputs to store~/ at the exact sizes the Unity Asset Store requires:
 
 These are clean, on-brand placeholders/mockups — replace the screenshots with
 real on-device captures before publishing (the store rejects pure Editor shots).
-Run: python3 tools/gen_store_images.py
+Run: python3 tools~/gen_store_images.py
 """
 import os
 import sys

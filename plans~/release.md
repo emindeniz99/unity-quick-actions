@@ -70,9 +70,9 @@ Legend: ✅ verified · ⛔ needs physical hardware.
 
 **Phase D — submit:**
 - Bump to `1.0.0` (package.json + CHANGELOG) if device-validated.
-- Build the `.unitypackage` (`tools/release.sh`, or grab it from the
+- Build the `.unitypackage` (`tools~/release.sh`, or grab it from the
   [GitHub Release](https://github.com/emindeniz99/unity-quick-actions/releases)
-  — `v0.4.0` is the first release; a local `python3 tools/pack_unitypackage.py`
+  — `v0.4.0` is the first release; a local `python3 tools~/pack_unitypackage.py`
   produces the same file).
 - Create publisher account, fill metadata + images, upload, submit for review.
 

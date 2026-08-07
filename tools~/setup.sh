@@ -6,7 +6,7 @@
 #
 # Debian/Ubuntu only (it shells out to apt-get). On macOS or Windows install the
 # same two prerequisites by hand — a .NET 10 SDK and any JDK 11+ on PATH — and
-# run tools/verify.sh directly; CI installs them with setup-dotnet/setup-java.
+# run tools~/verify.sh directly; CI installs them with setup-dotnet/setup-java.
 set -e
 
 need_dotnet=0; need_jdk=0

@@ -89,7 +89,7 @@ says "6.3" for work dated later than 2026-07-17, the Editor was `6000.3.21f1`.
 
 ## Sign-off
 
-- **Headless gate (closable without a Unity Editor): GREEN.** `tools/verify.sh` → **VERIFY: PASS** —
+- **Headless gate (closable without a Unity Editor): GREEN.** `tools~/verify.sh` → **VERIFY: PASS** —
   9 C# configs compile with **0 warnings**, **73 unit tests pass** (`dotnet test`),
   the Android plugin compiles and its Java smoke test passes **103 checks, 0
   failed**, and every asset has a stable `.meta`. Every managed feature has a
@@ -233,7 +233,7 @@ What is left is physical hardware.
    result this check exists to prevent.
 3. On a physical device: cold + warm taps, static + dynamic shortcuts, both
    OSes. The Android half is scripted in
-   [`tools/device-smoke/`](./tools/device-smoke/README.md); iOS is manual (no
+   [`tools~/device-smoke/`](./tools~/device-smoke/README.md); iOS is manual (no
    adb analog).
 
    **Android, partially closed 2026-08-07** — Moto G Play 2024 (Android 14,

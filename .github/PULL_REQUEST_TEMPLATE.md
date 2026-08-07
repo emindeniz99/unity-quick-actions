@@ -11,9 +11,9 @@ See CONTRIBUTING.md.
 
 ## Verification
 
-- [ ] `tools/verify.sh` prints **`VERIFY: PASS`**
+- [ ] `tools~/verify.sh` prints **`VERIFY: PASS`**
 - [ ] `.meta` files committed for every added/renamed/moved asset
-      (`python3 tools/gen_meta.py`, then `git add` them)
+      (`python3 tools~/gen_meta.py`, then `git add` them)
 - [ ] No `.unitypackage` in this PR (it is a build output; `dist~/` is ignored)
 - [ ] `CHANGELOG.md` updated for user-visible changes
 - [ ] `README.md` updated if the public API surface changed

@@ -7,10 +7,10 @@ Everything needed to publish **Home-Screen Quick Actions (iOS & Android)**. Sour
 
 ## Status — done vs needs-you
 
-✅ **Done in repo (run `tools/release.sh` to build/regenerate all):**
+✅ **Done in repo (run `tools~/release.sh` to build/regenerate all):**
 listing texts (`store~/listing/`), marketing images (`store~/`), compile + unit
 tests green, full source + docs. The drag-and-drop `.unitypackage` is a **build
-output** — it is not committed; `tools/release.sh` writes it to the gitignored
+output** — it is not committed; `tools~/release.sh` writes it to the gitignored
 `dist~/`, and CI attaches the same artifact to each
 [GitHub Release](https://github.com/emindeniz99/unity-quick-actions/releases),
 so you can either build it or download it — `v0.4.0` is the first release and
@@ -68,7 +68,7 @@ All copy is prepared in [`store~/listing/`](./store~/listing/) — paste verbati
 
 ## 3. Marketing images (generated → `store~/`)
 
-All sizes are ✅ pre-built by `python3 tools/gen_store_images.py`. See
+All sizes are ✅ pre-built by `python3 tools~/gen_store_images.py`. See
 [`store~/README.md`](./store~/README.md).
 
 - [x] **Icon** 160×160, no text — `store~/icon.png`
@@ -86,19 +86,15 @@ All sizes are ✅ pre-built by `python3 tools/gen_store_images.py`. See
 
 ## 4. Package contents — what to ship (and what to strip)
 
-A clean `.unitypackage` is **built on demand** — `python3 tools/pack_unitypackage.py`
+A clean `.unitypackage` is **built on demand** — `python3 tools~/pack_unitypackage.py`
 (no Unity needed) writes `dist~/QuickActions.unitypackage`, which is gitignored
 because it's a build output; the identical artifact is attached to every
 [GitHub Release](https://github.com/emindeniz99/unity-quick-actions/releases)
 (first one: `v0.4.0`). It:
 
 - [x] Includes only package content, remapped under `Assets/QuickActions/`
-      (Runtime, Editor, Plugins, Example, README/CHANGELOG/ROADMAP). `LICENSE.md`
-      is deliberately **not** in this artifact: Store products are governed by
-      Unity's EULA, and shipping an MIT grant beside it shows a reviewer two
-      licences for one product. The source stays MIT on GitHub — say so in the
-      listing description.
-- [x] Excludes dev/publishing collateral (`.verify/`, `tools/`, `plans/`,
+      (Runtime, Editor, Plugins, Example, README/CHANGELOG/LICENSE/ROADMAP).
+- [x] Excludes dev/publishing collateral (`.verify/`, `tools~/`, `plans~/`,
       `store~/`, `dist~/`, `Tests/`, `STORE_CHECKLIST.md`, `package.json`).
 - [x] Carries every asset's committed `.meta` GUID (scene→script refs intact).
 - [x] Ships **full source** for the native plugins (`.mm`, `.java`).
@@ -112,7 +108,7 @@ because it's a build output; the identical artifact is attached to every
       licensed editor — see [`PRODUCTION_READINESS.md`](./PRODUCTION_READINESS.md);
       2021.3 is in fact the most thoroughly verified line, down to an Android
       player build and an Xcode compile of the generated iOS project.)
-- [ ] `tools/verify.sh` is green (compile + unit tests + Android plugin).
+- [ ] `tools~/verify.sh` is green (compile + unit tests + Android plugin).
 - [ ] Switch build target to **iOS** and **Android** → Editor still compiles
       (confirms the asmdef extension-DLL references resolve — see ROADMAP).
 - [ ] Build to an **iOS device** (needs macOS/Xcode) and an **Android device**:
@@ -133,6 +129,10 @@ because it's a build output; the identical artifact is attached to every
       minimum, so the Store will show 2022.3 — that is unavoidable and does **not**
       mean dropping 2021.3 support: `package.json` keeps `"unity": "2021.3"`, and
       2021.3 users install from OpenUPM or the Git URL.
+- [ ] **Disclose the dual licensing in the submission notes**: the source is
+      MIT on GitHub/OpenUPM, this Store copy is additionally distributed under
+      Unity's EULA by the same author. The shipped README says "MIT-licensed",
+      so a reviewer will see it — better stated up front than queried.
 - [ ] Set price/availability and **Submit for review**.
 - [ ] Review is manual (typically several business days to ~2 weeks). Expect a
       pass or a decline with specific feedback to address and resubmit.
@@ -140,7 +140,7 @@ because it's a build output; the identical artifact is attached to every
 ## 7. Pre-flight one-liner
 
 ```bash
-tools/release.sh   # verify (compile + tests) + fresh images + dist~/QuickActions.unitypackage
+tools~/release.sh   # verify (compile + tests) + fresh images + dist~/QuickActions.unitypackage
 ```
 
 Then upload `dist~/QuickActions.unitypackage` from a licensed Editor.

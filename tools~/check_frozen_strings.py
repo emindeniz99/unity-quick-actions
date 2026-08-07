@@ -22,7 +22,7 @@ per-value unit test guarding exactly this class of mistake; these had nothing,
 which is what this script fixes. A C# test cannot cover them — the Editor
 constants live in assemblies the test asmdef does not reference, and the Java
 and Obj-C copies are not C# at all — so the check is a textual one, run by
-`tools/verify.sh`.
+`tools~/verify.sh`.
 
 If a value below genuinely must change, it is a **breaking change for shortcuts
 already on user devices**, not a refactor. Ship it with a major version and a
@@ -145,7 +145,7 @@ def main() -> int:
                     errors.append(
                         f"{rel}: unknown device-facing literal {m.group(1)!r}.\n"
                         f"      Either it is a typo of an existing key, or it is a new one —\n"
-                        f"      add it to FROZEN in tools/check_frozen_strings.py so it is\n"
+                        f"      add it to FROZEN in tools~/check_frozen_strings.py so it is\n"
                         f"      pinned from now on."
                     )
 

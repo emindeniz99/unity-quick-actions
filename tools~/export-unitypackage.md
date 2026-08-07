@@ -11,11 +11,11 @@ that has the package installed.
 
 ## Option 0 — prebuilt, no Unity needed (recommended)
 
-`tools/pack_unitypackage.py` builds a valid `.unitypackage` directly from the
+`tools~/pack_unitypackage.py` builds a valid `.unitypackage` directly from the
 source files and their `.meta` GUIDs — no Unity install required:
 
 ```bash
-python3 tools/pack_unitypackage.py   # -> dist~/QuickActions.unitypackage
+python3 tools~/pack_unitypackage.py   # -> dist~/QuickActions.unitypackage
 ```
 
 It already applies the include/exclude rules below and remaps content under
@@ -31,11 +31,11 @@ reproduces the exact file attached to that release.
 Ship only the package itself — the list is **include-only**, so new root files
 are excluded by default. **Include exactly:** `Runtime/`, `Editor/`, `Plugins/`,
 `Samples~/`, and the four root docs `README.md`, `CHANGELOG.md`, `LICENSE.md`,
-`ROADMAP.md`. **Everything else stays out** — `.verify/`, `tools/`, `docs/`,
+`ROADMAP.md`. **Everything else stays out** — `.verify/`, `tools~/`, `docs~/`,
 `store~/`, `dist~/`, `Tests/`, `package.json` (the classic `Assets/` layout
 doesn't use a UPM manifest), and all other root docs (`GETTING_STARTED.md`,
 `PRODUCTION_READINESS.md`, `SECURITY.md`, `MAINTAINING.md`, …).
-(`tools/pack_unitypackage.py` in Option 0 applies
+(`tools~/pack_unitypackage.py` in Option 0 applies
 exactly this split via its INCLUDE_DIRS/INCLUDE_FILES lists.)
 
 ## Option A — Unity Editor (GUI)

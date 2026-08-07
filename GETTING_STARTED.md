@@ -72,7 +72,7 @@ done for you — jump to A4. See [`Examples~/README.md`](./Examples~/README.md).
 ```
 https://github.com/emindeniz99/unity-quick-actions.git
 ```
-Append `#v0.4.2` to pin a version; the plain URL tracks the default branch.
+Append `#v0.4.3` to pin a version; the plain URL tracks the default branch.
 
 Alternatives:
 - **OpenUPM** — `openupm add com.emindeniz99.quick-actions` (needs the Node CLI:
@@ -86,7 +86,7 @@ Alternatives:
   `Assets/QuickActions/`. That file is a build output, not a committed file —
   grab it from the
   [Releases page](https://github.com/emindeniz99/unity-quick-actions/releases).
-  (Or build it yourself from a clone with `python3 tools/pack_unitypackage.py`.)
+  (Or build it yourself from a clone with `python3 tools~/pack_unitypackage.py`.)
 
 ### A3. ⚠️ Turn the package ON (the #1 gotcha)
 The package is **opt-in**: with no define, the `QuickActions` API doesn't even

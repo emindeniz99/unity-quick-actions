@@ -8,7 +8,7 @@ The condensed, day-of sequence. Details live in
 ## Phase 0 — before Unity (15 min, any OS)
 
 - [ ] `git clone https://github.com/emindeniz99/unity-quick-actions.git`
-- [ ] `cd unity-quick-actions && tools/setup.sh && tools/verify.sh`
+- [ ] `cd unity-quick-actions && tools~/setup.sh && tools~/verify.sh`
       → expect **`VERIFY: PASS`** (if not, stop: the checkout is broken, nothing
       else will work — re-clone before going further).
 - [ ] Install **Unity Hub** + the two editors on the ends of the supported
@@ -88,8 +88,8 @@ The condensed, day-of sequence. Details live in
 - [ ] Upload the `.unitypackage` via Asset Store Publishing Tools **from a
       2022.3+ editor** — store rule 1.3.a bans uploading from older editors, so
       the listing floor reads 2022.3 while OpenUPM keeps serving 2021.3. It is a build output,
-      not a repo file: build it with `python3 tools/pack_unitypackage.py` (or
-      `tools/release.sh`) → gitignored `dist~/QuickActions.unitypackage`, or take
+      not a repo file: build it with `python3 tools~/pack_unitypackage.py` (or
+      `tools~/release.sh`) → gitignored `dist~/QuickActions.unitypackage`, or take
       the one attached to the
       [GitHub Release](https://github.com/emindeniz99/unity-quick-actions/releases)
       — `v0.4.0` is the first release and carries it.
@@ -110,10 +110,10 @@ phase is what every later release repeats.
 - [ ] `git tag v<version> && git push origin v<version>` (e.g. `v0.4.0`).
 - [ ] Check the resulting **GitHub Release** carries the built
       `QuickActions.unitypackage` asset (CI attaches it; if it's missing, build
-      it with `tools/release.sh` and upload it to the release by hand) —
+      it with `tools~/release.sh` and upload it to the release by hand) —
       docs point downloaders at
       <https://github.com/emindeniz99/unity-quick-actions/releases>.
-- [ ] OpenUPM one-time submission: [`docs/publishing-to-openupm.md`](./docs/publishing-to-openupm.md).
+- [ ] OpenUPM one-time submission: [`docs~/publishing-to-openupm.md`](./docs~/publishing-to-openupm.md).
 
 ## If something breaks
 

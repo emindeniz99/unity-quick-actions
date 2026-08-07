@@ -12,22 +12,22 @@
 # hardware: the editor pass, the device pass, and a real screenshot.
 # See MAINTAINING.md.
 #
-# Prereqs: dotnet SDK + a JDK (see tools/setup.sh) for step 1, and Pillow
+# Prereqs: dotnet SDK + a JDK (see tools~/setup.sh) for step 1, and Pillow
 # (pip install Pillow) for step 2's image regen. The store~/ PNGs are already
 # committed, so step 2 only matters when you actually change the art.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 echo "### 1/3  verify"
-"$ROOT/tools/verify.sh"
+"$ROOT/tools~/verify.sh"
 
 echo
 echo "### 2/3  store images"
-python3 "$ROOT/tools/gen_store_images.py"
+python3 "$ROOT/tools~/gen_store_images.py"
 
 echo
 echo "### 3/3  unitypackage"
-python3 "$ROOT/tools/pack_unitypackage.py"
+python3 "$ROOT/tools~/pack_unitypackage.py"
 
 echo
 echo "Artifacts ready:"

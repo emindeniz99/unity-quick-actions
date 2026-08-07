@@ -8,24 +8,24 @@ rules below are non-negotiable.
 ## Before you push — always
 
 ```bash
-tools/verify.sh        # must end with: VERIFY: PASS
+tools~/verify.sh        # must end with: VERIFY: PASS
 ```
 
 It checks `.meta` completeness, compiles the C# in 9 configs against Unity
 stubs, runs the NUnit suite, and compiles + smoke-tests the Android Java plugin.
-`tools/setup.sh` installs the toolchain once. Never report a change as done on a
+`tools~/setup.sh` installs the toolchain once. Never report a change as done on a
 red or unrun verify; say what failed.
 
 ## Unity discipline
 
 - **Every asset needs a committed `.meta`.** After adding/renaming/moving files,
-  run `python3 tools/gen_meta.py` and `git add` the `.meta` next to the asset.
+  run `python3 tools~/gen_meta.py` and `git add` the `.meta` next to the asset.
   `verify.sh` fails if it had to generate one.
 - **`Samples~/`, `store~/`, `dist~/`** — folders ending in `~` are invisible to
   Unity; the folders themselves get no `.meta`. Files inside `Samples~/Demo/` do
   have `.meta`s (gen_meta handles that folder explicitly) — leave them.
 - **Never commit a `.unitypackage`.** It is a build output; `dist~/` is
-  gitignored, `tools/pack_unitypackage.py` produces it, CI attaches it to the
+  gitignored, `tools~/pack_unitypackage.py` produces it, CI attaches it to the
   GitHub Release (first one: `v0.4.0`).
 - The package is opt-in behind the `QUICKACTIONS_ENABLED` scripting define, and
   the test assembly is constrained on it plus `UNITY_INCLUDE_TESTS`. A consuming
@@ -92,7 +92,7 @@ Prefer relative links between files in this repo (`./GETTING_STARTED.md`) so
 they resolve on GitHub *and* in the Unity Package Manager. Install URL is
 `https://github.com/emindeniz99/unity-quick-actions.git` — `package.json` is at
 the repo root, so the URL carries no subfolder query suffix. Pin a version with
-`#v0.4.2`. Tags are plain semver; `v0.4.0` was the first one.
+`#v0.4.3`. Tags are plain semver; `v0.4.0` was the first one.
 
 Don't invent status claims. If a doc asserts something you cannot verify, leave
 it as it is rather than "improving" it.

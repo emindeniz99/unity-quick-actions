@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Android device smoke for the Quick Actions Unity package. Drives a real device
 # or emulator over adb and asserts the two things the headless harness
-# (tools/verify.sh) structurally cannot: that shortcuts really reach
+# (tools~/verify.sh) structurally cannot: that shortcuts really reach
 # ShortcutManager, and that a tap on one really comes back into the game as a
 # Performed event.
 #

@@ -14,11 +14,11 @@ Contributions are accepted under the repo's [MIT license](./LICENSE.md).
 git clone https://github.com/emindeniz99/unity-quick-actions.git
 cd unity-quick-actions
 
-tools/setup.sh     # one-time: installs the .NET SDK + a JDK if missing
-tools/verify.sh    # must print: VERIFY: PASS
+tools~/setup.sh     # one-time: installs the .NET SDK + a JDK if missing
+tools~/verify.sh    # must print: VERIFY: PASS
 ```
 
-`tools/verify.sh` is the gate for every change and **needs no Unity install**.
+`tools~/verify.sh` is the gate for every change and **needs no Unity install**.
 It runs four checks (see [`.verify/README.md`](./.verify/README.md) for the
 rationale):
 
@@ -73,7 +73,7 @@ Quick actions do not exist in the Editor, but they do work on the iOS Simulator
 (verified on Unity 6.3 / iOS 26.5 — the shortcuts appear on the Simulator home
 screen and a tap cold-launches the app). Android has no simulator equivalent, so
 Android behaviour needs a device long-press. See [`GETTING_STARTED.md`](./GETTING_STARTED.md)
-for the full device walkthrough, and `tools/device-smoke/` for the adb-driven
+for the full device walkthrough, and `tools~/device-smoke/` for the adb-driven
 Android smoke test.
 
 ---
@@ -86,7 +86,7 @@ without them, every consumer's Unity generates fresh GUIDs and scene/prefab and
 plugin-platform references break. After adding, renaming, or moving any file:
 
 ```bash
-python3 tools/gen_meta.py    # idempotent; derives stable GUIDs from the path
+python3 tools~/gen_meta.py    # idempotent; derives stable GUIDs from the path
 git add <asset> <asset>.meta
 ```
 
@@ -100,13 +100,13 @@ git add <asset> <asset>.meta
 import — and `gen_meta.py` handles that folder explicitly. Don't delete them.)
 
 **The `.unitypackage` is a build output and is never committed.** `dist~/` is
-gitignored. Produce one locally with `python3 tools/pack_unitypackage.py` (or
-`tools/release.sh` for every release artifact at once); CI attaches it to the
+gitignored. Produce one locally with `python3 tools~/pack_unitypackage.py` (or
+`tools~/release.sh` for every release artifact at once); CI attaches it to the
 [GitHub Release](https://github.com/emindeniz99/unity-quick-actions/releases)
 on every `v*` tag. Never add a `.unitypackage` to a commit or a PR.
 
 **Don't hand-edit generated collateral.** `store~/` PNGs come from
-`tools/gen_store_images.py`; regenerate rather than retouch.
+`tools~/gen_store_images.py`; regenerate rather than retouch.
 
 ---
 
@@ -140,8 +140,8 @@ Rules:
 | `editor`  | `Editor/` — settings, simulator window, build post-processors |
 | `ios`     | `Plugins/iOS/` and iOS-specific editor/build code             |
 | `android` | `Plugins/Android/` and Android-specific editor/build code     |
-| `tools`   | `tools/` — gen_meta, packer, release, device smoke            |
-| `docs`    | README, GETTING_STARTED, CHANGELOG, plans, this file          |
+| `tools`    | `tools~/` — gen_meta, packer, release, device smoke            |
+| `docs`     | README, GETTING_STARTED, CHANGELOG, plans, this file          |
 | `ci`      | `.github/workflows/`                                          |
 | `tests`   | `Tests/`, `.verify/` harness and stubs                        |
 | `repo`    | repo-wide config: `.gitignore`, license, metadata             |
@@ -199,14 +199,14 @@ they are pushed.
   substantive PR comments.
 - Do **not** add an emoji "Generated with …" footer.
 - Attribution does not transfer responsibility: you still read the diff, and
-  `tools/verify.sh` still has to print `VERIFY: PASS`.
+  `tools~/verify.sh` still has to print `VERIFY: PASS`.
 
 ---
 
 ## 6. Pull requests
 
 - Branch off `main`, keep the PR focused on one topic.
-- `tools/verify.sh` must pass locally; state what you tested on a **device** if
+- `tools~/verify.sh` must pass locally; state what you tested on a **device** if
   the change touches native code — the static harness cannot reach it.
 - Update [`CHANGELOG.md`](./CHANGELOG.md) under the unreleased heading for any
   user-visible change.
@@ -232,7 +232,7 @@ Tags are plain semver: `v0.4.0` is the first. Consumers pin a version by
 appending the tag to the git URL:
 
 ```
-https://github.com/emindeniz99/unity-quick-actions.git#v0.4.2
+https://github.com/emindeniz99/unity-quick-actions.git#v0.4.3
 ```
 
 ---

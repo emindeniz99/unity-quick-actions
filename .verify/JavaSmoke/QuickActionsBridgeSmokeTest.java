@@ -1,6 +1,6 @@
 package com.emindeniz99.quickactions;
 
-// Stateful smoke test for the Java layer, run by tools/verify.sh check 4 after
+// Stateful smoke test for the Java layer, run by tools~/verify.sh check 4 after
 // compiling against the .verify stubs. The C# NUnit suite pins the facade above
 // the JNI seam; this pins the Java BELOW it — the host-coexistence branches
 // (marker scoping, host-collision drop, host-aware budget, remove-then-add,

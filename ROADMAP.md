@@ -4,7 +4,7 @@ Follow-ups discussed but not shipped as of v0.4.0 (the first public release).
 Delete an entry in the same commit that ships it.
 
 - **Automated device CI, remaining scope** — v0.4.0 ships an adb-driven Android
-  smoke (`tools/device-smoke/`) and a manually-dispatched emulator workflow
+  smoke (`tools~/device-smoke/`) and a manually-dispatched emulator workflow
   (needs a Unity-built dev APK — no Unity license in CI). Remaining: iOS
   simulator automation (no adb analog for shortcut taps — see the device-smoke
   README), asserting the COLD-launch path (the smoke's tap is a warm resume),

@@ -9,10 +9,10 @@ lives in [`PRODUCTION_READINESS.md`](./PRODUCTION_READINESS.md).
 Every release starts from a green static verification:
 
 ```bash
-tools/verify.sh        # must end with: VERIFY: PASS
+tools~/verify.sh        # must end with: VERIFY: PASS
 ```
 
-`tools/setup.sh` installs the toolchain once (dotnet SDK + a JDK). `verify.sh`
+`tools~/setup.sh` installs the toolchain once (dotnet SDK + a JDK). `verify.sh`
 checks `.meta` completeness, compiles the C# in 9 configurations against the
 Unity stubs in `.verify/`, runs the NUnit suite, and compiles plus smoke-tests
 the Android Java plugin. Anything short of `VERIFY: PASS` blocks the release —
@@ -20,7 +20,7 @@ the failing check is fixed first, not worked around.
 
 ## Cutting a release
 
-1. `tools/verify.sh` passes.
+1. `tools~/verify.sh` passes.
 2. `version` in `package.json` is bumped to the new semver value.
 3. The matching `CHANGELOG.md` section is renamed from `Unreleased` to that
    version and given a real date. The version in `package.json` and the
@@ -32,9 +32,9 @@ the failing check is fixed first, not worked around.
 6. The tag is pushed: `git push origin v<version>`.
 7. CI (`.github/workflows/ci.yml`) re-runs the verification on the tagged
    commit, then packs `dist~/QuickActions.unitypackage` with
-   `tools/pack_unitypackage.py` and attaches it to the GitHub Release. The
+   `tools~/pack_unitypackage.py` and attaches it to the GitHub Release. The
    `.unitypackage` is a build output — `dist~/` is gitignored and the artifact
-   is never committed. If the release asset is missing, `tools/release.sh`
+   is never committed. If the release asset is missing, `tools~/release.sh`
    rebuilds it locally for a manual upload.
 8. The release is confirmed at
    <https://github.com/emindeniz99/unity-quick-actions/releases> with the
@@ -46,7 +46,7 @@ the failing check is fixed first, not worked around.
 OpenUPM distribution is a one-time submission, after which every new tag
 publishes automatically. The full procedure — the YAML entry, the empty
 `gitTagPrefix` requirement, and the "at least one release before submitting"
-rule — is in [`docs/publishing-to-openupm.md`](./docs/publishing-to-openupm.md).
+rule — is in [`docs~/publishing-to-openupm.md`](./docs~/publishing-to-openupm.md).
 
 ## Version policy
 

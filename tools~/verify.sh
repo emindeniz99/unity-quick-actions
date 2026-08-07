@@ -20,7 +20,7 @@ echo "== 1/5  .meta presence (must already be committed, not generated here) =="
 # catch a missing/uncommitted meta. Fail if it had to create any — a committed
 # repo/UPM must ship every .meta (a fresh GUID assigned on the user's machine
 # breaks prefab/scene references that stable metas exist to protect).
-meta_out="$(python3 "$ROOT/tools/gen_meta.py")" || fail=1
+meta_out="$(python3 "$ROOT/tools~/gen_meta.py")" || fail=1
 echo "$meta_out"
 if echo "$meta_out" | grep -qE 'created [1-9]'; then
   echo "!! .meta files were missing and had to be generated — commit them (git add)."
@@ -40,7 +40,7 @@ if command -v dotnet >/dev/null 2>&1; then
     if [ "$rc" -ne 0 ]; then fail=1; fi
   done
 else
-  echo "!! dotnet not found — run tools/setup.sh first"; fail=1
+  echo "!! dotnet not found — run tools~/setup.sh first"; fail=1
 fi
 
 echo
@@ -50,7 +50,7 @@ if command -v dotnet >/dev/null 2>&1; then
   echo "$out" | grep -E 'Passed!|Failed!|error|Passed:|Failed:' || true
   if [ "$rc" -ne 0 ]; then fail=1; fi
 else
-  echo "!! dotnet not found — run tools/setup.sh first"; fail=1
+  echo "!! dotnet not found — run tools~/setup.sh first"; fail=1
 fi
 
 echo
@@ -79,7 +79,7 @@ if command -v javac >/dev/null 2>&1; then
   fi
   rm -rf "$TMP"
 else
-  echo "!! javac not found — run tools/setup.sh first"; fail=1
+  echo "!! javac not found — run tools~/setup.sh first"; fail=1
 fi
 
 echo
@@ -90,7 +90,7 @@ echo "== 5/5  Frozen device-facing strings =="
 # res/xml baked into every shipped APK). Renaming one is silent: the app still
 # launches and Performed simply never fires. Each is duplicated across 2-4 files
 # in three languages, so a C# unit test cannot cover them.
-python3 "$ROOT/tools/check_frozen_strings.py" || fail=1
+python3 "$ROOT/tools~/check_frozen_strings.py" || fail=1
 
 if [ "$fail" = "0" ]; then echo "VERIFY: PASS"; else echo "VERIFY: FAIL"; fi
 exit $fail

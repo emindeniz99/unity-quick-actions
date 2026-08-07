@@ -66,7 +66,7 @@ namespace EminDeniz99.QuickActions.DemoSample
 
 #if UNITY_ANDROID && !UNITY_EDITOR
         // Launch-intent string extra that asks this demo to drive itself, set by
-        // tools/device-smoke/android_device_smoke.sh — keep the two in sync.
+        // tools~/device-smoke/android_device_smoke.sh — keep the two in sync.
         private const string AutotestExtra = "com.emindeniz99.quickactions.AUTOTEST";
 
         // Device-smoke hook: an adb-driven harness cannot tap an IMGUI button, so it
