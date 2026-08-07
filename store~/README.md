@@ -15,6 +15,16 @@ Regenerate with `python3 tools/gen_store_images.py`.
 | `screenshot-2.png` | 2400×1600 | Screenshot — C# API |
 | `screenshot-3.png` | 2400×1600 | Screenshot — feature grid |
 | `example-shortcut-icons/*.png` | 96×96 | Example Android shortcut drawables |
+| `device-ios.jpg` | 720×746 | **Real capture** — iOS long-press menu (README) |
+| `device-android.jpg` | 440×580 | **Real capture** — Android static shortcuts on a cold install (README) |
+| `device-android-dynamic.jpg` | 440×680 | **Real capture** — Android after a runtime `Add` (README) |
+
+The three `device-*.jpg` files are genuine captures, cropped to the icon and
+menu, saved as JPEG: these are photographic (gradient wallpapers), where q75 is
+~5× smaller than PNG at the same visible quality (680 KB → 140 KB, measured).
+The root README references them by absolute `raw.githubusercontent.com` URL,
+because that README is also rendered as the package's front page on OpenUPM,
+where relative paths are unreliable.
 
 ## Before publishing
 

@@ -10,6 +10,16 @@ Android calls them *app shortcuts*). An MIT-licensed C# wrapper over the
 platforms' own public APIs — Apple's `UIApplicationShortcutItem` and Android's
 `ShortcutManager` — targeting **Unity 2021 LTS and newer** (including Unity 6).
 
+| iOS | Android |
+|:---:|:---:|
+| ![Long-pressing the app icon on iOS shows New Game, Continue and Daily Reward with SF Symbol icons](https://raw.githubusercontent.com/emindeniz99/unity-quick-actions/main/store~/device-ios.jpg) | ![The same three shortcuts on an Android home screen](https://raw.githubusercontent.com/emindeniz99/unity-quick-actions/main/store~/device-android.jpg) |
+| iPhone (iOS 26.5) | Moto G Play 2024 (Android 14) |
+
+The demo's three shortcuts, from the same C# code on both platforms. Note the
+platform difference the screenshots make obvious: **iOS renders `Title` and
+`Subtitle` on two lines with an icon; Android's launcher shows a single label**
+— the *long* one, which is our `Subtitle`. Worth knowing when you write labels.
+
 | Platform | Mechanism | Min OS |
 |----------|-----------|--------|
 | iOS | `UIApplicationShortcutItem` (dynamic) | iOS 9 |
@@ -372,6 +382,17 @@ where the long-press menu works — only to verify the OS menu itself.
 For shortcuts that must exist on the **first** launch (before any runtime
 `Add`), open **Project Settings ▸ Quick Actions**, click *Create settings
 asset*, and add entries. At build time:
+
+<img src="https://raw.githubusercontent.com/emindeniz99/unity-quick-actions/main/store~/device-android-dynamic.jpg" alt="Four shortcuts on Android after the demo added two at runtime" width="240" align="right">
+
+Static and dynamic shortcuts coexist. The screenshot on the right is the same
+Android device after the demo added shortcuts at runtime: the two dynamic
+items whose ids collided with static ones were dropped in favour of the
+manifest entries, the dynamic-only `daily` and `settings` took the remaining
+slots, and static `daily_reward` fell off the end at the launcher's four-item
+cap — see [Known limits](#known-limits--the-os-shortcut-cap) and
+[Host coexistence](#host-coexistence--the-package-touches-only-its-own-shortcuts).
+
 
 - **iOS** — written into the Xcode `Info.plist` as `UIApplicationShortcutItems`
   (`UIApplicationShortcutItemType` = your `Id`, plus title/subtitle and one icon
