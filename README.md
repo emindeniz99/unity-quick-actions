@@ -108,7 +108,8 @@ under `Packages/`, and removing the one line removes it completely (see
 
 ### 2. UPM via OpenUPM (scoped registry)
 
-Once published to [OpenUPM](https://openupm.com), install with the CLI:
+Once published to [OpenUPM](https://openupm.com), install with its CLI — a Node
+tool, so install that first (`npm install -g openupm-cli`):
 
 ```bash
 openupm add com.emindeniz99.quick-actions
@@ -158,6 +159,15 @@ or:
 
 After installing, import the **Demo** sample from the package page to try it on a
 device. More on packaging/export: [`tools/export-unitypackage.md`](./tools/export-unitypackage.md).
+
+### Or skip the setup: open a ready-made project
+
+`Examples~/` holds one consuming Unity project per supported editor line —
+[`Testbed2021`](./Examples~/Testbed2021), [`Testbed2022`](./Examples~/Testbed2022)
+and [`Testbed6`](./Examples~/Testbed6) — each with the package linked, the
+define set and three static shortcuts already configured. Clone the repo, open
+the one matching your editor, and compare it against your own integration. See
+[`Examples~/README.md`](./Examples~/README.md).
 
 ## Dev-only — excluding it completely from production builds
 

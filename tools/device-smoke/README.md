@@ -7,7 +7,7 @@ a tap on one really comes back into the game. That is what this directory is
 for.
 
 Android has `adb`, so that half is automated: `android_device_smoke.sh`.
-iOS has no equivalent — see [iOS](#ios-no-automation-shipped) below, which
+iOS has no equivalent — see [iOS](#ios--no-automation-shipped) below, which
 documents the manual run instead of pretending it is covered.
 
 ## `android_device_smoke.sh`

@@ -60,6 +60,11 @@ In **Unity Hub ▸ New project ▸ 3D (URP or Built-in, doesn't matter)**. Name 
 `QuickActionsTestbed`. Open it. (An existing project works too — the package
 adds nothing to a build unless you turn it on in step A3.)
 
+**Shortcut:** the repo ships a ready-made project for each supported editor line
+under `Examples~/` (`Testbed2021`, `Testbed2022`, `Testbed6`). Clone the repo,
+open the one matching your editor in Unity Hub, and steps A2 and A3 are already
+done for you — jump to A4. See [`Examples~/README.md`](./Examples~/README.md).
+
 ### A2. Install the package
 **Window ▸ Package Manager ▸ + ▸ Add package from git URL…** and paste:
 ```

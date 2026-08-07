@@ -35,37 +35,78 @@ Two rules that bite if you get them wrong:
   If the tag says `v0.4.0` but `package.json` still says `0.3.0`, the OpenUPM
   build fails with **E811** (version mismatch). Bump `package.json` in the
   commit you tag, never after.
-- **`gitTagPrefix` must be empty** for this layout (see the YAML below).
-  OpenUPM strips the prefix from the tag and parses the rest as semver; with a
-  `v0.4.0` tag and an empty prefix it parses `v0.4.0` → `0.4.0` correctly. A
-  non-empty prefix is only for monorepos that namespace tags per package.
+- **`gitTagPrefix` must be empty** for this layout (see the YAML below). It is a
+  literal `startsWith` filter over raw tag names — it is **not** stripped before
+  the tag is parsed as semver. It exists for monorepos that namespace tags per
+  package, or repos with competing tag families. This repo has one package and
+  one family, so leave it `''`. Setting `'v'` would happen to work today and
+  silently drop any future tag that doesn't start with a lowercase `v`.
+  Likewise leave `gitTagIgnore` empty — the example value `'^v'` you'll see
+  around would exclude `v0.4.0`, the only tag there is.
 
 ## Submit once
 
 1. Go to <https://openupm.com/packages/add/>, enter the repo URL, and fill the
-   form — **it opens the pull request against
-   <https://github.com/openupm/openupm> for you**. What it produces (and what
-   you'd hand-write if you opened the PR yourself) is a single YAML file whose
-   filename must be **exactly the package name**:
+   form. It does **not** open the pull request for you: "Submit metadata" hands
+   you GitHub's *create new file* page under `data/packages/`, prefilled with
+   the filename, the generated YAML and a commit message — committing it is what
+   opens the PR. First-time contributors are prompted to fork `openupm/openupm`
+   first. Keep the default commit message
+   (`Create com.emindeniz99.quick-actions.yml`); that exact title is one of the
+   forms that lets Mergify auto-merge. Add nothing else to the PR — auto-merge
+   requires ≥1 file added and **0 modified, 0 removed**.
+
+   The filename must be **exactly the package name**, with a `.yml` extension:
    `data/packages/com.emindeniz99.quick-actions.yml`
 
    ```yaml
    name: com.emindeniz99.quick-actions
+   aliases: []
    displayName: Home-Screen Quick Actions
-   repoUrl: https://github.com/emindeniz99/unity-quick-actions
-   gitTagPrefix: ''            # empty — tags are plain "v0.4.0"
-   minVersion: 0.4.0
+   description: >-
+     Home-screen quick actions for Unity on iOS and Android: add and remove
+     app-icon shortcuts at runtime, with a tap callback. No native edits.
+   repoUrl: 'https://github.com/emindeniz99/unity-quick-actions'
+   trackingMode: git
+   parentRepoUrl: null
    licenseSpdxId: MIT
-   readme: main:README.md      # <branch>:<path>, rendered on the package page
+   licenseName: MIT License
+   topics:
+     - mobile
+     - integration
+   hunter: emindeniz99
+   gitTagPrefix: ''
+   gitTagIgnore: ''
+   minVersion: ''
+   image: >-
+     https://raw.githubusercontent.com/emindeniz99/unity-quick-actions/main/store~/cover.png
+   readme: 'main:README.md'
+   createdAt: 1786105762845
    ```
+
+   Three of those are easy to get wrong and are worth stating plainly:
+
+   - **`trackingMode: git`**, never `githubRelease`. With `githubRelease`,
+     OpenUPM looks for a `.tgz`/`.tar.gz` asset on each Release; ours carries a
+     `.unitypackage`, so every build would fail on a missing asset. With `git`
+     it clones the tag and runs `npm pack` itself, which is what we want.
+   - **`licenseName` is required and must be the canonical SPDX name** for
+     `licenseSpdxId` — `MIT` pairs with `MIT License`. A mismatch or an empty
+     string fails the Data validation check.
+   - **`createdAt` is epoch milliseconds, as a number.** The web form fills it;
+     if you hand-write the file, regenerate it with `node -p "Date.now()"`.
 
    There is **no** `parentDir`/`packageFolder` field in OpenUPM's schema — the
    build pipeline locates `package.json` wherever it lives in the repo. Here
-   it's the root, so nothing to configure.
+   it's the root, so nothing to configure. Unknown keys are silently stripped,
+   so a stray field looks like it worked and does nothing.
 
-2. After the PR merges, OpenUPM's CI picks up each matching tag and publishes it
-   to `https://package.openupm.com` within minutes. New tags publish
-   automatically thereafter — no further action per release.
+2. As a first-time contributor to that repo, the *Data validation* check sits as
+   `action_required` until a moderator approves the run; OpenUPM targets 24
+   hours. Re-pushing does not speed it up. After it goes green Mergify merges,
+   and the build pipeline publishes to `https://package.openupm.com` within
+   roughly 15–30 minutes. New tags publish automatically thereafter — no further
+   action per release.
 
 3. **Don't submit early.** OpenUPM expects the package to have **at least one
    release within 3 months** of submission. Tag `v0.4.0` first, then submit.
