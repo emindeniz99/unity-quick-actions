@@ -11,7 +11,7 @@ Regenerate with `python3 tools~/gen_store_images.py`.
 | `card.png` | 420×280 | Card (browse thumbnail) |
 | `cover.png` | 1950×1300 | Cover (main product image) |
 | `social.png` | 1200×630 | Social media |
-| `screenshot-1.png` | 2400×1600 | **Real capture** — iOS Simulator long-press menu, composited by `tools~/make_store_screenshot.py` |
+| `screenshot-1.jpg` | 2400×1600 | **Real capture** — iOS Simulator long-press menu, composited by `tools~/make_store_screenshot.py` |
 | `screenshot-2.png` | 2400×1600 | Screenshot — C# API |
 | `screenshot-3.png` | 2400×1600 | Screenshot — feature grid |
 | `example-shortcut-icons/*.png` | 96×96 | Example Android shortcut drawables |
@@ -28,10 +28,10 @@ where relative paths are unreliable.
 
 ## Before publishing
 
-- `screenshot-1.png` is now a **real capture**. `screenshot-2` and `-3` are
+- `screenshot-1.jpg` is now a **real capture**. `screenshot-2` and `-3` are
   still generated mockups; the store accepts those, but a real IDE view for
   `-2` would convert better. Regenerate `-1` from any device capture with
-  `python3 tools~/make_store_screenshot.py <capture.png> store~/screenshot-1.png`.
+  `python3 tools~/make_store_screenshot.py <capture.png> store~/screenshot-1.jpg`.
 - Images contain minimal text and no watermarks (guideline-compliant). Keep the
   icon text-free.
 - `example-shortcut-icons/` are functional: drop them into your app's

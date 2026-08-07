@@ -10,7 +10,7 @@ This scales the capture to fill the canvas height, centres it, and fills the
 background with the same gradient `gen_store_images.py` uses, so a genuine
 screenshot sits in the same visual family as the generated art.
 
-  python3 tools~/make_store_screenshot.py <capture.png> store~/screenshot-1.png
+  python3 tools~/make_store_screenshot.py <capture.png> store~/screenshot-1.jpg
 
 Needs Pillow (dev-only):  pip install Pillow
 """
@@ -60,7 +60,13 @@ def main(argv: list[str]) -> int:
 
     canvas = vgrad(W, H, TOP, BOT)
     canvas.paste(shot, ((W - new_w) // 2, (H - target_h) // 2))
-    canvas.save(out_path)
+    # A device capture is photographic (wallpaper gradients, blur), where PNG is
+    # the wrong container: the same image is ~70% smaller as JPEG q90 with no
+    # visible difference. The generated flat art stays PNG, where PNG wins.
+    if os.path.splitext(out_path)[1].lower() in (".jpg", ".jpeg"):
+        canvas.save(out_path, quality=90, optimize=True)
+    else:
+        canvas.save(out_path)
     print(f"wrote {out_path} ({W}x{H}) from {src_path} "
           f"({Image.open(src_path).size[0]}x{Image.open(src_path).size[1]})")
     return 0

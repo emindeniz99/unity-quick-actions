@@ -208,9 +208,15 @@ def make_shot1():
     # screenshot-1 is the designated REAL on-device capture slot: once the user
     # has replaced it (per MAINTAINING.md), never clobber it with the mockup
     # again unless explicitly forced with --force.
+    # The real capture is screenshot-1.JPG (made by make_store_screenshot.py from
+    # a device/Simulator shot). Check for either extension: if only .png were
+    # checked, the first run after switching to the real capture would silently
+    # recreate the mockup alongside it and the listing would carry both.
     target = os.path.join(OUT, "screenshot-1.png")
-    if os.path.exists(target) and "--force" not in sys.argv:
-        print("skip screenshot-1.png (exists; pass --force to regenerate the mockup)")
+    existing = [n for n in ("screenshot-1.jpg", "screenshot-1.png")
+                if os.path.exists(os.path.join(OUT, n))]
+    if existing and "--force" not in sys.argv:
+        print(f"skip screenshot-1 ({existing[0]} exists; pass --force to regenerate the mockup)")
         return
     w, h = 2400, 1600
     img = vgrad(w, h, (16, 20, 28), (10, 12, 16))
