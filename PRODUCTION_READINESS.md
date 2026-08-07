@@ -150,6 +150,17 @@ dll present; OFF → zero trace).
   **minimum**; anything newer belongs behind a `UNITY_x_OR_NEWER` gate and is
   verified in a real Editor, not in the harness.
 
+  **The 2021.3 Simulator cannot be tested on Apple silicon — Unity's limit,
+  not the package's.** Unity 2021.3's iOS support ships a simulator runtime for
+  **x86_64 only** (`baselib-amd64.a`; every arm64 library in that install is a
+  device build, and nothing in it is named `*sim*`). Apple silicon cannot run an
+  x86_64 app on a modern iOS Simulator runtime, so the 2021.3 player is
+  uninstallable there. For contrast, Unity 6.3 ships `libiPhone-lib-sim-arm64`,
+  `-sim-x64` and `-sim-x64arm64`, which is why the Simulator run below was
+  possible on that line. The 2021.3 runtime path is therefore covered by the
+  device gate, not by the Simulator; its build-time path (post-processor,
+  Info.plist, Xcode compile of the plugin) IS verified above.
+
   **Licensing note for anyone reproducing this:** `2021.3.45f2` is the newest
   2021.3 build a Personal/Pro licence can run. Later patches (`.46f1` onward,
   through `.58f1`) are **Extended LTS** and require Industry or Enterprise —
