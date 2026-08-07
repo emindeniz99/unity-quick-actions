@@ -31,11 +31,11 @@ reproduces the exact file attached to that release.
 Ship only the package itself — the list is **include-only**, so new root files
 are excluded by default. **Include exactly:** `Runtime/`, `Editor/`, `Plugins/`,
 `Samples~/`, and the four root docs `README.md`, `CHANGELOG.md`, `LICENSE.md`,
-`ROADMAP.md`. **Everything else stays out** — `.verify/`, `tools/`, `plans/`,
+`ROADMAP.md`. **Everything else stays out** — `.verify/`, `tools/`, `docs/`,
 `store~/`, `dist~/`, `Tests/`, `package.json` (the classic `Assets/` layout
-doesn't use a UPM manifest), and all other root docs (`STORE_CHECKLIST.md`,
-`GETTING_STARTED.md`, `PRODUCTION_READINESS.md`, `SECURITY.md`,
-`RELEASE_RUNBOOK.md`, …). (`tools/pack_unitypackage.py` in Option 0 applies
+doesn't use a UPM manifest), and all other root docs (`GETTING_STARTED.md`,
+`PRODUCTION_READINESS.md`, `SECURITY.md`, `MAINTAINING.md`, …).
+(`tools/pack_unitypackage.py` in Option 0 applies
 exactly this split via its INCLUDE_DIRS/INCLUDE_FILES lists.)
 
 ## Option A — Unity Editor (GUI)

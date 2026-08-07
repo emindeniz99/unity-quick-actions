@@ -9,13 +9,12 @@
 
 ## Context
 
-The paid Unity Asset Store package **"Quick Actions for iOS and Android"**
-(`311869`, min Unity `2022.3.43f1`, v1.1.0) lets a Unity game expose
-**home-screen quick actions** — the shortcuts that appear when a user
-long-presses the app icon. On iOS these are `UIApplicationShortcutItem`s; on
+**Home-screen quick actions** are the shortcuts that appear when a user
+long-presses an app icon. On iOS these are `UIApplicationShortcutItem`s; on
 Android they are App Shortcuts driven by `ShortcutManager` / `shortcuts.xml`.
+Unity exposes neither, so a game needs a plugin to reach them.
 
-This project is a clean-room, MIT-licensed re-implementation targeting
+This project is an MIT-licensed wrapper over those two platform APIs, targeting
 **Unity 2022 LTS and newer** (incl. Unity 6). It must:
 
 - Let developers declare **static** shortcuts in the Editor (baked into the
@@ -32,7 +31,7 @@ This project is a clean-room, MIT-licensed re-implementation targeting
 | Decision | Choice | Why |
 |---|---|---|
 | Distribution | UPM package (`package.json` at project root) | Installable by Git URL / local path; clean asmdef isolation; `Samples~` import. |
-| Public API | One static facade `QuickActions` + `QuickAction` POCO | Mirrors the asset's simple surface; easy to script. |
+| Public API | One static facade `QuickActions` + `QuickAction` POCO | Smallest surface that covers both platforms; easy to script. |
 | iOS native hook | **Method swizzling** of `UnityAppController` in an Obj-C category `+load` | True plug & play — no editing Unity's generated `main`/AppDelegate. |
 | Android entry hook | **Trampoline activity** (`QuickActionsTrampolineActivity`) + poll-on-focus | Avoids subclassing Unity's activity, so it works on both `UnityPlayerActivity` (2022) and `UnityPlayerGameActivity` (6+). |
 | Cold-start delivery | Native buffers a "launch action id"; C# pulls it on startup | Native fires before C# subscribers exist; pull avoids a lost event. |

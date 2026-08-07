@@ -8,9 +8,9 @@
 # CI rebuilds it reproducibly from the same script and attaches it to the GitHub
 # Release. Nothing here commits or diffs it.
 #
-# After this, the only remaining steps need YOU: a licensed Unity (open/compile),
-# a device pass, a real screenshot, then upload via the Publisher portal.
-# See STORE_CHECKLIST.md.
+# What this script cannot do is the part that needs a licensed Unity and real
+# hardware: the editor pass, the device pass, and a real screenshot.
+# See MAINTAINING.md.
 #
 # Prereqs: dotnet SDK + a JDK (see tools/setup.sh) for step 1, and Pillow
 # (pip install Pillow) for step 2's image regen. The store~/ PNGs are already
@@ -41,4 +41,4 @@ echo "  2. commit, then tag the release with a plain semver tag: v<version>"
 echo "     (git tag v<version> && git push origin v<version>)"
 echo "  3. CI rebuilds this .unitypackage from the tag and attaches it to the"
 echo "     GitHub Release — do not commit dist~/."
-echo "See RELEASE_RUNBOOK.md for the full checklist."
+echo "See MAINTAINING.md for the full release checklist."

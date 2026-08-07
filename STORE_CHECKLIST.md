@@ -43,8 +43,8 @@ GETTING_STARTED §C0 and README "Dev-only"):
 
 - **Publishing is free.** No fee to create a publisher account or list assets.
 - **Revenue split: you keep 70%, Unity takes 30%** (standard, non-negotiable).
-- **Price:** free, or paid with a **$4.99 minimum**. (The reference asset sells
-  for $7.) You can launch free to gather reviews, then switch to paid.
+- **Price:** free, or paid with a **$4.99 minimum** (Unity's floor for paid
+  assets). Launching free to gather reviews and switching later is allowed.
 - **Account needed:** a Unity ID + a **Publisher account** at
   <https://publisher.unity.com> (one publisher profile per seller).
 - **Payouts:** monthly via PayPal or quarterly via bank transfer.

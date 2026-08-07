@@ -145,7 +145,7 @@ First public release.
   LastPerformed) runnable in the Unity Test Runner and via `dotnet test`; plus
   JsonUtility serialization tests.
 - Store collateral: marketing images at Asset Store sizes (`store~/`,
-  `tools/gen_store_images.py`), `STORE_CHECKLIST.md`, and `plans/release.md`.
+  `tools/gen_store_images.py`).
 - **Opt-in `QUICKACTIONS_ENABLED` gate:** managed asmdefs use
   `defineConstraints: [QUICKACTIONS_ENABLED]`. Native plugins (which Unity won't
   gate via define constraints) are gated at the build-output level: the iOS

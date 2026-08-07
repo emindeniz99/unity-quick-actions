@@ -677,14 +677,19 @@ static char *QABuildShortcutsJson(void) {
         // Icon identity comes from our userInfo (see kQAIconKey): reporting 0 here
         // would make the next push rebuild reconciled items iconless. Same for the
         // symbol/template names and the payload.
-        NSNumber *iconBack = item.userInfo[kQAIconKey];
-        NSString *symbolBack = item.userInfo[kQAIconSymbolKey];
-        NSString *templateBack = item.userInfo[kQAIconTemplateKey];
-        NSString *payloadBack = item.userInfo[kQAPayloadKey];
+        // userInfo is NSDictionary<NSString *, id<NSSecureCoding>>, so every
+        // subscript yields id<NSSecureCoding> — declaring these as NSNumber*/
+        // NSString* is an incompatible-pointer-types warning (on by default, and
+        // an error for any consumer building with -Werror). The isKindOfClass
+        // checks below are what actually establish the type.
+        id iconBack = item.userInfo[kQAIconKey];
+        id symbolBack = item.userInfo[kQAIconSymbolKey];
+        id templateBack = item.userInfo[kQAIconTemplateKey];
+        id payloadBack = item.userInfo[kQAPayloadKey];
         // Title/Subtitle below are what the Home Screen SHOWS (resolved at the last
         // push); the blob is what lets C# recover the base text + per-locale tables
         // and notice the two disagree. Empty for an item that was never localized.
-        NSString *l10nBack = item.userInfo[kQAL10nKey];
+        id l10nBack = item.userInfo[kQAL10nKey];
         [out addObject:@{
             @"Id": item.type ?: @"",
             @"Title": item.localizedTitle ?: @"",

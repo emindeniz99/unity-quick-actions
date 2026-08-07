@@ -33,7 +33,7 @@ compiles against its own assemblies.
 A green run proves the package's C# and Java **compile and type-check** and that
 the Java layer's branch logic holds against AOSP-shaped stub semantics; it does
 not exercise runtime behaviour on a device. For that, see the on-device
-procedure in [`../plans/mvp.md`](../plans/mvp.md).
+checklist in [`../MAINTAINING.md`](../MAINTAINING.md).
 
 ## Web sessions / CI
 

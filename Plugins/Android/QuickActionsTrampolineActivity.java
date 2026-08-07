@@ -101,7 +101,16 @@ public final class QuickActionsTrampolineActivity extends Activity {
         // NEW_TASK and only muddy the behaviour.
         Intent launch = getPackageManager().getLaunchIntentForPackage(getPackageName());
         if (launch != null) {
-            startActivity(launch);
+            try {
+                startActivity(launch);
+            } catch (RuntimeException e) {
+                // This runs on EVERY shortcut tap, so an uncaught throw here is a
+                // process crash attributed to the game. ActivityNotFoundException
+                // (host disabled its launcher component) and SecurityException
+                // (OEM launch restrictions) are both reachable; every other native
+                // entry point in this package already contains its exceptions.
+                android.util.Log.w("QuickActions", "Could not launch the main activity", e);
+            }
         }
     }
 }

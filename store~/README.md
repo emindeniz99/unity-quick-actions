@@ -28,4 +28,4 @@ Regenerate with `python3 tools/gen_store_images.py`.
   `Assets/.../Plugins/Android/res/drawable/` (or any `res/drawable`) and set
   `QuickActionItem.AndroidDrawable = "ic_quickaction_play"` to use them.
 
-See [`../STORE_CHECKLIST.md`](../STORE_CHECKLIST.md) for the full submission flow.
+See [`../MAINTAINING.md`](../MAINTAINING.md) for the release procedure.

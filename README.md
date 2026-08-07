@@ -2,8 +2,9 @@
 
 Home-screen **quick actions** for Unity games — the shortcuts revealed when a
 user long-presses your app icon (iOS calls them *Home Screen quick actions*,
-Android calls them *app shortcuts*). A clean-room, MIT-licensed implementation
-targeting **Unity 2021 LTS and newer** (including Unity 6).
+Android calls them *app shortcuts*). An MIT-licensed C# wrapper over the
+platforms' own public APIs — Apple's `UIApplicationShortcutItem` and Android's
+`ShortcutManager` — targeting **Unity 2021 LTS and newer** (including Unity 6).
 
 | Platform | Mechanism | Min OS |
 |----------|-----------|--------|
@@ -29,6 +30,39 @@ hardware; iOS 13+ opens it with a plain long-press on every device.
   Unity's activity, so it works on both `UnityPlayerActivity` (2021/2022) and
   `UnityPlayerGameActivity` (6+).
 
+## Status
+
+This is **0.4.0**, a pre-1.0 release. Here is exactly what has been proven and
+what has not — one place, no hedging. (Per-feature detail:
+[PRODUCTION_READINESS.md](./PRODUCTION_READINESS.md).)
+
+**Verified in a licensed Unity Editor** — on **2022.3 LTS**, **Unity 6.0 LTS**
+and **Unity 6.3 LTS** the package imports with **0 console errors** and the
+**Unity Test Runner run is green** on each (35/35 at the time of those runs;
+the suite has grown to 74 since and has not been re-run in a licensed Editor).
+On 2022.3 the Android path went further: **real APKs** proved the trampoline
+`<activity>` injection, the baked static shortcuts, and the "define off → zero
+package trace" gate.
+
+**Not verified — Unity 2021.3.** `package.json` declares 2021.3 as the minimum
+because that is where the newest Editor API this package uses (`NamedBuildTarget`)
+landed, but **the package has never been compiled on 2021.3.** It is
+architecturally the same era as the fully-proven 2022.3 line, so the risk is
+low — but it is untested, and "untested" is the honest word. If you are on
+2021.3 and hit a compile error, please [open an issue](https://github.com/emindeniz99/unity-quick-actions/issues).
+
+**Not verified — physical devices.** Neither the iOS nor the Android tap path
+has been exercised on real hardware. The OS-facing behaviour (long-press menu,
+cold/warm tap delivery) is reviewed, compiled and covered by logic tests, not
+observed on a phone. Plan on validating it in your own build before you ship.
+
+**Also true:** the suite is 73 headless tests (`dotnet test`) and 74 in Unity's
+Test Runner (it adds the `JsonUtility` serialization tests), plus an Android
+Java smoke of 103 checks, across 9 C# compile configurations with 0 warnings.
+The iOS `.mm` compiles cleanly against the current iOS SDK
+(ARC, arm64, deployment target iOS 13) with no deprecation or availability
+errors — that is a compile result, not a runtime one.
+
 ## Install
 
 > **⚠️ After installing — one required step:** add `QUICKACTIONS_ENABLED` to
@@ -36,10 +70,9 @@ hardware; iOS 13+ opens it with a plain long-press on every device.
 > deliberately inert without it (that's its dev-only safety design — see
 > [Dev-only](#dev-only--excluding-it-completely-from-production-builds)).
 
-> New here / haven't cloned it yet? See
-> **[GETTING_STARTED](./GETTING_STARTED.md)**
-> for a full walkthrough: clone → test in a fresh project → run on a device →
-> publish to the Asset Store.
+> New here? **[GETTING_STARTED](./GETTING_STARTED.md)** walks the whole thing
+> end to end: install into a fresh project → turn the define on → wire up a
+> handler → run it on a device.
 
 Pick whichever fits — all install the same package. `package.json` sits at the
 repo root, so the UPM methods point straight at the repository.
@@ -92,7 +125,6 @@ package under `dependencies`:
 ```
 
 OpenUPM gives version management and update notifications in Package Manager.
-(Publishing it there is a one-time setup — see [`plans/openupm.md`](./plans/openupm.md).)
 
 ### 3. Drag-and-drop `.unitypackage` (classic)
 
@@ -102,9 +134,8 @@ Download `QuickActions.unitypackage` from the
 repo. Drag it into an open Editor (or *Assets ▸ Import Package ▸ Custom
 Package…*). It installs under `Assets/QuickActions/`. Build it yourself any time
 with `python3 tools/pack_unitypackage.py` (no Unity needed); the result lands in
-the gitignored `dist~/`. This is also what Asset Store buyers get. Note: it lands
-in `Assets/` (editable, not read-only), so it's less clean to fully remove than
-UPM.
+the gitignored `dist~/`. Note: it lands in `Assets/` (editable, not read-only),
+so it's less clean to fully remove than UPM.
 
 ### 4. UPM from a local clone
 
@@ -486,7 +517,11 @@ subclass-shadowed fallback — and the Android localized static output). OS read
 identity in its ownership-marker payload — Android extras, iOS `userInfo` — so
 reconciled items keep their icons on both platforms.
 
-## Verification
+## Verification — running the checks yourself
+
+*What has actually been proven is stated once, under [Status](#status) above,
+and per feature in [PRODUCTION_READINESS.md](./PRODUCTION_READINESS.md). This
+section is only how to re-run the checks.*
 
 The package is type-checked and compiled without Unity via a stub-based harness:
 
@@ -495,25 +530,32 @@ tools/setup.sh     # install dotnet + JDK (once)
 tools/verify.sh    # .meta gen + C# compile (9 configs) + unit tests + Android plugin
 ```
 
-`verify.sh` runs the unit tests via `dotnet test`; the same tests (plus
-JsonUtility serialization tests) run in Unity's **Test Runner** from
-`Tests/Editor/`. For a real device/emulator, `tools/device-smoke/` has an
-adb-driven Android smoke (install a dev APK → assert the demo's shortcuts
-registered → simulate a tap → assert delivery) and a manually-dispatched
-emulator CI workflow — see its README, including the honest iOS limitations. See [`.verify/README.md`](./.verify/README.md). A green run
-proves everything compiles and the logic tests pass; on-device behaviour is
-validated with the procedure in [`plans/mvp.md`](./plans/mvp.md) (iOS/Android
-quick actions can't run in the Editor or on Linux).
+`verify.sh` compiles the C# in **9 configurations** (0 warnings), runs the **73**
+headless unit tests via `dotnet test`, and compiles and smoke-tests the Android
+Java plugin (**103** checks). The same tests plus the `JsonUtility`
+serialization tests run in Unity's **Test Runner** from `Tests/Editor/` — **74**
+there. See [`.verify/README.md`](./.verify/README.md) for how the stubs work.
+
+For a real device/emulator, `tools/device-smoke/` has an adb-driven Android
+smoke (install a dev APK → assert the demo's shortcuts registered → simulate a
+tap → assert delivery) and a manually-dispatched emulator CI workflow — see its
+README, including the honest iOS limitations. A green `verify.sh` proves
+everything compiles and the logic tests pass; it says nothing about on-device
+behaviour, which cannot run in the Editor.
 
 ## Notes / learnings
 
-- Min Unity is 2021.3 LTS (NamedBuildTarget, our newest Editor API, ships in 2021.2). The dynamic native hooks avoid editing generated
+- Min Unity is **declared** as 2021.3 LTS because `NamedBuildTarget` — the
+  newest Editor API this package uses — ships in 2021.2; that line is not yet
+  compile-verified (see [Status](#status)). The dynamic native hooks avoid editing generated
   `UnityAppController` / `UnityPlayerActivity`; only **static** shortcuts need
   build post-processors (Info.plist / shortcuts.xml).
-- The iOS `.mm` is compiled by Unity against the real SDK; here it's reviewed
-  and brace/structure-checked only (no Apple SDK on Linux). The C# and Android
-  Java are fully compiled against stubs by `tools/verify.sh` — and the Java is
-  also *executed* against stateful stubs (`.verify/JavaSmoke`).
+- The iOS `.mm` compiles cleanly against the real iOS SDK (ARC, arm64,
+  deployment target iOS 13) with no deprecation or availability errors; the
+  cross-platform `tools/verify.sh` harness can only brace/structure-check it,
+  so that compile is a separate, macOS-only step. The C# and Android Java are
+  fully compiled against stubs by `verify.sh` — and the Java is also *executed*
+  against stateful stubs (`.verify/JavaSmoke`).
 - **Unity 6 scripting defines are ADDITIVE across scopes** (csc.rsp + Player
   Settings + Build Profile). A profile can *add* a symbol but never *remove*
   one — so a dev-only gate must live in the **dev profile**, never in shared
@@ -534,7 +576,7 @@ quick actions can't run in the Editor or on Linux).
   completionHandler). Returning `NO` from `didFinishLaunchingWithOptions` is
   what dedupes a cold shortcut tap.
 - **Compile-only stubs miss contract bugs.** The classes of defect that
-  slipped past `javac` + 45 NUnit tests (in-place pinned updates, null-vs-empty
+  slipped past `javac` + the NUnit suite (in-place pinned updates, null-vs-empty
   reads, rate-limit windows) were caught only by *running* the plugin against
   stateful stubs and by adversarial review against the real AOSP source. Also:
   a test that stays green when the fix is deleted is a tautology — mutation-check

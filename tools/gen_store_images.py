@@ -170,7 +170,7 @@ def banner(d, w, title, sub):
 
 def make_shot1():
     # screenshot-1 is the designated REAL on-device capture slot: once the user
-    # has replaced it (per RELEASE_RUNBOOK), never clobber it with the mockup
+    # has replaced it (per MAINTAINING.md), never clobber it with the mockup
     # again unless explicitly forced with --force.
     target = os.path.join(OUT, "screenshot-1.png")
     if os.path.exists(target) and "--force" not in sys.argv:

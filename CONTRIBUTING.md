@@ -225,7 +225,7 @@ they are pushed.
 
 ## 7. Releases
 
-Releases are cut by the maintainer — see [`RELEASE_RUNBOOK.md`](./RELEASE_RUNBOOK.md).
+Releases are cut by the maintainer — see [`MAINTAINING.md`](./MAINTAINING.md).
 Tags are plain semver: `v0.4.0`. Consumers pin a version by appending the tag to
 the git URL:
 

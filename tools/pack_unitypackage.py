@@ -12,7 +12,7 @@ so scene/script references stay intact. This lets us ship the legacy
 drag-into-the-Editor format alongside the modern UPM package.
 
 Layout: package content is remapped under Assets/QuickActions/. Dev folders
-(.verify, tools, plans, store~, Tests) and package.json are excluded.
+(.verify, tools, docs, store~, Tests) and package.json are excluded.
 
 Run: python3 tools/pack_unitypackage.py  ->  dist~/QuickActions.unitypackage
 

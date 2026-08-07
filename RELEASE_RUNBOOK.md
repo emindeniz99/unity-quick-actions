@@ -10,7 +10,7 @@ The condensed, day-of sequence. Details live in
 - [ ] `git clone https://github.com/emindeniz99/unity-quick-actions.git`
 - [ ] `cd unity-quick-actions && tools/setup.sh && tools/verify.sh`
       → expect **`VERIFY: PASS`** (if not, stop: the checkout is broken, nothing
-      else will work — re-clone or ask for help).
+      else will work — re-clone before going further).
 - [ ] Install **Unity Hub** + the two editors on the ends of the supported
       range: **2021.3 LTS** and **Unity 6.3**, each with **Android Build Support**
       (+ iOS Build Support if on a Mac). *(GS §0)*
@@ -34,7 +34,7 @@ The condensed, day-of sequence. Details live in
       `QUICKACTIONS_ENABLED` (Android tab; iOS tab too if building iOS). *(GS §A5)*
 - [ ] Console shows **0 errors / 0 warnings** after recompile.
       ⚠️ First real-Unity compile — if an asmdef/DLL error appears here, copy the
-      exact message and bring it back; this is the one known unproven seam.
+      exact message — this is the one known unproven seam, and it belongs in an issue.
 - [ ] Package Manager ▸ the package ▸ Samples ▸ **Import Demo**.
 - [ ] **Window ▸ Quick Actions ▸ Simulator** opens; **Window ▸ Quick Actions ▸
       About** opens (both menus must exist).
@@ -107,16 +107,16 @@ Tags are plain semver (`v0.4.0`), one tag per release.
       it with `tools/release.sh` and upload it to the release by hand) —
       docs point downloaders at
       <https://github.com/emindeniz99/unity-quick-actions/releases>.
-- [ ] OpenUPM one-time submission: [`plans/openupm.md`](./plans/openupm.md).
+- [ ] OpenUPM one-time submission: [`docs/publishing-to-openupm.md`](./docs/publishing-to-openupm.md).
 
 ## If something breaks
 
 | Symptom | First move |
 |---|---|
-| Console errors on import / platform switch | Copy the exact error → bring it back to me (likely the asmdef extension-DLL seam — known unproven spot) |
+| Console errors on import / platform switch | Copy the exact error and open an issue (likely the asmdef extension-DLL seam — known unproven spot) |
 | `QuickActions` type not found | The define (Phase 1, "THE step") — per platform tab |
 | Shortcuts don't appear on long-press | Did you tap "Add 3 shortcuts" first? Android ≥ 7.1? |
-| Tap opens app but no log line | Grab `adb logcat -s QuickActions Unity` output → bring it back |
+| Tap opens app but no log line | Grab `adb logcat -s QuickActions Unity` output and attach it to the issue |
 | Store review declines | Read their reason; usual fixes: real screenshot, zero console warnings, clearer description |
 
 **Everything in Phases 0–1 and 6 is reversible; nothing here can damage the repo.**
