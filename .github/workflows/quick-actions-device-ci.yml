@@ -1,0 +1,57 @@
+name: quick-actions-unity device smoke
+
+# EXPERIMENTAL — manual only. It needs two things this repo cannot supply on its
+# own: repository Actions enabled, and a URL to a Unity-built DEVELOPMENT APK of
+# the Demo sample (Scripting Define Symbols must contain QUICKACTIONS_ENABLED).
+# There is no Unity licence in CI, so nothing here can build that APK — wiring
+# this to push/pull_request would fail every commit for a reason that says
+# nothing about the package. Hence workflow_dispatch and nothing else.
+#
+# Runs tools/device-smoke/android_device_smoke.sh
+# against an emulator: shortcuts must reach ShortcutManager, and a tap on one
+# must come back into the game as a Performed event. See that script's README
+# for what the smoke asserts and what it deliberately does not.
+
+on:
+  workflow_dispatch:
+    inputs:
+      apk_url:
+        description: "Direct download URL of a development APK of the Demo sample (built with QUICKACTIONS_ENABLED)"
+        required: true
+        type: string
+      app_id:
+        description: "Application id of that APK, e.g. com.example.game"
+        required: true
+        type: string
+
+jobs:
+  android-device-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # The x86_64 image needs KVM; without a writable /dev/kvm the emulator
+      # falls back to software rendering and hits the job timeout instead of
+      # reporting anything useful about the package.
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      # Dispatch inputs reach the shell through env, never through an inline
+      # ${{ }} expansion — to the runner they are arbitrary text.
+      - name: Download the APK
+        env:
+          APK_URL: ${{ inputs.apk_url }}
+        run: curl -fsSL --retry 3 -o "$RUNNER_TEMP/quickactions-demo.apk" "$APK_URL"
+
+      - name: Device smoke (API 30 emulator)
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          APP_ID: ${{ inputs.app_id }}
+        with:
+          api-level: 30
+          arch: x86_64
+          target: google_apis
+          script: tools/device-smoke/android_device_smoke.sh "$RUNNER_TEMP/quickactions-demo.apk" "$APP_ID"
