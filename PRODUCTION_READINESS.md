@@ -130,18 +130,32 @@ dll present; OFF → zero trace).
   confirms no Unity-6 API deprecation breaks the package. The 6.x **Android**
   Gradle pass (GameActivity era) has not been run and is covered by the device
   matrix.
-- **Unity 2021.3: NEVER COMPILED — the honest gap.** `package.json` declares
-  2021.3 as the minimum because `NamedBuildTarget`, the newest Editor API this
-  package uses, ships in 2021.2 — but **no 2021.3 compile has ever succeeded**.
-  An attempt on a licensed Unity 2021.3.45f2 got as far as the package
-  resolving and its assemblies loading, then stalled in the Editor's
-  `bee_backend` script-compile step (a known toolchain hang on that Unity line,
-  not a package defect: the identical C# imports with 0 errors on 2022.3, 6.0
-  and 6.3, and compiles in the stub harness under `UNITY_2021_3_OR_NEWER`).
-  2021.3 is architecturally the same era as the **fully-proven 2022.3** line
-  (same `UnityPlayerActivity` model, same compilation model, same Android
-  Gradle structure), so the risk is low — but the line is untested and is
-  documented as such in the README.
+- **Unity 2021.3: VERIFIED (2021.3.45f2) — and it found a real bug.** The
+  declared minimum is now proven in a real Editor: **74/74 tests pass**, an
+  Android player builds with the trampoline `<activity>` injected on the old
+  `UnityPlayerActivity` path, the same build with the define removed contains
+  **no trace** of it, and the generated Xcode project compiles with
+  `xcodebuild` against the device SDK with **zero warnings from
+  `QuickActions.mm`**.
+
+  The first attempt did not compile: `SystemLanguage.Hindi` (added in Unity
+  2022.2) was used ungated in the localization mapping, so the package had
+  never been compilable on its own declared minimum. It is now behind
+  `UNITY_2022_2_OR_NEWER`.
+
+  The reason nothing caught this earlier is worth keeping: the stub harness's
+  `SystemLanguage` enum mirrored a NEWER Editor than the declared minimum
+  (it included `Hindi = 42`), so all nine compile configs and every CI run went
+  green against an API 2021.3 does not have. The stub now mirrors the
+  **minimum**; anything newer belongs behind a `UNITY_x_OR_NEWER` gate and is
+  verified in a real Editor, not in the harness.
+
+  **Licensing note for anyone reproducing this:** `2021.3.45f2` is the newest
+  2021.3 build a Personal/Pro licence can run. Later patches (`.46f1` onward,
+  through `.58f1`) are **Extended LTS** and require Industry or Enterprise —
+  the Editor refuses to launch with `com.unity.editor.access.xlts` missing.
+  Unity's public release API lists only `.45f1` and `.45f2` for this line,
+  which is the cheapest way to tell before downloading ~10 GB.
 - **Device gate: OPEN — no physical-device validation has been done on either
   platform.** Everything marked ⏳ above needs each claimed Unity line (2021.3,
   2022.3, 6.0, 6.3 — full pass on all) + an iOS device (via macOS/Xcode) + an
@@ -154,11 +168,24 @@ dll present; OFF → zero trace).
   to a `1.0.0` "production-ready" stamp.
 
 ### Exact remaining steps to close the device gate
-1. Open the package in EACH claimed line (2021.3, 2022.3, 6.0, 6.3); switch to iOS + Android targets →
-   confirm 0 console errors and that the gated Editor asmdefs' `precompiledReferences`
-   resolve.
-2. Dev build (define ON) + prod build (define OFF) on each platform; diff the
-   output for `QUICKACTIONS_ENABLED` / `QuickActionsTrampolineActivity`.
+
+Steps 1 and 2 below are **DONE** for `2021.3.45f2` and `6000.3.21f1`, and the
+iOS runtime path is done on the Simulator (see the Editor-coverage list above).
+What is left is physical hardware.
+
+1. ~~Open the package in EACH claimed line; switch to iOS + Android targets →
+   confirm 0 console errors and that the gated Editor asmdefs'
+   `precompiledReferences` resolve.~~ Done on 2021.3 and 6.3; 2022.3 and 6.0
+   were covered by the earlier Editor runs.
+2. ~~Dev build (define ON) + prod build (define OFF) on each platform; diff the
+   output for `QuickActionsTrampolineActivity`.~~ Done on both lines: present
+   with the define, absent without it, in the built APK's manifest.
+
+   Note for whoever repeats this: the define must be flipped in a **separate
+   Editor invocation** from the build. The package refuses to build otherwise
+   — the Editor assemblies would still carry the define and the player would
+   quietly keep the dev-only pieces, which is exactly the false "no trace"
+   result this check exists to prevent.
 3. On a physical device: cold + warm taps, static + dynamic shortcuts, both
    OSes. The Android half is scripted in
    [`tools/device-smoke/`](./tools/device-smoke/README.md); iOS is manual (no
