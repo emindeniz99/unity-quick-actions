@@ -8,7 +8,7 @@ Fill these into the Publisher portal package draft. Long-form copy is in
 | **Title** | Home-Screen Quick Actions (iOS & Android) |
 | **Category** | Tools ▸ Integration |
 | **Summary** | See [`summary.txt`](./summary.txt) |
-| **Description** | See [`description.md`](./description.md) |
+| **Description** | Paste [`description-portal.txt`](./description-portal.txt) — plain text for the portal's rich-text editor (Markdown does NOT convert there; `description.md` is the formatted source) |
 | **Tags / keywords** | See [`tags.txt`](./tags.txt) |
 | **Version** | 0.4.4 (bump to 1.0.0 after device validation) |
 | **Supported Unity** | 2021.3 LTS or higher (incl. Unity 6) — but **upload from 2022.3+**: store rule 1.3.a forbids uploading from older editors, so the listing's floor will read 2022.3 even though the package supports 2021.3 (which the OpenUPM/Git channels still serve) |

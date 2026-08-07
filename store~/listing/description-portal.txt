@@ -1,0 +1,42 @@
+Add the long-press app-icon shortcuts players already expect — in minutes, from one C# API.
+
+When a user presses and holds your app icon on the home screen, iOS and Android show a menu of shortcuts ("New Game", "Daily Reward", "Continue"…). Quick Actions brings that native feature to Unity with a single, clean API — no Objective-C, no Java, no editing the generated Xcode or Gradle projects.
+
+Why you'll like it
+
+• One API, both platforms — the same C# call drives iOS UIApplicationShortcutItem and Android ShortcutManager.
+• Dynamic and static — create shortcuts at runtime, or configure them in Project Settings and bake them into the build so they exist on first launch.
+• Tap callback that just works — a Performed event fires with your action id on every tap, including the cold launch that started the app.
+• Zero native edits — the iOS app delegate is hooked automatically; Android uses a lightweight trampoline activity injected into the build for you.
+• Future-proof — works on Unity 2021 LTS through Unity 6, surviving the UnityPlayerActivity → UnityPlayerGameActivity change on Android.
+• Full source included — readable C#, Objective-C++ and Java. No black-box DLLs. Unit-tested and documented.
+
+One switch to turn it on
+
+The package is opt-in by design. Click Window ▸ Quick Actions ▸ Enable Quick Actions (or add the QUICKACTIONS_ENABLED scripting define by hand) and everything activates. Without the define the package stays completely out of your build — that's a feature: keep it in your dev builds only, and your production builds are guaranteed to contain zero of its code.
+
+Dead-simple usage
+
+QuickActions.Performed += id => Route(id);
+QuickActions.Add(new QuickActionItem("new_game", "New Game", "Start fresh", IconType.Add));
+
+Need shortcuts before the first launch? Add them in Project Settings ▸ Quick Actions and they're baked into the build automatically.
+
+What's included
+
+• Runtime API: add, remove, list and query shortcuts, plus tap events
+• Static shortcut configuration in Project Settings, with iOS and Android build post-processors
+• Native plugins with full source (iOS .mm, Android .java)
+• Ready-to-run demo scene and an in-Editor tap Simulator — test without a device
+• Complete README; the full unit-test suite lives in the open-source repo
+
+Compatibility
+
+• Unity 2021.3 LTS or newer, including Unity 6. The Store lists 2022.3 as the minimum because submissions must be uploaded from 2022.3+; for 2021.3, install from OpenUPM or the GitHub URL.
+• iOS 9+ and Android 7.1+ (API 25). On older devices every call is a guarded, crash-free no-op, and the plugin imposes no minSdk on your game.
+• Mono and IL2CPP. Built-in, URP, HDRP and custom SRPs — no rendering involved.
+• iOS builds require macOS with Xcode, as with any iOS Unity project.
+
+Support
+
+Questions and feature requests are welcome — open an issue on the MIT-licensed repository: https://github.com/emindeniz99/unity-quick-actions. The package ships full source, so it's easy to extend.
