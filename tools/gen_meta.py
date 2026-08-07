@@ -192,6 +192,10 @@ def main() -> int:
         for name in files:
             if name.endswith(".meta"):
                 continue
+            # Unity's importer ignores the same names it ignores for dirs, so a
+            # .meta for one (e.g. .gitignore.meta) would be an orphan.
+            if name.startswith(".") or name.endswith("~"):
+                continue
             abs_file = os.path.join(root, name)
             rel = os.path.relpath(abs_file, PKG).replace(os.sep, "/")
             meta = abs_file + ".meta"
