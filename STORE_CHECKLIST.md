@@ -10,7 +10,9 @@
 > <https://assetstore.unity.com/packages/slug/398736> · short
 > <https://u3d.as/470o>. Owner-only preview:
 > <https://assetstore.unity.com/preview/398736/1441200> (302s to login for
-> anyone else — do not share it as the public link).
+> anyone else — do not share it as the public link). Portal edit page for
+> handling curation feedback:
+> <https://publisher.unity.com/packages/1441200/edit/upload>.
 >
 > **When the listing goes live:** sweep the "in review" hedge in README
 > ("### 3. Drag-and-drop" section) and add the Asset Store badge/link
