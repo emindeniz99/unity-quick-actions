@@ -171,6 +171,12 @@ OpenUPM gives version management and update notifications in Package Manager.
 
 ### 3. Drag-and-drop `.unitypackage` (classic)
 
+The same package is also **submitted to the Unity Asset Store** (Free; in
+review since 2026-08-07). Once approved, the listing lives at
+<https://assetstore.unity.com/packages/slug/398736> (short:
+<https://u3d.as/470o>) — until then that link 404s, and the download below is
+identical to what the Store will ship.
+
 Download `QuickActions.unitypackage` from the
 [**Releases** page](https://github.com/emindeniz99/unity-quick-actions/releases)
 — it's a build output attached to each release by CI, not a file committed to the

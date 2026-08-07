@@ -5,6 +5,16 @@
 > licensing, the BuildProfile reflection note and the AI disclosure.
 > Pipeline: In queue (~10 business days) → Assigned (1–3) → Reviewed →
 > Resolved. If curation requests changes, handle them against this checklist.
+>
+> **Public links** (activate on publish, then never change):
+> <https://assetstore.unity.com/packages/slug/398736> · short
+> <https://u3d.as/470o>. Owner-only preview:
+> <https://assetstore.unity.com/preview/398736/1441200> (302s to login for
+> anyone else — do not share it as the public link).
+>
+> **When the listing goes live:** sweep the "in review" hedge in README
+> ("### 3. Drag-and-drop" section) and add the Asset Store badge/link
+> alongside the OpenUPM one at the top.
 
 Everything needed to publish **Home-Screen Quick Actions (iOS & Android)**. Sources:
 [Submission Guidelines](https://assetstore.unity.com/publishing/submission-guidelines),
