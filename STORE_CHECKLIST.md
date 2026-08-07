@@ -76,9 +76,12 @@ All sizes are ✅ pre-built by `python3 tools~/gen_store_images.py`. See
 - [x] **Cover** 1950×1300 — `store~/cover.png`
 - [x] **Social** 1200×630 — `store~/social.png`
 - [x] **Screenshots** ≥1200w (2400×1600 here), ≥1 — `store~/screenshot-*.png`
-- [ ] ⚠️ Replace `screenshot-1` with a **real on-device** long-press capture
-      before submitting (store prefers in-context shots over mockups). Optional
-      but improves approval odds & conversion.
+- [x] `screenshot-1.png` is a **real capture**, not a mockup (2026-08-07): the
+      iOS Simulator long-press menu, composited onto the 2400×1600 canvas with
+      `python3 tools~/make_store_screenshot.py <capture.png> store~/screenshot-1.png`.
+      A raw phone capture is the wrong shape for a landscape listing thumbnail;
+      the tool scales and centres it on the same gradient the generated art uses.
+      Re-run it with an Android capture if you want that platform shown too.
 - [x] Key-image text rules (checked 2026-08-07, images regenerated to match):
       icon and **social** carry no text at all; **card** carries only the asset
       title and publisher name; **cover** carries the title plus one tag line.
