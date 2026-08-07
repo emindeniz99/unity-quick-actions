@@ -88,7 +88,7 @@ A clean `.unitypackage` is **built on demand** — `python3 tools/pack_unitypack
 (no Unity needed) writes `dist~/QuickActions.unitypackage`, which is gitignored
 because it's a build output; the identical artifact is attached to every
 [GitHub Release](https://github.com/emindeniz99/unity-quick-actions/releases)
-(none cut yet — build it locally until the first one exists). It:
+(first one: `v0.4.0`). It:
 
 - [x] Includes only package content, remapped under `Assets/QuickActions/`
       (Runtime, Editor, Plugins, Example, README/CHANGELOG/LICENSE/ROADMAP).

@@ -99,8 +99,8 @@ Pin a version by appending a tag, e.g.:
 https://github.com/emindeniz99/unity-quick-actions.git#v0.4.0
 ```
 
-(Without a tag you track the default branch — which is the only option today: no
-tag has been cut yet, so `#v0.4.0` will not resolve until the first one lands.)
+(Without a tag you track the default branch. `v0.4.0` is the first tag, so
+pinning works from that version on.)
 
 This is the best fit for the **dev-only** workflow: the package lives read-only
 under `Packages/`, and removing the one line removes it completely (see
