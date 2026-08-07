@@ -53,10 +53,14 @@ The condensed, day-of sequence. Details live in
 - [ ] Tap one → app foregrounds, log shows `Performed '<id>'` (**warm**).
 - [ ] Force-close app → long-press → tap a shortcut → app **cold-launches** and
       still logs the id.
-- [ ] 📸 **Take the long-press screenshot now** → save it over
-      `store~/screenshot-1.png`. ⚠️ Do **not** run `gen_store_images.py`
-      afterwards — it regenerates placeholders (it now skips an existing
-      screenshot-1 unless you pass `--force`, but don't tempt it).
+- [ ] 📸 **Take the long-press screenshot now**, then composite it to listing
+      size — do not save the raw capture over the listing image, a portrait
+      phone screen becomes a sliver in a landscape thumbnail:
+      `python3 tools~/make_store_screenshot.py <capture.png> store~/screenshot-1.jpg`
+      (JPEG, because a device capture is photographic). An iOS Simulator
+      version is already committed; this replaces it with an Android one if you
+      want that platform shown. `gen_store_images.py` skips screenshot-1 when
+      either extension exists, so it will not clobber your capture.
 - [ ] *(Optional but recommended)* Project Settings ▸ Quick Actions → add one
       **static** shortcut → rebuild → it exists on first launch before pressing
       anything.
