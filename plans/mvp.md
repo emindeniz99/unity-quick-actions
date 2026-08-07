@@ -42,7 +42,7 @@ This project is a clean-room, MIT-licensed re-implementation targeting
 ## Package layout
 
 ```
-projects/quick-actions-unity/
+<repo root>/                   # package.json sits at the root of the repo
   package.json  README.md  CHANGELOG.md  LICENSE.md  ROADMAP.md
   Runtime/
     QuickActions.cs            # public static facade + C# event

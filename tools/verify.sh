@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Full static verification for quick-actions-unity, runnable without a Unity
-# install. Four checks:
+# Full static verification for the Quick Actions package, runnable without a
+# Unity install. Four checks:
 #   1. gen_meta.py        -> every asset has a stable .meta
 #   2. dotnet build x9    -> Runtime/Editor C# type-checks against UnityEngine/
 #                            UnityEditor stubs (editor, iOS, Android, sample —

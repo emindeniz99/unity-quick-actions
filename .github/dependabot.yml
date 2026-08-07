@@ -1,0 +1,46 @@
+version: 2
+
+# Two dependency surfaces in this repo:
+#
+#   1. /.verify — the Unity-free verification harness. It is the only place with
+#      NuGet packages: the stub-compile csproj set plus the `dotnet test` runner
+#      (Microsoft.NET.Test.Sdk, NUnit, NUnit3TestAdapter). The shipped UPM
+#      package itself has no package dependencies.
+#   2. /.github/workflows — the actions used by CI, all pinned to commit SHAs,
+#      which Dependabot understands and bumps (SHA + trailing version comment).
+#
+# `cooldown` keeps Dependabot from proposing a version until it has sat on the
+# registry for a few days — the standard mitigation for malicious-release
+# attacks where a compromised maintainer publishes a poisoned version and pulls
+# it within hours. Majors wait longest: most disruptive, and the most credible
+# disguise for a hostile release.
+
+updates:
+  - package-ecosystem: nuget
+    directory: /.verify
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore(tests)
+      include: scope
+    # NUnit is pinned to the 3.x line on purpose (Unity Test Runner bundles
+    # NUnit 3; NUnit 4 removed the classic assert API) — ignore its majors.
+    ignore:
+      - dependency-name: NUnit
+        update-types: ["version-update:semver-major"]
+    cooldown:
+      default-days: 7
+      semver-major-days: 30
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: ci(repo)
+      include: scope
+    cooldown:
+      default-days: 7
+      semver-major-days: 30

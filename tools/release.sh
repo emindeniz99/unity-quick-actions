@@ -4,6 +4,10 @@
 #   2. store images — regenerate marketing PNGs at Asset Store sizes
 #   3. unitypackage — build the drag-and-drop dist~/QuickActions.unitypackage
 #
+# The .unitypackage is a BUILD OUTPUT, not a source file: dist~/ is gitignored,
+# CI rebuilds it reproducibly from the same script and attaches it to the GitHub
+# Release. Nothing here commits or diffs it.
+#
 # After this, the only remaining steps need YOU: a licensed Unity (open/compile),
 # a device pass, a real screenshot, then upload via the Publisher portal.
 # See STORE_CHECKLIST.md.
@@ -27,9 +31,14 @@ python3 "$ROOT/tools/pack_unitypackage.py"
 
 echo
 echo "Artifacts ready:"
-echo "  - dist~/QuickActions.unitypackage   (drag into the Unity Editor)"
+echo "  - dist~/QuickActions.unitypackage   (untracked build output; drag into the Editor)"
 echo "  - store~/*.png                       (Asset Store images)"
 echo "  - store~/listing/*                   (paste-ready listing text)"
 echo
-echo "Reminder at release time: set the [0.1.0] date in CHANGELOG.md (currently"
-echo "'Unreleased') and git-tag quick-actions/v<version> (see plans/openupm.md)."
+echo "Reminder at release time — the version lives in package.json:"
+echo "  1. bump \"version\" in package.json and date the matching CHANGELOG.md section"
+echo "  2. commit, then tag the release with a plain semver tag: v<version>"
+echo "     (git tag v<version> && git push origin v<version>)"
+echo "  3. CI rebuilds this .unitypackage from the tag and attaches it to the"
+echo "     GitHub Release — do not commit dist~/."
+echo "See RELEASE_RUNBOOK.md for the full checklist."

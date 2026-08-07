@@ -44,7 +44,7 @@ builds (define ON → dll present; OFF → zero trace).
 |---|---|---|---|
 | `QuickActionItem` ctor / `IsValid` / equality-by-id | unit + review | `Constructor_SetsFields`, `IsValid_RequiresIdAndTitle`, `Equality_IsByIdOnly` | ✅ |
 | `IconType` pinned 0..29 (native contract) | unit + review | `IconType_EveryValueIsPinned`, `IconType_NoneIsZero…` | ✅ |
-| JSON contract `{"items":[{"Id"…}]}` (exact keys, Icon as int) | unity-test + review + **editor-2022.3 + editor-6.x** | `SerializationTests` — **executed for real: 35/35 on 2022.3, 6.0 and 6.3** | ✅ |
+| JSON contract `{"items":[{"Id"…}]}` (exact keys, Icon as int) | unity-test + review + **editor-2022.3 + editor-6.x** | `SerializationTests` (5 tests) — **executed for real on 2022.3, 6.0 and 6.3** (the whole suite was 35/35 at the time; see Sign-off for today's counts) | ✅ |
 
 ## 3. Bridges / native (compiled here, behavior is device-only)
 
@@ -77,14 +77,29 @@ builds (define ON → dll present; OFF → zero trace).
 ## Sign-off
 
 - **Headless gate (closable here): GREEN.** `tools/verify.sh` → **VERIFY: PASS** —
-  8 C# configs compile, **45 unit tests pass**, Java compiles, every asset has a
-  stable `.meta`. Every managed feature has a dedicated, intent-encoding test
-  (Rule 9). Reviewed one-by-one across repeated adversarial rounds + a 15-unit workflow
-  (every confirmed finding fixed or explicitly documented; **0 P0 ship-blockers**).
-  (The `35/35` real-editor runs below predate the tests added 2026-07-17 —
-  cap-reconcile, failed-read/failed-write contracts, empty-accepted; a fresh
-  Unity run would now report 47/47 (45 dotnet + 2 Unity-only JsonUtility) — not
-  re-run in-editor since.)
+  9 C# configs compile with **0 warnings**, **73 unit tests pass** (`dotnet test`),
+  the Android plugin compiles and its Java smoke test passes **103 checks, 0
+  failed**, and every asset has a stable `.meta`. Every managed feature has a
+  dedicated, intent-encoding test (Rule 9). Reviewed one-by-one across repeated
+  adversarial rounds + a 15-unit workflow (every confirmed finding fixed or
+  explicitly documented; **0 P0 ship-blockers**).
+- **Test inventory (where each number comes from).** 78 distinct C# tests:
+  - **69 shared** — `Tests/Editor/QuickActionsApiTests.cs` (63) and
+    `QuickActionItemTests.cs` (6). Run by BOTH `dotnet test` and the Unity Test
+    Runner.
+  - **5 Unity-only** — `Tests/Editor/SerializationTests.cs`. Needs real
+    `JsonUtility`, so the headless harness excludes it (see the `Compile Include`
+    list in `.verify/QuickActions.Tests.csproj`).
+  - **4 headless-only** — `.verify/EditorTests/AndroidStaticLocalizationTests.cs`.
+    Lives in the harness because the code under test sits behind a
+    `UNITY_ANDROID` `defineConstraints` asmdef that a Unity test assembly cannot
+    reference on other build targets.
+
+  So `dotnet test` reports **73** (69 + 4) and a fresh Unity Test Runner run
+  would report **74** (69 + 5). The `35/35` real-editor runs cited below predate
+  every test added from 2026-07-17 onward (cap-reconcile, failed-read/failed-write
+  contracts, empty-accepted, and the later waves) — the editor runs have not been
+  repeated since, so `35/35` is a historical measurement, not the current count.
 - **Real-Editor gate (2022.3): CLOSED IN-CONTAINER 2026-07-17** via a licensed
   Unity 2022.3.9f1 (student Pro `.ulf`): package imports with **0 console
   errors**, **Unity Test Runner 35/35**, both menus registered, the managed
@@ -142,5 +157,5 @@ builds (define ON → dll present; OFF → zero trace).
 3. On-device: cold + warm taps, static + dynamic shortcuts, both OSes
    (procedure in `plans/mvp.md`).
 
-Until step 3 passes, ship honestly as **`0.1.0` (pre-device-validation)**, not
-`1.0.0`.
+Until step 3 passes, ship honestly as a **`0.x` pre-device-validation release**
+(the first public one is `0.4.0`), not `1.0.0`.

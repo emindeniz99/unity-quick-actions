@@ -4,47 +4,19 @@ All notable changes to this package are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the package adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.2.0] - Unreleased
+> **Note on the early history.** Versions 0.2.0 through 0.4.0 were developed in
+> three waves before the package was ever published, and ship together as the
+> **first public release, `v0.4.0`**. Only `v0.4.0` is tagged — 0.1.0 through
+> 0.3.0 were never published and cannot be installed. Each wave is kept as its
+> own section because each is a distinct, self-contained set of API additions;
+> read them as the package's development log.
+
+## [0.4.0] - 2026-07-31
+
+First public release.
 
 ### Added
 
-- **SF Symbols and template-image icons on iOS**: `QuickActionItem.IosSystemImage`
-  (e.g. `"star.fill"`, iOS 13+) and `QuickActionItem.IosTemplateImage` (bundle
-  image name). Icon priority is SF Symbol > template image > `IconType` glyph,
-  for dynamic and static (Info.plist `IconSymbolName`/`IconFile`) shortcuts
-  alike; identity survives the cold-start reconcile via the `userInfo` marker.
-  iOS 12: a dynamic symbol-only item falls through to the next icon source at
-  runtime; a static one renders iconless (the plist carries a single icon key —
-  see the `IosSystemImage` doc).
-- **Runtime bitmap icons on Android**: `QuickActionItem.AndroidBitmapFile`
-  (absolute path to a PNG/JPEG — e.g. a `Texture2D` written with
-  `EncodeToPNG()`), plus `AndroidBitmapAdaptive` for `createWithAdaptiveBitmap`
-  masking (API 26+). Falls back down the icon chain when the file is missing;
-  identity survives the reconcile via the extras marker.
-- **Pinned shortcuts (Android 8.0+)**: `QuickActions.IsPinSupported` and
-  `QuickActions.RequestPin(id)` → `requestPinShortcut`, ownership-gated so only
-  this package's currently installed shortcuts can be pinned. Honest no-op
-  (false) on iOS and in the Editor.
-- **Per-item payload**: `QuickActionItem.Payload`, an app-defined string riding
-  the shortcut (iOS `userInfo`, Android extras + launch-intent extra) and
-  restored across cold starts — read it via `GetById(id)?.Payload` from the id
-  `Performed` reports (null for static-shortcut taps and ids removed since —
-  static items never join the runtime list).
-- **`QuickActions.MaxShortcutCount`**: the OS shortcut budget
-  (`getMaxShortcutCountPerActivity` on Android; 4 on iOS, the Home Screen
-  display limit; 0 in-Editor).
-- **In-place `Update(item)`**: replace the added action with the same `Id`
-  without changing its list position (launcher rank preserved), one OS update;
-  Android user-pinned copies refresh in place. Same honesty contract as `Add`
-  (false on refused/dropped writes, previous item restored on failure).
-- **`ReportUsed(id)`**: forward in-app feature usage to the launcher's ranking
-  predictor (`reportShortcutUsed`), ownership-gated like `RequestPin`; false on
-  iOS/Editor (no analog).
-- **iOS template-image pipeline**: a texture list in Project Settings ▸ Quick
-  Actions — each PNG/JPEG is copied into the generated Xcode project's app
-  target at build time, so `IosTemplateImage` art ships straight from Unity
-  assets (manifest-scoped Append-build cleanup; only files the package copied
-  are ever touched).
 - **Per-locale titles/subtitles (localization)**:
   `QuickActionItem.LocalizedTitles`/`LocalizedSubtitles` (`LocalizedText`
   pairs; exact locale > language prefix > base text, case-insensitive) and
@@ -81,6 +53,53 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   simulated trampoline tap delivers `Performed`; a manually-dispatched
   workflow runs it on a GitHub-hosted emulator. iOS automation is documented
   as not shipped (no adb analog) with manual steps instead.
+
+## [0.3.0] - 2026-07-29
+
+### Added
+
+- **In-place `Update(item)`**: replace the added action with the same `Id`
+  without changing its list position (launcher rank preserved), one OS update;
+  Android user-pinned copies refresh in place. Same honesty contract as `Add`
+  (false on refused/dropped writes, previous item restored on failure).
+- **`ReportUsed(id)`**: forward in-app feature usage to the launcher's ranking
+  predictor (`reportShortcutUsed`), ownership-gated like `RequestPin`; false on
+  iOS/Editor (no analog).
+- **iOS template-image pipeline**: a texture list in Project Settings ▸ Quick
+  Actions — each PNG/JPEG is copied into the generated Xcode project's app
+  target at build time, so `IosTemplateImage` art ships straight from Unity
+  assets (manifest-scoped Append-build cleanup; only files the package copied
+  are ever touched).
+
+## [0.2.0] - 2026-07-29
+
+### Added
+
+- **SF Symbols and template-image icons on iOS**: `QuickActionItem.IosSystemImage`
+  (e.g. `"star.fill"`, iOS 13+) and `QuickActionItem.IosTemplateImage` (bundle
+  image name). Icon priority is SF Symbol > template image > `IconType` glyph,
+  for dynamic and static (Info.plist `IconSymbolName`/`IconFile`) shortcuts
+  alike; identity survives the cold-start reconcile via the `userInfo` marker.
+  iOS 12: a dynamic symbol-only item falls through to the next icon source at
+  runtime; a static one renders iconless (the plist carries a single icon key —
+  see the `IosSystemImage` doc).
+- **Runtime bitmap icons on Android**: `QuickActionItem.AndroidBitmapFile`
+  (absolute path to a PNG/JPEG — e.g. a `Texture2D` written with
+  `EncodeToPNG()`), plus `AndroidBitmapAdaptive` for `createWithAdaptiveBitmap`
+  masking (API 26+). Falls back down the icon chain when the file is missing;
+  identity survives the reconcile via the extras marker.
+- **Pinned shortcuts (Android 8.0+)**: `QuickActions.IsPinSupported` and
+  `QuickActions.RequestPin(id)` → `requestPinShortcut`, ownership-gated so only
+  this package's currently installed shortcuts can be pinned. Honest no-op
+  (false) on iOS and in the Editor.
+- **Per-item payload**: `QuickActionItem.Payload`, an app-defined string riding
+  the shortcut (iOS `userInfo`, Android extras + launch-intent extra) and
+  restored across cold starts — read it via `GetById(id)?.Payload` from the id
+  `Performed` reports (null for static-shortcut taps and ids removed since —
+  static items never join the runtime list).
+- **`QuickActions.MaxShortcutCount`**: the OS shortcut budget
+  (`getMaxShortcutCountPerActivity` on Android; 4 on iOS, the Home Screen
+  display limit; 0 in-Editor).
 - CI now packs `dist~/QuickActions.unitypackage` and uploads it as a workflow
   artifact.
 

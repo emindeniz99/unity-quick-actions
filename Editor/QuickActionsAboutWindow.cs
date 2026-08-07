@@ -11,7 +11,7 @@ namespace EminDeniz99.QuickActions.Editor
     public sealed class QuickActionsAboutWindow : EditorWindow
     {
         private const string DocsUrl =
-            "https://github.com/emindeniz99/playground/tree/main/projects/quick-actions-unity";
+            "https://github.com/emindeniz99/unity-quick-actions";
 
         private const string Snippet =
 @"using EminDeniz99.QuickActions;

@@ -91,7 +91,8 @@ tools/device-smoke/android_device_smoke.sh ~/builds/demo.apk com.example.game em
 
 ### CI
 
-`.github/workflows/quick-actions-device-ci.yml` runs exactly this script against
+[`.github/workflows/device-ci.yml`](../../.github/workflows/device-ci.yml) runs
+exactly this script against
 an API 30 emulator, `workflow_dispatch`-only: it takes a URL to an already-built
 APK because there is no Unity licence in CI to build one. It is **experimental**
 and deliberately not attached to push/PR.

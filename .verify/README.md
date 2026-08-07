@@ -54,7 +54,7 @@ opt-in). To enable it, add this entry to the `SessionStart` array in
   "hooks": [
     {
       "type": "command",
-      "command": "sh -c 'f=\"${CLAUDE_PROJECT_DIR:-.}/projects/quick-actions-unity/tools/setup.sh\"; if [ -x \"$f\" ] && ! { command -v dotnet >/dev/null 2>&1 && command -v javac >/dev/null 2>&1; }; then nohup \"$f\" >/tmp/quick-actions-setup.log 2>&1 & fi; exit 0'"
+      "command": "sh -c 'f=\"${CLAUDE_PROJECT_DIR:-.}/tools/setup.sh\"; if [ -x \"$f\" ] && ! { command -v dotnet >/dev/null 2>&1 && command -v javac >/dev/null 2>&1; }; then nohup \"$f\" >/tmp/quick-actions-setup.log 2>&1 & fi; exit 0'"
     }
   ]
 }

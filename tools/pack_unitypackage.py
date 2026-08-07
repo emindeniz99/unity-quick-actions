@@ -15,6 +15,10 @@ Layout: package content is remapped under Assets/QuickActions/. Dev folders
 (.verify, tools, plans, store~, Tests) and package.json are excluded.
 
 Run: python3 tools/pack_unitypackage.py  ->  dist~/QuickActions.unitypackage
+
+`dist~/` is gitignored: the .unitypackage is a build output, never a committed
+source file. CI runs this same script and attaches the result to the GitHub
+Release, so users download it from the Releases page rather than from the tree.
 """
 import gzip
 import hashlib
@@ -105,8 +109,10 @@ def collect():
 
     # Sort by target path so the tar member order (and thus the gzip bytes) is
     # deterministic regardless of os.walk's filesystem/inode ordering — os.walk
-    # does NOT sort filenames, so without this the committed dist~ artifact churns
-    # across machines despite identical source (the mtime=0 reproducibility intent).
+    # does NOT sort filenames, so without this the artifact would differ from
+    # machine to machine despite identical source (the mtime=0 reproducibility
+    # intent). Reproducibility is what lets anyone rebuild the released
+    # .unitypackage from its tag and get the same bytes CI attached.
     return sorted(files, key=lambda t: t[0]), sorted(folders)
 
 
@@ -122,8 +128,8 @@ def main():
     os.makedirs(OUT_DIR, exist_ok=True)
 
     # Deterministic output: gzip normally stamps the compression TIME into its
-    # header, so rebuilding identical content still changed the bytes (churning
-    # git). mtime=0 makes the artifact reproducible — same input, same bytes.
+    # header, so two builds of identical content still differed byte-for-byte.
+    # mtime=0 makes the artifact reproducible — same input, same bytes.
     with gzip.GzipFile(OUT, "wb", mtime=0) as gz, tarfile.open(fileobj=gz, mode="w") as tar:
         # folder entries (so Unity makes stable-GUID folders)
         for folder in folders:

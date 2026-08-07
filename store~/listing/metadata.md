@@ -10,7 +10,7 @@ Fill these into the Publisher portal package draft. Long-form copy is in
 | **Summary** | See [`summary.txt`](./summary.txt) |
 | **Description** | See [`description.md`](./description.md) |
 | **Tags / keywords** | See [`tags.txt`](./tags.txt) |
-| **Version** | 0.1.0 (bump to 1.0.0 after device validation) |
+| **Version** | 0.4.0 (bump to 1.0.0 after device validation) |
 | **Supported Unity** | 2021.3 LTS or higher (incl. Unity 6) — upload from a 2021.3 editor so the portal lists that minimum |
 | **Render pipelines** | Built-in, URP, HDRP (no rendering — all compatible) |
 | **Scripting backends** | Mono + IL2CPP |
@@ -28,6 +28,8 @@ Fill these into the Publisher portal package draft. Long-form copy is in
 
 ## Package upload
 
-Upload `dist~/QuickActions.unitypackage` (built by
-`tools/pack_unitypackage.py`). It installs the package under
-`Assets/QuickActions/`.
+Upload `QuickActions.unitypackage`. It is a build output, not a committed file:
+build it with `python3 tools/pack_unitypackage.py` (or `tools/release.sh`) →
+`dist~/QuickActions.unitypackage`, or download the artifact attached to the
+matching [GitHub Release](https://github.com/emindeniz99/unity-quick-actions/releases).
+It installs the package under `Assets/QuickActions/`.

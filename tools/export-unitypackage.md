@@ -4,6 +4,11 @@ The package ships in **UPM** layout. To also distribute it the classic way
 (a `.unitypackage` that drops into `Assets/`), export it from a Unity project
 that has the package installed.
 
+> **Just want the file?** Every release ships one, built exactly this way:
+> download `QuickActions.unitypackage` from the
+> [Releases page](https://github.com/emindeniz99/unity-quick-actions/releases).
+> It is a build output, so it is **not** in the repo tree.
+
 ## Option 0 — prebuilt, no Unity needed (recommended)
 
 `tools/pack_unitypackage.py` builds a valid `.unitypackage` directly from the
@@ -16,6 +21,10 @@ python3 tools/pack_unitypackage.py   # -> dist~/QuickActions.unitypackage
 It already applies the include/exclude rules below and remaps content under
 `Assets/QuickActions/`. Drag the result into the Editor to install. (Import it
 once in a real Editor to confirm before submitting to the store.)
+
+`dist~/` is gitignored — the artifact is never committed. The build is
+byte-reproducible (sorted entries, `mtime=0`), so running this on a release tag
+reproduces the exact file attached to that release.
 
 ## What to include / exclude
 
@@ -52,4 +61,5 @@ intact.
 
 > Note: Options A/B need a Unity install; Option 0 does not (the format is a
 > gzip tar of GUID-named entries, which `pack_unitypackage.py` writes directly).
-> Attaching the Option 0 artifact to releases from CI is tracked in `ROADMAP.md`.
+> Option 0 is what CI runs on a release tag, and its output is the
+> `.unitypackage` attached to the GitHub Release.

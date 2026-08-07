@@ -1,14 +1,24 @@
 # Quick Actions for Unity — Roadmap
 
-Follow-ups discussed but not shipped in v0.1.0. Delete an entry in the same
-commit that ships it.
+Follow-ups discussed but not shipped as of v0.4.0 (the first public release).
+Delete an entry in the same commit that ships it.
 
-- **Automated device CI, remaining scope** — v0.4 ships an adb-driven Android
+- **Automated device CI, remaining scope** — v0.4.0 ships an adb-driven Android
   smoke (`tools/device-smoke/`) and a manually-dispatched emulator workflow
   (needs a Unity-built dev APK — no Unity license in CI). Remaining: iOS
   simulator automation (no adb analog for shortcut taps — see the device-smoke
   README), asserting the COLD-launch path (the smoke's tap is a warm resume),
   and wiring the smoke into always-on CI once a Unity license (game-ci) exists.
+- **Documentation site (considered, deliberately deferred)** — the reference
+  docs live in a single 545-line [README](./README.md) plus a task-oriented
+  [GETTING_STARTED](./GETTING_STARTED.md); a GitHub Pages site (or a UPM
+  `Documentation~/` folder, which the Package Manager surfaces as the package's
+  "Documentation" link) would make that navigable, searchable and versioned per
+  release. Deferred for v0.4.0: a single README is what the Package Manager and
+  the Asset Store listing both render inline, and one file is cheaper to keep
+  truthful than a site that can silently drift from the code. Revisit if the
+  README keeps growing — the natural first split is the per-platform behavior
+  tables and the icon/localization reference.
 
 ## Validate in a real Unity Editor (license-gated; can't run here)
 
@@ -23,12 +33,12 @@ The stub harness compiles the C#/Java but can't confirm Unity-only wiring:
   the focus poll (performAction precedes didBecomeActive), and that static
   shortcuts.xml taps round-trip the action-encoded id. Confirm iOS cold + warm
   on a device via Xcode.
-- **v0.2 feature validation (on-device):** SF Symbol + template-image icons
+- **v0.2.0 feature validation (on-device):** SF Symbol + template-image icons
   render on iOS (incl. the iOS 12 dynamic fall-through), `AndroidBitmapFile`
   icons render and survive a reconcile (file kept alive), the adaptive variant
   masks correctly per launcher, `RequestPin` shows the launcher confirm sheet
   and the pinned copy taps through, and `Payload` survives a cold-start
-  reconcile on both OSes. Also v0.3: `Update(item)` refreshes a pinned copy's
+  reconcile on both OSes. Also v0.3.0: `Update(item)` refreshes a pinned copy's
   label/icon in place on a real launcher; `ReportUsed` influences ranking (long
   feedback loop — just confirm no crash/no-op); and the template-image pipeline:
   confirm a copied PNG lands in the built app bundle root (group-style PBX adds
@@ -36,7 +46,7 @@ The stub harness compiles the C#/Java but can't confirm Unity-only wiring:
   on device. The pipeline (`SyncTemplateImages`) is COMPILE-CHECKED ONLY in the
   harness — its PBX stubs are no-ops — so its behavior (manifest cleanup
   ordering, package-path resolution, Append rebuilds) is real-Editor/Xcode
-  validation, not covered by verify.sh. NOTE the iOS side of v0.2 (the .mm userInfo
+  validation, not covered by verify.sh. NOTE the iOS side of v0.2.0 (the .mm userInfo
   persistence of symbol/template/payload and its read-back) has NO automated
   coverage — the .verify harness is Java+C# only — so the iOS reconcile
   round-trip is device-validation-only; the equivalent Android extras path is
@@ -82,7 +92,7 @@ The stub harness compiles the C#/Java but can't confirm Unity-only wiring:
   `QUICKACTIONS_ENABLED` off shows it as "missing script". Harmless and reversible
   (re-enable the define), documented in README. A future cleanup could move the SO
   *type* into an always-compiled editor assembly so the asset never orphans.
-- **iOS scene lifecycle + cold dedup (SHIPPED in v0.4 — device-validate):** the
+- **iOS scene lifecycle + cold dedup (SHIPPED in v0.4.0 — device-validate):** the
   package now learns the scene-delegate class from the host's
   `UISceneConfiguration` and installs cold
   (`scene:willConnectToSession:options:`) + warm
@@ -91,7 +101,7 @@ The stub harness compiles the C#/Java but can't confirm Unity-only wiring:
   double-delivery on the app-delegate path. NO ObjC compile harness exists:
   first real validation is an Xcode build. On device, verify: a scene-manifest
   app delivers cold + warm taps exactly once each; a default (no-manifest) app
-  behaves byte-identically to v0.3; a host UnityAppController subclass that
+  behaves byte-identically to v0.3.0; a host UnityAppController subclass that
   discards our `NO` no longer double-delivers; multi-scene-delegate-class hosts
   get coverage only for the first class learned (documented in-code). Also
   verify the SUBCLASS-SHADOWED shape specifically: a host that overrides
@@ -101,7 +111,7 @@ The stub harness compiles the C#/Java but can't confirm Unity-only wiring:
   that shape, and measure whether the FIRST cold tap does — the notification may
   be posted after the delegate's own `willConnect`, in which case that one tap
   is lost by design (a `[super ...]` call on the host side closes it).
-- **Localization (SHIPPED in v0.4 — device-validate):** dynamic per-locale
+- **Localization (SHIPPED in v0.4.0 — device-validate):** dynamic per-locale
   titles resolve/refresh across cold starts (verify a device-language change
   re-renders on next launch, and the refresh push tolerates rate limiting);
   static output needs a real toolchain check — that aapt2 accepts the generated

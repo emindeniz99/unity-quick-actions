@@ -1,0 +1,79 @@
+name: CI
+
+# Unity asset verified WITHOUT Unity: tools/verify.sh generates .meta files,
+# compiles the C# against UnityEngine/UnityEditor stubs (9 configs), runs the
+# NUnit suite via `dotnet test`, and compiles the Android plugin against Android
+# SDK stubs. The iOS .mm and on-device behaviour still need a real Unity build
+# (see PRODUCTION_READINESS.md). See .verify/README.md.
+#
+# On a pushed `v*` tag the same commit is verified and the `release` job packs
+# dist~/QuickActions.unitypackage and attaches it to the GitHub Release. The
+# artifact is a BUILD OUTPUT and is not committed (dist~/ is gitignored).
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+
+# Least privilege by default; only `release` widens this, in its own block.
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5.4.0
+        with:
+          dotnet-version: "10.0.x"
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Verify (meta + 9 C# configs + unit tests + Android plugin)
+        run: tools/verify.sh
+      - name: Pack .unitypackage (reproducible, no Unity needed)
+        run: python3 tools/pack_unitypackage.py
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: QuickActions.unitypackage
+          path: dist~/QuickActions.unitypackage
+          if-no-files-found: error
+
+  # Tag pushes only. Runs after `verify`, so nothing is published from a commit
+  # that does not compile and pass its tests. Packs from a clean checkout with
+  # no restored cache — a poisoned cache must not be able to become the
+  # published artifact — and the packer is pure Python stdlib, so no toolchain
+  # is installed here at all.
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Pack .unitypackage
+        run: python3 tools/pack_unitypackage.py
+      # `gh` is preinstalled on the runner, so this needs no third-party action.
+      # The tag reaches the shell through env, never an inline ${{ }} expansion.
+      # Works whether or not the Release already exists: created from the UI
+      # first, or created here from the tag with generated notes.
+      - name: Attach the .unitypackage to the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist~/QuickActions.unitypackage --clobber
+          else
+            gh release create "$TAG" dist~/QuickActions.unitypackage \
+              --verify-tag --generate-notes --title "$TAG"
+          fi

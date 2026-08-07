@@ -1,10 +1,10 @@
 # Installing Unity on Linux (reproducible steps)
 
-The web-session container is ephemeral, so Unity does not persist between
-sessions. These are the exact steps used to install a Unity 2022.3 LTS Editor
-for manual smoke-testing. **Day-to-day verification does not need Unity** — use
-[`verify.sh`](./verify.sh) (stub-based, license-free). Unity is only needed to
-open a real project and confirm import/compile in-Editor.
+Throwaway containers and CI runners are ephemeral, so Unity does not persist
+between sessions. These are the exact steps used to install a Unity 2022.3 LTS
+Editor for manual smoke-testing. **Day-to-day verification does not need Unity**
+— use [`verify.sh`](./verify.sh) (stub-based, license-free). Unity is only
+needed to open a real project and confirm import/compile in-Editor.
 
 ## 1. Unity Hub (optional, for managing installs)
 

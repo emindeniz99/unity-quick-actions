@@ -7,17 +7,20 @@ The condensed, day-of sequence. Details live in
 
 ## Phase 0 — before Unity (15 min, any OS)
 
-- [ ] `git clone https://github.com/emindeniz99/playground.git`
-- [ ] `cd playground/projects/quick-actions-unity && tools/setup.sh && tools/verify.sh`
+- [ ] `git clone https://github.com/emindeniz99/unity-quick-actions.git`
+- [ ] `cd unity-quick-actions && tools/setup.sh && tools/verify.sh`
       → expect **`VERIFY: PASS`** (if not, stop: the checkout is broken, nothing
       else will work — re-clone or ask for help).
-- [ ] Install **Unity Hub** + all four editors: **2021.3 LTS, 2022.3 LTS, 6.0 LTS, 6.3 LTS**, each with **Android Build Support**
+- [ ] Install **Unity Hub** + the two editors on the ends of the supported
+      range: **2021.3 LTS** and **Unity 6.3**, each with **Android Build Support**
       (+ iOS Build Support if on a Mac). *(GS §0)*
 - [ ] Phone ready: Android 7.1+ with **USB debugging** enabled.
 
-> **Matrix rule:** we claim four Unity lines, so all four get the FULL bar —
-> repeat **Phases 1–3** (and Phase 4 on a Mac) in **each** editor: 2021.3,
-> 2022.3, 6.0, 6.3. One testbed project per editor version (don't upgrade one
+> **Matrix rule (current plan):** the two ends of the supported range get the
+> FULL bar — repeat **Phases 1–3** (and Phase 4 on a Mac) in **2021.3 LTS** and
+> in **Unity 6.3**. The lines in between (2022.3, 6.0) are **not claimed as
+> tested**; they should work, but nothing here validates them, so don't write
+> them up as verified. One testbed project per editor version (don't upgrade one
 > project through versions — that tests migration, not fresh installs). Budget
 > roughly half a day per line; start with 2021.3 (the minimum, most likely to
 > surface an API gap) and finish with 6.3 (the longest-lived target).
@@ -25,7 +28,8 @@ The condensed, day-of sequence. Details live in
 ## Phase 1 — Editor smoke test (30 min per editor)
 
 - [ ] Unity Hub ▸ New 3D project `QuickActionsTestbed`; open it.
-- [ ] Package Manager ▸ + ▸ *Add package from disk…* ▸ this folder's `package.json`.
+- [ ] Package Manager ▸ + ▸ *Add package from disk…* ▸ the `package.json` at the
+      **root of your clone**.
 - [ ] **THE step:** Project Settings ▸ Player ▸ Scripting Define Symbols → add
       `QUICKACTIONS_ENABLED` (Android tab; iOS tab too if building iOS). *(GS §A5)*
 - [ ] Console shows **0 errors / 0 warnings** after recompile.
@@ -79,16 +83,31 @@ The condensed, day-of sequence. Details live in
       section — the gate is the product), `tags.txt`.
 - [ ] Upload images from `store~/` (icon/card/cover/social + screenshots incl.
       your real one).
-- [ ] Upload `dist~/QuickActions.unitypackage` via Asset Store Publishing Tools **from the 2021.3 editor** (upload version = listed minimum).
+- [ ] Upload the `.unitypackage` via Asset Store Publishing Tools **from the
+      2021.3 editor** (upload version = listed minimum). It is a build output,
+      not a repo file: build it with `python3 tools/pack_unitypackage.py` (or
+      `tools/release.sh`) → gitignored `dist~/QuickActions.unitypackage`, or take
+      the one attached to the
+      [GitHub Release](https://github.com/emindeniz99/unity-quick-actions/releases).
 - [ ] Price: **Free**. Submit for review. (Review: days → ~2 weeks.)
 
 ## Phase 6 — stamp the release (10 min, back in the repo)
 
-- [x] `CHANGELOG.md`: replace `Unreleased` with today's date (2026-07-29).
-- [ ] If device-validated and you're confident: bump `0.1.0` → `1.0.0` in
-      `package.json` + CHANGELOG heading (else stay 0.1.0 — honest pre-1.0).
-- [ ] `git tag quick-actions/v<version> && git push origin quick-actions/v<version>`
-- [ ] (When repo goes public) OpenUPM one-time submission: `plans/openupm.md`.
+The **first public release is `v0.4.0`** — the version this repo already carries.
+Tags are plain semver (`v0.4.0`), one tag per release.
+
+- [ ] `package.json` `version` and the top `CHANGELOG.md` heading agree, and the
+      heading has a real date (no `Unreleased` left).
+- [ ] Stay in `0.x` until the matrix above has actually been walked on devices;
+      a `1.0.0` is a claim of "validated on both ends of the supported range",
+      not a mood. Bumping later is cheap.
+- [ ] `git tag v<version> && git push origin v<version>` (e.g. `v0.4.0`).
+- [ ] Check the resulting **GitHub Release** carries the built
+      `QuickActions.unitypackage` asset (CI attaches it; if it's missing, build
+      it with `tools/release.sh` and upload it to the release by hand) —
+      docs point downloaders at
+      <https://github.com/emindeniz99/unity-quick-actions/releases>.
+- [ ] OpenUPM one-time submission: [`plans/openupm.md`](./plans/openupm.md).
 
 ## If something breaks
 

@@ -4,8 +4,9 @@ A step-by-step guide for someone who has **not pulled the repo yet**. Three
 parts: **A) get it running locally**, **B) test on a real device**, **C) publish
 to the Unity Asset Store**.
 
-> Key fact up front: this folder is a **Unity package**, not a runnable Unity
-> project. You test it by creating a small empty project and importing it.
+> Key fact up front: this repo is a **Unity package** (its `package.json` sits at
+> the repo root), not a runnable Unity project. You test it by creating a small
+> empty project and importing it.
 
 ---
 
@@ -27,11 +28,11 @@ needs no Apple hardware.
 
 ### A1. Pull the code to your PC
 ```bash
-git clone https://github.com/emindeniz99/playground.git
-cd playground/projects/quick-actions-unity
+git clone https://github.com/emindeniz99/unity-quick-actions.git
+cd unity-quick-actions
 ```
-(The repo is a monorepo; everything for this asset is under
-`projects/quick-actions-unity`.)
+(Everything for this asset is in that one repo, and every path below is relative
+to its root.)
 
 ### A2. (Optional, no Unity needed) Sanity-check it compiles
 ```bash
@@ -45,10 +46,15 @@ In **Unity Hub ▸ New project ▸ 3D (URP or Built-in, doesn't matter)**. Name 
 `QuickActionsTestbed`. Open it.
 
 ### A4. Install the package into the test project
-**Window ▸ Package Manager ▸ + ▸ Add package from disk…** and pick
-`projects/quick-actions-unity/package.json`.
-(Alternative: drag `dist~/QuickActions.unitypackage` into the Project window — it
-lands under `Assets/QuickActions/`.)
+**Window ▸ Package Manager ▸ + ▸ Add package from disk…** and pick the
+`package.json` at the **root of your clone**.
+(Alternatives: **+ ▸ Add package from git URL…** with
+`https://github.com/emindeniz99/unity-quick-actions.git` — append `#v0.4.0` to
+pin a version; or drag a `QuickActions.unitypackage` into the Project window —
+it lands under `Assets/QuickActions/`. That `.unitypackage` is a build output,
+not a committed file: grab it from the
+[Releases page](https://github.com/emindeniz99/unity-quick-actions/releases) or
+build it yourself with `python3 tools/pack_unitypackage.py`.)
 
 ### A5. ⚠️ Turn the package ON (the #1 gotcha)
 The package is **opt-in**: with no define, the `QuickActions` API doesn't even
@@ -68,7 +74,8 @@ Do this for **each platform tab** you'll build (Android / iOS). Press Enter, the
 ### A6. Import the Demo
 Package Manager ▸ select **Home-Screen Quick Actions** ▸ **Samples** tab ▸
 **Import** next to "Demo". It copies into `Assets/Samples/…/Demo`.
-(If you used the `.unitypackage`, the demo is at `Assets/QuickActions/Example`.)
+(If you imported a `.unitypackage` instead, the demo is at
+`Assets/QuickActions/Example`.)
 
 Open the demo scene (`QuickActionsDemo.unity`) — or just drop the
 `QuickActionsDemo` component onto an empty GameObject in any scene. It's IMGUI,
@@ -166,15 +173,21 @@ Go to <https://publisher.unity.com>, sign in with your Unity ID, create a
 **Publisher profile**, fill payout (PayPal/bank), and accept the Provider Agreement.
 
 ### C2. Validate the package in a real Unity (the device gate)
-Before uploading, do the FULL pass (Part B, device included) on **each supported line: 2021.3 LTS, 2022.3 LTS, Unity 6.0 LTS and 6.3 LTS** — we claim them all, so we validate them all —
-with **zero console errors/warnings**. This is the one thing that must pass and
-that I could not do for you (no Unity/devices in the build environment).
+Before uploading, do the FULL pass (Part B, device included) on **both ends of
+the supported range: 2021.3 LTS (the minimum) and Unity 6.3** — the versions in
+between are not claimed as tested — with **zero console errors/warnings**. This
+is the one thing that must pass and that could not be done in the build
+environment (no Unity, no devices). Step-by-step order in
+[`RELEASE_RUNBOOK.md`](./RELEASE_RUNBOOK.md).
 
 ### C3. Build the upload package
 - Easiest: install **Asset Store Publishing Tools** from the Asset Store (search
   it in the Package Manager / Asset Store), which adds an uploader window in Unity.
-- Or upload the prebuilt `dist~/QuickActions.unitypackage` (rebuild any time with
-  `python3 tools/pack_unitypackage.py`).
+- Or upload a `QuickActions.unitypackage`. It is a **build output** — not
+  committed to the repo — so either download it from the
+  [Releases page](https://github.com/emindeniz99/unity-quick-actions/releases) or
+  build it locally with `python3 tools/pack_unitypackage.py` (or `tools/release.sh`,
+  which also refreshes the store images); it lands in the gitignored `dist~/`.
 
 ### C4. Fill the listing (everything is pre-written)
 In the publisher portal, create a draft package and paste from

@@ -61,7 +61,8 @@ Actions** and they're baked into the build automatically.
   post-processors
 • Native plugins with full source (iOS `.mm`, Android `.java`)
 • A ready-to-run demo scene + an in-Editor tap Simulator (test without a device)
-• A complete README (the full unit-test suite lives in the open-source repo)
+• A complete README (the full unit-test suite lives in the open-source repo at
+  github.com/emindeniz99/unity-quick-actions)
 
 ## Compatibility
 
@@ -75,5 +76,7 @@ Actions** and they're baked into the build automatically.
 
 ## Support
 
-Questions or feature requests are welcome — see the included README and ROADMAP.
-The package ships full source, so it's easy to extend.
+Questions or feature requests are welcome — see the included README and ROADMAP,
+or open an issue on the MIT-licensed repository:
+<https://github.com/emindeniz99/unity-quick-actions>. The package ships full
+source, so it's easy to extend.

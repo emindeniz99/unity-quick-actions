@@ -1,4 +1,4 @@
-name: quick-actions-unity device smoke
+name: device smoke
 
 # EXPERIMENTAL — manual only. It needs two things this repo cannot supply on its
 # own: repository Actions enabled, and a URL to a Unity-built DEVELOPMENT APK of
@@ -24,11 +24,16 @@ on:
         required: true
         type: string
 
+permissions:
+  contents: read
+
 jobs:
   android-device-smoke:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       # The x86_64 image needs KVM; without a writable /dev/kvm the emulator
       # falls back to software rendering and hits the job timeout instead of
@@ -47,7 +52,7 @@ jobs:
         run: curl -fsSL --retry 3 -o "$RUNNER_TEMP/quickactions-demo.apk" "$APK_URL"
 
       - name: Device smoke (API 30 emulator)
-        uses: reactivecircus/android-emulator-runner@v2
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         env:
           APP_ID: ${{ inputs.app_id }}
         with:

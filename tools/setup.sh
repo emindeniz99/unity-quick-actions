@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
-# Idempotent toolchain setup for the quick-actions-unity verification harness.
+# Idempotent toolchain setup for this package's verification harness (.verify/).
 # Installs the .NET SDK (for C# stub compilation) and a JDK (for the Android
-# plugin compilation) if they are not already present. Fast no-op when both
-# are available, so it is safe to call from a SessionStart hook.
+# plugin compilation) if they are not already present. Fast no-op when both are
+# available, so it is safe to call repeatedly / from a shell startup script.
+#
+# Debian/Ubuntu only (it shells out to apt-get). On macOS or Windows install the
+# same two prerequisites by hand — a .NET 10 SDK and any JDK 11+ on PATH — and
+# run tools/verify.sh directly; CI installs them with setup-dotnet/setup-java.
 set -e
 
 need_dotnet=0; need_jdk=0

@@ -1,7 +1,8 @@
 # Home-Screen Quick Actions for iOS & Android (Unity)
 
 Home-screen **quick actions** for Unity games — the shortcuts revealed when a
-user long-presses your app icon. A clean-room, MIT-licensed implementation
+user long-presses your app icon (iOS calls them *Home Screen quick actions*,
+Android calls them *app shortcuts*). A clean-room, MIT-licensed implementation
 targeting **Unity 2021 LTS and newer** (including Unity 6).
 
 | Platform | Mechanism | Min OS |
@@ -36,12 +37,12 @@ hardware; iOS 13+ opens it with a plain long-press on every device.
 > [Dev-only](#dev-only--excluding-it-completely-from-production-builds)).
 
 > New here / haven't cloned it yet? See
-> **[GETTING_STARTED](https://github.com/emindeniz99/playground/blob/main/projects/quick-actions-unity/GETTING_STARTED.md)**
+> **[GETTING_STARTED](./GETTING_STARTED.md)**
 > for a full walkthrough: clone → test in a fresh project → run on a device →
 > publish to the Asset Store.
 
-Pick whichever fits — all install the same package. The repo is a monorepo, so
-the UPM methods point at the `projects/quick-actions-unity` subfolder.
+Pick whichever fits — all install the same package. `package.json` sits at the
+repo root, so the UPM methods point straight at the repository.
 
 ### 1. UPM via Git URL — recommended, works for everyone
 
@@ -49,18 +50,16 @@ No registry, no download. **Package Manager ▸ + ▸ Add package from git URL�
 paste (or add the line to `Packages/manifest.json` under `dependencies`):
 
 ```
-https://github.com/emindeniz99/playground.git?path=projects/quick-actions-unity
+https://github.com/emindeniz99/unity-quick-actions.git
 ```
 
-Pin a version with a tag (recommended once tags exist), e.g.:
+Pin a version by appending a tag, e.g.:
 
 ```
-https://github.com/emindeniz99/playground.git?path=projects/quick-actions-unity#quick-actions/v0.1.0
+https://github.com/emindeniz99/unity-quick-actions.git#v0.4.0
 ```
 
-(The tag is prefixed `quick-actions/v…` because this is a monorepo — see
-[`plans/openupm.md`](https://github.com/emindeniz99/playground/blob/main/projects/quick-actions-unity/plans/openupm.md). No tags exist yet; the default-branch
-URL above works in the meantime.)
+(Without a tag you track the default branch.)
 
 This is the best fit for the **dev-only** workflow: the package lives read-only
 under `Packages/`, and removing the one line removes it completely (see
@@ -87,21 +86,25 @@ package under `dependencies`:
     }
   ],
   "dependencies": {
-    "com.emindeniz99.quick-actions": "0.1.0"
+    "com.emindeniz99.quick-actions": "0.4.0"
   }
 }
 ```
 
 OpenUPM gives version management and update notifications in Package Manager.
-(Publishing it there is a one-time setup — see [`plans/openupm.md`](https://github.com/emindeniz99/playground/blob/main/projects/quick-actions-unity/plans/openupm.md).)
+(Publishing it there is a one-time setup — see [`plans/openupm.md`](./plans/openupm.md).)
 
 ### 3. Drag-and-drop `.unitypackage` (classic)
 
-Drag [`dist~/QuickActions.unitypackage`](https://github.com/emindeniz99/playground/raw/main/projects/quick-actions-unity/dist~/QuickActions.unitypackage) into an
-open Editor (or *Assets ▸ Import Package ▸ Custom Package…*). It installs under
-`Assets/QuickActions/`. Rebuild any time with `python3 tools/pack_unitypackage.py`
-(no Unity needed). This is also what Asset Store buyers get. Note: it lands in
-`Assets/` (editable, not read-only), so it's less clean to fully remove than UPM.
+Download `QuickActions.unitypackage` from the
+[**Releases** page](https://github.com/emindeniz99/unity-quick-actions/releases)
+— it's a build output attached to each release by CI, not a file committed to the
+repo. Drag it into an open Editor (or *Assets ▸ Import Package ▸ Custom
+Package…*). It installs under `Assets/QuickActions/`. Build it yourself any time
+with `python3 tools/pack_unitypackage.py` (no Unity needed); the result lands in
+the gitignored `dist~/`. This is also what Asset Store buyers get. Note: it lands
+in `Assets/` (editable, not read-only), so it's less clean to fully remove than
+UPM.
 
 ### 4. UPM from a local clone
 
@@ -109,13 +112,13 @@ open Editor (or *Assets ▸ Import Package ▸ Custom Package…*). It installs 
 or:
 
 ```json
-"com.emindeniz99.quick-actions": "file:../path/to/projects/quick-actions-unity"
+"com.emindeniz99.quick-actions": "file:../path/to/unity-quick-actions"
 ```
 
 ---
 
 After installing, import the **Demo** sample from the package page to try it on a
-device. More on packaging/export: [`tools/export-unitypackage.md`](https://github.com/emindeniz99/playground/blob/main/projects/quick-actions-unity/tools/export-unitypackage.md).
+device. More on packaging/export: [`tools/export-unitypackage.md`](./tools/export-unitypackage.md).
 
 ## Dev-only — excluding it completely from production builds
 
@@ -458,7 +461,7 @@ minification, so this only matters if yours does.)
 ## Security: a shortcut tap is not an authenticated action
 
 > Found a vulnerability? Please report it privately — see
-> [SECURITY.md](https://github.com/emindeniz99/playground/blob/main/projects/quick-actions-unity/SECURITY.md).
+> [SECURITY.md](./SECURITY.md).
 
 Treat the id from `Performed` / `LastPerformed` as a **navigation hint, not an
 authorization**. On Android the trampoline activity must be `exported` for the
@@ -488,7 +491,7 @@ reconciled items keep their icons on both platforms.
 The package is type-checked and compiled without Unity via a stub-based harness:
 
 ```bash
-tools/setup.sh     # install dotnet + JDK (once; pre-baked in the devcontainer)
+tools/setup.sh     # install dotnet + JDK (once)
 tools/verify.sh    # .meta gen + C# compile (9 configs) + unit tests + Android plugin
 ```
 
@@ -497,9 +500,9 @@ JsonUtility serialization tests) run in Unity's **Test Runner** from
 `Tests/Editor/`. For a real device/emulator, `tools/device-smoke/` has an
 adb-driven Android smoke (install a dev APK → assert the demo's shortcuts
 registered → simulate a tap → assert delivery) and a manually-dispatched
-emulator CI workflow — see its README, including the honest iOS limitations. See [`.verify/README.md`](https://github.com/emindeniz99/playground/blob/main/projects/quick-actions-unity/.verify/README.md). A green run
+emulator CI workflow — see its README, including the honest iOS limitations. See [`.verify/README.md`](./.verify/README.md). A green run
 proves everything compiles and the logic tests pass; on-device behaviour is
-validated with the procedure in [`plans/mvp.md`](https://github.com/emindeniz99/playground/blob/main/projects/quick-actions-unity/plans/mvp.md) (iOS/Android
+validated with the procedure in [`plans/mvp.md`](./plans/mvp.md) (iOS/Android
 quick actions can't run in the Editor or on Linux).
 
 ## Notes / learnings
