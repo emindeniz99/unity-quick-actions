@@ -1,5 +1,9 @@
 # Home-Screen Quick Actions for iOS & Android (Unity)
 
+[![openupm](https://img.shields.io/npm/v/com.emindeniz99.quick-actions?label=openupm&registry_uri=https://package.openupm.com)](https://openupm.com/packages/com.emindeniz99.quick-actions/)
+[![license](https://img.shields.io/badge/license-MIT-blue)](./LICENSE.md)
+[![Unity](https://img.shields.io/badge/Unity-2021.3%2B-black?logo=unity)](https://unity.com)
+
 Home-screen **quick actions** for Unity games — the shortcuts revealed when a
 user long-presses your app icon (iOS calls them *Home Screen quick actions*,
 Android calls them *app shortcuts*). An MIT-licensed C# wrapper over the
@@ -113,8 +117,10 @@ under `Packages/`, and removing the one line removes it completely (see
 
 ### 2. UPM via OpenUPM (scoped registry)
 
-Once published to [OpenUPM](https://openupm.com), install with its CLI — a Node
-tool, so install that first (`npm install -g openupm-cli`):
+Published on OpenUPM:
+[**openupm.com/packages/com.emindeniz99.quick-actions**](https://openupm.com/packages/com.emindeniz99.quick-actions/).
+Install with its CLI — a Node tool, so install that first
+(`npm install -g openupm-cli`):
 
 ```bash
 openupm add com.emindeniz99.quick-actions

@@ -75,6 +75,10 @@ https://github.com/emindeniz99/unity-quick-actions.git
 Append `#v0.4.1` to pin a version; the plain URL tracks the default branch.
 
 Alternatives:
+- **OpenUPM** — `openupm add com.emindeniz99.quick-actions` (needs the Node CLI:
+  `npm install -g openupm-cli`). This is the route that gives you version
+  management and update notifications inside Package Manager. Package page:
+  <https://openupm.com/packages/com.emindeniz99.quick-actions/>.
 - **+ ▸ Add package from disk…** pointing at the `package.json` at the root of a
   local clone (`git clone https://github.com/emindeniz99/unity-quick-actions.git`)
   — use this if you want to edit the package source.
