@@ -23,8 +23,8 @@ OpenUPM builds from Git tags. This repo ships exactly one package, so the tags
 are plain semver with the conventional `v` prefix:
 
 ```bash
-git tag v0.4.0
-git push origin v0.4.0
+git tag v0.4.1
+git push origin v0.4.1
 ```
 
 Each new release = a new semver tag.

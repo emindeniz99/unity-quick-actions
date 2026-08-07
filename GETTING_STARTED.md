@@ -44,12 +44,14 @@ no Apple hardware.
   an x86_64-only simulator runtime there, which Apple silicon cannot execute,
   and arm64 Simulator support was added in Unity 6 and will not be backported.
   2022.3 does ship arm64 simulator libraries.
-- **No physical-device validation has happened yet**, on either platform — that
-  is the one remaining gap. The end-to-end behaviour described in Part B has
-  been confirmed on the **iOS Simulator** (6.3 / iOS 26.5); on Android, and on
-  real hardware generally, it is what the package is built to do and what the
-  build artifacts show, not something confirmed by a human tapping a physical
-  home-screen icon.
+- **Physical-device validation is partial.** On Android it has now happened once
+  (Moto G Play 2024 / Android 14): static shortcuts appeared on a long-press of
+  a cold, never-opened install, runtime `Add` published more, and a static/
+  dynamic id collision resolved as documented. What a human has **not** yet
+  confirmed on hardware is the tap itself arriving as `Performed`, on either
+  platform — that path is confirmed on the **iOS Simulator** (6.3 / iOS 26.5)
+  and by what the build artifacts contain, not by tapping a physical icon. No
+  physical iPhone run has happened at all.
 
 ---
 
@@ -70,7 +72,7 @@ done for you — jump to A4. See [`Examples~/README.md`](./Examples~/README.md).
 ```
 https://github.com/emindeniz99/unity-quick-actions.git
 ```
-Append `#v0.4.0` to pin a version; the plain URL tracks the default branch.
+Append `#v0.4.1` to pin a version; the plain URL tracks the default branch.
 
 Alternatives:
 - **+ ▸ Add package from disk…** pointing at the `package.json` at the root of a

@@ -5,11 +5,50 @@ All notable changes to this package are documented here. The format follows
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 > **Note on the early history.** Versions 0.2.0 through 0.4.0 were developed in
-> three waves before the package was ever published, and ship together as the
-> **first public release, `v0.4.0`**. Only `v0.4.0` is tagged — 0.1.0 through
-> 0.3.0 were never published and cannot be installed. Each wave is kept as its
-> own section because each is a distinct, self-contained set of API additions;
-> read them as the package's development log.
+> three waves before the package was ever published, and shipped together as the
+> **first public release, `v0.4.0`**. Only `v0.4.0` and later are tagged — 0.1.0
+> through 0.3.0 were never published and cannot be installed. Each wave is kept
+> as its own section because each is a distinct, self-contained set of API
+> additions; read them as the package's development log.
+
+## [0.4.1] - 2026-08-07
+
+Documentation and examples only — no runtime, editor or native code changed
+from `0.4.0`. Published because `0.4.0` reached the OpenUPM registry carrying a
+pre-release README and a broken example project, and a registry version is
+immutable once built.
+
+### Fixed
+
+- **The example project could not be opened by anyone.** Its package path was
+  `file:../../../..`; Unity resolves a `file:` path relative to the project's
+  `Packages` folder, so that pointed one level *above* the repository root and
+  failed with `The file [.../package.json] cannot be found` on every editor
+  version. Corrected to three levels.
+- **The example targeted only Unity 6** (`ProjectVersion.txt` 6000.3.21f1) while
+  claiming "Unity 2021.3 LTS or newer", and pinned Unity-6-only packages. Unity
+  migrates projects forward only, so 2021.3 and 2022.3 users hit package
+  resolution errors.
+- Documentation that still described the package as unreleased: install
+  instructions telling readers no tag existed and to build the
+  `.unitypackage` locally, and an OpenUPM submission recipe whose metadata
+  template omitted seven required fields and described `gitTagPrefix` and the
+  submission flow incorrectly.
+
+### Added
+
+- `Examples~/Testbed2021`, `Examples~/Testbed2022` and `Examples~/Testbed6` —
+  one consuming project per supported editor line, each carrying that line's own
+  manifest, the `QUICKACTIONS_ENABLED` define, and three static shortcuts so a
+  long-press shows shortcuts before the app is first opened. Each verified to
+  open in its own editor with no resolution or compile errors.
+- `TestbedBuilder.BuildAndroidPhone` — an IL2CPP build carrying both `arm64-v8a`
+  and `armeabi-v7a`. The previous default (Mono, `armeabi-v7a`) will not install
+  on the 64-bit-only SoCs shipping since around 2023.
+- First physical-device confirmation, recorded in `PRODUCTION_READINESS.md`
+  (Moto G Play 2024, Android 14): static shortcuts render on a cold,
+  never-opened install, and the static/dynamic same-id collision behaves exactly
+  as documented.
 
 ## [0.4.0] - 2026-08-07
 

@@ -32,7 +32,7 @@ hardware; iOS 13+ opens it with a plain long-press on every device.
 
 ## Status
 
-This is **0.4.0**, a pre-1.0 release. Here is exactly what has been proven and
+This is **0.4.1**, a pre-1.0 release. Here is exactly what has been proven and
 what has not — one place, no hedging. (Per-feature detail:
 [PRODUCTION_READINESS.md](./PRODUCTION_READINESS.md).)
 
@@ -58,9 +58,14 @@ Unity ships an x86_64-only simulator runtime for that line, and Apple silicon
 cannot run it (Unity added arm64 Simulator support in Unity 6 and stated it
 will not be backported to 2021 LTS).
 
-**Not verified — physical devices.** Neither tap path has been exercised on
-real hardware. Everything above is an Editor, build-artifact or Simulator
-result. Plan on validating on a phone before you ship.
+**Partly verified on a physical device (Android).** On a Moto G Play 2024
+(Android 14), a sideloaded build from `Examples~/Testbed2021` showed the baked
+static shortcuts on a long-press of a **cold, never-opened install**, runtime
+`Add` published further shortcuts, and a dynamic item whose id collided with a
+static one was dropped in favour of the manifest entry — exactly as documented.
+**Still not verified on hardware:** a tap arriving as `Performed` (cold or
+warm), and anything at all on a physical iPhone. Plan on validating the tap path
+on your own device before you ship.
 
 **Also true:** the suite is 73 headless tests (`dotnet test`) and 74 in Unity's
 Test Runner (it adds 5 `JsonUtility` serialization tests; 4 of the headless ones
@@ -96,7 +101,7 @@ https://github.com/emindeniz99/unity-quick-actions.git
 Pin a version by appending a tag, e.g.:
 
 ```
-https://github.com/emindeniz99/unity-quick-actions.git#v0.4.0
+https://github.com/emindeniz99/unity-quick-actions.git#v0.4.1
 ```
 
 (Without a tag you track the default branch. `v0.4.0` is the first tag, so
@@ -128,7 +133,7 @@ package under `dependencies`:
     }
   ],
   "dependencies": {
-    "com.emindeniz99.quick-actions": "0.4.0"
+    "com.emindeniz99.quick-actions": "0.4.1"
   }
 }
 ```

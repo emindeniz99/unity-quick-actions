@@ -36,8 +36,11 @@ red or unrun verify; say what failed.
   runtime-added shortcuts appeared on the Simulator home screen and a tap
   cold-launched the app and delivered the id to `Performed`. (Android has no
   simulator equivalent; the 2021.3 line cannot do a Simulator run at all —
-  Unity ships an x86_64-only simulator runtime there.) What is still unverified
-  is **physical hardware**: do not claim real-device behaviour you did not run;
+  Unity ships an x86_64-only simulator runtime there.) **Physical hardware is
+  partly covered**: one Android run (Moto G Play 2024 / Android 14) confirmed
+  static shortcuts on a cold install, runtime `Add`, and the static/dynamic
+  id-collision rule; a tap arriving as `Performed` on hardware, and any iPhone
+  run, are still unverified. Do not claim real-device behaviour you did not run;
   the static harness cannot reach it.
 
 ## Commits
@@ -89,7 +92,7 @@ Prefer relative links between files in this repo (`./GETTING_STARTED.md`) so
 they resolve on GitHub *and* in the Unity Package Manager. Install URL is
 `https://github.com/emindeniz99/unity-quick-actions.git` — `package.json` is at
 the repo root, so the URL carries no subfolder query suffix. Pin a version with
-`#v0.4.0`. Tags are plain semver; `v0.4.0` is the first one.
+`#v0.4.1`. Tags are plain semver; `v0.4.0` was the first one.
 
 Don't invent status claims. If a doc asserts something you cannot verify, leave
 it as it is rather than "improving" it.
