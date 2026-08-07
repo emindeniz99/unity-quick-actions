@@ -1,5 +1,11 @@
 # Unity Asset Store — submission checklist
 
+> **SUBMITTED 2026-08-07** — package 0.4.4, price Free, auto-publish ON,
+> submission notes included the opt-in-gate explanation, the MIT/EULA dual
+> licensing, the BuildProfile reflection note and the AI disclosure.
+> Pipeline: In queue (~10 business days) → Assigned (1–3) → Reviewed →
+> Resolved. If curation requests changes, handle them against this checklist.
+
 Everything needed to publish **Home-Screen Quick Actions (iOS & Android)**. Sources:
 [Submission Guidelines](https://assetstore.unity.com/publishing/submission-guidelines),
 [Start publishing](https://assetstore.unity.com/publishing/publish-and-sell-assets),
