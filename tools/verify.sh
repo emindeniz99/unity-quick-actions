@@ -15,7 +15,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 VERIFY="$ROOT/.verify"
 fail=0
 
-echo "== 1/4  .meta presence (must already be committed, not generated here) =="
+echo "== 1/5  .meta presence (must already be committed, not generated here) =="
 # gen_meta only CREATES missing metas and always exits 0, so running it can't
 # catch a missing/uncommitted meta. Fail if it had to create any — a committed
 # repo/UPM must ship every .meta (a fresh GUID assigned on the user's machine
@@ -28,7 +28,7 @@ if echo "$meta_out" | grep -qE 'created [1-9]'; then
 fi
 
 echo
-echo "== 2/4  C# compile (UnityEngine/UnityEditor stubs) =="
+echo "== 2/5  C# compile (UnityEngine/UnityEditor stubs) =="
 if command -v dotnet >/dev/null 2>&1; then
   export DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_NOLOGO=1
   for proj in Editor EditoriOS EditorAndroid NativeGate NativeGateiOS iOS Android Sample SampleAndroid; do
@@ -44,7 +44,7 @@ else
 fi
 
 echo
-echo "== 3/4  C# unit tests (dotnet test) =="
+echo "== 3/5  C# unit tests (dotnet test) =="
 if command -v dotnet >/dev/null 2>&1; then
   out="$(dotnet test "$VERIFY/QuickActions.Tests.csproj" -v q --nologo 2>&1)"; rc=$?
   echo "$out" | grep -E 'Passed!|Failed!|error|Passed:|Failed:' || true
@@ -54,7 +54,7 @@ else
 fi
 
 echo
-echo "== 4/4  Java compile + smoke test (Android SDK stubs) =="
+echo "== 4/5  Java compile + smoke test (Android SDK stubs) =="
 if command -v javac >/dev/null 2>&1; then
   TMP="$(mktemp -d)"
   mkdir -p "$TMP/out"
@@ -83,5 +83,14 @@ else
 fi
 
 echo
+echo
+echo "== 5/5  Frozen device-facing strings =="
+# These literals are persisted by the OS on end-user devices (pinned shortcut
+# intents, PersistableBundle extras, UIApplicationShortcutItemUserInfo, and the
+# res/xml baked into every shipped APK). Renaming one is silent: the app still
+# launches and Performed simply never fires. Each is duplicated across 2-4 files
+# in three languages, so a C# unit test cannot cover them.
+python3 "$ROOT/tools/check_frozen_strings.py" || fail=1
+
 if [ "$fail" = "0" ]; then echo "VERIFY: PASS"; else echo "VERIFY: FAIL"; fi
 exit $fail

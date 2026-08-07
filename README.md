@@ -46,7 +46,7 @@ hardware; iOS 13+ opens it with a plain long-press on every device.
 
 ## Status
 
-This is **0.4.1**, a pre-1.0 release. Here is exactly what has been proven and
+This is **0.4.2**, a pre-1.0 release. Here is exactly what has been proven and
 what has not — one place, no hedging. (Per-feature detail:
 [PRODUCTION_READINESS.md](./PRODUCTION_READINESS.md).)
 
@@ -100,6 +100,15 @@ errors — a compile result, separate from the Simulator run above.
 > end to end: install into a fresh project → turn the define on → wire up a
 > handler → run it on a device.
 
+> **⚠️ Pick exactly one install method.** The UPM package and the drag-and-drop
+> `.unitypackage` are the *same* assemblies with the *same* asset GUIDs, so a
+> project holding both fails to compile with
+> `Assembly with name 'EminDeniz99.QuickActions' already exists`. Unity raises
+> that at compile time, which is *before* any code of ours could run — so the
+> package cannot detect the clash and warn you itself. If you see that error,
+> remove one copy: delete `Assets/QuickActions/`, or drop the package line from
+> `Packages/manifest.json`.
+
 Pick whichever fits — all install the same package. `package.json` sits at the
 repo root, so the UPM methods point straight at the repository.
 
@@ -115,7 +124,7 @@ https://github.com/emindeniz99/unity-quick-actions.git
 Pin a version by appending a tag, e.g.:
 
 ```
-https://github.com/emindeniz99/unity-quick-actions.git#v0.4.1
+https://github.com/emindeniz99/unity-quick-actions.git#v0.4.2
 ```
 
 (Without a tag you track the default branch. `v0.4.0` is the first tag, so
@@ -149,7 +158,7 @@ package under `dependencies`:
     }
   ],
   "dependencies": {
-    "com.emindeniz99.quick-actions": "0.4.1"
+    "com.emindeniz99.quick-actions": "0.4.2"
   }
 }
 ```

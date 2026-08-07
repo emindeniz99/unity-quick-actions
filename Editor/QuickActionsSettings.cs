@@ -44,8 +44,23 @@ namespace EminDeniz99.QuickActions.Editor
         /// </summary>
         public IReadOnlyList<Texture2D> IosTemplateImages => iosTemplateImages;
 
-        /// <summary>Default location of the settings asset when auto-created.</summary>
-        public const string DefaultAssetPath = "Assets/QuickActions/QuickActionsSettings.asset";
+        /// <summary>
+        /// Default location of the settings asset when auto-created.
+        /// <para>
+        /// Deliberately <b>not</b> under <c>Assets/QuickActions/</c>. The
+        /// drag-and-drop <c>.unitypackage</c> — and the Asset Store listing built
+        /// from it — installs into exactly that folder, and updating such an
+        /// asset means deleting and re-importing it, which would take the user's
+        /// own configuration with it. Keeping the settings outside the install
+        /// root makes reimport non-destructive.
+        /// </para>
+        /// <para>
+        /// Moving this is safe for projects that already have one:
+        /// <see cref="GetOrNull"/> finds the asset by <i>type</i>, not by path,
+        /// so a settings asset at the old location keeps working untouched.
+        /// </para>
+        /// </summary>
+        public const string DefaultAssetPath = "Assets/Settings/QuickActionsSettings.asset";
 
         /// <summary>Loads the settings asset, or null if the project has none.</summary>
         public static QuickActionsSettings GetOrNull()

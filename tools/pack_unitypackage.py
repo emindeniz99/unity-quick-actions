@@ -45,7 +45,14 @@ INCLUDE_DIRS = [
     # project, or those few sample GUIDs would collide.
     ("Samples~/Demo", "Example"),
 ]
-INCLUDE_FILES = ["README.md", "CHANGELOG.md", "LICENSE.md", "ROADMAP.md"]
+# LICENSE.md is deliberately absent. This artifact is the Asset Store delivery,
+# and Store products are governed by Unity's own EULA — dropping an MIT grant
+# into the customer's project alongside it presents a reviewer with two
+# conflicting licences for one product. The source stays MIT and stays public on
+# GitHub; the store listing says so in its description. Nothing is taken away
+# from anyone: dual-licensing our own code is the copyright holder's choice, and
+# the GitHub/OpenUPM channels still ship LICENSE.md as before.
+INCLUDE_FILES = ["README.md", "CHANGELOG.md", "ROADMAP.md"]
 
 
 def guid_of_meta(meta_path):
@@ -87,9 +94,12 @@ def collect():
         with open(meta) as f:
             meta_text = f.read()
         files.append((target, data, meta_text, guid))
-        # register ancestor folders
+        # Register ancestor folders — but never the bare "Assets" root. A real
+        # Unity project has no Assets.meta, and shipping a folder entry for it
+        # is exactly the shape Asset Store rule 5.2.d calls out. Unity tolerates
+        # it in practice; it costs one condition to be correct.
         d = os.path.dirname(target)
-        while d and d != ".":
+        while d and d != "." and d != "Assets":
             folders.add(d)
             d = os.path.dirname(d)
 

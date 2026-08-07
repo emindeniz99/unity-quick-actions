@@ -23,9 +23,29 @@ except ImportError:
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, "store~")
 ICONS = os.path.join(OUT, "example-shortcut-icons")
-FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
-FONT_B = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
-MONO = "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf"
+# Candidates, most-preferred first. DejaVu is the intended look and is what the
+# devcontainer ships; the macOS entries exist because this art gets regenerated
+# on a laptop at least as often as in CI, and Pillow's bitmap fallback produces
+# images too coarse to upload. A silent quality regression is worse than a loud
+# missing-font error, so `f()` warns once per family and never renders bitmap
+# text into a key image without saying so.
+FONT = [
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+    "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
+    "/System/Library/Fonts/Supplemental/Arial.ttf",
+    "/System/Library/Fonts/Helvetica.ttc",
+]
+FONT_B = [
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+    "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
+    "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
+    "/System/Library/Fonts/Helvetica.ttc",
+]
+MONO = [
+    "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
+    "/System/Library/Fonts/Menlo.ttc",
+    "/System/Library/Fonts/SFNSMono.ttf",
+]
 
 BG = (14, 17, 22)          # near-black
 BG2 = (24, 28, 38)         # panel
@@ -35,19 +55,31 @@ INK = (236, 239, 244)      # near-white
 MUTE = (150, 158, 172)
 
 
-def f(path, size):
-    # DejaVu is present on most dev/CI images but not on minimal containers. Fall
-    # back to Pillow's bundled default (with a clear hint) instead of crashing the
-    # whole release pipeline with an opaque "cannot open resource" OSError.
-    try:
-        return ImageFont.truetype(path, size)
-    except OSError:
-        print(f"WARN: font not found at {path}; using Pillow's default. "
-              f"Install fonts-dejavu-core for the intended look.", file=sys.stderr)
+_font_warned = set()
+
+
+def f(candidates, size):
+    # Try each candidate in order; fall back to Pillow's bundled default (with a
+    # clear, once-per-family hint) instead of crashing the release pipeline with
+    # an opaque "cannot open resource" OSError.
+    for path in candidates:
         try:
-            return ImageFont.truetype("DejaVuSans.ttf", size)  # Pillow may bundle it
+            return ImageFont.truetype(path, size)
         except OSError:
-            return ImageFont.load_default()
+            continue
+    try:
+        return ImageFont.truetype("DejaVuSans.ttf", size)  # Pillow may bundle it
+    except OSError:
+        pass
+    key = candidates[0]
+    if key not in _font_warned:
+        _font_warned.add(key)
+        print(f"WARN: none of these fonts exist: {', '.join(candidates)}\n"
+              f"      Falling back to Pillow's bitmap default — the output will look\n"
+              f"      coarse and is NOT good enough to upload to the Asset Store.\n"
+              f"      Install fonts-dejavu-core (Linux) or run this on macOS.",
+              file=sys.stderr)
+    return ImageFont.load_default()
 
 
 def vgrad(w, h, top, bot):
@@ -98,14 +130,19 @@ def make_card():
     img = vgrad(420, 280, (18, 22, 30), BG)
     d = ImageDraw.Draw(img)
     img.paste(brand_tile(96), (28, 92), brand_tile(96))
-    text(d, (150, 104), "Quick Actions", f(FONT_B, 30), INK)
-    text(d, (150, 144), "iOS & Android", f(FONT_B, 30), ACCENT2)
-    text(d, (150, 196), "Home-screen app shortcuts", f(FONT, 17), MUTE)
+    # Card images may carry only the asset title and the publisher name.
+    text(d, (150, 116), "Quick Actions", f(FONT_B, 34), INK)
+    text(d, (150, 166), "emindeniz99", f(FONT, 20), MUTE)
     img.save(os.path.join(OUT, "card.png"))
 
 
-def phone_mock(d, x, y, w, h, actions):
-    """Draw a stylized phone showing a long-press quick-action menu."""
+def phone_mock(d, x, y, w, h, actions, labels=True):
+    """Draw a stylized phone showing a long-press quick-action menu.
+
+    `labels=False` draws the same menu with neutral bars instead of words —
+    needed for social.png, where Unity's key-image guidance allows no text
+    at all.
+    """
     rounded(d, [x, y, x + w, y + h], int(w * 0.10), (8, 10, 14))
     rounded(d, [x + 6, y + 6, x + w - 6, y + h - 6], int(w * 0.09), (20, 24, 32))
     # app icon
@@ -121,7 +158,11 @@ def phone_mock(d, x, y, w, h, actions):
         if i:
             d.line([px + 14, ly, px + pw - 14, ly], fill=(50, 55, 68), width=1)
         d.ellipse([px + 16, ly + 12, px + 44, ly + 40], fill=glyph)
-        text(d, (px + 60, ly + 16), label, f(FONT, 20), INK)
+        if labels:
+            text(d, (px + 60, ly + 16), label, f(FONT, 20), INK)
+        else:
+            bar_w = int(pw * 0.42) - (i % 3) * 14
+            rounded(d, [px + 60, ly + 22, px + 60 + bar_w, ly + 32], 5, (70, 78, 96))
 
 
 def make_cover():
@@ -132,13 +173,8 @@ def make_cover():
     img.paste(brand_tile(150), (150, 150), brand_tile(150))
     text(d, (330, 158), "Quick Actions", f(FONT_B, 92), INK)
     text(d, (330, 262), "for iOS & Android", f(FONT_B, 64), ACCENT2)
-    for i, s in enumerate([
-        "Long-press the app icon → shortcuts",
-        "Dynamic at runtime + static in build",
-        "One C# API · no native edits",
-        "Unity 2021 LTS → Unity 6",
-    ]):
-        text(d, (330, 430 + i * 78), "•  " + s, f(FONT, 40), MUTE)
+    # Cover images allow the title plus a single tag line — not a feature list.
+    text(d, (330, 430), "Home-screen app shortcuts, from one C# API.", f(FONT, 44), MUTE)
     phone_mock(d, 1320, 360, 470, 820, [
         (ACCENT, "New Game"), (ACCENT2, "Continue"),
         ((230, 90, 120), "Daily Reward"), ((90, 200, 160), "Settings"),
@@ -151,14 +187,14 @@ def make_social():
     img = vgrad(w, h, (16, 20, 28), (10, 12, 16))
     d = ImageDraw.Draw(img)
     d._image = img
-    img.paste(brand_tile(120), (90, 90), brand_tile(120))
-    text(d, (240, 96), "Quick Actions", f(FONT_B, 66), INK)
-    text(d, (240, 176), "for iOS & Android", f(FONT_B, 46), ACCENT2)
-    text(d, (92, 300), "Home-screen app shortcuts for Unity games.", f(FONT, 34), INK)
-    text(d, (92, 352), "Runtime + static, one callback, no native edits.", f(FONT, 30), MUTE)
-    phone_mock(d, 860, 150, 250, 430, [
+    # With no text allowed, the brand mark carries the whole left side, so it is
+    # sized up and vertically centred rather than tucked in a corner.
+    tile = brand_tile(240)
+    img.paste(tile, (150, (h - 240) // 2), tile)
+    # Social images must carry NO text — brand mark and product shape only.
+    phone_mock(d, 800, 120, 300, 500, [
         (ACCENT, "New Game"), (ACCENT2, "Continue"), ((230, 90, 120), "Daily"),
-    ])
+    ], labels=False)
     img.save(os.path.join(OUT, "social.png"))
 
 
@@ -221,7 +257,7 @@ def make_shot3():
         ("Dynamic + static", "Create at runtime or bake into the build"),
         ("iOS + Android", "UIApplicationShortcutItem & ShortcutManager"),
         ("Zero native edits", "App-delegate swizzling + trampoline activity"),
-        ("Unity 2022 → 6", "Survives the UnityPlayerActivity → GameActivity change"),
+        ("Unity 2021 LTS → 6", "Survives the UnityPlayerActivity → GameActivity change"),
         ("Cold + warm taps", "Performed event & LastPerformed"),
         ("Tested + documented", "Unit tests, samples, full README"),
     ]

@@ -64,8 +64,7 @@ All copy is prepared in [`store~/listing/`](./store~/listing/) — paste verbati
 - [x] **Summary:** [`summary.txt`](./store~/listing/summary.txt)
 - [x] **Description:** [`description.md`](./store~/listing/description.md)
 - [x] **Tags / keywords:** [`tags.txt`](./store~/listing/tags.txt)
-- [x] **Price:** **FREE** (decided 2026-07-10; can switch to paid ≥ $4.99 later
-      after reviews accumulate).
+- [x] **Price:** **FREE** (decided 2026-07-10).
 
 ## 3. Marketing images (generated → `store~/`)
 
@@ -80,7 +79,10 @@ All sizes are ✅ pre-built by `python3 tools/gen_store_images.py`. See
 - [ ] ⚠️ Replace `screenshot-1` with a **real on-device** long-press capture
       before submitting (store prefers in-context shots over mockups). Optional
       but improves approval odds & conversion.
-- [ ] No watermarks; minimal text; not blurry/stretched; not bare Editor shots.
+- [x] Key-image text rules (checked 2026-08-07, images regenerated to match):
+      icon and **social** carry no text at all; **card** carries only the asset
+      title and publisher name; **cover** carries the title plus one tag line.
+- [ ] No watermarks; not blurry/stretched; not bare Editor shots.
 
 ## 4. Package contents — what to ship (and what to strip)
 
@@ -91,7 +93,11 @@ because it's a build output; the identical artifact is attached to every
 (first one: `v0.4.0`). It:
 
 - [x] Includes only package content, remapped under `Assets/QuickActions/`
-      (Runtime, Editor, Plugins, Example, README/CHANGELOG/LICENSE/ROADMAP).
+      (Runtime, Editor, Plugins, Example, README/CHANGELOG/ROADMAP). `LICENSE.md`
+      is deliberately **not** in this artifact: Store products are governed by
+      Unity's EULA, and shipping an MIT grant beside it shows a reviewer two
+      licences for one product. The source stays MIT on GitHub — say so in the
+      listing description.
 - [x] Excludes dev/publishing collateral (`.verify/`, `tools/`, `plans/`,
       `store~/`, `dist~/`, `Tests/`, `STORE_CHECKLIST.md`, `package.json`).
 - [x] Carries every asset's committed `.meta` GUID (scene→script refs intact).

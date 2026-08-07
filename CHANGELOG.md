@@ -11,6 +11,52 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 > as its own section because each is a distinct, self-contained set of API
 > additions; read them as the package's development log.
 
+## [0.4.2] - 2026-08-07
+
+Packaging, guardrails and store-compliance. No public API change.
+
+### Fixed
+
+- **The published package no longer carries the development repository.** There
+  was no `files` allowlist, so `npm pack` shipped everything tracked — 303 files,
+  2.1 MB. Worse than the weight: `tools/`, `plans/` and `docs/` are neither
+  tilde- nor dot-prefixed **and** carry folder `.meta` files, so Unity *imported*
+  them into every consuming project — a consumer's Project window contained our
+  release runbook and publishing notes. Now 107 files, 465 KB, containing only
+  `Runtime`, `Editor`, `Plugins`, `Tests`, `Samples~` and the user-facing docs.
+- **The settings asset no longer defaults inside the install root.**
+  `DefaultAssetPath` moved from `Assets/QuickActions/QuickActionsSettings.asset`
+  to `Assets/Settings/QuickActionsSettings.asset`. Updating a `.unitypackage`
+  install means deleting and re-importing `Assets/QuickActions/`, which would
+  have taken the user's own configuration with it. Existing projects are
+  unaffected — the asset is located by type, not by path.
+- The `.unitypackage` no longer emits a folder entry for the bare `Assets` root
+  (Asset Store rule 5.2.d), and no longer includes `LICENSE.md`: Store products
+  are governed by Unity's EULA, and an MIT grant beside it presents a reviewer
+  with two licences for one product. The source remains MIT and public.
+- Marketing images regenerated to Unity's key-image text rules — `social.png`
+  and `icon.png` now carry no text, `card.png` only the title and publisher,
+  `cover.png` the title plus one tag line. The feature grid also claimed
+  "Unity 2022 → 6" while the package supports 2021.3.
+- `tools/gen_store_images.py` now finds a real font on macOS instead of silently
+  falling back to Pillow's bitmap default, which produced art too coarse to
+  upload; when nothing is found it says so loudly.
+
+### Added
+
+- **`tools/check_frozen_strings.py`**, run by `tools/verify.sh`, pins the 13
+  identifier strings the OS persists on end-user devices — the ownership marker,
+  the trampoline class name, the intent action prefix and extra, and the
+  icon/payload/l10n keys — across all 24 copies in Java, Objective-C and C#.
+  These cannot be covered by a C# test (the Editor constants live in assemblies
+  the test asmdef does not reference, and two of the three languages are not C#),
+  and renaming one fails **silently**: the app launches and `Performed` never
+  fires. A reverse scan also rejects any new or misspelled variant.
+- README now documents the dual-install collision: the UPM package and the
+  `.unitypackage` share assembly names and asset GUIDs, so a project holding both
+  fails to compile. Unity raises that at compile time — before any of our code
+  could run — so the package cannot detect it and warn.
+
 ## [0.4.1] - 2026-08-07
 
 Documentation and examples only — no runtime, editor or native code changed
