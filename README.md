@@ -46,7 +46,7 @@ hardware; iOS 13+ opens it with a plain long-press on every device.
 
 ## Status
 
-This is **0.4.3**, a pre-1.0 release. Here is exactly what has been proven and
+This is **0.4.4**, a pre-1.0 release. Here is exactly what has been proven and
 what has not — one place, no hedging. (Per-feature detail:
 [PRODUCTION_READINESS.md](./PRODUCTION_READINESS.md).)
 
@@ -83,7 +83,7 @@ on your own device before you ship.
 
 **Also true:** the suite is 73 headless tests (`dotnet test`) and 74 in Unity's
 Test Runner (it adds 5 `JsonUtility` serialization tests; 4 of the headless ones
-don't run there), plus an Android Java smoke of 103 checks, across 9 C# compile
+don't run there), plus an Android Java smoke of 103 checks, across 10 C# compile
 configurations with 0 warnings.
 The iOS `.mm` compiles cleanly against the current iOS SDK
 (ARC, arm64, deployment target iOS 13) with no deprecation or availability
@@ -91,9 +91,13 @@ errors — a compile result, separate from the Simulator run above.
 
 ## Install
 
-> **⚠️ After installing — one required step:** add `QUICKACTIONS_ENABLED` to
-> **Project Settings ▸ Player ▸ Scripting Define Symbols**. The package is
-> deliberately inert without it (that's its dev-only safety design — see
+> **⚠️ After installing — one required step:** turn the package on. Easiest is
+> **Window ▸ Quick Actions ▸ Enable Quick Actions**, which adds the
+> `QUICKACTIONS_ENABLED` define for Standalone, Android and iOS in one click;
+> that menu item is the one piece of the package that exists while it is off.
+> By hand: **Project Settings ▸ Player ▸ Scripting Define Symbols**, per
+> platform tab. The package is deliberately inert without the define (that's
+> its dev-only safety design — see
 > [Dev-only](#dev-only--excluding-it-completely-from-production-builds)).
 
 > New here? **[GETTING_STARTED](./GETTING_STARTED.md)** walks the whole thing
@@ -124,7 +128,7 @@ https://github.com/emindeniz99/unity-quick-actions.git
 Pin a version by appending a tag, e.g.:
 
 ```
-https://github.com/emindeniz99/unity-quick-actions.git#v0.4.3
+https://github.com/emindeniz99/unity-quick-actions.git#v0.4.4
 ```
 
 (Without a tag you track the default branch. `v0.4.0` is the first tag, so
@@ -158,7 +162,7 @@ package under `dependencies`:
     }
   ],
   "dependencies": {
-    "com.emindeniz99.quick-actions": "0.4.3"
+    "com.emindeniz99.quick-actions": "0.4.4"
   }
 }
 ```
@@ -587,7 +591,7 @@ The package is type-checked and compiled without Unity via a stub-based harness:
 
 ```bash
 tools~/setup.sh     # install dotnet + JDK (once)
-tools~/verify.sh    # .meta gen + C# compile (9 configs) + unit tests + Android plugin
+tools~/verify.sh    # .meta gen + C# compile (10 configs) + unit tests + Android plugin
 ```
 
 `verify.sh` compiles the C# in **9 configurations** (0 warnings), runs the **73**

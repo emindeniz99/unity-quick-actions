@@ -54,6 +54,12 @@ namespace UnityEditor
 
     public static class EditorUtility
     {
+        // Modal dialogs: the 2-button form returns the user's choice, the
+        // 1-button form returns nothing. Both are stubbed as no-ops that report
+        // "cancelled", so headless compilation never blocks on a dialog.
+        public static bool DisplayDialog(string title, string message, string ok, string cancel) => false;
+        public static void DisplayDialog(string title, string message, string ok) { }
+
         public static bool scriptCompilationFailed;
     }
 
@@ -70,6 +76,10 @@ namespace UnityEditor
     [AttributeUsage(AttributeTargets.Method)]
     public sealed class MenuItemAttribute : Attribute
     {
+        // Unity exposes `priority` and `validate` as settable members, so call
+        // sites use named-argument syntax; positional ctors alone do not compile.
+        public int priority;
+        public bool validate;
         public MenuItemAttribute(string itemName) { }
         public MenuItemAttribute(string itemName, bool isValidateFunction) { }
         public MenuItemAttribute(string itemName, bool isValidateFunction, int priority) { }

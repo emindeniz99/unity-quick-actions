@@ -232,7 +232,7 @@ Tags are plain semver: `v0.4.0` is the first. Consumers pin a version by
 appending the tag to the git URL:
 
 ```
-https://github.com/emindeniz99/unity-quick-actions.git#v0.4.3
+https://github.com/emindeniz99/unity-quick-actions.git#v0.4.4
 ```
 
 ---

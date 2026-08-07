@@ -15,6 +15,6 @@
   <ItemGroup>
     <Compile Include="Stubs/**/*.cs" />
     <Compile Include="../Runtime/**/*.cs" />
-    <Compile Include="../Editor/**/*.cs" />
+    <Compile Include="../Editor/**/*.cs" Exclude="../Editor/Bootstrap/**/*.cs" />
   </ItemGroup>
 </Project>

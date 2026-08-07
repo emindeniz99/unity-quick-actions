@@ -18,6 +18,6 @@
   <ItemGroup>
     <Compile Include="Stubs/**/*.cs" />
     <Compile Include="../Runtime/**/*.cs" />
-    <Compile Include="../Editor/**/*.cs" Exclude="../Editor/Android/**/*.cs;../Editor/NativeGate/**/*.cs" />
+    <Compile Include="../Editor/**/*.cs" Exclude="../Editor/Bootstrap/**/*.cs;../Editor/Android/**/*.cs;../Editor/NativeGate/**/*.cs" />
   </ItemGroup>
 </Project>

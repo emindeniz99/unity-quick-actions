@@ -1,7 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- Mirrors the Editor.Android asmdef in isolation: compiles the Android
-       post-processor with ONLY UNITY_ANDROID defined and WITHOUT the iOS
-       post-processor present. -->
+  <!-- Compiles the UNGATED bootstrap (Editor/Bootstrap) with QUICKACTIONS_ENABLED
+       ABSENT and no platform define. This is the assembly that must exist when the
+       package is switched off, so it may not reference any gated type — that is
+       exactly what this config catches. -->
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <LangVersion>9.0</LangVersion>
@@ -11,11 +12,10 @@
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <OutputType>Library</OutputType>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
-    <DefineConstants>UNITY_EDITOR;UNITY_2021_3_OR_NEWER;UNITY_ANDROID;QUICKACTIONS_ENABLED</DefineConstants>
+    <DefineConstants>UNITY_EDITOR;UNITY_2021_3_OR_NEWER</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Stubs/**/*.cs" />
-    <Compile Include="../Runtime/**/*.cs" />
-    <Compile Include="../Editor/**/*.cs" Exclude="../Editor/Bootstrap/**/*.cs;../Editor/iOS/**/*.cs;../Editor/NativeGate/iOS/**/*.cs" />
+    <Compile Include="../Editor/Bootstrap/**/*.cs" />
   </ItemGroup>
 </Project>

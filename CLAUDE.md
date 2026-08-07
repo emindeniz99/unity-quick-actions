@@ -11,7 +11,7 @@ rules below are non-negotiable.
 tools~/verify.sh        # must end with: VERIFY: PASS
 ```
 
-It checks `.meta` completeness, compiles the C# in 9 configs against Unity
+It checks `.meta` completeness, compiles the C# in 10 configs against Unity
 stubs, runs the NUnit suite, and compiles + smoke-tests the Android Java plugin.
 `tools~/setup.sh` installs the toolchain once. Never report a change as done on a
 red or unrun verify; say what failed.
@@ -92,7 +92,7 @@ Prefer relative links between files in this repo (`./GETTING_STARTED.md`) so
 they resolve on GitHub *and* in the Unity Package Manager. Install URL is
 `https://github.com/emindeniz99/unity-quick-actions.git` — `package.json` is at
 the repo root, so the URL carries no subfolder query suffix. Pin a version with
-`#v0.4.3`. Tags are plain semver; `v0.4.0` was the first one.
+`#v0.4.4`. Tags are plain semver; `v0.4.0` was the first one.
 
 Don't invent status claims. If a doc asserts something you cannot verify, leave
 it as it is rather than "improving" it.

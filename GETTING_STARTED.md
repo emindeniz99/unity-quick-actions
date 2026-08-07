@@ -72,7 +72,7 @@ done for you — jump to A4. See [`Examples~/README.md`](./Examples~/README.md).
 ```
 https://github.com/emindeniz99/unity-quick-actions.git
 ```
-Append `#v0.4.3` to pin a version; the plain URL tracks the default branch.
+Append `#v0.4.4` to pin a version; the plain URL tracks the default branch.
 
 Alternatives:
 - **OpenUPM** — `openupm add com.emindeniz99.quick-actions` (needs the Node CLI:
@@ -92,7 +92,13 @@ Alternatives:
 The package is **opt-in**: with no define, the `QuickActions` API doesn't even
 exist and nothing happens. Enable it:
 
-**Project Settings ▸ Player ▸ Other Settings ▸ Scripting Define Symbols** → add:
+**Window ▸ Quick Actions ▸ Enable Quick Actions** — one click, and it covers
+Standalone, Android and iOS together. (That menu item is deliberately ungated:
+it is the only thing the package registers while it is switched off.) The item
+greys out once every platform already has the define.
+
+By hand, if you prefer: **Project Settings ▸ Player ▸ Other Settings ▸
+Scripting Define Symbols** → add:
 ```
 QUICKACTIONS_ENABLED
 ```

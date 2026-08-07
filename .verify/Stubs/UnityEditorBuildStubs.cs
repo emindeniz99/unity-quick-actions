@@ -27,6 +27,7 @@ namespace UnityEditor
     {
         public static string applicationIdentifier => "com.example.app";
         public static string GetScriptingDefineSymbols(UnityEditor.Build.NamedBuildTarget target) => string.Empty;
+        public static void SetScriptingDefineSymbols(UnityEditor.Build.NamedBuildTarget target, string defines) { }
     }
 
     public enum BuildTarget { NoTarget, iOS, Android, StandaloneWindows64, StandaloneOSX, StandaloneLinux64 }
@@ -62,6 +63,7 @@ namespace UnityEditor.Build
 {
     public struct NamedBuildTarget
     {
+        public static readonly NamedBuildTarget Standalone = default;
         public static readonly NamedBuildTarget Android = default;
         public static readonly NamedBuildTarget iOS = default;
     }

@@ -11,6 +11,33 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 > as its own section because each is a distinct, self-contained set of API
 > additions; read them as the package's development log.
 
+## [0.4.4] - 2026-08-07
+
+### Added
+
+- **Window ▸ Quick Actions ▸ Enable Quick Actions** — one click adds the
+  `QUICKACTIONS_ENABLED` define for Standalone, Android and iOS. It lives in a
+  new `Editor/Bootstrap` assembly that carries **no** define constraint and no
+  platform constraint, so it is the one piece of the package that exists while
+  the package is switched off. Editor-only; nothing reaches a player build.
+
+  Unity's own Asset Store validator is what made the case: importing the package
+  into a clean project raises *"Check Missing Components in Scenes"* against the
+  Demo scene, because the component it references is compiled away without the
+  define. Nothing is broken — that is the gate working — but a first-time user
+  reasonably reads an inert package and a missing script as a defect. The menu
+  item turns "read the docs, find the right Player Settings tab, do it per
+  platform" into one click, and greys itself out once every target has it.
+
+  The define check matches whole tokens rather than substrings, so an unrelated
+  define that merely contains this one as a prefix cannot be mistaken for it.
+
+### Changed
+
+- The stub harness compiles **10** configurations, not 9: the new ungated
+  assembly gets its own config with `QUICKACTIONS_ENABLED` absent, which is what
+  proves it cannot accidentally depend on a gated type.
+
 ## [0.4.3] - 2026-08-07
 
 Completes the 0.4.2 packaging fix and undoes one part of it that backfired.

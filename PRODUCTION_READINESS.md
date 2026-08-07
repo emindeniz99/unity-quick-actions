@@ -12,7 +12,7 @@ the two must not disagree.
 
 **Legend — Verified by:**
 `unit` = headless NUnit (`dotnet test`, 73 tests) · `unity-test` = Unity Test
-Runner only (JsonUtility) · `static` = compiles in the stub harness (9 configs) ·
+Runner only (JsonUtility) · `static` = compiles in the stub harness (10 configs) ·
 `review` = code review, several adversarial rounds (see git log) ·
 `device` = **requires a real physical device** — Android partially done
 (2026-08-07, Moto G Play 2024: static + dynamic shortcuts render, tap delivery
