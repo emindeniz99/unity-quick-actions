@@ -121,7 +121,12 @@ because it's a build output; the identical artifact is attached to every
 - [ ] Install **Asset Store Publishing tools** (Publisher portal → "Create new
       package" → use the Unity Editor uploader / Asset Store Tools package).
 - [ ] Create the draft package in the portal, attach metadata + images.
-- [ ] Upload the clean `.unitypackage` **from a 2021.3 editor** — the upload editor version becomes the listing's minimum.
+- [ ] Upload the clean `.unitypackage` **from a 2022.3 (or newer) editor**. Rule
+      1.3.a: *"New assets and updates to already published assets use Unity
+      version 2022.3 or newer versions."* The upload editor sets the listing's
+      minimum, so the Store will show 2022.3 — that is unavoidable and does **not**
+      mean dropping 2021.3 support: `package.json` keeps `"unity": "2021.3"`, and
+      2021.3 users install from OpenUPM or the Git URL.
 - [ ] Set price/availability and **Submit for review**.
 - [ ] Review is manual (typically several business days to ~2 weeks). Expect a
       pass or a decline with specific feedback to address and resubmit.

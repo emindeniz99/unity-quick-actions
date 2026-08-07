@@ -85,8 +85,9 @@ The condensed, day-of sequence. Details live in
       section — the gate is the product), `tags.txt`.
 - [ ] Upload images from `store~/` (icon/card/cover/social + screenshots incl.
       your real one).
-- [ ] Upload the `.unitypackage` via Asset Store Publishing Tools **from the
-      2021.3 editor** (upload version = listed minimum). It is a build output,
+- [ ] Upload the `.unitypackage` via Asset Store Publishing Tools **from a
+      2022.3+ editor** — store rule 1.3.a bans uploading from older editors, so
+      the listing floor reads 2022.3 while OpenUPM keeps serving 2021.3. It is a build output,
       not a repo file: build it with `python3 tools/pack_unitypackage.py` (or
       `tools/release.sh`) → gitignored `dist~/QuickActions.unitypackage`, or take
       the one attached to the

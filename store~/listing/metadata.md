@@ -11,7 +11,7 @@ Fill these into the Publisher portal package draft. Long-form copy is in
 | **Description** | See [`description.md`](./description.md) |
 | **Tags / keywords** | See [`tags.txt`](./tags.txt) |
 | **Version** | 0.4.1 (bump to 1.0.0 after device validation) |
-| **Supported Unity** | 2021.3 LTS or higher (incl. Unity 6) — upload from a 2021.3 editor so the portal lists that minimum |
+| **Supported Unity** | 2021.3 LTS or higher (incl. Unity 6) — but **upload from 2022.3+**: store rule 1.3.a forbids uploading from older editors, so the listing's floor will read 2022.3 even though the package supports 2021.3 (which the OpenUPM/Git channels still serve) |
 | **Render pipelines** | Built-in, URP, HDRP (no rendering — all compatible) |
 | **Scripting backends** | Mono + IL2CPP |
 | **Platforms** | iOS 9+, Android 7.1+ (API 25) |
