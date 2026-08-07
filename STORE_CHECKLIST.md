@@ -121,6 +121,27 @@ because it's a build output; the identical artifact is attached to every
 - [ ] Unique root namespace (`EminDeniz99.QuickActions`) and asmdef names.
 - [ ] Demo lives under `Samples~/` and imports cleanly via the package page.
 
+## 5b. Asset Store Validator — the two warnings you will see
+
+Run with `QUICKACTIONS_ENABLED` set, or you get a third (below).
+
+- **"Check Missing Components in Scenes"** — appears only when the define is
+  ABSENT: `Samples~/Demo/QuickActionsDemo.cs` is wrapped in
+  `#if QUICKACTIONS_ENABLED`, so the component the demo scene references is
+  compiled away and Unity calls it missing. Set the define (Window ▸ Quick
+  Actions ▸ Enable Quick Actions) and it clears. Nothing to fix in the package.
+- **"Check Static Variables"** — a heuristic that fires on any script with a
+  static field; the validator itself says it "does not definitively identify
+  problematic code areas". Already handled here: `QuickActions.cs`'s
+  `EditorResetForPlaySession` (`[RuntimeInitializeOnLoadMethod(SubsystemRegistration)]`)
+  clears every static for the Fast-Enter-Play-Mode case, and static events are
+  cleared on play EXIT via `EditorClearPerformedSubscribers` — deliberately on
+  exit, since wiping subscribers during an entry phase could race a legitimate
+  same-phase subscription. `QuickActionsRuntime._instance` is not in that reset
+  and does not need to be: its GameObject is destroyed on play exit, and Unity's
+  overloaded `!=` reports destroyed objects as null, so the Bootstrap guard
+  recreates it. No action.
+
 ## 6. Submit
 
 - [ ] Make a **fresh, empty 3D project in 2022.3** to upload from. ⚠️ Do **not**
