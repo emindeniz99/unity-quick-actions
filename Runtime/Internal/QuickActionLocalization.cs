@@ -173,7 +173,12 @@ namespace EminDeniz99.QuickActions.Internal
                 case SystemLanguage.German: return "de";
                 case SystemLanguage.Greek: return "el";
                 case SystemLanguage.Hebrew: return "he";
+#if UNITY_2022_2_OR_NEWER
+                // SystemLanguage.Hindi (42) was added in Unity 2022.2. The package
+                // supports 2021.3, where naming it is a compile error, so the case
+                // is gated rather than dropped — Hindi still maps on 2022.2+.
                 case SystemLanguage.Hindi: return "hi";
+#endif
                 // Unity's member for Hungarian is the long-standing TYPO `Hugarian`
                 // (value 18); `Hungarian` is the same value under the correct spelling
                 // and is the only one that compiles (the typo is [Obsolete(error)]).

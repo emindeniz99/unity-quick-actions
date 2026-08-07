@@ -91,7 +91,12 @@ namespace UnityEngine
         Latvian = 24, Lithuanian = 25, Norwegian = 26, Polish = 27, Portuguese = 28,
         Romanian = 29, Russian = 30, SerboCroatian = 31, Slovak = 32, Slovenian = 33,
         Spanish = 34, Swedish = 35, Thai = 36, Turkish = 37, Ukrainian = 38,
-        Vietnamese = 39, ChineseSimplified = 40, ChineseTraditional = 41, Hindi = 42,
+        Vietnamese = 39, ChineseSimplified = 40, ChineseTraditional = 41,
+        // Hindi = 42 is deliberately ABSENT: it arrived in Unity 2022.2, and this
+        // stub mirrors the package's DECLARED MINIMUM (2021.3). Including it is how
+        // an ungated `SystemLanguage.Hindi` compiled here for months and then failed
+        // in a real 2021.3 Editor. Anything newer than the minimum belongs behind a
+        // UNITY_x_OR_NEWER gate, and is verified in a real Editor, not here.
         Unknown = 43
     }
 
