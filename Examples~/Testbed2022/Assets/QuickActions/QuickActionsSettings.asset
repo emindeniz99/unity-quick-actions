@@ -1,0 +1,55 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dd195449a5aaa37c3f5d9be245189c89, type: 3}
+  m_Name: QuickActionsSettings
+  m_EditorClassIdentifier: EminDeniz99.QuickActions.Editor::EminDeniz99.QuickActions.Editor.QuickActionsSettings
+  staticShortcuts:
+  - Id: new_game
+    Title: New Game
+    Subtitle: Start a fresh run
+    LocalizedTitles: []
+    LocalizedSubtitles: []
+    Icon: 0
+    AndroidDrawable: 
+    IosSystemImage: plus.circle
+    IosTemplateImage: 
+    AndroidBitmapFile: 
+    AndroidBitmapAdaptive: 0
+    Payload: 
+    L10n: 
+  - Id: continue
+    Title: Continue
+    Subtitle: Resume your save
+    LocalizedTitles: []
+    LocalizedSubtitles: []
+    Icon: 0
+    AndroidDrawable: 
+    IosSystemImage: play.circle
+    IosTemplateImage: 
+    AndroidBitmapFile: 
+    AndroidBitmapAdaptive: 0
+    Payload: 
+    L10n: 
+  - Id: daily_reward
+    Title: Daily Reward
+    Subtitle: Claim today's gift
+    LocalizedTitles: []
+    LocalizedSubtitles: []
+    Icon: 0
+    AndroidDrawable: 
+    IosSystemImage: gift
+    IosTemplateImage: 
+    AndroidBitmapFile: 
+    AndroidBitmapAdaptive: 0
+    Payload: 
+    L10n: 
+  iosTemplateImages: []

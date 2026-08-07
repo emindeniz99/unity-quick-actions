@@ -41,7 +41,7 @@
     "com.unity.modules.vr": "1.0.0",
     "com.unity.modules.wind": "1.0.0",
     "com.unity.modules.xr": "1.0.0",
-    "com.emindeniz99.quick-actions": "file:../../../.."
+    "com.emindeniz99.quick-actions": "file:../../.."
   },
   "testables": [
     "com.emindeniz99.quick-actions"

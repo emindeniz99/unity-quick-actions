@@ -33,6 +33,19 @@ public static class TestbedBuilder
 
     // Step 2 of 2 — run in a SEPARATE invocation, after scripts recompiled.
     public static void BuildAndroidNoDefine() => Build(BuildTarget.Android, "Builds/NoDefine.apk");
+
+    // Sideload build for a real handset. BuildAndroid() inherits the project
+    // default (Mono, armeabi-v7a), which will not install on the 64-bit-only
+    // SoCs shipping since ~2023 — Mono has no ARM64 backend on Android, so
+    // reaching arm64 means IL2CPP. Both ABIs go in one APK so the same file
+    // works on any phone from 7.1 up.
+    public static void BuildAndroidPhone()
+    {
+        PlayerSettings.SetScriptingBackend(UnityEditor.Build.NamedBuildTarget.Android, ScriptingImplementation.IL2CPP);
+        PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARMv7 | AndroidArchitecture.ARM64;
+        EditorUserBuildSettings.buildAppBundle = false;   // .apk, never .aab
+        Build(BuildTarget.Android, "Builds/QuickActionsDemo-phone.apk");
+    }
     public static void BuildiOS()       => Build(BuildTarget.iOS,     "Builds/iOSProject");
 
     // Simulator variant: the default iOS build targets the device SDK, whose

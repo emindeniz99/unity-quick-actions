@@ -41,3 +41,9 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
+
+# The Examples~ testbeds are real Unity projects; the editor regenerates these
+# inside each of them, and the root-only rules above do not reach that deep.
+Examples~/*/*.sln
+Examples~/*/*.slnx
+Examples~/*/*.csproj
