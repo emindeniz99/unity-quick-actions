@@ -123,8 +123,17 @@ because it's a build output; the identical artifact is attached to every
 
 ## 6. Submit
 
+- [ ] Make a **fresh, empty 3D project in 2022.3** to upload from. ⚠️ Do **not**
+      use `Examples~/Testbed2022`: it already links the package through UPM, so
+      importing the `.unitypackage` on top collides — same assembly names, same
+      asset GUIDs, `Assembly with name 'EminDeniz99.QuickActions' already
+      exists`, and the project stops compiling.
 - [ ] Install **Asset Store Publishing tools** (Publisher portal → "Create new
-      package" → use the Unity Editor uploader / Asset Store Tools package).
+      package" → use the Unity Editor uploader / Asset Store Tools package),
+      then import the `.unitypackage` so `Assets/QuickActions/` exists. The
+      uploader may want a *folder* inside `Assets/` rather than a pre-exported
+      file; importing first covers both, and uploads identical content either
+      way.
 - [ ] Create the draft package in the portal, attach metadata + images.
 - [ ] Upload the clean `.unitypackage` **from a 2022.3 (or newer) editor**. Rule
       1.3.a: *"New assets and updates to already published assets use Unity
