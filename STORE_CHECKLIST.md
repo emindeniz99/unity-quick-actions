@@ -132,6 +132,23 @@ because it's a build output; the identical artifact is attached to every
       minimum, so the Store will show 2022.3 — that is unavoidable and does **not**
       mean dropping 2021.3 support: `package.json` keeps `"unity": "2021.3"`, and
       2021.3 users install from OpenUPM or the Git URL.
+- [ ] **Upload from 2022.3 specifically — not 6.x.** Two rules push the same
+      way. 1.3.a bars uploading from anything older than 2022.3, so 2022.3 is
+      the oldest editor allowed and therefore the widest listed range you can
+      get. And 1.3.c: *"New assets and updates ... submitted using Unity Editor
+      6.5 or newer must support Universal Render Pipeline (URP) or
+      High-Definition Render Pipeline (HDRP)."* This package does no rendering
+      and is pipeline-agnostic, so it would likely satisfy that trivially —
+      but uploading from 2022.3 means never having to argue it.
+      One upload is enough: 1.3.b's multi-version upload exists for packages
+      whose code differs per editor line, and ours compiles unchanged on all
+      four.
+- [ ] **Say the 2021.3 support in the description**, since the compatibility
+      field cannot carry it. 1.3.b explicitly allows explaining version
+      compatibility in description text. Suggested wording: "Also compatible
+      with Unity 2021.3 LTS — the Asset Store lists 2022.3 as the minimum
+      because submissions must be uploaded from 2022.3 or newer. For 2021.3,
+      install from OpenUPM or the Git URL."
 - [ ] **Disclose the dual licensing in the submission notes**: the source is
       MIT on GitHub/OpenUPM, this Store copy is additionally distributed under
       Unity's EULA by the same author. The shipped README says "MIT-licensed",
