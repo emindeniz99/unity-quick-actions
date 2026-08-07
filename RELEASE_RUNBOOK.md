@@ -18,9 +18,10 @@ The condensed, day-of sequence. Details live in
 
 > **Matrix rule (current plan):** the two ends of the supported range get the
 > FULL bar — repeat **Phases 1–3** (and Phase 4 on a Mac) in **2021.3 LTS** and
-> in **Unity 6.3**. The lines in between (2022.3, 6.0) are **not claimed as
-> tested**; they should work, but nothing here validates them, so don't write
-> them up as verified. One testbed project per editor version (don't upgrade one
+> in **Unity 6.3**. The lines in between (2022.3, 6.0) have since had their own
+> Editor pass too (import + Test Runner green; 2022.3 also builds the Android
+> player) — see `PRODUCTION_READINESS.md` for exactly how far each line got.
+> One testbed project per editor version (don't upgrade one
 > project through versions — that tests migration, not fresh installs). Budget
 > roughly half a day per line; start with 2021.3 (the minimum, most likely to
 > surface an API gap) and finish with 6.3 (the longest-lived target).
@@ -33,8 +34,9 @@ The condensed, day-of sequence. Details live in
 - [ ] **THE step:** Project Settings ▸ Player ▸ Scripting Define Symbols → add
       `QUICKACTIONS_ENABLED` (Android tab; iOS tab too if building iOS). *(GS §A5)*
 - [ ] Console shows **0 errors / 0 warnings** after recompile.
-      ⚠️ First real-Unity compile — if an asmdef/DLL error appears here, copy the
-      exact message — this is the one known unproven seam, and it belongs in an issue.
+      If an asmdef/DLL error appears here, copy the exact message — it belongs
+      in an issue. (This seam has since compiled cleanly on 2021.3, 2022.3, 6.0
+      and 6.3, so an error here would be news.)
 - [ ] Package Manager ▸ the package ▸ Samples ▸ **Import Demo**.
 - [ ] **Window ▸ Quick Actions ▸ Simulator** opens; **Window ▸ Quick Actions ▸
       About** opens (both menus must exist).
@@ -88,13 +90,15 @@ The condensed, day-of sequence. Details live in
       not a repo file: build it with `python3 tools/pack_unitypackage.py` (or
       `tools/release.sh`) → gitignored `dist~/QuickActions.unitypackage`, or take
       the one attached to the
-      [GitHub Release](https://github.com/emindeniz99/unity-quick-actions/releases).
+      [GitHub Release](https://github.com/emindeniz99/unity-quick-actions/releases)
+      — no release has been cut yet, so today that means building it locally.
 - [ ] Price: **Free**. Submit for review. (Review: days → ~2 weeks.)
 
 ## Phase 6 — stamp the release (10 min, back in the repo)
 
 The **first public release is `v0.4.0`** — the version this repo already carries.
-Tags are plain semver (`v0.4.0`), one tag per release.
+Tags are plain semver (`v0.4.0`), one tag per release. No tag has been pushed and
+no GitHub Release exists yet; this phase is where the first one gets created.
 
 - [ ] `package.json` `version` and the top `CHANGELOG.md` heading agree, and the
       heading has a real date (no `Unreleased` left).
@@ -113,7 +117,7 @@ Tags are plain semver (`v0.4.0`), one tag per release.
 
 | Symptom | First move |
 |---|---|
-| Console errors on import / platform switch | Copy the exact error and open an issue (likely the asmdef extension-DLL seam — known unproven spot) |
+| Console errors on import / platform switch | Copy the exact error and open an issue (first suspect is the asmdef extension-DLL seam, though it now compiles clean on all four claimed lines) |
 | `QuickActions` type not found | The define (Phase 1, "THE step") — per platform tab |
 | Shortcuts don't appear on long-press | Did you tap "Add 3 shortcuts" first? Android ≥ 7.1? |
 | Tap opens app but no log line | Grab `adb logcat -s QuickActions Unity` output and attach it to the issue |

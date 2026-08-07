@@ -69,8 +69,10 @@ a local `file:` path — never by copying sources into a project.
 
 4. Import the **Demo** sample from the package page to exercise the API.
 
-Quick actions do not exist in the Editor or on a plain simulator — real
-behaviour needs a device long-press. See [`GETTING_STARTED.md`](./GETTING_STARTED.md)
+Quick actions do not exist in the Editor, but they do work on the iOS Simulator
+(verified on Unity 6.3 / iOS 26.5 — the shortcuts appear on the Simulator home
+screen and a tap cold-launches the app). Android has no simulator equivalent, so
+Android behaviour needs a device long-press. See [`GETTING_STARTED.md`](./GETTING_STARTED.md)
 for the full device walkthrough, and `tools/device-smoke/` for the adb-driven
 Android smoke test.
 
@@ -100,7 +102,8 @@ import — and `gen_meta.py` handles that folder explicitly. Don't delete them.)
 **The `.unitypackage` is a build output and is never committed.** `dist~/` is
 gitignored. Produce one locally with `python3 tools/pack_unitypackage.py` (or
 `tools/release.sh` for every release artifact at once); CI attaches it to the
-[GitHub Release](https://github.com/emindeniz99/unity-quick-actions/releases).
+[GitHub Release](https://github.com/emindeniz99/unity-quick-actions/releases)
+(no release has been cut yet, so the local packer is the only source for now).
 Never add a `.unitypackage` to a commit or a PR.
 
 **Don't hand-edit generated collateral.** `store~/` PNGs come from
@@ -226,8 +229,9 @@ they are pushed.
 ## 7. Releases
 
 Releases are cut by the maintainer — see [`MAINTAINING.md`](./MAINTAINING.md).
-Tags are plain semver: `v0.4.0`. Consumers pin a version by appending the tag to
-the git URL:
+Tags are plain semver: `v0.4.0`. No tag has been cut yet, so the pin below is
+the form consumers will use once one exists. Consumers pin a version by
+appending the tag to the git URL:
 
 ```
 https://github.com/emindeniz99/unity-quick-actions.git#v0.4.0

@@ -31,5 +31,7 @@ Fill these into the Publisher portal package draft. Long-form copy is in
 Upload `QuickActions.unitypackage`. It is a build output, not a committed file:
 build it with `python3 tools/pack_unitypackage.py` (or `tools/release.sh`) →
 `dist~/QuickActions.unitypackage`, or download the artifact attached to the
-matching [GitHub Release](https://github.com/emindeniz99/unity-quick-actions/releases).
+matching [GitHub Release](https://github.com/emindeniz99/unity-quick-actions/releases)
+(no tag has been pushed and no Release cut yet, so the local build is the only
+source today).
 It installs the package under `Assets/QuickActions/`.

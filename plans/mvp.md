@@ -152,10 +152,11 @@ intent donation, `.unitypackage` export, automated device CI.
   compiles against UnityEngine/UnityEditor stubs (9 configs) and the Android
   plugin against Android SDK stubs; toolchain baked into the devcontainer. This
   replaces the "structural lint only" plan with real compilation. The iOS `.mm`
-  remains review-only (no Apple SDK on Linux).
-- A Unity 2022.3 LTS Editor is installed under `/opt/unity` in this environment
-  for manual project smoke-testing; on-device builds still require macOS/Xcode
-  (iOS) and a licensed editor.
+  is not covered by that harness — it is compiled by Xcode when the generated
+  project is built, which has since been done on macOS with zero warnings.
+- Editor verification has since been done on real licensed editors rather than
+  a single environment; see `PRODUCTION_READINESS.md` for which Unity line
+  proved what. Physical-device builds remain the open item.
 - **Superseded since this plan:** the warm-delivery design above
   (iOS `UnitySendMessage` push) was unified into a **single pull channel** — iOS
   warm taps now enqueue and are drained by the focus/pause poll, same as cold and

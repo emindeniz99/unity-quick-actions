@@ -82,4 +82,6 @@ Two rules that bite if you get them wrong:
   on demand, `Tests` excluded from consumer builds).
 - The `.unitypackage` is **not** part of the OpenUPM path at all — it's a build
   output for the Asset Store / manual-import audience, attached to the
-  [GitHub Release](https://github.com/emindeniz99/unity-quick-actions/releases).
+  [GitHub Release](https://github.com/emindeniz99/unity-quick-actions/releases)
+  (no Release has been cut yet — until one is, build it locally with
+  `python3 tools/pack_unitypackage.py`).

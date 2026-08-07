@@ -26,13 +26,19 @@ red or unrun verify; say what failed.
   have `.meta`s (gen_meta handles that folder explicitly) — leave them.
 - **Never commit a `.unitypackage`.** It is a build output; `dist~/` is
   gitignored, `tools/pack_unitypackage.py` produces it, CI attaches it to the
-  GitHub Release.
+  GitHub Release (no release has been cut yet — build it locally for now).
 - The package is opt-in behind the `QUICKACTIONS_ENABLED` scripting define, and
   the test assembly is constrained on it plus `UNITY_INCLUDE_TESTS`. A consuming
   project also needs `"testables": ["com.emindeniz99.quick-actions"]` in its
   `Packages/manifest.json` or the tests never show in the Test Runner.
-- Quick actions cannot be observed in the Editor or on a plain simulator. Do not
-  claim device behaviour you did not run; the static harness cannot reach it.
+- Quick actions cannot be observed in the Editor, but they **do** work on the
+  iOS Simulator — verified on Unity 6.3 / iOS 26.5, where static and
+  runtime-added shortcuts appeared on the Simulator home screen and a tap
+  cold-launched the app and delivered the id to `Performed`. (Android has no
+  simulator equivalent; the 2021.3 line cannot do a Simulator run at all —
+  Unity ships an x86_64-only simulator runtime there.) What is still unverified
+  is **physical hardware**: do not claim real-device behaviour you did not run;
+  the static harness cannot reach it.
 
 ## Commits
 
@@ -83,7 +89,8 @@ Prefer relative links between files in this repo (`./GETTING_STARTED.md`) so
 they resolve on GitHub *and* in the Unity Package Manager. Install URL is
 `https://github.com/emindeniz99/unity-quick-actions.git` — `package.json` is at
 the repo root, so the URL carries no subfolder query suffix. Pin a version with
-`#v0.4.0`. Tags are plain semver.
+`#v0.4.0`. Tags are plain semver. (No tag exists yet — the pin syntax is what
+consumers will use once one is cut.)
 
 Don't invent status claims. If a doc asserts something you cannot verify, leave
 it as it is rather than "improving" it.

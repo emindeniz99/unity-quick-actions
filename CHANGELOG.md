@@ -54,6 +54,16 @@ First public release.
   workflow runs it on a GitHub-hosted emulator. iOS automation is documented
   as not shipped (no adb analog) with manual steps instead.
 
+### Fixed
+
+- **Compiles on Unity 2021.3, the version `package.json` declares as the
+  minimum.** The localization mapping named `SystemLanguage.Hindi`, which Unity
+  added in 2022.2, so the package could not compile on its own declared floor.
+  The case now sits behind `UNITY_2022_2_OR_NEWER`; Hindi still maps on the
+  versions that have it. The stub-compile harness could not catch this — its
+  `SystemLanguage` enum mirrored a newer Editor than the minimum — so that stub
+  now mirrors the minimum instead.
+
 ## [0.3.0] - 2026-07-29
 
 ### Added

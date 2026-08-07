@@ -39,6 +39,9 @@ the failing check is fixed first, not worked around.
 8. The release is confirmed at
    <https://github.com/emindeniz99/unity-quick-actions/releases> with the
    `.unitypackage` attached, because the install docs point downloaders there.
+   (No tag has been pushed and no Release has been cut yet, so that page is
+   empty today; until the first one exists the artifact is built locally with
+   `python3 tools/pack_unitypackage.py`.)
 
 ## OpenUPM
 
@@ -56,20 +59,24 @@ sentiment. Bumping later is cheap.
 
 ## What must be true before a 1.0
 
-Quick actions cannot be observed in the Editor or on a plain simulator, so none
-of the following can be replaced by the static harness. Each item is currently
-open — see `PRODUCTION_READINESS.md` for the record of what has been executed.
+Quick actions cannot be observed in the Editor, so none of the following can be
+replaced by the static harness. The Editor pass is closed on 2021.3, 2022.3 and
+6.3; what is still open is the physical-hardware work below — see
+`PRODUCTION_READINESS.md` for the record of what has been executed. (Quick
+actions *do* work on the iOS Simulator, which is where the 6.3 runtime pass was
+done; the 2021.3 line cannot be run there at all, because Unity ships an
+x86_64-only simulator runtime on 2021 LTS.)
 
 **Editor pass, per claimed Unity line**
 
-- [ ] The package imports into a fresh project on Unity **2021.3 LTS** — the
-      declared minimum, which has never been compiled — and on the lines
-      already validated (2022.3, 6.0, 6.3), each with **0 console errors and 0
+- [x] The package imports into a fresh project on Unity **2021.3 LTS** — the
+      declared minimum — and on the lines already validated (2022.3, 6.0, 6.3),
+      each with **0 console errors and 0
       warnings** after the `QUICKACTIONS_ENABLED` scripting define is added to
       the Android and iOS tabs of Player ▸ Scripting Define Symbols.
-- [ ] `Window ▸ Quick Actions ▸ Simulator` and `Window ▸ Quick Actions ▸ About`
+- [x] `Window ▸ Quick Actions ▸ Simulator` and `Window ▸ Quick Actions ▸ About`
       both register.
-- [ ] With the Demo sample imported: a click in the Simulator with Play Mode
+- [x] With the Demo sample imported: a click in the Simulator with Play Mode
       off starts Play Mode and logs the performed id at startup (the cold path);
       a click during Play Mode delivers immediately (the warm path).
 
@@ -97,7 +104,9 @@ open — see `PRODUCTION_READINESS.md` for the record of what has been executed.
 - [ ] With `QUICKACTIONS_ENABLED` removed and the project rebuilt, the
       generated/merged `AndroidManifest.xml` contains no
       `QuickActionsTrampolineActivity` and a long-press shows no shortcuts from
-      this package.
+      this package. (The manifest half is already verified on 2021.3 and 6.3 —
+      a define-off player build carries no trace of the trampoline; only the
+      long-press half still needs a device.)
 - [ ] The generated production Xcode project greps clean for
       `QUICKACTIONS_ENABLED`.
 

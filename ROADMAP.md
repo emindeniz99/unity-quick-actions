@@ -10,7 +10,7 @@ Delete an entry in the same commit that ships it.
   README), asserting the COLD-launch path (the smoke's tap is a warm resume),
   and wiring the smoke into always-on CI once a Unity license (game-ci) exists.
 - **Documentation site (considered, deliberately deferred)** — the reference
-  docs live in a single 545-line [README](./README.md) plus a task-oriented
+  docs live in a single 590-line [README](./README.md) plus a task-oriented
   [GETTING_STARTED](./GETTING_STARTED.md); a GitHub Pages site (or a UPM
   `Documentation~/` folder, which the Package Manager surfaces as the package's
   "Documentation" link) would make that navigable, searchable and versioned per
@@ -20,7 +20,7 @@ Delete an entry in the same commit that ships it.
   README keeps growing — the natural first split is the per-platform behavior
   tables and the icon/localization reference.
 
-## Validate in a real Unity Editor (license-gated; can't run here)
+## Validate in a real Unity Editor (license-gated; not covered by the stub harness)
 
 The stub harness compiles the C#/Java but can't confirm Unity-only wiring:
 
@@ -78,8 +78,9 @@ The stub harness compiles the C#/Java but can't confirm Unity-only wiring:
   no `QuickActions` symbols. Android: `QuickActionsTrampolineInjectorAndroid`
   (gated) injects the trampoline `<activity>` only when the define is on, and
   `QuickActionsTrampolineStripperAndroid` (ungated) strips any stale entry when
-  it is off — verify
-  the prod manifest has no `QuickActionsTrampolineActivity` (the `.java` dead
+  it is off — the build-output half is CONFIRMED on 2021.3 and 6.3 (a player
+  built with the define removed contains no trace of the trampoline); on device,
+  verify the prod manifest has no `QuickActionsTrampolineActivity` (the `.java` dead
   class remains; literally-zero needs the package excluded from the prod project).
   Both ungated cleanups gate on compile-time `#if QUICKACTIONS_ENABLED` (the
   same truth as the gated injectors), with a stale-assembly coherence check
@@ -98,8 +99,11 @@ The stub harness compiles the C#/Java but can't confirm Unity-only wiring:
   (`scene:willConnectToSession:options:`) + warm
   (`windowScene:performActionForShortcutItem:completionHandler:`) hooks, with a
   consume-once cold-dedup marker that also swallows the host-subclass
-  double-delivery on the app-delegate path. NO ObjC compile harness exists:
-  first real validation is an Xcode build. On device, verify: a scene-manifest
+  double-delivery on the app-delegate path. NO ObjC compile harness exists; the
+  first real validation was an Xcode build, and it has now happened — the
+  generated project compiles against the real iOS device SDK on 2021.3 and 6.3
+  with zero warnings from `QuickActions.mm`, and a 6.3 / iOS 26.5 Simulator run
+  confirms a cold tap reaching `Performed`. On device, verify: a scene-manifest
   app delivers cold + warm taps exactly once each; a default (no-manifest) app
   behaves byte-identically to v0.3.0; a host UnityAppController subclass that
   discards our `NO` no longer double-delivers; multi-scene-delegate-class hosts

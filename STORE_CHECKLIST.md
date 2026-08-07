@@ -13,12 +13,13 @@ tests green, full source + docs. The drag-and-drop `.unitypackage` is a **build
 output** — it is not committed; `tools/release.sh` writes it to the gitignored
 `dist~/`, and CI attaches the same artifact to each
 [GitHub Release](https://github.com/emindeniz99/unity-quick-actions/releases),
-so you can either build it or download it.
+so you can either build it or download it. (No release has been cut yet — there
+is nothing on that page to download today, so build it locally for now.)
 
 ⏳ **Needs your account / hardware (can't be automated):**
 1. Create the free publisher account + accept the agreement.
-2. Open the package in **each** licensed Unity line (2021.3, 2022.3, 6.0, 6.3) and confirm a
-   clean import; switch to iOS/Android targets.
+2. ~~Open the package in **each** licensed Unity line (2021.3, 2022.3, 6.0, 6.3) and confirm a
+   clean import; switch to iOS/Android targets.~~ — done on all four lines (see §5).
 3. **Device test** (Android device; iOS via macOS/Xcode) + one real screenshot.
 4. Set the price to **Free** (decided 2026-07-10 — see §2), upload the
    `.unitypackage`, submit for review.
@@ -86,8 +87,8 @@ All sizes are ✅ pre-built by `python3 tools/gen_store_images.py`. See
 A clean `.unitypackage` is **built on demand** — `python3 tools/pack_unitypackage.py`
 (no Unity needed) writes `dist~/QuickActions.unitypackage`, which is gitignored
 because it's a build output; the identical artifact is attached to every
-[GitHub Release](https://github.com/emindeniz99/unity-quick-actions/releases).
-It:
+[GitHub Release](https://github.com/emindeniz99/unity-quick-actions/releases)
+(none cut yet — build it locally until the first one exists). It:
 
 - [x] Includes only package content, remapped under `Assets/QuickActions/`
       (Runtime, Editor, Plugins, Example, README/CHANGELOG/LICENSE/ROADMAP).
@@ -99,11 +100,12 @@ It:
 
 ## 5. Technical review gates (do before upload)
 
-- [ ] Imports into a fresh **2021.3 LTS** project (the claimed minimum) with **zero console
+- [x] Imports into a fresh **2021.3 LTS** project (the claimed minimum) with **zero console
       errors/warnings**; repeat the FULL check on **2022.3, 6.0 LTS and 6.3 LTS** (all claimed lines get the same bar).
-      (2022.3, 6.0 and 6.3 already passed import + Test Runner in a licensed
-      editor — see [`PRODUCTION_READINESS.md`](./PRODUCTION_READINESS.md); 2021.3
-      is the one line never compiled.)
+      (2021.3, 2022.3, 6.0 and 6.3 have all passed import + Test Runner in a
+      licensed editor — see [`PRODUCTION_READINESS.md`](./PRODUCTION_READINESS.md);
+      2021.3 is in fact the most thoroughly verified line, down to an Android
+      player build and an Xcode compile of the generated iOS project.)
 - [ ] `tools/verify.sh` is green (compile + unit tests + Android plugin).
 - [ ] Switch build target to **iOS** and **Android** → Editor still compiles
       (confirms the asmdef extension-DLL references resolve — see ROADMAP).

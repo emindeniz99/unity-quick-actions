@@ -36,32 +36,39 @@ This is **0.4.0**, a pre-1.0 release. Here is exactly what has been proven and
 what has not — one place, no hedging. (Per-feature detail:
 [PRODUCTION_READINESS.md](./PRODUCTION_READINESS.md).)
 
-**Verified in a licensed Unity Editor** — on **2022.3 LTS**, **Unity 6.0 LTS**
-and **Unity 6.3 LTS** the package imports with **0 console errors** and the
-**Unity Test Runner run is green** on each (35/35 at the time of those runs;
-the suite has grown to 74 since and has not been re-run in a licensed Editor).
-On 2022.3 the Android path went further: **real APKs** proved the trampoline
-`<activity>` injection, the baked static shortcuts, and the "define off → zero
-package trace" gate.
+**Verified in a licensed Unity Editor — across the supported range.**
+On **2021.3.45f2** (the declared minimum) and **Unity 6.3** the package imports
+with 0 console errors and the **Unity Test Runner run is green: 74/74** on
+each. On both lines a **real Android APK** carries the trampoline `<activity>`
+— injected on the old `UnityPlayerActivity` path for 2021.3 and on the
+`UnityPlayerGameActivity` path for 6.x — and the same build with the define
+removed contains **no trace of it**. On both lines the generated Xcode project
+compiles against the real iOS SDK with **no warnings from the plugin**.
+**2022.3.62f3** matches them in the middle of the range: it imports with 0
+console errors, the Test Runner is green at **74/74**, and a real Android APK
+carries the trampoline on the `UnityPlayerActivity` path. **Unity 6.0 LTS** was
+verified earlier (0 console errors, Test Runner green at 35/35 — a *historical*
+number, from when the suite was that size).
 
-**Not verified — Unity 2021.3.** `package.json` declares 2021.3 as the minimum
-because that is where the newest Editor API this package uses (`NamedBuildTarget`)
-landed, but **the package has never been compiled on 2021.3.** It is
-architecturally the same era as the fully-proven 2022.3 line, so the risk is
-low — but it is untested, and "untested" is the honest word. If you are on
-2021.3 and hit a compile error, please [open an issue](https://github.com/emindeniz99/unity-quick-actions/issues).
+**Verified on the iOS Simulator (Unity 6.3).** Long-pressing the app icon shows
+the static shortcuts baked into `Info.plist` alongside one added at runtime
+through the C# API; tapping one cold-launches the app, and the action id
+arrives on the `Performed` event. The same run is not possible on 2021.3:
+Unity ships an x86_64-only simulator runtime for that line, and Apple silicon
+cannot run it (Unity added arm64 Simulator support in Unity 6 and stated it
+will not be backported to 2021 LTS).
 
-**Not verified — physical devices.** Neither the iOS nor the Android tap path
-has been exercised on real hardware. The OS-facing behaviour (long-press menu,
-cold/warm tap delivery) is reviewed, compiled and covered by logic tests, not
-observed on a phone. Plan on validating it in your own build before you ship.
+**Not verified — physical devices.** Neither tap path has been exercised on
+real hardware. Everything above is an Editor, build-artifact or Simulator
+result. Plan on validating on a phone before you ship.
 
 **Also true:** the suite is 73 headless tests (`dotnet test`) and 74 in Unity's
-Test Runner (it adds the `JsonUtility` serialization tests), plus an Android
-Java smoke of 103 checks, across 9 C# compile configurations with 0 warnings.
+Test Runner (it adds 5 `JsonUtility` serialization tests; 4 of the headless ones
+don't run there), plus an Android Java smoke of 103 checks, across 9 C# compile
+configurations with 0 warnings.
 The iOS `.mm` compiles cleanly against the current iOS SDK
 (ARC, arm64, deployment target iOS 13) with no deprecation or availability
-errors — that is a compile result, not a runtime one.
+errors — a compile result, separate from the Simulator run above.
 
 ## Install
 
@@ -92,7 +99,8 @@ Pin a version by appending a tag, e.g.:
 https://github.com/emindeniz99/unity-quick-actions.git#v0.4.0
 ```
 
-(Without a tag you track the default branch.)
+(Without a tag you track the default branch — which is the only option today: no
+tag has been cut yet, so `#v0.4.0` will not resolve until the first one lands.)
 
 This is the best fit for the **dev-only** workflow: the package lives read-only
 under `Packages/`, and removing the one line removes it completely (see
@@ -131,7 +139,8 @@ OpenUPM gives version management and update notifications in Package Manager.
 Download `QuickActions.unitypackage` from the
 [**Releases** page](https://github.com/emindeniz99/unity-quick-actions/releases)
 — it's a build output attached to each release by CI, not a file committed to the
-repo. Drag it into an open Editor (or *Assets ▸ Import Package ▸ Custom
+repo. (No release has been cut yet, so for now build the file locally with the
+command below.) Drag it into an open Editor (or *Assets ▸ Import Package ▸ Custom
 Package…*). It installs under `Assets/QuickActions/`. Build it yourself any time
 with `python3 tools/pack_unitypackage.py` (no Unity needed); the result lands in
 the gitignored `dist~/`. Note: it lands in `Assets/` (editable, not read-only),
@@ -334,8 +343,9 @@ Simulator** and click any listed shortcut (or type a custom id) — it raises
   the runtime's real pending-queue drain, exactly like tapping the icon while the
   app is closed (a *cold launch*).
 
-Use this fast loop while coding; build to a device only to verify the OS
-long-press menu itself. (Editor-only — it never ships in a build.)
+Use this fast loop while coding; build to a device — or, on iOS, the Simulator,
+where the long-press menu works — only to verify the OS menu itself.
+(Editor-only — it never ships in a build.)
 
 ### Static shortcuts (baked into the build)
 
@@ -532,9 +542,10 @@ tools/verify.sh    # .meta gen + C# compile (9 configs) + unit tests + Android p
 
 `verify.sh` compiles the C# in **9 configurations** (0 warnings), runs the **73**
 headless unit tests via `dotnet test`, and compiles and smoke-tests the Android
-Java plugin (**103** checks). The same tests plus the `JsonUtility`
-serialization tests run in Unity's **Test Runner** from `Tests/Editor/` — **74**
-there. See [`.verify/README.md`](./.verify/README.md) for how the stubs work.
+Java plugin (**103** checks). Those tests (bar 4 headless-only ones) plus 5
+`JsonUtility` serialization tests run in Unity's **Test Runner** from
+`Tests/Editor/` — **74** there. See [`.verify/README.md`](./.verify/README.md)
+for how the stubs work.
 
 For a real device/emulator, `tools/device-smoke/` has an adb-driven Android
 smoke (install a dev APK → assert the demo's shortcuts registered → simulate a
@@ -546,8 +557,9 @@ behaviour, which cannot run in the Editor.
 ## Notes / learnings
 
 - Min Unity is **declared** as 2021.3 LTS because `NamedBuildTarget` — the
-  newest Editor API this package uses — ships in 2021.2; that line is not yet
-  compile-verified (see [Status](#status)). The dynamic native hooks avoid editing generated
+  newest Editor API this package uses — ships in 2021.2; that line is verified
+  end to end (import, 74/74 Test Runner, an APK with the trampoline, and a clean
+  Xcode compile — see [Status](#status)). The dynamic native hooks avoid editing generated
   `UnityAppController` / `UnityPlayerActivity`; only **static** shortcuts need
   build post-processors (Info.plist / shortcuts.xml).
 - The iOS `.mm` compiles cleanly against the real iOS SDK (ARC, arm64,
