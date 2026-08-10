@@ -3,6 +3,84 @@
 Follow-ups discussed but not shipped as of v0.4.0 (the first public release).
 Delete an entry in the same commit that ships it.
 
+- **Android built-in icons: ship them from the build post-processor (0.5.0).**
+  The `IconType` catalog has 29 entries and *none* of them render on Android
+  unless the consumer adds a drawable themselves — the launcher draws a blank
+  square, which is what the Android screenshot in the README shows. 0.4.5
+  documented the manual `.androidlib` procedure, which is the honest fix but
+  still one manual step for every user. The real fix is to write the PNGs into
+  the generated Gradle project at build time, so nobody does anything.
+
+  *Precedent worth copying:* Unity's own `com.unity.mobile.notifications`
+  solves exactly this problem the same way. Its Java calls
+  `res.getIdentifier(name, "drawable", context.getPackageName())` — identical
+  to `QuickActionsBridge.java:505` — and its editor code writes the icon bytes
+  into the generated project. On 2021.3/2022.3 it uses
+  `IPostGenerateGradleAndroidProject` writing to
+  `<gradleProject>/<lib>.androidlib/src/main/res/…`; on Unity 6 it switched to
+  `AndroidProjectFilesModifier` writing to `unityLibrary/src/main/res/…`. That
+  version split is the main implementation cost — we support both lines.
+
+  *Where our code already is:* `Editor/Android/QuickActionsBuildPostProcessorAndroid.cs`
+  already runs at exactly this point and already writes `res/xml/` and
+  `values-<qualifier>/` into the generated project. Adding `res/drawable-xhdpi/`
+  is the same code path, not a new mechanism.
+
+  *Plan:* move the four PNGs from `store~/example-shortcut-icons/` into
+  `Editor/Android/BuiltInIcons/` (normal imported assets with committed `.meta`,
+  so they survive `.unitypackage` export — `package.json`'s `files` already
+  includes `Editor`, so no allowlist change). Emit only the icons actually
+  referenced by the build's shortcut set, so an app using none pays nothing.
+  Cost if we emitted all four unconditionally: ~1.5 KB of APK.
+
+  *Blocking sub-bug — must ship in the same release.* With `minifyEnabled` +
+  `shrinkResources` (Gradle's default safe mode), the drawables are marked
+  unreachable and their bytes replaced with a 67-byte dummy **while their
+  resource-table entries survive**. So `getIdentifier` returns non-zero,
+  `setIcon` is called, and the launcher still draws an empty square — a
+  release-only failure that looks exactly like the un-configured state. Cause is
+  our own naming: `QuickActionsBridge.java:505` builds the name by
+  concatenation (`"ic_quickaction_" + ICON_NAMES[i]`), so the string pool holds
+  only the bare prefix and the shrinker matches nothing. Fix is to emit
+  `res/raw/quickactions_keep.xml` carrying `tools:keep`. **This bug exists
+  today**, independently of shipping icons: any consumer who adds their own
+  drawable and builds a minified release hits it.
+
+  *Note:* even after this, 25 of the 29 catalog entries stay blank on Android —
+  we only own art for add/compose/favorite/play. Either commission the rest,
+  or document the catalog as "iOS-complete, Android-partial".
+
+- **Verify the Android drawable mechanism on a real build (blocks the above).**
+  Everything in the entry above rests on Unity documentation and on reading
+  Unity's first-party package — **not** on a build we ran. The APK proof was
+  attempted and could not run: the Unity editors live on `/Volumes/T7Data`,
+  which was unmounted. Before writing 0.5.0, mount it and confirm on 2022.3:
+  (a) a `.androidlib` under `Assets/` lands its `src/main/res/drawable-*/`
+  entries in the APK resource table (`aapt2 dump resources <apk> | grep -i
+  quickaction`); (b) `res/` at the `.androidlib` root is silently dropped, as
+  the docs imply; (c) the `shrinkResources` failure reproduces, and `tools:keep`
+  fixes it; (d) a `.androidlib` shipped *inside a UPM package* is picked up —
+  Unity's notifications package does this, but it is undocumented behaviour.
+
+- **`.androidlib` does not survive `.unitypackage` export/import** (reported
+  against 2022.3.15, re-confirmed 2024, unfixed). This is why the built-in icons
+  must be written by the build post-processor rather than shipped as a
+  `.androidlib` inside the package: the Asset Store channel delivers a
+  `.unitypackage`, so anything relying on a shipped `.androidlib` would work on
+  OpenUPM/Git and silently vanish for Asset Store users. Re-check whether Unity
+  has fixed this before choosing any design that depends on it.
+
+- **Teaching sample for custom Android icons (small, optional).** A
+  `Samples~/AndroidIcons/` containing a ready-made `QuickActionIcons.androidlib`
+  (correct `src/main/AndroidManifest.xml` + `src/main/res/drawable-xhdpi/`)
+  would let a user import a *working* example rather than follow a five-step
+  written recipe. Imports to `Assets/Samples/<pkg>/<version>/…`, which is under
+  `Assets/`, so it would be picked up with no further action. Caveats: nobody
+  ships this combination today (untested), `Samples~` content ships without
+  `.meta` so the Android-only `PluginImporter` setting falls back to defaults,
+  and it inherits the `.unitypackage` limitation above. Do this *after* the
+  post-processor work, as documentation-by-example — not as the delivery path.
+
 - **Automated device CI, remaining scope** — v0.4.0 ships an adb-driven Android
   smoke (`tools~/device-smoke/`) and a manually-dispatched emulator workflow
   (needs a Unity-built dev APK — no Unity license in CI). Remaining: iOS

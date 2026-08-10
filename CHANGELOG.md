@@ -11,6 +11,40 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 > as its own section because each is a distinct, self-contained set of API
 > additions; read them as the package's development log.
 
+## [0.4.5] - 2026-08-11
+
+Documentation only. No code change.
+
+### Fixed
+
+- **The one instruction this package gave for adding an Android shortcut icon
+  was wrong, and would have broken the reader's build.** `store~/README.md`
+  told users to drop drawables into `Assets/.../Plugins/Android/res/drawable/`.
+  Unity **removed** that path in 2021.2 — one minor version below this
+  package's declared 2021.3 floor — and files placed there now fail the build
+  outright (`OBSOLETE - Providing Android resources in Assets/Plugins/Android/res
+  was removed`), rather than being quietly ignored. It was wrong on every Unity
+  version the package has ever supported.
+- **And no shipped file said where drawables go at all.** That instruction lived
+  in `store~/`, which reaches no consumer on any of the three channels (excluded
+  from the npm/OpenUPM tarball and the `.unitypackage`, tilde-hidden on the
+  git-URL path). Every surface a user actually reads — the README field table,
+  `IconType.cs`, the Java bridge comment, the Editor's build warning — named the
+  `ic_quickaction_<name>` convention and never named a folder. The package
+  required a step it documented nowhere.
+
+### Added
+
+- README gains **"Android icons need a drawable in your project"**: why the two
+  platforms differ (iOS uses Apple's system glyph catalog; Android has none, so
+  the name is resolved out of your project with `getIdentifier`), the correct
+  `.androidlib` layout — identical on 2021.3, 2022.3 and 6.x — and two traps:
+  resources must sit under `src/main/res/`, and a `res/` folder at the
+  `.androidlib` root is silently dropped with no warning.
+- The screenshot caption now explains the blank Android icons instead of
+  leaving readers to conclude the Android half is broken. It is the
+  un-configured state, and it is what every user sees until they add a drawable.
+
 ## [0.4.4] - 2026-08-07
 
 ### Added

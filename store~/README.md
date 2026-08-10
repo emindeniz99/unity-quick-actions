@@ -34,8 +34,13 @@ where relative paths are unreliable.
   `python3 tools~/make_store_screenshot.py <capture.png> store~/screenshot-1.jpg`.
 - Images contain minimal text and no watermarks (guideline-compliant). Keep the
   icon text-free.
-- `example-shortcut-icons/` are functional: drop them into your app's
-  `Assets/.../Plugins/Android/res/drawable/` (or any `res/drawable`) and set
-  `QuickActionItem.AndroidDrawable = "ic_quickaction_play"` to use them.
+- `example-shortcut-icons/` are functional PNGs, but the instruction that used
+  to be here was **wrong and harmful**: it named
+  `Assets/.../Plugins/Android/res/drawable/`, a path Unity **removed in 2021.2**
+  — one minor version below this package's 2021.3 floor. Files placed there do
+  not silently fail to load; they **fail the consumer's build**
+  ("OBSOLETE - Providing Android resources in Assets/Plugins/Android/res was
+  removed"). The correct procedure is in the root
+  [README](../README.md#android-icons-need-a-drawable-in-your-project); use that.
 
 See [`../MAINTAINING.md`](../MAINTAINING.md) for the release procedure.

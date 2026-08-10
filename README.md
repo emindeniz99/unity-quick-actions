@@ -19,6 +19,10 @@ The demo's three shortcuts, from the same C# code on both platforms. Note the
 platform difference the screenshots make obvious: **iOS renders `Title` and
 `Subtitle` on two lines with an icon; Android's launcher shows a single label**
 — the *long* one, which is our `Subtitle`. Worth knowing when you write labels.
+The blank icons on the Android side are also expected: Android has no system
+glyph catalog, so icons come from drawables **you** add to your project — see
+[Android icons](#android-icons-need-a-drawable-in-your-project). The demo ships
+none, so you are seeing the un-configured state.
 
 | Platform | Mechanism | Min OS |
 |----------|-----------|--------|
@@ -46,7 +50,7 @@ hardware; iOS 13+ opens it with a plain long-press on every device.
 
 ## Status
 
-This is **0.4.4**, a pre-1.0 release. Here is exactly what has been proven and
+This is **0.4.5**, a pre-1.0 release. Here is exactly what has been proven and
 what has not — one place, no hedging. (Per-feature detail:
 [PRODUCTION_READINESS.md](./PRODUCTION_READINESS.md).)
 
@@ -128,7 +132,7 @@ https://github.com/emindeniz99/unity-quick-actions.git
 Pin a version by appending a tag, e.g.:
 
 ```
-https://github.com/emindeniz99/unity-quick-actions.git#v0.4.4
+https://github.com/emindeniz99/unity-quick-actions.git#v0.4.5
 ```
 
 (Without a tag you track the default branch. `v0.4.0` is the first tag, so
@@ -162,7 +166,7 @@ package under `dependencies`:
     }
   ],
   "dependencies": {
-    "com.emindeniz99.quick-actions": "0.4.4"
+    "com.emindeniz99.quick-actions": "0.4.5"
   }
 }
 ```
@@ -370,7 +374,7 @@ public class ShortcutRouter : MonoBehaviour
 | Field | Purpose |
 |-------|---------|
 | `Id` (required, unique) / `Title` (required) / `Subtitle` | Labels. `Subtitle` renders under the title on iOS and as the Android long label. |
-| `Icon` (`IconType`) | Built-in glyph catalog (29 entries, iOS system icons; Android `ic_quickaction_*` drawables). |
+| `Icon` (`IconType`) | Built-in glyph catalog (29 entries). iOS uses Apple's system icons — nothing to ship. Android resolves `ic_quickaction_<name>` from a drawable **you add**; without one the launcher shows a blank square. See [Android icons](#android-icons-need-a-drawable-in-your-project). |
 | `IosSystemImage` | SF Symbol name (`"star.fill"`, iOS 13+) — beats `IosTemplateImage` and `Icon`. Ignored on Android. |
 | `IosTemplateImage` | Template-image name shipped in the Xcode bundle (single-color, ~35×35 pt) — beats `Icon`. Ignored on Android. |
 | `AndroidBitmapFile` | Absolute path to a PNG/JPEG on device — runtime icons from a `Texture2D`: `File.WriteAllBytes(path, tex.EncodeToPNG())` under `Application.persistentDataPath` (keep the file alive; the launcher re-reads it). Beats `AndroidDrawable` and `Icon`. Ignored on iOS (no runtime-bitmap shortcut API). |
@@ -378,6 +382,46 @@ public class ShortcutRouter : MonoBehaviour
 | `AndroidDrawable` | Drawable resource name overriding the `Icon` lookup. Ignored on iOS. |
 | `Payload` | App-defined string riding the shortcut (iOS `userInfo`, Android extras), restored across cold starts. Not pushed with the tap — read it via `GetById(id)?.Payload` from the id `Performed` reports (`GetById` is null for a **static**-shortcut tap or an id removed since: static items never join the runtime list and carry no payload). |
 | `LocalizedTitles` / `LocalizedSubtitles` | Per-locale label replacements (`LocalizedText { Locale, Text }` pairs). Resolution: exact locale match > language prefix (`"pt-BR"` matches a `"pt"` entry) > base `Title`/`Subtitle`, case-insensitive. The tables survive cold starts (they ride the ownership-marker payload), so labels re-resolve after a device-language change. Static (baked) shortcuts localize on **Android only** (`values-<qualifier>/` string resources); iOS static shortcuts render in their base language — see "Known limits". |
+
+### Android icons need a drawable in your project
+
+`IconType` resolves differently per platform, and this is the one step Android
+users must do by hand. **iOS** maps it to Apple's built-in
+`UIApplicationShortcutIconType` catalog — the OS owns those glyphs, nothing to
+ship. **Android has no system glyph catalog**, so the same `IconType` resolves
+to a drawable *name* looked up in **your** project:
+
+```java
+getResources().getIdentifier("ic_quickaction_add", "drawable", getPackageName())
+```
+
+No such drawable → no icon, and the launcher draws an empty placeholder square.
+That is why the Android screenshot at the top of this file shows blank icons:
+the demo project ships no drawables.
+
+To supply one, create an **Android Library plug-in** anywhere under `Assets/`
+(this is Unity's supported mechanism on 2021.3, 2022.3 and 6.x alike — the
+import instructions are identical across all three):
+
+```
+Assets/QuickActionIcons.androidlib/
+  src/main/AndroidManifest.xml     <manifest package="com.yourcompany.qaicons"/>
+  src/main/res/drawable-xhdpi/ic_quickaction_add.png
+```
+
+Then either name the drawable `ic_quickaction_<icontype>` so `Icon` finds it, or
+point at any resource explicitly with `AndroidDrawable = "my_icon"`.
+
+Two traps worth knowing:
+
+- The resources must sit under **`src/main/res/`**. A `res/` folder at the
+  `.androidlib` root is silently ignored — green build, no warning, no icon.
+- **Do not** use `Assets/Plugins/Android/res/`. Unity **removed** that path in
+  2021.2, below this package's floor, and it now fails the build outright
+  rather than being ignored.
+
+For runtime art (a `Texture2D` you generate or download) skip drawables
+entirely and use `AndroidBitmapFile` — see the field table above.
 
 ### Test in the Editor — no device needed
 
