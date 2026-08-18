@@ -34,6 +34,11 @@
          only way its aapt2-breaking cases get a regression test. -->
     <Compile Include="../Editor/QuickActionsSettings.cs" />
     <Compile Include="../Editor/Android/QuickActionsBuildPostProcessorAndroid.cs" />
+    <!-- The build-time placeholder/customize pipeline both platform bakers call.
+         Compiled here for the same reason as the Android post-processor above:
+         its behavior (escaping, precedence, per-locale interpolation) only
+         otherwise surfaces inside a real device build's Info.plist / res/xml. -->
+    <Compile Include="../Editor/QuickActionsStaticBuild.cs" />
     <Compile Include="EditorTests/**/*.cs" />
   </ItemGroup>
 </Project>

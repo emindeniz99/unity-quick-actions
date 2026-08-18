@@ -11,7 +11,7 @@ physical-device validation has happened — is the **Status** section of the
 the two must not disagree.
 
 **Legend — Verified by:**
-`unit` = headless NUnit (`dotnet test`, 73 tests) · `unity-test` = Unity Test
+`unit` = headless NUnit (`dotnet test`, 90 tests) · `unity-test` = Unity Test
 Runner only (JsonUtility) · `static` = compiles in the stub harness (10 configs) ·
 `review` = code review, several adversarial rounds (see git log) ·
 `device` = **requires a real physical device** — Android partially done
@@ -74,6 +74,7 @@ says "6.3" for work dated later than 2026-07-17, the Editor was `6000.3.21f1`.
 | Feature | Verified by | Status / gate |
 |---|---|---|
 | Static shortcuts → iOS `Info.plist` (`PBXProject`/`PlistDocument`) | static + review + **editor-6.x iOS Simulator run** | ✅ run for real on 6.3: the baker wrote the static shortcuts into the generated Xcode project's `Info.plist`, and they appear on the Simulator home screen with their SF Symbol icons (alongside one added at runtime through the C# API) |
+| Static-shortcut `{placeholder}` interpolation + build-code hooks (`QuickActionsStaticBuild`: `Customize`, `RegisterPlaceholder`) | unit + static | 17 headless tests pin the engine — escaping, case-insensitivity, unknown-token verbatim, override/custom precedence, per-locale rows, throwing resolvers, the customizer contract, copy-not-mutate on subscriber items — and both bakers consume the prepared list. The resolved strings ride the two bake paths proven above/below; no device build has been run **since** this feature landed. |
 | Static shortcuts → Android `res/xml` + strings + meta-data (escaping, real `applicationId`) | static + review + **editor-2022.3 REAL APK** | ✅ **build-proven 2026-07-17**: 4 static shortcuts (with hostile escaping inputs — embedded `"`, `'`, `&`, `<>`, leading `@`/`?`, `\`, edge whitespace) baked into a real dev APK. `aapt dump`: `res/xml/quickactions_shortcuts.xml` present, each `<shortcut>` intent targets `QuickActionsTrampolineActivity` with action `…PERFORM.<id>` and `targetPackage` = the real `applicationId` from the launcher `build.gradle`; launcher activity has the `android.app.shortcuts` meta-data; every string round-tripped exactly and aapt2 accepted them (a wrong `EscapeResValue` would fail the resource compile). |
 | Trampoline `<activity>` injector (`QuickActionsTrampolineInjectorAndroid`, gated) | static + review + **editor-2022.3 REAL APK** + **editor-6.x REAL BUILD** | ✅ **build-proven 2026-07-17**: real Gradle dev build (define ON) → `aapt dump xmltree` shows the trampoline `<activity>` with exported/translucent/taskAffinity=""/excludeFromRecents/noHistory. Since re-proven on the `UnityPlayerActivity` path (2021.3.45f2, 2022.3.62f3) **and** on the Unity 6 `UnityPlayerGameActivity` path (6000.3.21f1). (The injector exists because a real build proved Unity does **not** merge a loose `AndroidManifest.xml` from inside a UPM package — the pre-fix dev APK had no trampoline at all.) |
 | Project Settings ▸ Quick Actions UI (+ asset create, dup-id warning) | static + review | ⏳ **Unity** — Editor GUI |
@@ -90,25 +91,27 @@ says "6.3" for work dated later than 2026-07-17, the Editor was `6000.3.21f1`.
 ## Sign-off
 
 - **Headless gate (closable without a Unity Editor): GREEN.** `tools~/verify.sh` → **VERIFY: PASS** —
-  9 C# configs compile with **0 warnings**, **73 unit tests pass** (`dotnet test`),
+  10 C# configs compile with **0 warnings**, **90 unit tests pass** (`dotnet test`),
   the Android plugin compiles and its Java smoke test passes **103 checks, 0
   failed**, and every asset has a stable `.meta`. Every managed feature has a
   dedicated, intent-encoding test. Reviewed feature by feature across repeated
   adversarial rounds; every confirmed finding was fixed or explicitly
   documented, and **no ship-blocker remains open**.
-- **Test inventory (where each number comes from).** 78 distinct C# tests:
+- **Test inventory (where each number comes from).** 95 distinct C# tests:
   - **69 shared** — `Tests/Editor/QuickActionsApiTests.cs` (63) and
     `QuickActionItemTests.cs` (6). Run by BOTH `dotnet test` and the Unity Test
     Runner.
   - **5 Unity-only** — `Tests/Editor/SerializationTests.cs`. Needs real
     `JsonUtility`, so the headless harness excludes it (see the `Compile Include`
     list in `.verify/QuickActions.Tests.csproj`).
-  - **4 headless-only** — `.verify/EditorTests/AndroidStaticLocalizationTests.cs`.
-    Lives in the harness because the code under test sits behind a
-    `UNITY_ANDROID` `defineConstraints` asmdef that a Unity test assembly cannot
-    reference on other build targets.
+  - **21 headless-only** — `.verify/EditorTests/AndroidStaticLocalizationTests.cs`
+    (4) and `StaticBuildPlaceholdersTests.cs` (17). Live in the harness because
+    the code under test sits in Editor assemblies a Unity test assembly cannot
+    reference (the Android post-processor's asmdef is `defineConstraints`-gated
+    to `UNITY_ANDROID`; the runtime-referencing test asmdef can't see the Editor
+    assembly the placeholder pipeline lives in).
 
-  So `dotnet test` reports **73** (69 + 4) and a Unity Test Runner run reports
+  So `dotnet test` reports **90** (69 + 21) and a Unity Test Runner run reports
   **74** (69 + 5) — and **74/74 is the measured result** on 2021.3.45f2,
   2022.3.62f3 and 6000.3.21f1. The `35/35` real-editor runs cited below predate
   every test added from 2026-07-17 onward (cap-reconcile, failed-read/failed-write

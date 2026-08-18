@@ -25,6 +25,10 @@ namespace EminDeniz99.QuickActions.Editor
         /// <summary>The configured static shortcuts (may be empty).</summary>
         public IReadOnlyList<QuickActionItem> StaticShortcuts => staticShortcuts;
 
+        // Editor-UI append (the settings page's preset button). Callers own the
+        // Undo/SetDirty bookkeeping — this only mutates the serialized list.
+        internal void AddStaticShortcut(QuickActionItem item) => staticShortcuts.Add(item);
+
         [Tooltip("PNG (preferred) or JPEG textures copied into the iOS build (app " +
                  "target). A PNG resolves as IosTemplateImage = \"<file name without " +
                  "extension>\"; a JPEG must include its extension (bare-name bundle " +

@@ -9,21 +9,26 @@ using System.Xml;
 using EminDeniz99.QuickActions;
 using UnityEditor;
 using UnityEditor.Android;
+using UnityEditor.Build;
+using UnityEditor.Build.Reporting;
 using UnityEngine;
 
 namespace EminDeniz99.QuickActions.Editor
 {
     /// <summary>
-    /// Bakes the static shortcuts from <see cref="QuickActionsSettings"/> into the
-    /// generated Gradle project: writes <c>res/xml/quickactions_shortcuts.xml</c>
-    /// (+ the required string resources) and injects the
-    /// <c>android.app.shortcuts</c> meta-data into the launcher activity.
+    /// Bakes the static shortcuts from <see cref="QuickActionsSettings"/> — as
+    /// prepared by <see cref="QuickActionsStaticBuild"/> (Customize hook +
+    /// <c>{placeholder}</c> interpolation) — into the generated Gradle project:
+    /// writes <c>res/xml/quickactions_shortcuts.xml</c> (+ the required string
+    /// resources) and injects the <c>android.app.shortcuts</c> meta-data into
+    /// the launcher activity.
     ///
     /// Static shortcut intents target <see cref="QuickActionsTrampolineActivity"/>
     /// and encode the action id in the intent action (XML shortcut intents cannot
     /// carry extras); the trampoline decodes it. Guarded by <c>UNITY_ANDROID</c>.
     /// </summary>
-    internal sealed class QuickActionsBuildPostProcessorAndroid : IPostGenerateGradleAndroidProject
+    internal sealed class QuickActionsBuildPostProcessorAndroid
+        : IPostGenerateGradleAndroidProject, IPreprocessBuildWithReport
     {
         private const string AndroidNs = "http://schemas.android.com/apk/res/android";
         private const string ActionPrefix = "com.emindeniz99.quickactions.PERFORM.";
@@ -33,10 +38,31 @@ namespace EminDeniz99.QuickActions.Editor
 
         public int callbackOrder => 100;
 
+        // The Development flag of the build ACTUALLY running. The Gradle callback
+        // gets no BuildReport, and EditorUserBuildSettings.development is only the
+        // persisted Build Settings checkbox — a scripted BuildPlayer(options:
+        // Development) doesn't sync it, so reading the checkbox here would hand
+        // Customize subscribers the wrong flag on exactly the CI builds the
+        // dev-only recipe targets (the iOS baker reads report.summary.options;
+        // the platforms must agree). Captured in OnPreprocessBuild, which Unity
+        // runs for the same build earlier in the same domain; the checkbox is
+        // only the fallback for a state where no preprocess ever fired.
+        private static bool? s_developmentBuild;
+
+        public void OnPreprocessBuild(BuildReport report) =>
+            s_developmentBuild = (report.summary.options & BuildOptions.Development) != 0;
+
         public void OnPostGenerateGradleAndroidProject(string path)
         {
-            var settings = QuickActionsSettings.GetOrNull();
-            var hasShortcuts = settings != null && settings.StaticShortcuts.Count > 0;
+            // The applicationId also feeds the {bundleId} placeholder, so a label
+            // and the intent it sits next to can never disagree about the id.
+            var appId = ResolveApplicationId(path);
+            // The baked set is the PREPARED one — settings copies run through the
+            // Customize hook, then {placeholder} interpolation — not the raw asset.
+            var shortcuts = QuickActionsStaticBuild.Prepare(BuildTarget.Android,
+                s_developmentBuild ?? EditorUserBuildSettings.development,
+                new Dictionary<string, string> { ["bundleId"] = appId });
+            var hasShortcuts = shortcuts.Count > 0;
 
             // The launcher activity (MAIN/LAUNCHER) may live in the unityLibrary
             // module (given here) or the sibling launcher module. Resources and the
@@ -62,17 +88,19 @@ namespace EminDeniz99.QuickActions.Editor
 
             if (!hasShortcuts)
             {
-                // No static shortcuts configured. A reused/exported Gradle project may
+                // No static shortcuts to bake. A reused/exported Gradle project may
                 // still hold the res files + meta-data a previous build wrote; remove
                 // them so stale long-press shortcuts don't ship. (Parity with iOS.)
                 RemoveGeneratedShortcuts(moduleDir, manifestPath);
                 return;
             }
 
-            var appId = ResolveApplicationId(path);
-            WriteResources(moduleDir, settings, appId);
+            // Log what was actually WRITTEN, not the prepared count: the writer
+            // still skips empty/duplicate items (an interpolated-to-empty title
+            // included), and claiming those were written would be a lie.
+            var written = WriteResources(moduleDir, shortcuts, appId);
             if (InjectMetaData(manifestPath))
-                Debug.Log($"[QuickActions] Wrote {settings.StaticShortcuts.Count} static shortcut(s) to the Android project.");
+                Debug.Log($"[QuickActions] Wrote {written} static shortcut(s) to the Android project.");
         }
 
         // Removes the generated shortcut resources and the launcher meta-data so a
@@ -195,7 +223,9 @@ namespace EminDeniz99.QuickActions.Editor
             return null;
         }
 
-        private static void WriteResources(string moduleDir, QuickActionsSettings settings, string appId)
+        // Returns the number of shortcuts actually written (invalid/duplicate
+        // items are skipped).
+        private static int WriteResources(string moduleDir, IReadOnlyList<QuickActionItem> items, string appId)
         {
             var resDir = Path.Combine(moduleDir, "src", "main", "res");
             var xmlDir = Path.Combine(resDir, "xml");
@@ -236,7 +266,7 @@ namespace EminDeniz99.QuickActions.Editor
 
             var seen = new HashSet<string>();
             var index = 0;
-            foreach (var item in settings.StaticShortcuts)
+            foreach (var item in items)
             {
                 if (item == null || string.IsNullOrEmpty(item.Id) || string.IsNullOrEmpty(item.Title))
                     continue;
@@ -304,6 +334,7 @@ namespace EminDeniz99.QuickActions.Editor
             }
             if (localized.Count > 0)
                 Debug.Log($"[QuickActions] Wrote localized static-shortcut labels for {localized.Count} locale(s).");
+            return index;
         }
 
         // Adds one item's per-locale labels to the per-qualifier buckets, skipping

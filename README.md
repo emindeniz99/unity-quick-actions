@@ -85,8 +85,8 @@ static one was dropped in favour of the manifest entry — exactly as documented
 warm), and anything at all on a physical iPhone. Plan on validating the tap path
 on your own device before you ship.
 
-**Also true:** the suite is 73 headless tests (`dotnet test`) and 74 in Unity's
-Test Runner (it adds 5 `JsonUtility` serialization tests; 4 of the headless ones
+**Also true:** the suite is 90 headless tests (`dotnet test`) and 74 in Unity's
+Test Runner (it adds 5 `JsonUtility` serialization tests; 21 of the headless ones
 don't run there), plus an Android Java smoke of 103 checks, across 10 C# compile
 configurations with 0 warnings.
 The iOS `.mm` compiles cleanly against the current iOS SDK
@@ -373,7 +373,7 @@ public class ShortcutRouter : MonoBehaviour
 
 | Field | Purpose |
 |-------|---------|
-| `Id` (required, unique) / `Title` (required) / `Subtitle` | Labels. `Subtitle` renders under the title on iOS and as the Android long label. |
+| `Id` (required, unique) / `Title` (required) / `Subtitle` | Labels. `Subtitle` renders under the title on iOS and as the Android long label. In **static** (baked) items both may embed build-time `{placeholders}` — see [Build-time placeholders](#build-time-placeholders--app-info-on-long-press). |
 | `Icon` (`IconType`) | Built-in glyph catalog (29 entries). iOS uses Apple's system icons — nothing to ship. Android resolves `ic_quickaction_<name>` from a drawable **you add**; without one the launcher shows a blank square. See [Android icons](#android-icons-need-a-drawable-in-your-project). |
 | `IosSystemImage` | SF Symbol name (`"star.fill"`, iOS 13+) — beats `IosTemplateImage` and `Icon`. Ignored on Android. |
 | `IosTemplateImage` | Template-image name shipped in the Xcode bundle (single-color, ~35×35 pt) — beats `Icon`. Ignored on Android. |
@@ -479,6 +479,112 @@ shortcuts are **not** surfaced by the runtime query API — `GetAll()`/`IsAdded(
 see only dynamic shortcuts, so avoid reusing a static shortcut's `Id` in a
 runtime `Add()`: on iOS it shows twice, and on Android the colliding dynamic item
 is dropped (the rest of the set is unaffected).
+
+### Build-time placeholders — app info on long-press
+
+Static titles and subtitles may embed `{placeholder}` tokens; the build
+post-processors resolve them while baking `Info.plist` / `shortcuts.xml`, so
+the resolved text exists from the first install, before the app ever runs. The
+classic use is a build-info shortcut for development: **Project Settings ▸
+Quick Actions** has an **"Add app info shortcut"** button that appends
+
+```text
+Id: app_info    Title: App info    Subtitle: v{version} ({build})
+```
+
+and the baked subtitle then reads e.g. `v1.4.0 (37)` — which build is on this
+device, answerable from a long-press without launching the app. The version
+belongs in the **subtitle** because that is the line long-press actually shows:
+Android launchers render the long label (the subtitle), iOS shows title and
+subtitle.
+
+Built-in tokens (matched case-insensitively):
+
+| Token | Bakes to |
+|-------|----------|
+| `{version}` | `PlayerSettings.bundleVersion` — what `Application.version` reports at runtime. |
+| `{build}` | iOS: `PlayerSettings.iOS.buildNumber` (`CFBundleVersion`). Android: `PlayerSettings.Android.bundleVersionCode`. Left unresolved on any other target. |
+| `{bundleId}` | iOS: `PlayerSettings.applicationIdentifier`. Android: the **Gradle-resolved** `applicationId` — the same id the static intent targets, so the label and the intent can never disagree. |
+| `{productName}` | `PlayerSettings.productName`. |
+| `{unityVersion}` | The Editor version building the player. |
+| `{platform}` | `iOS` / `Android`. |
+
+Rules: `{{` / `}}` produce a literal brace; an unknown token is left verbatim
+(the settings page and the build log both warn); anything not token-shaped —
+`{}`, `{a b}`, an unclosed `{` — passes through untouched. One upgrade caveat:
+a pre-0.4.6 label that happens to contain a known token name (a literal
+`{version}`) or doubled braces IS now interpolated/escaped — double the braces
+(`{{version}}`) to keep such text literal. Localized titles/subtitles are
+interpolated too (relevant on Android; iOS static items don't localize — see
+[Known limits](#known-limits--localization)). Values are
+frozen into that build and change only on the next one — for version info,
+that's the point.
+
+Two editor-script hooks extend this (both editor-only, in
+`EminDeniz99.QuickActions.Editor`):
+
+**Custom placeholders** — any value you can compute at build time (build date,
+git hash, CI run number, an env var…):
+
+```csharp
+using UnityEditor;
+using EminDeniz99.QuickActions.Editor;
+
+[InitializeOnLoad]
+static class MyBuildPlaceholders
+{
+    static MyBuildPlaceholders()
+    {
+        QuickActionsStaticBuild.RegisterPlaceholder("buildDate",
+            () => System.DateTime.UtcNow.ToString("yyyy-MM-dd"));
+        QuickActionsStaticBuild.RegisterPlaceholder("ci",
+            () => System.Environment.GetEnvironmentVariable("GITHUB_RUN_NUMBER") ?? "local");
+        // then e.g. Subtitle: "v{version} ({build}) · {buildDate} · #{ci}"
+    }
+}
+```
+
+Resolvers run once per build, at bake time. One that throws never fails the
+build — the build log warns and the token falls back: it stays verbatim for a
+new name, or keeps the built-in value when the resolver shadowed one. Custom
+names win over built-ins (you can redefine `{version}`). A token that resolves
+to an **empty title** would make the bakers skip that shortcut, so the build
+log warns about that too.
+
+**The `Customize` hook** — rewrite the baked set in code; e.g. ship the
+app-info shortcut in development builds only:
+
+```csharp
+[InitializeOnLoad]
+static class DevOnlyAppInfo
+{
+    static DevOnlyAppInfo()
+    {
+        QuickActionsStaticBuild.Customize += ctx =>
+        {
+            if (ctx.DevelopmentBuild)
+                ctx.Shortcuts.Add(new QuickActionItem(
+                    "app_info", "App info", "v{version} ({build})"));
+        };
+    }
+}
+```
+
+`ctx.Shortcuts` is the exact list about to bake (copies — the settings asset is
+never touched): add, remove, reorder or edit freely. Added items get
+placeholder resolution too, and the hook also runs — with an empty list — in a
+project that has no settings asset at all, so a whole static set can be defined
+in code. A subscriber that throws fails the build, deliberately: baking a
+half-customized set into a release would be worse.
+
+This is a **static-shortcut** feature. Dynamic shortcuts don't need it — build
+their strings at runtime with ordinary C# interpolation
+(`new QuickActionItem("info", $"v{Application.version}")`); the platform build
+number has no Unity runtime API, which is exactly why the static tokens resolve
+in the Editor. The in-Editor [Simulator](#test-in-the-editor--no-device-needed)
+previews built-in tokens using the active build target's Player Settings;
+custom placeholders and `Customize` subscribers run only in real builds, so
+their tokens show raw there.
 
 ## How it works
 
@@ -644,9 +750,9 @@ tools~/setup.sh     # install dotnet + JDK (once)
 tools~/verify.sh    # .meta gen + C# compile (10 configs) + unit tests + Android plugin
 ```
 
-`verify.sh` compiles the C# in **9 configurations** (0 warnings), runs the **73**
+`verify.sh` compiles the C# in **10 configurations** (0 warnings), runs the **90**
 headless unit tests via `dotnet test`, and compiles and smoke-tests the Android
-Java plugin (**103** checks). Those tests (bar 4 headless-only ones) plus 5
+Java plugin (**103** checks). Those tests (bar 21 headless-only ones) plus 5
 `JsonUtility` serialization tests run in Unity's **Test Runner** from
 `Tests/Editor/` — **74** there. See [`.verify/README.md`](./.verify/README.md)
 for how the stubs work.

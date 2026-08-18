@@ -12,8 +12,10 @@ using UnityEngine;
 namespace EminDeniz99.QuickActions.Editor
 {
     /// <summary>
-    /// Writes the static shortcuts from <see cref="QuickActionsSettings"/> into the
-    /// generated Xcode project's <c>Info.plist</c> as <c>UIApplicationShortcutItems</c>.
+    /// Writes the static shortcuts from <see cref="QuickActionsSettings"/> — as
+    /// prepared by <see cref="QuickActionsStaticBuild"/> (Customize hook +
+    /// <c>{placeholder}</c> interpolation) — into the generated Xcode project's
+    /// <c>Info.plist</c> as <c>UIApplicationShortcutItems</c>.
     /// Dynamic shortcuts (set at runtime) need none of this. The native tap path is
     /// identical for static and dynamic items, so no native change is required here.
     ///
@@ -44,10 +46,14 @@ namespace EminDeniz99.QuickActions.Editor
             var plist = new PlistDocument();
             plist.ReadFromFile(plistPath);
 
-            var settings = QuickActionsSettings.GetOrNull();
-            if (settings == null || settings.StaticShortcuts.Count == 0)
+            // The baked set is the PREPARED one — settings copies run through the
+            // Customize hook, then {placeholder} interpolation — not the raw asset:
+            // a customizer may add items to an asset-less project or empty the list.
+            var shortcuts = QuickActionsStaticBuild.Prepare(BuildTarget.iOS,
+                (report.summary.options & BuildOptions.Development) != 0);
+            if (shortcuts.Count == 0)
             {
-                // No static shortcuts configured. On an *Append* build the plist may
+                // No static shortcuts to bake. On an *Append* build the plist may
                 // still hold entries a previous build wrote; remove ONLY ours (marked)
                 // so stale package shortcuts don't ship while a host app's / another
                 // plugin's own UIApplicationShortcutItems are preserved.
@@ -73,7 +79,7 @@ namespace EminDeniz99.QuickActions.Editor
 
             var seen = new HashSet<string>();
             var count = 0;
-            foreach (var item in settings.StaticShortcuts)
+            foreach (var item in shortcuts)
             {
                 if (item == null || string.IsNullOrEmpty(item.Id) || string.IsNullOrEmpty(item.Title))
                     continue;

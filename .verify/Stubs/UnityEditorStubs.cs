@@ -61,6 +61,13 @@ namespace UnityEditor
         public static void DisplayDialog(string title, string message, string ok) { }
 
         public static bool scriptCompilationFailed;
+
+        public static void SetDirty(UnityEngine.Object target) { }
+    }
+
+    public static class Undo
+    {
+        public static void RecordObject(UnityEngine.Object objectToUndo, string name) { }
     }
 
     public static class SessionState
