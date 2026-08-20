@@ -20,26 +20,45 @@ the failing check is fixed first, not worked around.
 
 ## Cutting a release
 
-1. `tools~/verify.sh` passes.
-2. `version` in `package.json` is bumped to the new semver value.
-3. The matching `CHANGELOG.md` section is renamed from `Unreleased` to that
-   version and given a real date. The version in `package.json` and the
-   version in the top `CHANGELOG.md` heading must agree — OpenUPM rejects a
-   mismatch between the tag and `package.json` with error **E811**, so the bump
+**Releases are automatic.** You decide the version and write the changelog;
+merging is the whole ceremony. There is no tag to push and no artifact to
+upload by hand.
+
+1. In the release PR, bump `version` in `package.json` **and** rename the top
+   `CHANGELOG.md` section from `Unreleased` to that version with a real date.
+   The two must agree: `tools~/verify.sh` check 6 fails the PR when they do
+   not, because OpenUPM rejects a tag/`package.json` mismatch with error
+   **E811** and the release notes are quoted from that section — so the bump
    belongs in the commit that gets tagged, never in a follow-up commit.
-4. Both changes are committed together.
-5. The commit is tagged with a plain semver tag: `git tag v<version>`.
-6. The tag is pushed: `git push origin v<version>`.
-7. CI (`.github/workflows/ci.yml`) re-runs the verification on the tagged
-   commit, then packs `dist~/QuickActions.unitypackage` with
-   `tools~/pack_unitypackage.py` and attaches it to the GitHub Release. The
+2. Merge the PR with a real merge commit (never squash — see below).
+3. [`.github/workflows/release.yml`](./.github/workflows/release.yml) takes it
+   from there: it notices that main declares a version with no tag, runs
+   `verify.sh`, packs `dist~/QuickActions.unitypackage`, creates the tag
+   `v<version>` at the merge commit and publishes the GitHub Release with your
+   changelog section as its notes. A merge that does not bump the version is a
+   no-op, so the workflow can watch every push to main harmlessly.
+4. Confirm at <https://github.com/emindeniz99/unity-quick-actions/releases>
+   that the `.unitypackage` is attached, because the install docs point
+   downloaders there. (`v0.4.0`, cut 2026-08-07, is the first one.) The
    `.unitypackage` is a build output — `dist~/` is gitignored and the artifact
-   is never committed. If the release asset is missing, `tools~/release.sh`
-   rebuilds it locally for a manual upload.
-8. The release is confirmed at
-   <https://github.com/emindeniz99/unity-quick-actions/releases> with the
-   `.unitypackage` attached, because the install docs point downloaders there.
-   (`v0.4.0`, cut 2026-08-07, is the first one.)
+   is never committed.
+
+**Manual fallback**, still fully supported: push a tag by hand
+(`git tag v<version> && git push origin v<version>`) and the tag-triggered
+`release` job in `ci.yml` does the same packaging. `tools~/release.sh`
+rebuilds the artifact locally if you ever need to upload one yourself.
+
+**Why not Release Please / semantic-release.** Both own `CHANGELOG.md`, and
+this one is written by hand on purpose — a narrative log with a bold thesis
+per entry, which is why the release notes can simply quote it. Release Please
+offers no opt-out for changelog generation, so adopting it means trading that
+for `* editor: bake placeholders (#1)`. It also cannot fire our packaging step:
+anything it does with the repo's own `GITHUB_TOKEN` is invisible to other
+workflows, so its tag would publish a release with no `.unitypackage` unless
+we added a long-lived PAT to a public repo. `release.yml` avoids both by doing
+verify → pack → tag → publish inside one run. What remains of their value —
+inferring the version from `feat:`/`fix:` prefixes — is a judgement this
+package makes deliberately, not one to hand to a parser.
 
 ## OpenUPM
 

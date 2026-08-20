@@ -30,6 +30,27 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   runs, so untrusted code never reaches them, and the run still ends green.
   Not yet run — it awaits the licence secrets and a merge to `main`.
 
+- **Releases cut themselves: the `release` workflow.** Bump `version` in
+  `package.json`, date the `CHANGELOG.md` section, merge — and
+  `.github/workflows/release.yml` notices that main declares a version with no
+  tag, runs `verify.sh`, packs the `.unitypackage`, creates the tag and
+  publishes the GitHub Release with **your changelog section as its notes**. A
+  merge that does not bump the version is a no-op. No tag to push, no artifact
+  to upload, and the release notes stay the hand-written narrative this file
+  already is — which is precisely why Release Please was not adopted: it owns
+  `CHANGELOG.md` with no opt-out, and anything it does with the repo's own
+  `GITHUB_TOKEN` cannot trigger the packaging job, so its releases would ship
+  without the `.unitypackage` unless a long-lived PAT were added to a public
+  repo. `MAINTAINING.md` records the full reasoning.
+- **`verify.sh` gained a sixth check** (and its header stopped claiming four):
+  `package.json` and the top `CHANGELOG.md` heading must agree on the version.
+  That rule existed only as prose in `MAINTAINING.md`, yet breaking it means
+  OpenUPM's **E811** and release notes describing the wrong version — now the
+  PR goes red instead of main after the merge that would have cut the release.
+  A section still called `[Unreleased]` passes, since that is a legal
+  mid-development state. `CONTRIBUTING.md` said "four checks" and "nine build
+  configurations"; both were already wrong and now read six and ten.
+
 - **Static shortcut labels can now carry build-time `{placeholder}` tokens** —
   the answer to "which build is on this device?" from a long-press, before the
   app is ever launched. The platform bakers resolve them while writing

@@ -751,7 +751,7 @@ The package is type-checked and compiled without Unity via a stub-based harness:
 
 ```bash
 tools~/setup.sh     # install dotnet + JDK (once)
-tools~/verify.sh    # .meta gen + C# compile (10 configs) + unit tests + Android plugin
+tools~/verify.sh    # .meta + C# compile (10 configs) + unit tests + Android plugin + frozen strings + release coherence
 ```
 
 `verify.sh` compiles the C# in **10 configurations** (0 warnings), runs the **90**
