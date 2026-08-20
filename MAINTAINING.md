@@ -13,7 +13,7 @@ tools~/verify.sh        # must end with: VERIFY: PASS
 ```
 
 `tools~/setup.sh` installs the toolchain once (dotnet SDK + a JDK). `verify.sh`
-checks `.meta` completeness, compiles the C# in 9 configurations against the
+checks `.meta` completeness, compiles the C# in 10 configurations against the
 Unity stubs in `.verify/`, runs the NUnit suite, and compiles plus smoke-tests
 the Android Java plugin. Anything short of `VERIFY: PASS` blocks the release —
 the failing check is fixed first, not worked around.

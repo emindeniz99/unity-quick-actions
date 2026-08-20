@@ -11,6 +11,71 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 > as its own section because each is a distinct, self-contained set of API
 > additions; read them as the package's development log.
 
+## [0.4.6] - 2026-08-20
+
+### Added
+
+- **A real-Unity CI lane: the `unity` workflow (GameCI).** The stub harness
+  proves the C# type-checks but cannot open an editor;
+  `.github/workflows/unity-ci.yml` is configured to run the EditMode suite on
+  all three `Examples~` testbeds for every code push and PR, and — on manual
+  dispatch or the weekly cron, because an hour of IL2CPP per line is not what a
+  one-line change needs — to build a development APK per line and feed it
+  through the adb device smoke, and export the iOS Simulator Xcode project on
+  every line, compiling it unsigned and cold-launching it on a macOS-runner
+  simulator for 2022.3 and Unity 6 (2021.3 exports only — that line's simulator
+  support is x86_64-only). Unity jobs skip cleanly when the
+  `UNITY_LICENSE`/`UNITY_EMAIL`/`UNITY_PASSWORD` secrets are absent, which is
+  exactly what a fork PR gets: GitHub withholds secrets from fork-triggered
+  runs, so untrusted code never reaches them, and the run still ends green.
+  Not yet run — it awaits the licence secrets and a merge to `main`.
+
+- **Static shortcut labels can now carry build-time `{placeholder}` tokens** —
+  the answer to "which build is on this device?" from a long-press, before the
+  app is ever launched. The platform bakers resolve them while writing
+  `Info.plist` / `shortcuts.xml`: `{version}`, `{build}` (iOS build number /
+  Android versionCode — each platform gets its own), `{bundleId}` (on Android
+  the **Gradle-resolved** `applicationId`, the same value the static intent
+  targets), `{productName}`, `{unityVersion}`, `{platform}`. Matching is
+  case-insensitive, `{{` escapes a literal brace, localized rows are
+  interpolated too, and an unknown token is left verbatim — warned about on the
+  settings page and in the build log — rather than baked as a hole. The
+  settings page also gained a one-click **"Add app info shortcut"** preset
+  (`app_info` / `v{version} ({build})` in the subtitle, because the subtitle is
+  the line long-press actually shows on Android), and the Simulator window
+  previews built-in tokens for the active build target.
+- **`QuickActionsStaticBuild` — the baked set is now programmable.** Rather
+  than shipping an opinionated "development-only" list, the pipeline exposes
+  the two primitives that make any policy a three-line editor script:
+  `RegisterPlaceholder("buildDate", …)` for custom values (env vars, git, CI
+  numbers; a throwing resolver never fails the build — its token falls back to
+  verbatim, or to the built-in value it shadowed, with a warning) and the
+  `Customize` event, which hands subscribers the exact item list about to bake
+  (copies — the asset is untouched) plus the platform and the Development-build
+  flag, so `if (ctx.DevelopmentBuild) ctx.Shortcuts.Add(…)` is the dev-only
+  recipe. A throwing `Customize` subscriber fails the build on purpose — a
+  half-customized release set would be worse. 17 new headless tests pin the
+  engine's contracts; `dotnet test` now runs **90**.
+
+### Changed
+
+- **A pre-existing static label that happens to contain `{aKnownTokenName}` or
+  doubled braces now changes output on upgrade.** Interpolation is
+  unconditional, so a literal `{version}` typed before this release starts
+  resolving and `{{`/`}}` collapse to one brace — silently, since only
+  *unknown* tokens warn. Non-token-shaped brace text (`{}`, `{a b}`, an
+  unclosed `{`) still bakes exactly as typed; double the braces to keep
+  token-shaped text literal.
+
+### Fixed
+
+- **Four stale harness counts in the docs said "9 compile configurations".**
+  `verify.sh` has built 10 since the Bootstrap config landed (the 9→10 change
+  was even changelogged at the time); README's Verifying section,
+  `PRODUCTION_READINESS.md`'s sign-off, `MAINTAINING.md`'s verify description
+  and `.verify/README.md`'s config list now say 10 — and the latter now
+  actually names `Bootstrap`.
+
 ## [0.4.5] - 2026-08-11
 
 Documentation only. No code change.

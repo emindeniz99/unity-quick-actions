@@ -107,6 +107,10 @@ namespace UnityEngine
         // Deterministic in the harness (the real property reads the device); tests
         // that care about locale set QuickActions.Locale explicitly.
         public static SystemLanguage systemLanguage => SystemLanguage.English;
+
+        // Deterministic for the {unityVersion} placeholder tests; spelled like a
+        // real 2021.3 editor version (the declared minimum this stub mirrors).
+        public static string unityVersion => "2021.3.45f1";
     }
 
     public static class JsonUtility

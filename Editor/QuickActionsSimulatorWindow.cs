@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 
@@ -18,6 +19,13 @@ namespace EminDeniz99.QuickActions.Editor
         // run on every OnGUI repaint in a large project.
         private QuickActionsSettings _settings;
 
+        // Built-in {placeholder} values for the ACTIVE build target, so the static
+        // buttons preview the label that target would bake. Built-ins only: custom
+        // placeholders and Customize subscribers run in a real build (a resolver
+        // may shell out to git — not something to do per repaint), so their tokens
+        // show raw here. Cached alongside _settings for the same repaint-cost reason.
+        private Dictionary<string, string> _placeholderPreview;
+
         [MenuItem("Window/Quick Actions/Simulator")]
         private static void Open()
         {
@@ -28,7 +36,12 @@ namespace EminDeniz99.QuickActions.Editor
         private void OnEnable() => RefreshSettings();
         private void OnFocus() => RefreshSettings();
         private void OnProjectChange() => RefreshSettings();
-        private void RefreshSettings() => _settings = QuickActionsSettings.GetOrNull();
+        private void RefreshSettings()
+        {
+            _settings = QuickActionsSettings.GetOrNull();
+            _placeholderPreview =
+                QuickActionsStaticBuild.BuiltinValues(EditorUserBuildSettings.activeBuildTarget);
+        }
 
         private void OnGUI()
         {
@@ -58,14 +71,20 @@ namespace EminDeniz99.QuickActions.Editor
                 foreach (var item in runtimeItems)
                     DrawTapButton(item.Title, item.Id);
 
-            // Static shortcuts from the settings asset (baked into the build at build time).
+            // Static shortcuts from the settings asset (baked into the build at build
+            // time). Titles preview built-in {placeholder} values for the active
+            // build target — see the _placeholderPreview note.
             if (_settings != null && _settings.StaticShortcuts.Count > 0)
             {
+                if (_placeholderPreview == null)
+                    RefreshSettings();
                 EditorGUILayout.Space();
                 EditorGUILayout.LabelField("Static shortcuts (baked into the build)", EditorStyles.boldLabel);
                 foreach (var item in _settings.StaticShortcuts)
                     if (item != null && !string.IsNullOrEmpty(item.Id))
-                        DrawTapButton(item.Title, item.Id);
+                        DrawTapButton(
+                            QuickActionsStaticBuild.Interpolate(item.Title, _placeholderPreview, null),
+                            item.Id);
             }
 
             // Arbitrary id — e.g. simulate a cold launch from any shortcut id.

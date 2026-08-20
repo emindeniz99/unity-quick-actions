@@ -26,11 +26,38 @@ namespace UnityEditor
     public static class PlayerSettings
     {
         public static string applicationIdentifier => "com.example.app";
+        // Deterministic values so the placeholder tests can pin exact output.
+        // buildNumber and bundleVersionCode are DISTINCT on purpose: a test can
+        // prove {build} came from the platform it asked for. All of these read
+        // real project state in the Editor; constants are enough to compile and
+        // to exercise the interpolation engine.
+        public static string bundleVersion => "1.2.3";
+        public static string productName => "Example App";
         public static string GetScriptingDefineSymbols(UnityEditor.Build.NamedBuildTarget target) => string.Empty;
         public static void SetScriptingDefineSymbols(UnityEditor.Build.NamedBuildTarget target, string defines) { }
+
+        // Mirrors the real nested settings classes (2021.3 API).
+        public static class iOS
+        {
+            public static string buildNumber => "7";
+        }
+
+        public static class Android
+        {
+            public static int bundleVersionCode => 42;
+        }
     }
 
     public enum BuildTarget { NoTarget, iOS, Android, StandaloneWindows64, StandaloneOSX, StandaloneLinux64 }
+
+    [Flags]
+    public enum BuildOptions { None = 0, Development = 1 }
+
+    public static class EditorUserBuildSettings
+    {
+        public static BuildTarget activeBuildTarget => BuildTarget.Android;
+        public static bool development => false;
+    }
 
     public enum SettingsScope { User, Project }
 
@@ -93,6 +120,7 @@ namespace UnityEditor.Build.Reporting
     {
         public BuildTarget platform;
         public string outputPath;
+        public BuildOptions options;
     }
 }
 
