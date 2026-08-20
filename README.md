@@ -50,7 +50,7 @@ hardware; iOS 13+ opens it with a plain long-press on every device.
 
 ## Status
 
-This is **0.4.5**, a pre-1.0 release. Here is exactly what has been proven and
+This is **0.4.6**, a pre-1.0 release. Here is exactly what has been proven and
 what has not — one place, no hedging. (Per-feature detail:
 [PRODUCTION_READINESS.md](./PRODUCTION_READINESS.md).)
 
@@ -83,7 +83,11 @@ static shortcuts on a long-press of a **cold, never-opened install**, runtime
 static one was dropped in favour of the manifest entry — exactly as documented.
 **Still not verified on hardware:** a tap arriving as `Performed` (cold or
 warm), and anything at all on a physical iPhone. Plan on validating the tap path
-on your own device before you ship.
+on your own device before you ship. The 0.4.6 build-time
+[placeholders](#build-time-placeholders--app-info-on-long-press) are likewise
+covered by headless tests only — no device or Simulator run has happened since
+they landed, so what a resolved `v1.4.0 (37)` looks like on a real home screen
+is still unconfirmed.
 
 **Also true:** the suite is 90 headless tests (`dotnet test`) and 74 in Unity's
 Test Runner (it adds 5 `JsonUtility` serialization tests; 21 of the headless ones
