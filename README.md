@@ -757,19 +757,23 @@ Java plugin (**103** checks). Those tests (bar 21 headless-only ones) plus 5
 `Tests/Editor/` — **74** there. See [`.verify/README.md`](./.verify/README.md)
 for how the stubs work.
 
-Beyond the stubs, [`unity-ci.yml`](./.github/workflows/unity-ci.yml) is a
-manual/weekly GitHub Actions lane that runs the **real editors** via
-[GameCI](https://game.ci): the EditMode suite on all three
-[`Examples~`](./Examples~) testbeds, a development Android APK per line fed
-into the adb device smoke, and an iOS Simulator-SDK Xcode export per line —
-compiled unsigned and cold-launched on a macOS-runner simulator for 2022.3 and
-Unity 6 (2021.3 exports only: its simulator support is x86_64-only). It needs
-the repo secrets `UNITY_LICENSE` (a Unity Hub personal-licence `.ulf`'s
+Beyond the stubs, [`unity-ci.yml`](./.github/workflows/unity-ci.yml) runs the
+**real editors** via [GameCI](https://game.ci). It is split by cost: the
+EditMode suite runs on all three [`Examples~`](./Examples~) testbeds for every
+push and PR that touches code (docs-only changes trigger nothing), while the
+build-heavy legs — a development Android APK per line fed into the adb device
+smoke, and an iOS Simulator-SDK Xcode export per line, compiled unsigned and
+cold-launched on a macOS-runner simulator for 2022.3 and Unity 6 (2021.3
+exports only: its simulator support is x86_64-only) — run on manual dispatch
+and a weekly cron. It needs the repo secrets `UNITY_LICENSE` (a Unity Hub personal-licence `.ulf`'s
 contents), `UNITY_EMAIL` and `UNITY_PASSWORD` (Pro: `UNITY_SERIAL` instead of
-the `.ulf`); without them every Unity job skips and the run stays green. The
-workflow header documents the setup step by step. It has not produced a green
-run yet — it needs those secrets, and dispatch/cron only work once the file is
-on `main`.
+the `.ulf`); without them every Unity job skips and the run stays green — which
+is also what happens on a **fork** PR, where GitHub withholds secrets from the
+run by design, so an outside contributor's code never comes within reach of
+them. (Nothing here uses `pull_request_target`, the trigger that *would* hand
+secrets to untrusted code.) The workflow header documents the setup step by
+step. It has not produced a green run yet — it needs those secrets, and the
+triggers only fire once the file is on `main`.
 
 For a real device/emulator, `tools~/device-smoke/` has an adb-driven Android
 smoke (install a dev APK → assert the demo's shortcuts registered → simulate a

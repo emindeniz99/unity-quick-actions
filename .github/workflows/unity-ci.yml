@@ -7,11 +7,18 @@ name: unity
 # an unsigned xcodebuild compile on macOS for the lines whose simulator support
 # allows it.
 #
-# NOT wired to push/pull_request on purpose: every Unity job needs a licence
-# and burns tens of minutes; a red run here must mean "the package broke in a
-# real editor", never "a fork PR had no secrets". Dispatch it by hand or let
-# the weekly cron catch regressions. (Public repo — GitHub-hosted runners,
-# macOS included, are free.)
+# Split by cost: the EditMode tests run on every code push/PR (~15 min a leg,
+# the signal worth having per change), while the build-heavy legs — Android
+# IL2CPP, the emulator smoke, the iOS export and its macOS compile — stay on
+# manual dispatch and the weekly cron, because an hour of IL2CPP per line is
+# not what a one-line change needs. Docs-only changes trigger nothing (paths
+# filter). Public repo: GitHub-hosted runners, macOS included, are free.
+#
+# Fork PRs are safe by construction: GitHub does not pass secrets to a
+# workflow triggered from a fork, so the licence gate below reports "missing"
+# and every Unity job SKIPS — the run is green and no secret was ever within
+# reach of the fork's code. Nothing here uses pull_request_target, which is
+# the trigger that WOULD hand secrets to untrusted code.
 #
 # Secrets (Settings ▸ Secrets and variables ▸ Actions) — see
 # https://game.ci/docs/github/activation:
@@ -37,15 +44,40 @@ name: unity
 on:
   workflow_dispatch:
   schedule:
-    # Weekly regression net; runs from the default branch only.
+    # Weekly regression net for the full set; runs from the default branch only.
     - cron: "0 3 * * 1"
+  # Code only — a docs/store commit must not spend an hour of Unity runners.
+  # The two lists are duplicated on purpose: GitHub accepts a YAML anchor here,
+  # but actionlint cannot resolve the alias, and a linter that rejects our own
+  # workflow is worse than seven repeated lines. Keep them in sync.
+  push:
+    branches: [main]
+    paths:
+      - "Runtime/**"
+      - "Editor/**"
+      - "Plugins/**"
+      - "Tests/**"
+      - "Examples~/**"
+      - "package.json"
+      - ".github/workflows/unity-ci.yml"
+  pull_request:
+    paths:
+      - "Runtime/**"
+      - "Editor/**"
+      - "Plugins/**"
+      - "Tests/**"
+      - "Examples~/**"
+      - "package.json"
+      - ".github/workflows/unity-ci.yml"
 
 permissions:
   contents: read
 
 concurrency:
   group: unity-ci-${{ github.ref }}
-  cancel-in-progress: false
+  # A new push to a PR supersedes its in-flight run (saves minutes and licence
+  # seat contention); a dispatch or the weekly cron is never cancelled.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   # The `secrets` context is not readable in a job-level `if`, so this gate
@@ -68,7 +100,7 @@ jobs:
             echo "available=true" >> "$GITHUB_OUTPUT"
           else
             echo "available=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::Unity licence secrets are not configured — every Unity job was skipped. Add UNITY_LICENSE + UNITY_EMAIL + UNITY_PASSWORD (see the header of .github/workflows/unity-ci.yml)."
+            echo "::notice::No Unity licence secrets in reach — every Unity job was skipped (expected on a fork PR, where GitHub withholds secrets by design). On this repo's own branches, add UNITY_LICENSE + UNITY_EMAIL + UNITY_PASSWORD; see the header of .github/workflows/unity-ci.yml."
           fi
 
   # Unity Test Runner (EditMode) on each testbed: the same 74-test suite the
@@ -132,7 +164,7 @@ jobs:
   android-build:
     name: android build (${{ matrix.testbed.name }})
     needs: license
-    if: needs.license.outputs.available == 'true'
+    if: ${{ needs.license.outputs.available == 'true' && (github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
     strategy:
@@ -231,7 +263,7 @@ jobs:
   ios-export:
     name: ios export (${{ matrix.testbed.name }})
     needs: license
-    if: needs.license.outputs.available == 'true'
+    if: ${{ needs.license.outputs.available == 'true' && (github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
     strategy:
