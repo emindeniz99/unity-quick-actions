@@ -1,0 +1,354 @@
+name: unity
+
+# Real-Unity CI via GameCI (game.ci): the stub harness in ci.yml proves the C#
+# type-checks; this workflow runs the REAL editor — Unity Test Runner (EditMode)
+# on all three Examples~ testbeds, an Android IL2CPP APK per testbed fed into
+# the adb device smoke, and an iOS Simulator-SDK Xcode export per testbed with
+# an unsigned xcodebuild compile on macOS for the lines whose simulator support
+# allows it.
+#
+# NOT wired to push/pull_request on purpose: every Unity job needs a licence
+# and burns tens of minutes; a red run here must mean "the package broke in a
+# real editor", never "a fork PR had no secrets". Dispatch it by hand or let
+# the weekly cron catch regressions. (Public repo — GitHub-hosted runners,
+# macOS included, are free.)
+#
+# Secrets (Settings ▸ Secrets and variables ▸ Actions) — see
+# https://game.ci/docs/github/activation:
+#   UNITY_LICENSE   contents of Unity_lic.ulf — Unity Hub ▸ Preferences ▸
+#                   Licenses ▸ Add ▸ "Get a free personal license", then copy
+#                   ~/.local/share/unity3d/Unity/Unity_lic.ulf (Linux),
+#                   /Library/Application Support/Unity/Unity_lic.ulf (macOS) or
+#                   C:\ProgramData\Unity\Unity_lic.ulf (Windows). The .ulf is
+#                   not tied to an editor version. (The old license.unity3d.com
+#                   manual-activation flow is dead for Personal licences.)
+#   UNITY_EMAIL     the Unity account e-mail (must be the e-mail, not a name)
+#   UNITY_PASSWORD  its password (avoid special characters — known GameCI issue)
+#   UNITY_SERIAL    Professional licences only; leave unset for Personal.
+# Without the secrets every Unity job is SKIPPED (gate job below), so the
+# workflow stays green instead of failing on activation.
+#
+# Licence seats: all parallel Linux docker jobs consume ONE seat, explicitly a
+# non-issue for free licences (https://game.ci/docs/faq/) — hence a full
+# fail-fast:false matrix with no max-parallel. A transient "Unity exits -1
+# within seconds" is a concurrent-activation hiccup: re-run the job after ~30s,
+# and never delete the Library cache for it.
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Weekly regression net; runs from the default branch only.
+    - cron: "0 3 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: unity-ci-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # The `secrets` context is not readable in a job-level `if`, so this gate
+  # turns "are the licence secrets configured?" into a job output the Unity
+  # jobs can condition on.
+  license:
+    runs-on: ubuntu-latest
+    outputs:
+      available: ${{ steps.check.outputs.available }}
+    steps:
+      - id: check
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+        run: |
+          if { [ -n "$UNITY_LICENSE" ] || [ -n "$UNITY_SERIAL" ]; } \
+             && [ -n "$UNITY_EMAIL" ] && [ -n "$UNITY_PASSWORD" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Unity licence secrets are not configured — every Unity job was skipped. Add UNITY_LICENSE + UNITY_EMAIL + UNITY_PASSWORD (see the header of .github/workflows/unity-ci.yml)."
+          fi
+
+  # Unity Test Runner (EditMode) on each testbed: the same 74-test suite the
+  # README quotes, on the real editor of each supported line. The testbeds
+  # already carry `testables` and QUICKACTIONS_ENABLED, so no setup step —
+  # opening the project IS the test. (GameCI test-runner is Linux-only.)
+  tests:
+    name: tests (${{ matrix.testbed.name }})
+    needs: license
+    if: needs.license.outputs.available == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      checks: write # unity-test-runner publishes a check run per matrix leg
+    strategy:
+      fail-fast: false
+      matrix:
+        testbed:
+          - { name: "2021.3", path: Examples~/Testbed2021 }
+          - { name: "2022.3", path: Examples~/Testbed2022 }
+          - { name: "unity6", path: Examples~/Testbed6 }
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ matrix.testbed.path }}/Library
+          key: Library-${{ matrix.testbed.name }}-tests-${{ hashFiles(format('{0}/Packages/**', matrix.testbed.path), format('{0}/ProjectSettings/**', matrix.testbed.path)) }}
+          restore-keys: |
+            Library-${{ matrix.testbed.name }}-tests-
+            Library-${{ matrix.testbed.name }}-
+      - id: tests
+        uses: game-ci/unity-test-runner@0ff419b913a3630032cbe0de48a0099b5a9f0ed9 # v4.3.1
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+        with:
+          projectPath: ${{ matrix.testbed.path }}
+          testMode: EditMode
+          checkName: unity tests (${{ matrix.testbed.name }})
+          githubToken: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        if: always()
+        with:
+          name: test-results-${{ matrix.testbed.name }}
+          path: ${{ steps.tests.outputs.artifactsPath }}
+          retention-days: 14
+
+  # Development APK per testbed via the testbed's own CLI entry point
+  # (TestbedBuilder.BuildAndroidPhone: IL2CPP, ARMv7+ARM64 — installs on any
+  # handset, and on the x86_64 CI emulator through its ARM translation, the
+  # same configuration device-ci.yml was designed around). The Demo sample is
+  # copied in first because the build scene lives at
+  # Assets/Samples/QuickActionsDemo/ — that copy dirties the checkout, hence
+  # allowDirtyBuild. versioning:None keeps the builder from rewriting the
+  # project version out of git history.
+  android-build:
+    name: android build (${{ matrix.testbed.name }})
+    needs: license
+    if: needs.license.outputs.available == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        testbed:
+          - { name: "2021.3", path: Examples~/Testbed2021 }
+          - { name: "2022.3", path: Examples~/Testbed2022 }
+          - { name: "unity6", path: Examples~/Testbed6 }
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Import the Demo sample into the testbed
+        env:
+          TESTBED: ${{ matrix.testbed.path }}
+        run: |
+          mkdir -p "$TESTBED/Assets/Samples/QuickActionsDemo"
+          cp -R Samples~/Demo/. "$TESTBED/Assets/Samples/QuickActionsDemo/"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ matrix.testbed.path }}/Library
+          key: Library-${{ matrix.testbed.name }}-android-${{ hashFiles(format('{0}/Packages/**', matrix.testbed.path), format('{0}/ProjectSettings/**', matrix.testbed.path)) }}
+          restore-keys: |
+            Library-${{ matrix.testbed.name }}-android-
+            Library-${{ matrix.testbed.name }}-
+      - uses: game-ci/unity-builder@1d4ee0697f193f54668e98961d79907911f4b4f2 # v4.8.1
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+        with:
+          projectPath: ${{ matrix.testbed.path }}
+          targetPlatform: Android
+          buildMethod: TestbedBuilder.BuildAndroidPhone
+          versioning: None
+          allowDirtyBuild: true
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: quickactions-demo-apk-${{ matrix.testbed.name }}
+          path: ${{ matrix.testbed.path }}/Builds/QuickActionsDemo-phone.apk
+          if-no-files-found: error
+          retention-days: 14
+
+  # The same adb smoke device-ci.yml runs on a user-supplied APK, but fed from
+  # the build above: shortcuts must reach ShortcutManager and a tap must come
+  # back as a Performed event. Asserts the placeholder feature's output ships
+  # inside a real APK end-to-end.
+  android-smoke:
+    name: android smoke (${{ matrix.testbed.name }})
+    needs: android-build
+    # Not the implicit success() gate: that skips EVERY smoke leg when any one
+    # build leg fails, losing the end-to-end signal for the healthy lines. Run
+    # whenever the build job ran at all (a leg whose own APK is missing fails
+    # fast at download-artifact); the no-secrets path still propagates as
+    # skipped, keeping secretless runs green.
+    if: ${{ !cancelled() && needs.android-build.result != 'skipped' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        testbed:
+          - { name: "2021.3" }
+          - { name: "2022.3" }
+          - { name: "unity6" }
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: quickactions-demo-apk-${{ matrix.testbed.name }}
+          path: ${{ runner.temp }}/apk
+      # Same KVM prerequisite as device-ci.yml: without /dev/kvm the emulator
+      # software-renders into the job timeout.
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Device smoke (API 30 emulator)
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        with:
+          api-level: 30
+          arch: x86_64
+          target: google_apis
+          script: tools~/device-smoke/android_device_smoke.sh "$RUNNER_TEMP/apk/QuickActionsDemo-phone.apk" com.quickactions.testbed
+
+  # iOS export per testbed on the ubuntu docker image: proves the package's
+  # iOS build post-processor (static shortcuts + template-image sync + the
+  # {placeholder} pipeline) runs inside a real editor and yields an Xcode
+  # project. Simulator SDK on purpose — the compile stage below needs no Apple
+  # signing that way.
+  ios-export:
+    name: ios export (${{ matrix.testbed.name }})
+    needs: license
+    if: needs.license.outputs.available == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        testbed:
+          - { name: "2021.3", path: Examples~/Testbed2021 }
+          - { name: "2022.3", path: Examples~/Testbed2022 }
+          - { name: "unity6", path: Examples~/Testbed6 }
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Import the Demo sample into the testbed
+        env:
+          TESTBED: ${{ matrix.testbed.path }}
+        run: |
+          mkdir -p "$TESTBED/Assets/Samples/QuickActionsDemo"
+          cp -R Samples~/Demo/. "$TESTBED/Assets/Samples/QuickActionsDemo/"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ matrix.testbed.path }}/Library
+          key: Library-${{ matrix.testbed.name }}-ios-${{ hashFiles(format('{0}/Packages/**', matrix.testbed.path), format('{0}/ProjectSettings/**', matrix.testbed.path)) }}
+          restore-keys: |
+            Library-${{ matrix.testbed.name }}-ios-
+            Library-${{ matrix.testbed.name }}-
+      - uses: game-ci/unity-builder@1d4ee0697f193f54668e98961d79907911f4b4f2 # v4.8.1
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+        with:
+          projectPath: ${{ matrix.testbed.path }}
+          targetPlatform: iOS
+          buildMethod: TestbedBuilder.BuildiOSSimulator
+          versioning: None
+          allowDirtyBuild: true
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: ios-simulator-xcodeproj-${{ matrix.testbed.name }}
+          path: ${{ matrix.testbed.path }}/Builds/iOSSimulator
+          if-no-files-found: error
+          retention-days: 14
+
+  # Compile the exported project for the iOS Simulator on macOS — unsigned
+  # (CODE_SIGNING_ALLOWED=NO), then boot a simulator, install the .app and
+  # launch it, asserting the process is still alive afterwards (`simctl
+  # launch` exiting 0 only means the spawn was accepted). 2021.3 is exported
+  # above but deliberately NOT compiled here: that line's simulator support is
+  # x86_64-only (see README "Status") while current macOS runners ship
+  # arm64-only iOS 26 runtimes, and its IL2CPP output needs ld_classic
+  # workarounds under Xcode 15+ — a red job there would say nothing about the
+  # package. 2022.3 gets macos-15 (Xcode 16.4 default); Unity 6 gets the
+  # current macos-latest (Xcode 26).
+  ios-simulator:
+    name: ios simulator (${{ matrix.target.name }})
+    needs: ios-export
+    # Same per-leg gating as android-smoke — doubly needed here, since this
+    # job never consumes the 2021.3 export at all and must not be skipped by
+    # that leg failing.
+    if: ${{ !cancelled() && needs.ios-export.result != 'skipped' }}
+    runs-on: ${{ matrix.target.runner }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - { name: "2022.3", runner: macos-15 }
+          - { name: "unity6", runner: macos-latest }
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ios-simulator-xcodeproj-${{ matrix.target.name }}
+          path: ${{ runner.temp }}/iosproj
+      - name: xcodebuild for the iOS Simulator (unsigned)
+        run: |
+          cd "$RUNNER_TEMP/iosproj"
+          xcodebuild -project Unity-iPhone.xcodeproj \
+            -scheme Unity-iPhone \
+            -configuration Release \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            build
+      - name: Boot a simulator, install and launch the app
+        run: |
+          set -euo pipefail
+          APP="$(find "$RUNNER_TEMP/DerivedData/Build/Products/Release-iphonesimulator" -maxdepth 1 -name '*.app' -print -quit)"
+          [ -n "$APP" ] || { echo "no .app produced"; exit 1; }
+          UDID="$(xcrun simctl list devices available --json | python3 -c '
+          import json, sys
+          devices = json.load(sys.stdin)["devices"]
+          for runtime in sorted(devices, reverse=True):
+              if "iOS" not in runtime:
+                  continue
+              for device in devices[runtime]:
+                  if device.get("isAvailable") and "iPhone" in device["name"]:
+                      print(device["udid"]); raise SystemExit
+          raise SystemExit("no available iPhone simulator")')"
+          echo "Using simulator $UDID"
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl install "$UDID" "$APP"
+          xcrun simctl launch "$UDID" com.quickactions.testbed
+          # `launch` exit 0 only proves the spawn; give the app time to crash,
+          # then require its process to still be registered. Capture-then-case,
+          # never `| grep -q`: under pipefail an early grep exit SIGPIPEs
+          # launchctl into a spurious failure (same rule as the adb smoke).
+          sleep 15
+          LIST="$(xcrun simctl spawn "$UDID" launchctl list)"
+          case "$LIST" in
+            *com.quickactions.testbed*) ;;
+            *)
+              echo "app is no longer running — crashed after launch"
+              ls ~/Library/Logs/DiagnosticReports/ 2>/dev/null || true
+              exit 1
+              ;;
+          esac
+          echo "app launched and stayed alive on the simulator"

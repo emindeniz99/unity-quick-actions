@@ -11,9 +11,22 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 > as its own section because each is a distinct, self-contained set of API
 > additions; read them as the package's development log.
 
-## [0.4.6] - 2026-08-18
+## [0.4.6] - 2026-08-20
 
 ### Added
+
+- **A real-Unity CI lane: the `unity` workflow (GameCI).** The stub harness
+  proves the C# type-checks but cannot open an editor;
+  `.github/workflows/unity-ci.yml` — manual dispatch plus a weekly cron, never
+  per-PR — is configured to run the EditMode suite on all three `Examples~`
+  testbeds, build a development APK per line and feed it through the adb
+  device smoke, and export the iOS Simulator Xcode project on every line,
+  compiling it unsigned and cold-launching it on a macOS-runner simulator for
+  2022.3 and Unity 6 (2021.3 exports only — that line's simulator support is
+  x86_64-only). Unity jobs skip cleanly when the
+  `UNITY_LICENSE`/`UNITY_EMAIL`/`UNITY_PASSWORD` secrets are absent, so forks
+  stay green. Not yet run — it awaits the licence secrets and a merge to
+  `main`.
 
 - **Static shortcut labels can now carry build-time `{placeholder}` tokens** —
   the answer to "which build is on this device?" from a long-press, before the

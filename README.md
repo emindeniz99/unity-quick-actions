@@ -757,6 +757,20 @@ Java plugin (**103** checks). Those tests (bar 21 headless-only ones) plus 5
 `Tests/Editor/` — **74** there. See [`.verify/README.md`](./.verify/README.md)
 for how the stubs work.
 
+Beyond the stubs, [`unity-ci.yml`](./.github/workflows/unity-ci.yml) is a
+manual/weekly GitHub Actions lane that runs the **real editors** via
+[GameCI](https://game.ci): the EditMode suite on all three
+[`Examples~`](./Examples~) testbeds, a development Android APK per line fed
+into the adb device smoke, and an iOS Simulator-SDK Xcode export per line —
+compiled unsigned and cold-launched on a macOS-runner simulator for 2022.3 and
+Unity 6 (2021.3 exports only: its simulator support is x86_64-only). It needs
+the repo secrets `UNITY_LICENSE` (a Unity Hub personal-licence `.ulf`'s
+contents), `UNITY_EMAIL` and `UNITY_PASSWORD` (Pro: `UNITY_SERIAL` instead of
+the `.ulf`); without them every Unity job skips and the run stays green. The
+workflow header documents the setup step by step. It has not produced a green
+run yet — it needs those secrets, and dispatch/cron only work once the file is
+on `main`.
+
 For a real device/emulator, `tools~/device-smoke/` has an adb-driven Android
 smoke (install a dev APK → assert the demo's shortcuts registered → simulate a
 tap → assert delivery) and a manually-dispatched emulator CI workflow — see its
