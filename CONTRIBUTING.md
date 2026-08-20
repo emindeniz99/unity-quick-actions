@@ -19,16 +19,21 @@ tools~/verify.sh    # must print: VERIFY: PASS
 ```
 
 `tools~/verify.sh` is the gate for every change and **needs no Unity install**.
-It runs four checks (see [`.verify/README.md`](./.verify/README.md) for the
+It runs six checks (see [`.verify/README.md`](./.verify/README.md) for the
 rationale):
 
 1. every asset has a committed, stable `.meta`;
-2. the C# type-checks against UnityEngine/UnityEditor stubs in **nine** build
-   configurations (editor / iOS / Android / native gates / sample), so every
-   `#if` branch is compiled;
+2. the C# type-checks against UnityEngine/UnityEditor stubs in **ten** build
+   configurations (editor / iOS / Android / native gates / bootstrap / sample),
+   so every `#if` branch is compiled;
 3. the NUnit suite runs via `dotnet test`;
 4. the Android Java plugin compiles against Android SDK stubs and passes its
-   stateful smoke test.
+   stateful smoke test;
+5. the device-persisted string literals (intent actions, extras keys, the
+   ownership marker) still match across C#, Java and Objective-C++;
+6. `package.json` and the top `CHANGELOG.md` heading agree on the version —
+   the release is cut from those two, so a disagreement is caught here rather
+   than on main.
 
 Run it before you push. CI runs the same script, so a red local run is a red PR.
 

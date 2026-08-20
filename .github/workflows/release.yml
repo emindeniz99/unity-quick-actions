@@ -1,0 +1,113 @@
+name: release
+
+# Cut the release automatically when main declares a version that has no tag.
+#
+# The flow is: a PR bumps `version` in package.json and dates its CHANGELOG
+# section → you merge it → this workflow verifies the tree, packs the
+# .unitypackage, creates the tag and publishes the GitHub Release with the
+# changelog section as its notes. Nothing to remember, nothing to run locally.
+# A merge that does not bump the version is a no-op (the tag already exists),
+# so this can sit on every push to main harmlessly.
+#
+# WHY NOT release-please (or semantic-release):
+#   1. It owns CHANGELOG.md, and this one is hand-written on purpose — a
+#      narrative development log with a bold thesis per entry. Release Please
+#      has no opt-out for changelog generation; it would replace all of that
+#      with "* editor: bake placeholders (#1)". The tool's headline feature is
+#      a downgrade here, so it is the wrong tool, not a missing dependency.
+#   2. Everything it does with the repo's own GITHUB_TOKEN is invisible to
+#      other workflows ("events triggered by the GITHUB_TOKEN will not create a
+#      new workflow run"), so the tag it pushes would NOT fire the packaging
+#      job, and every release would ship without the .unitypackage the install
+#      docs send people to. Fixing that means a PAT — a long-lived credential
+#      with write access, added to a public repo, to solve a problem this
+#      workflow does not have: it does verify → pack → tag → publish inside
+#      ONE run, where no cross-workflow trigger is needed.
+# What is left of their value — deciding the version from commit subjects — is
+# a judgement this package makes deliberately (see MAINTAINING.md), not a
+# thing to infer from a `feat:` prefix.
+#
+# The tag-triggered `release` job in ci.yml still exists and still works; it
+# covers the manual path (a hand-pushed tag), which stays available for a
+# re-release. Both use --clobber semantics, so neither can corrupt the other.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    # Never publish from a fork of this repository.
+    if: github.repository == 'emindeniz99/unity-quick-actions'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write # create the tag and the release
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Does main declare a version that has never been tagged? If not, stop
+      # here — this is an ordinary merge, not a release.
+      - id: version
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          VERSION="$(python3 tools~/release_notes.py --version)"
+          TAG="v$VERSION"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          if gh api "repos/$REPO/git/ref/tags/$TAG" >/dev/null 2>&1; then
+            echo "needed=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::$TAG already exists — nothing to release."
+          else
+            echo "needed=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::package.json declares $VERSION and $TAG does not exist — cutting the release."
+          fi
+
+      # Refuses a tree whose package.json and CHANGELOG disagree (the E811 rule)
+      # and writes the curated section out as the release notes.
+      - if: steps.version.outputs.needed == 'true'
+        run: python3 tools~/release_notes.py > "$RUNNER_TEMP/notes.md"
+
+      - if: steps.version.outputs.needed == 'true'
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5.4.0
+        with:
+          dotnet-version: "10.0.x"
+      - if: steps.version.outputs.needed == 'true'
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      # The same gate a human release runs first (MAINTAINING step 1): nothing
+      # is published from a tree that does not verify.
+      - if: steps.version.outputs.needed == 'true'
+        run: tools~/verify.sh
+
+      - if: steps.version.outputs.needed == 'true'
+        run: python3 tools~/pack_unitypackage.py
+
+      # Creates the tag at this commit, publishes the release and attaches the
+      # .unitypackage in one call — the install docs point downloaders at it.
+      - if: steps.version.outputs.needed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.version.outputs.tag }}
+          SHA: ${{ github.sha }}
+        run: |
+          gh release create "$TAG" dist~/QuickActions.unitypackage \
+            --target "$SHA" \
+            --title "$TAG" \
+            --notes-file "$RUNNER_TEMP/notes.md"
+          echo "::notice::Published $TAG with the .unitypackage attached."
