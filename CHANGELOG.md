@@ -64,6 +64,17 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   cold start has in front of it. Asserted, not observed: the script has not
   been run on a device or an emulator since the step was added.
 
+### Changed
+
+- **`game-ci/unity-builder` v4.8.1 → v5.0.0.** The major version extracts the
+  CloudRunner inputs into a separate orchestrator action and moves the runtime
+  from node20 to node24; every input this workflow passes (`projectPath`,
+  `targetPlatform`, `buildMethod`, `versioning`, `allowDirtyBuild`) and the
+  licence env contract (`UNITY_LICENSE`/`UNITY_EMAIL`/`UNITY_PASSWORD`) are
+  unchanged, verified against the v5.0.0 `action.yml` and compiled dist. The
+  companion pins were checked the same way and stay: `unity-test-runner` v4.3.1
+  and `android-emulator-runner` v2.38.0 are the latest stable releases.
+
 ### Fixed
 
 - **The emulator smoke's failure output could not say WHY an app went silent.**
