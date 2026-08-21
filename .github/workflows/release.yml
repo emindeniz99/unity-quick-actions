@@ -28,8 +28,13 @@ name: release
 # thing to infer from a `feat:` prefix.
 #
 # The tag-triggered `release` job in ci.yml still exists and still works; it
-# covers the manual path (a hand-pushed tag), which stays available for a
-# re-release. Both use --clobber semantics, so neither can corrupt the other.
+# covers the manual path (a hand-pushed tag) and is safe to re-run: it looks the
+# release up first and re-uploads with --clobber. THIS workflow has no such
+# property and needs none — the tag check below stops it before the publish step
+# whenever the tag already exists, so it never touches an existing release. The
+# flip side is that a tag existing WITHOUT a published release (a cancelled run,
+# a hand-pushed tag whose ci.yml job failed) reads here as "already released";
+# publish that one from ci.yml by re-pushing the tag, or with tools~/release.sh.
 
 on:
   push:
