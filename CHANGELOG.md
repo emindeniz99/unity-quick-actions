@@ -15,6 +15,29 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **Launcher icons could ship blank in minified release builds.** Every icon
+  drawable is reached only through `getIdentifier("ic_quickaction_" + name, …)`,
+  so with `minifyEnabled` + `shrinkResources` nothing statically references it
+  and the shrinker may dummy-replace the file — bytes swapped for a tiny
+  placeholder while the resource-table entry survives, so `getIdentifier` still
+  returns non-zero and the launcher draws an empty square in release builds
+  only, looking exactly like the un-configured state. AGP's *safe* (default)
+  mode does carry a prefix heuristic for this concatenation shape, so the
+  catalog names were probably surviving there — but that is an implementation
+  detail, it can never cover a custom `AndroidDrawable` name handed in from C#
+  at runtime (never a constant in the compiled code), and a single library
+  declaring `tools:shrinkMode="strict"` flips the *whole* app to strict mode,
+  where nothing name-resolved survives and a package cannot opt out. The Android
+  post-processor now writes `res/raw/quickactions_keep.xml`
+  (`tools:keep="@drawable/ic_quickaction_*"`, uniquely named because keep files
+  merge globally by name) on **every** enabled Android build — before launcher
+  discovery and before the zero-static-shortcuts return, because a dynamic-only
+  project bakes no static set yet resolves its icons by exactly the same lookup —
+  and never changes the host app's shrink mode. The define-off stripper deletes
+  it, so a prod project keeps carrying no package trace. 8 new headless tests
+  pin the emission, the parsed `tools:keep` value, idempotence, and that the
+  static-shortcut cleanup leaves the file alone; that the shrinker **honors** it
+  is not yet confirmed on a real minified Gradle build.
 - **The release guard added in 0.4.6 did not catch the mistake it was added
   for.** `verify.sh` check 6 exempted an `[Unreleased]` top heading
   unconditionally, so the exact release-PR slip it exists to stop — bump

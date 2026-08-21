@@ -89,8 +89,8 @@ covered by headless tests only — no device or Simulator run has happened since
 they landed, so what a resolved `v1.4.0 (37)` looks like on a real home screen
 is still unconfirmed.
 
-**Also true:** the suite is 90 headless tests (`dotnet test`) and 74 in Unity's
-Test Runner (it adds 5 `JsonUtility` serialization tests; 21 of the headless ones
+**Also true:** the suite is 98 headless tests (`dotnet test`) and 74 in Unity's
+Test Runner (it adds 5 `JsonUtility` serialization tests; 29 of the headless ones
 don't run there), plus an Android Java smoke of 103 checks, across 10 C# compile
 configurations with 0 warnings.
 The iOS `.mm` compiles cleanly against the current iOS SDK
@@ -383,7 +383,7 @@ public class ShortcutRouter : MonoBehaviour
 | `IosTemplateImage` | Template-image name shipped in the Xcode bundle (single-color, ~35×35 pt) — beats `Icon`. Ignored on Android. |
 | `AndroidBitmapFile` | Absolute path to a PNG/JPEG on device — runtime icons from a `Texture2D`: `File.WriteAllBytes(path, tex.EncodeToPNG())` under `Application.persistentDataPath` (keep the file alive; the launcher re-reads it). Beats `AndroidDrawable` and `Icon`. Ignored on iOS (no runtime-bitmap shortcut API). |
 | `AndroidBitmapAdaptive` | Install `AndroidBitmapFile` as an adaptive icon (API 26+, launcher-masked; supply safe-zone padding). |
-| `AndroidDrawable` | Drawable resource name overriding the `Icon` lookup. Ignored on iOS. |
+| `AndroidDrawable` | Drawable resource name overriding the `Icon` lookup. Ignored on iOS. A name outside the `ic_quickaction_*` catalog **used only from a runtime `Add(...)`** needs your own keep rule under minification (a **static** item's name is baked as a real `@drawable` reference the shrinker follows) — see [Known limits](#known-limits--android-minification-r8proguard--resource-shrinking). |
 | `Payload` | App-defined string riding the shortcut (iOS `userInfo`, Android extras), restored across cold starts. Not pushed with the tap — read it via `GetById(id)?.Payload` from the id `Performed` reports (`GetById` is null for a **static**-shortcut tap or an id removed since: static items never join the runtime list and carry no payload). |
 | `LocalizedTitles` / `LocalizedSubtitles` | Per-locale label replacements (`LocalizedText { Locale, Text }` pairs). Resolution: exact locale match > language prefix (`"pt-BR"` matches a `"pt"` entry) > base `Title`/`Subtitle`, case-insensitive. The tables survive cold starts (they ride the ownership-marker payload), so labels re-resolve after a device-language change. Static (baked) shortcuts localize on **Android only** (`values-<qualifier>/` string resources); iOS static shortcuts render in their base language — see "Known limits". |
 
@@ -416,13 +416,19 @@ Assets/QuickActionIcons.androidlib/
 Then either name the drawable `ic_quickaction_<icontype>` so `Icon` finds it, or
 point at any resource explicitly with `AndroidDrawable = "my_icon"`.
 
-Two traps worth knowing:
+Three traps worth knowing:
 
 - The resources must sit under **`src/main/res/`**. A `res/` folder at the
   `.androidlib` root is silently ignored — green build, no warning, no icon.
 - **Do not** use `Assets/Plugins/Android/res/`. Unity **removed** that path in
   2021.2, below this package's floor, and it now fails the build outright
   rather than being ignored.
+- **Minified release builds** can strip a drawable's bytes while leaving its
+  resource entry behind, so the icon goes blank in release only — the package
+  ships a keep rule for `ic_quickaction_*` names, and a **static** shortcut's
+  `AndroidDrawable` bakes a real `@drawable` reference the shrinker follows.
+  Only a custom name used **only** from a runtime `Add(...)` needs your own; see
+  [Known limits](#known-limits--android-minification-r8proguard--resource-shrinking).
 
 For runtime art (a `Texture2D` you generate or download) skip drawables
 entirely and use `AndroidBitmapFile` — see the field table above.
@@ -697,9 +703,9 @@ the wrong package. For variant builds, prefer **runtime** shortcuts
 always variant-correct. (Single-`applicationId` projects — the common case — are
 unaffected.)
 
-### Known limits — Android minification (R8/ProGuard)
+### Known limits — Android minification (R8/ProGuard + resource shrinking)
 
-The C# runtime reaches the Java helper `com.emindeniz99.quickactions.QuickActionsBridge`
+**Code (R8/ProGuard).** The C# runtime reaches the Java helper `com.emindeniz99.quickactions.QuickActionsBridge`
 **by name** over JNI. If you build a **minified** dev/QA build (Player Settings ▸
 Publishing Settings ▸ *Minify*), R8 can rename or strip that non-manifest class, and
 the JNI lookup then fails so shortcuts silently don't get set. Add a keep rule to
@@ -712,6 +718,50 @@ the JNI lookup then fails so shortcuts silently don't get set. Add a keep rule t
 (The trampoline `<activity>` is kept automatically because it's declared in the
 manifest — only the JNI-only bridge needs this. Most dev builds don't enable
 minification, so this only matters if yours does.)
+
+**Resources (`shrinkResources`) — icons.** Icon drawables are reached *only*
+through `getIdentifier(name, "drawable", …)`, so with `minifyEnabled` +
+`shrinkResources` nothing statically references them and the shrinker may
+**dummy-replace** them: the file's bytes are swapped for a tiny placeholder
+while the resource-table entry survives. `getIdentifier` therefore still returns
+non-zero, `setIcon` is still called, and the launcher draws a **blank icon** — in
+release builds only, looking exactly like the un-configured state.
+
+The package handles the catalog names for you: on every Android build with the
+define on it writes `res/raw/quickactions_keep.xml` carrying
+`tools:keep="@drawable/ic_quickaction_*"` into the generated Gradle project, so
+every `ic_quickaction_<name>` drawable survives even **strict** shrink mode —
+which any *one* library in your app can switch the whole app into, with no way
+for a package to opt out. No action needed for `ic_quickaction_*` names.
+
+A **custom `AndroidDrawable`** name used only from a runtime `Add(...)` is
+different: it has no static reference *and* never appears as a string constant in
+the compiled code (it arrives from C# at runtime), so no shrinker heuristic can
+retain it. Either:
+
+- name your drawable with the `ic_quickaction_` prefix, and the shipped rule
+  covers it; or
+- ship your own keep rule inside your `.androidlib` (see
+  [Android icons](#android-icons-need-a-drawable-in-your-project)) —
+  `src/main/res/raw/myapp_keep.xml`:
+
+  ```xml
+  <?xml version="1.0" encoding="utf-8"?>
+  <resources xmlns:tools="http://schemas.android.com/tools"
+      tools:keep="@drawable/my_icon" />
+  ```
+
+  Give it a **unique file name** (`myapp_keep.xml`, not `keep.xml`): keep files
+  merge globally by name, so a generic name collides with the host app's or
+  another library's.
+
+`AndroidBitmapFile` is unaffected — it is a path to a file on disk, not a
+resource, so the shrinker never sees it.
+
+*Honesty note:* the keep file's **emission** is covered by headless tests (it is
+written, well-formed, namespaced, idempotent, and survives the static-shortcut
+cleanup). That a real shrinker **honors** it has not yet been confirmed on a real
+minified Gradle build.
 
 ## Security: a shortcut tap is not an authenticated action
 
@@ -754,9 +804,9 @@ tools~/setup.sh     # install dotnet + JDK (once)
 tools~/verify.sh    # .meta + C# compile (10 configs) + unit tests + Android plugin + frozen strings + release coherence
 ```
 
-`verify.sh` compiles the C# in **10 configurations** (0 warnings), runs the **90**
+`verify.sh` compiles the C# in **10 configurations** (0 warnings), runs the **98**
 headless unit tests via `dotnet test`, and compiles and smoke-tests the Android
-Java plugin (**103** checks). Those tests (bar 21 headless-only ones) plus 5
+Java plugin (**103** checks). Those tests (bar 29 headless-only ones) plus 5
 `JsonUtility` serialization tests run in Unity's **Test Runner** from
 `Tests/Editor/` — **74** there. See [`.verify/README.md`](./.verify/README.md)
 for how the stubs work.

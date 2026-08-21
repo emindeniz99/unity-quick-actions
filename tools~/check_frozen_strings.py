@@ -27,6 +27,12 @@ and Obj-C copies are not C# at all — so the check is a textual one, run by
 If a value below genuinely must change, it is a **breaking change for shortcuts
 already on user devices**, not a refactor. Ship it with a major version and a
 note in the CHANGELOG.
+
+The table also carries **one build-time cross-language pin** alongside the
+device-persisted values — `ic_quickaction_`, the icon-name prefix the Java
+lookup concatenates and the C# post-processor's resource-shrinker keep rule
+protects. It is here for the same reason: two copies in two languages, no
+compiler and no test run that can notice them drifting apart.
 """
 from __future__ import annotations
 
@@ -86,6 +92,17 @@ FROZEN: dict[str, list[str]] = {
     "com.emindeniz99.quickactions.bitmap_adaptive": ["Plugins/Android/QuickActionsBridge.java"],
     "com.emindeniz99.quickactions.symbol": ["Plugins/iOS/QuickActions.mm"],
     "com.emindeniz99.quickactions.template": ["Plugins/iOS/QuickActions.mm"],
+    # Unlike every other row here this one is NOT device-persisted: it is a
+    # two-language BUILD-TIME contract. The Java lookup builds an icon name by
+    # concatenation ("ic_quickaction_" + catalog name) and the C# post-processor
+    # writes res/raw/quickactions_keep.xml with tools:keep="@drawable/ic_quickaction_*".
+    # If the two spellings drift, the keep rule stops covering the drawables the
+    # lookup asks for and minified release builds silently ship blank icons —
+    # nothing fails at build time, on either side.
+    "ic_quickaction_": [
+        "Plugins/Android/QuickActionsBridge.java",
+        "Editor/Android/QuickActionsBuildPostProcessorAndroid.cs",
+    ],
 }
 
 # The Java package the trampoline and bridge live in — the first half of every

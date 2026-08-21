@@ -35,6 +35,13 @@ namespace EminDeniz99.QuickActions.Editor
         private const string TrampolineClass = "com.emindeniz99.quickactions.QuickActionsTrampolineActivity";
         private const string ShortcutsResource = "quickactions_shortcuts";
         private const string StringsResource = "quickactions_strings";
+        private const string KeepResource = "quickactions_keep";
+        // Must stay in lock-step with QuickActionsBridge.java's lookup — the
+        // ic_quickaction_ + <catalog name> concatenation this keep rule shields.
+        // Pinned cross-language by tools~/check_frozen_strings.py, whose check
+        // matches the QUOTED literal: keep this comment unquoted, or the pin is
+        // satisfied by the comment and stops noticing the const drifting.
+        internal const string IconPrefix = "ic_quickaction_";
 
         public int callbackOrder => 100;
 
@@ -54,6 +61,22 @@ namespace EminDeniz99.QuickActions.Editor
 
         public void OnPostGenerateGradleAndroidProject(string path)
         {
+            // FIRST, before every early return below and before any launcher
+            // discovery: icons are resolved BY NAME at runtime
+            // (getIdentifier("ic_quickaction_…")), so with minifyEnabled +
+            // shrinkResources nothing statically references them. AGP's DEFAULT
+            // "safe" mode does carry a heuristic that retains resources whose
+            // names start with a string constant used near a getIdentifier call,
+            // so the catalog names are LIKELY kept there — but that is an
+            // implementation detail, not a contract, and any single library in
+            // the consuming app carrying tools:shrinkMode="strict" flips the
+            // WHOLE app to strict mode, where nothing name-resolved survives and
+            // a package cannot opt out. This rule makes the catalog prefix immune
+            // to both. It is written independently of the static set because a
+            // project with ZERO static shortcuts still adds icons at runtime —
+            // the dynamic-only case is exactly the one the returns below skip.
+            WriteKeepRules(path);
+
             // The applicationId also feeds the {bundleId} placeholder, so a label
             // and the intent it sits next to can never disagree about the id.
             var appId = ResolveApplicationId(path);
@@ -106,6 +129,11 @@ namespace EminDeniz99.QuickActions.Editor
         // Removes the generated shortcut resources and the launcher meta-data so a
         // reused build directory doesn't keep shipping shortcuts after they're all
         // removed from the settings (mirrors the iOS post-processor's stale-plist clear).
+        //
+        // Deliberately NOT the keep file: its lifetime is tied to the DEFINE, not to
+        // the static set. With zero static shortcuts the package is still live and
+        // dynamic icons still resolve by name, so the keep rule must stay. Only the
+        // define-off stripper (QuickActionsTrampolineStripperAndroid) removes it.
         internal static void RemoveGeneratedShortcuts(string moduleDir, string manifestPath)
         {
             var removedMeta = RemoveShortcutsMetaData(manifestPath);
@@ -221,6 +249,29 @@ namespace EminDeniz99.QuickActions.Editor
                 }
             }
             return null;
+        }
+
+        private const string ToolsNs = "http://schemas.android.com/tools";
+
+        // Written into unityLibrary (the module this callback receives) — keep rules
+        // are GLOBAL to the app's shrink analysis over the merged resource set, so
+        // the file need not sit next to the drawables it protects. The unique
+        // (package-scoped) file name is required: keep files merge by name, and a
+        // host app's own res/raw/keep.xml must never collide with ours.
+        //
+        // No tools:shrinkMode is emitted: switching the host app's shrinker between
+        // safe and strict is the app's decision, never a package's. No try/catch
+        // either — the sibling writers don't have one, and a res/ write that fails
+        // means the Gradle build is doomed anyway; failing loudly beats the silent
+        // blank-icon state this file exists to prevent.
+        internal static void WriteKeepRules(string moduleDir)
+        {
+            var rawDir = Path.Combine(moduleDir, "src", "main", "res", "raw");
+            Directory.CreateDirectory(rawDir);
+            File.WriteAllText(Path.Combine(rawDir, KeepResource + ".xml"),
+                "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
+                "<resources xmlns:tools=\"" + ToolsNs + "\"\n" +
+                "    tools:keep=\"@drawable/" + IconPrefix + "*\" />\n");
         }
 
         // Returns the number of shortcuts actually written (invalid/duplicate

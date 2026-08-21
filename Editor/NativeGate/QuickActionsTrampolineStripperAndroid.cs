@@ -34,6 +34,7 @@ namespace EminDeniz99.QuickActions.Editor.NativeGate
         private const string TrampolineClassShort = ".QuickActionsTrampolineActivity";
         private const string ShortcutsResource = "quickactions_shortcuts";
         private const string StringsResource = "quickactions_strings";
+        private const string KeepResource = "quickactions_keep";
 
         public int callbackOrder => 90;
 
@@ -100,6 +101,9 @@ namespace EminDeniz99.QuickActions.Editor.NativeGate
                 // Delete our generated (uniquely named) shortcut resources too.
                 SafeDelete(Path.Combine(module, "src", "main", "res", "xml", ShortcutsResource + ".xml"));
                 SafeDelete(Path.Combine(module, "src", "main", "res", "values", StringsResource + ".xml"));
+                // The gated post-processor writes the icon keep rule (define ON); with
+                // the define off it must not survive into a reused/exported project.
+                SafeDelete(Path.Combine(module, "src", "main", "res", "raw", KeepResource + ".xml"));
             }
 #endif
         }
