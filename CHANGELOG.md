@@ -38,6 +38,20 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   pin the emission, the parsed `tools:keep` value, idempotence, and that the
   static-shortcut cleanup leaves the file alone; that the shrinker **honors** it
   is not yet confirmed on a real minified Gradle build.
+- **The define-off stripper left this package's per-locale string files in the
+  Gradle project.** Reviewing the keep-file cleanup exposed an older gap next to
+  it: the ungated stripper deleted `res/xml/quickactions_shortcuts.xml` and the
+  base `res/values/quickactions_strings.xml`, but never the
+  `res/values-<qualifier>/quickactions_strings.xml` copies the baker writes for
+  localized static shortcuts — the stripper's delete list predates localization
+  and only the gated cleanup learned about the per-locale files. A reused or
+  exported Gradle project rebuilt with the define off therefore still shipped
+  this package's `qa_short_N`/`qa_long_N` labels inside a release APK,
+  contradicting the documented "no package trace" guarantee (which was measured
+  before localization existed). The stripper now sweeps `values-*` directories
+  for its own file name in both modules — a host app's `values-fr/strings.xml`
+  is never touched — verified by compiling the stripper define-off against the
+  stub harness and running it over a populated Gradle tree.
 - **The release guard added in 0.4.6 did not catch the mistake it was added
   for.** `verify.sh` check 6 exempted an `[Unreleased]` top heading
   unconditionally, so the exact release-PR slip it exists to stop — bump
