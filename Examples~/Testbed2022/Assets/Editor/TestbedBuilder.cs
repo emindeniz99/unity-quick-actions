@@ -46,6 +46,25 @@ public static class TestbedBuilder
         EditorUserBuildSettings.buildAppBundle = false;   // .apk, never .aab
         Build(BuildTarget.Android, "Builds/QuickActionsDemo-phone.apk");
     }
+
+    // Gradle-project export, for the resource-shrinker experiment in
+    // .github/workflows/unity-ci.yml (job `android-shrink-verify`). The package
+    // writes res/raw/quickactions_keep.xml so the icon drawables — reachable
+    // only through getIdentifier("ic_quickaction_" + name) — survive
+    // shrinkResources; whether AGP actually honours that keep rule can only be
+    // answered by a minified release build. Exporting is what lets CI flip
+    // minifyEnabled + shrinkResources on POST-export: turning them on inside
+    // the testbed would ship experiment-only build configuration to everyone
+    // who reads the example. ARM64 alone (not both ABIs) because the experiment
+    // inspects the resource table, not compiled code, and one ABI halves the
+    // IL2CPP time.
+    public static void ExportAndroidGradle()
+    {
+        PlayerSettings.SetScriptingBackend(UnityEditor.Build.NamedBuildTarget.Android, ScriptingImplementation.IL2CPP);
+        PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64;
+        EditorUserBuildSettings.buildAppBundle = false;   // .apk shape, never .aab
+        Build(BuildTarget.Android, "Builds/AndroidProject", exportAndroidProject: true);
+    }
     public static void BuildiOS()       => Build(BuildTarget.iOS,     "Builds/iOSProject");
 
     // Simulator variant: the default iOS build targets the device SDK, whose
@@ -61,8 +80,19 @@ public static class TestbedBuilder
         Build(BuildTarget.iOS, "Builds/iOSSimulator");
     }
 
-    private static void Build(BuildTarget target, string relativeOutput)
+    private static void Build(BuildTarget target, string relativeOutput, bool exportAndroidProject = false)
     {
+        // exportAsGoogleAndroidProject persists in Library/EditorUserBuildSettings.asset,
+        // so it must be stated on EVERY Android build, not just the one that wants
+        // it — otherwise a build after a failed or cached ExportAndroidGradle run
+        // silently emits a Gradle directory named *.apk. Asserting it here covers
+        // every current and future Android entry point; resetting it at the end of
+        // ExportAndroidGradle would not, because a failed build exits the editor.
+        if (target == BuildTarget.Android)
+        {
+            EditorUserBuildSettings.exportAsGoogleAndroidProject = exportAndroidProject;
+        }
+
         var output = Path.Combine(Directory.GetCurrentDirectory(), relativeOutput);
         Directory.CreateDirectory(Path.GetDirectoryName(output));
 

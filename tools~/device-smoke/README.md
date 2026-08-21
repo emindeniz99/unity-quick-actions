@@ -46,10 +46,23 @@ tools~/device-smoke/android_device_smoke.sh <apk> <application-id> [adb-serial]
 6. Clears logcat and starts the exported trampoline directly:
    `am start -n <app-id>/com.emindeniz99.quickactions.QuickActionsTrampolineActivity
    -a android.intent.action.VIEW --es com.emindeniz99.quickactions.ACTION_ID new_game`.
-   That is the same intent the launcher sends for a tap.
+   That is the same intent the launcher sends for a tap. The app is still
+   running at this point, so this is the **warm** path.
 7. Polls logcat for the package's own line
    `[QuickActions] Performed quick action 'new_game'.` (the demo turns
    `LoggingEnable` on in `Awake`).
+8. `am force-stop`s the app, **proves the process is gone** (polls `pidof`
+   empty — force-stop's exit status says nothing, and a still-alive app would
+   silently turn this into a second warm tap), clears logcat and sends the same
+   intent shape **for a second registered id** (`continue`) — the assertion
+   deliberately matches text that cannot pre-exist in the buffer, because
+   `logcat -c` can under-clear on emulators while exiting 0. Nothing of ours is
+   running at this point, so the trampoline has to start the process and the id
+   has to survive that start. Polls for that id's `Performed` line, on a larger
+   budget (`COLD_LOG_ATTEMPTS`) because a cold start carries a whole Unity
+   boot. No `pm clear` here: the shortcuts from step 5 must stay registered, or
+   the trampoline's ownership gate would reject the tap and the step would
+   blame the wrong thing.
 
 Every failure names the step that failed, prints the evidence it collected
 (dumpsys section, logcat tail) and exits non-zero. A clean run ends in a single
@@ -57,22 +70,30 @@ Every failure names the step that failed, prints the evidence it collected
 
 Waits are bounded and overridable by environment variable:
 `POLL_INTERVAL` (seconds, default 1), `BOOT_ATTEMPTS` (120),
-`SHORTCUT_ATTEMPTS` (45), `LOG_ATTEMPTS` (30).
+`SHORTCUT_ATTEMPTS` (45), `LOG_ATTEMPTS` (30), `COLD_LOG_ATTEMPTS` (60).
 
 ### What it asserts — and what it does not
 
 It asserts that a `QUICKACTIONS_ENABLED` build publishes dynamic shortcuts the
 OS accepts, and that a tap intent for one of them is turned into a `Performed`
-event inside the running game. Because the id it taps is a live registered
-shortcut, it also exercises the path the trampoline's spoof gate deliberately
-**allows** (`isKnownShortcut`).
+event inside the game — **twice**: once into a running process
+(`OnApplicationFocus`/`OnApplicationPause`, the warm resume) and once into an
+app that was force-stopped first, where the tap starts the process and the id
+has to reach the game through the launch intent. Because the id it taps is a
+live registered shortcut, it also exercises the path the trampoline's spoof gate
+deliberately **allows** (`isKnownShortcut`).
+
+The cold step is new, and "asserts" is the operative word: the script has not
+been run against a device or an emulator since it was added, so nothing here is
+a report of observed behaviour.
 
 It does **not** prove:
 
 * that a **launcher** renders those shortcuts, their icons, or their order —
   that needs human eyes on a home screen;
-* the **cold-launch** delivery path: the app is already running when the tap is
-  sent, so this is the warm-resume path (`OnApplicationFocus`/`OnApplicationPause`);
+* that a real **launcher tap** on a quit app behaves like the `am start` the
+  script sends — the intent is the same one the launcher builds, but only
+  SpringBoard-style UI automation could tap the icon itself;
 * that an **unregistered** id is *rejected* by the trampoline (the negative half
   of the spoof gate — covered headlessly by the Java smoke test in
   `.verify/JavaSmoke`);

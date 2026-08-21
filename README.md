@@ -784,8 +784,9 @@ spoof a tap; on either platform the id is just a string the OS hands you. So:
 ## Limitations / roadmap
 
 See [`ROADMAP.md`](./ROADMAP.md). Notable remaining: always-on device CI (the
-shipped adb smoke + emulator workflow are manual — no Unity license in CI —
-and cover Android warm taps only; iOS has no adb analog) and on-device
+shipped adb smoke + emulator workflow run on manual dispatch and a weekly cron
+only, and cover Android alone — warm *and* cold taps, the cold half not yet
+run on a device; iOS has no adb analog) and on-device
 validation of the newest native paths (UIScene hooks — including the
 subclass-shadowed fallback — and the Android localized static output). OS read-back can't recover icons natively; the package persists icon
 identity in its ownership-marker payload — Android extras, iOS `userInfo` — so
@@ -819,20 +820,34 @@ build-heavy legs — a development Android APK per line fed into the adb device
 smoke, and an iOS Simulator-SDK Xcode export per line, compiled unsigned and
 cold-launched on a macOS-runner simulator for 2022.3 and Unity 6 (2021.3
 exports only: its simulator support is x86_64-only) — run on manual dispatch
-and a weekly cron. It needs the repo secrets `UNITY_LICENSE` (a Unity Hub personal-licence `.ulf`'s
-contents), `UNITY_EMAIL` and `UNITY_PASSWORD` (Pro: `UNITY_SERIAL` instead of
-the `.ulf`); without them every Unity job skips and the run stays green — which
-is also what happens on a **fork** PR, where GitHub withholds secrets from the
-run by design, so an outside contributor's code never comes within reach of
-them. (Nothing here uses `pull_request_target`, the trigger that *would* hand
-secrets to untrusted code.) The workflow header documents the setup step by
-step. Both runs so far ended green exactly that way — the PR run and the `main`
-merge run each had the licence gate report *missing* and every Unity job skip.
-No real editor has been opened in CI yet.
+and a weekly cron. Each Android APK is also read back with `aapt2`, which must
+find the baked static shortcuts, the resource-shrinker keep file and the
+trampoline `<activity>` inside it, and a further 2022.3-only job
+(`android-shrink-verify`) exports the Gradle project and assembles a minified
+release build to test whether the shrinker honours that keep file — both of
+those assertions are newer than the workflow's first live run and have not yet
+executed. It needs the repo secrets `UNITY_LICENSE` (a Unity Hub
+personal-licence `.ulf`'s contents), `UNITY_EMAIL` and `UNITY_PASSWORD` (Pro:
+`UNITY_SERIAL` instead of the `.ulf`); without them every Unity job skips and
+the run stays green — which is also what happens on a **fork** PR, where
+GitHub withholds secrets from the run by design, so an outside contributor's
+code never comes within reach of them. (Nothing here uses
+`pull_request_target`, the trigger that *would* hand secrets to untrusted
+code.) The workflow header documents the setup step by step. The first live
+run with the secrets in place (2026-08-21) opened the real editors: all three
+EditMode legs, all three Android APK builds, all three iOS exports and both
+macOS simulator cold-launches were green on the first attempt; the emulator
+smoke passed end-to-end on 2021.3 and 2022.3 and timed out waiting for the
+Unity 6 app to publish — the cause (slow ARM-translated boot vs. a launch
+crash) was not distinguishable from what the script then captured, which is
+why its failure paths now print process-alive state, the crash buffer and the
+engine log tail, and the CI wait budgets were raised.
 
 For a real device/emulator, `tools~/device-smoke/` has an adb-driven Android
 smoke (install a dev APK → assert the demo's shortcuts registered → simulate a
-tap → assert delivery) and a manually-dispatched emulator CI workflow — see its
+tap → assert delivery, once warm and once more after a force-stop, though that
+second assertion has not been run on a device yet) and a manually-dispatched
+emulator CI workflow — see its
 README, including the honest iOS limitations. A green `verify.sh` proves
 everything compiles and the logic tests pass; it says nothing about on-device
 behaviour, which cannot run in the Editor.

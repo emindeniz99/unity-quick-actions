@@ -3,7 +3,8 @@
 # or emulator over adb and asserts the two things the headless harness
 # (tools~/verify.sh) structurally cannot: that shortcuts really reach
 # ShortcutManager, and that a tap on one really comes back into the game as a
-# Performed event.
+# Performed event — both while the app is running (warm resume) and after a
+# force-stop, which is the path a launcher tap takes on a quit app.
 #
 # The APK must be a DEVELOPMENT build of the Demo sample with QUICKACTIONS_ENABLED
 # defined: a production build ships neither the trampoline <activity> (the gate
@@ -32,6 +33,12 @@ EXTRA_ACTION_ID="com.emindeniz99.quickactions.ACTION_ID"
 AUTOTEST_EXTRA="com.emindeniz99.quickactions.AUTOTEST"
 SHORTCUT_IDS="new_game continue daily"
 TAP_ID="new_game"
+# The cold step taps a DIFFERENT registered id on purpose: its assertion reads
+# the whole `logcat -d` buffer, and `logcat -c` is known to under-clear on
+# emulators while still exiting 0 (issuetracker.google.com/issues/175488702),
+# which the `|| fail` on the clear cannot detect. Reusing TAP_ID would let the
+# warm tap's line satisfy the cold assertion on its first poll.
+COLD_TAP_ID="continue"
 
 # Every wait is bounded: a smoke run that hangs in CI tells you less than one
 # that fails. Overridable for slow emulators/first boots.
@@ -39,6 +46,10 @@ POLL_INTERVAL="${POLL_INTERVAL:-1}"
 BOOT_ATTEMPTS="${BOOT_ATTEMPTS:-120}"
 SHORTCUT_ATTEMPTS="${SHORTCUT_ATTEMPTS:-45}"
 LOG_ATTEMPTS="${LOG_ATTEMPTS:-30}"
+# The cold tap gets its own, larger budget: the warm tap only has to survive a
+# resume, while this one waits out a whole process start — zygote fork, IL2CPP
+# load, Unity's first frames — before the game can report anything.
+COLD_LOG_ATTEMPTS="${COLD_LOG_ATTEMPTS:-60}"
 
 STEP="startup"
 
@@ -106,22 +117,53 @@ shortcuts_registered() {
   return 0
 }
 
+# When the app goes silent, the question that decides everything downstream is
+# whether the process is still alive (slow boot — raise the budget) or dead
+# (crash — read the crash buffer). The dumpsys section alone cannot answer it:
+# the first live CI run of the unity6 leg printed three healthy static
+# shortcuts and "Calls: 0", which is what BOTH failure modes look like from
+# ShortcutManager's side, and nothing else was captured before the emulator was
+# torn down. Every fail message about the app's behaviour appends this.
+app_diagnostics() {
+  local pid
+  pid="$(adb_ shell pidof "$APP_ID" 2>/dev/null | tr -d '\r\n')" || pid=""
+  if [ -n "$pid" ]; then
+    echo "process state: ALIVE (pid $pid) — still booting, or running without publishing."
+  else
+    echo "process state: DEAD — the app process is gone; it crashed or was killed."
+  fi
+  echo "-- crash buffer (logcat -b crash), last 40 lines:"
+  adb_ logcat -d -b crash 2>/dev/null | tr -d '\r' | tail -n 40 || true
+  echo "-- engine/package logcat lines, last 60:"
+  adb_ logcat -d 2>/dev/null | tr -d '\r' \
+    | grep -iE 'unity|quickactions|FATAL|AndroidRuntime' | tail -n 60 || true
+}
+
 # The package's own log line (QuickActions.Dispatch), which the demo turns on via
 # LoggingEnable in Awake. Asserting on it — not on the demo's echo — is what
-# makes this a test of the package rather than of the sample.
+# makes this a test of the package rather than of the sample. Takes the id as an
+# argument because the warm and cold steps assert different ids (see COLD_TAP_ID).
 performed_logged() {
-  local log
+  local log id="$1"
   log="$(adb_ logcat -d 2>/dev/null | tr -d '\r')" || return 1
   case "$log" in
-    *"Performed quick action '$TAP_ID'"*) return 0 ;;
+    *"Performed quick action '$id'"*) return 0 ;;
   esac
   return 1
+}
+
+# The precondition of the cold step, and the only thing separating it from the
+# warm one. `am force-stop` can be accepted by AMS and still leave the process
+# briefly alive (or, on a refusal, indefinitely alive), and its exit status
+# says nothing either way — only an empty pidof does.
+app_stopped() {
+  [ -z "$(adb_ shell pidof "$APP_ID" 2>/dev/null | tr -d '\r\n')" ]
 }
 
 command -v adb >/dev/null 2>&1 || fail "adb is not on PATH (install Android platform-tools)."
 [ -f "$APK" ] || fail "APK not found: $APK"
 
-step "1/7 wait for the device"
+step "1/8 wait for the device"
 poll "$BOOT_ATTEMPTS" boot_completed \
   || fail "no booted device after $((BOOT_ATTEMPTS * POLL_INTERVAL))s (serial='${SERIAL:-<default>}'). \`adb devices\` shows:
 $(adb devices || true)"
@@ -139,7 +181,7 @@ echo "device ready (API $API_LEVEL)"
 [ "$API_LEVEL" -ge 25 ] 2>/dev/null \
   || fail "this device reports API '$API_LEVEL'; dynamic shortcuts need API 25+."
 
-step "2/7 install the APK"
+step "2/8 install the APK"
 if ! out="$(adb_ install -r "$APK" 2>&1)"; then
   fail "adb install failed:
 $out"
@@ -152,7 +194,7 @@ $out" ;;
 esac
 echo "installed $APK"
 
-step "3/7 reset app state"
+step "3/8 reset app state"
 # The autotest hook runs in Start, i.e. only in a FRESH process, and a previous
 # run's shortcuts persist in ShortcutManager. Clearing data drops both; the
 # force-stop is the fallback that still guarantees the cold start if the clear
@@ -164,7 +206,7 @@ if ! adb_ shell pm clear "$APP_ID" >/dev/null 2>&1; then
 fi
 adb_ shell am force-stop "$APP_ID" >/dev/null 2>&1 || true
 
-step "4/7 launch with the autotest extra"
+step "4/8 launch with the autotest extra"
 # Resolve the launcher component instead of hard-coding it: the Unity entry point
 # differs by version (UnityPlayerActivity vs UnityPlayerGameActivity).
 # Same guard as step 1, and needed more here: the 2>/dev/null that keeps a clean
@@ -192,17 +234,19 @@ $out" ;;
 esac
 echo "launched $COMPONENT with $AUTOTEST_EXTRA=add3"
 
-step "5/7 wait for the demo's shortcuts to reach ShortcutManager"
+step "5/8 wait for the demo's shortcuts to reach ShortcutManager"
 if ! poll "$SHORTCUT_ATTEMPTS" shortcuts_registered; then
   fail "after $((SHORTCUT_ATTEMPTS * POLL_INTERVAL))s, 'dumpsys shortcut' does not list all of: $SHORTCUT_IDS
 This means the app did not publish them — the autotest hook did not run (not a
-QUICKACTIONS_ENABLED dev build of the Demo sample?), or the write was rejected.
+QUICKACTIONS_ENABLED dev build of the Demo sample?), the write was rejected, or
+the app never got that far.
+$(app_diagnostics)
 dumpsys section for $APP_ID:
 $(our_shortcut_dump || true)"
 fi
 echo "registered: $SHORTCUT_IDS"
 
-step "6/7 simulate a tap on '$TAP_ID'"
+step "6/8 simulate a WARM tap on '$TAP_ID' (app already running)"
 # A launcher tap is an intent at the exported trampoline, so starting it directly
 # is the same thing the launcher does. It also exercises the REGISTERED-id path
 # that the trampoline's spoof gate deliberately allows: an id that is not a live
@@ -221,14 +265,63 @@ $out" ;;
 esac
 echo "started $APP_ID/$TRAMPOLINE with $EXTRA_ACTION_ID=$TAP_ID"
 
-step "7/7 assert the tap arrived as Performed"
-if ! poll "$LOG_ATTEMPTS" performed_logged; then
+step "7/8 assert the warm tap arrived as Performed"
+if ! poll "$LOG_ATTEMPTS" performed_logged "$TAP_ID"; then
   fail "no \"Performed quick action '$TAP_ID'\" in logcat within $((LOG_ATTEMPTS * POLL_INTERVAL))s.
 The shortcut is registered, so the tap either never reached the trampoline, was
-dropped by its ownership gate, or never surfaced in the game. QuickActions lines
-seen since the tap:
+dropped by its ownership gate, or never surfaced in the game.
+$(app_diagnostics)
+QuickActions lines seen since the tap:
+$(adb_ logcat -d 2>/dev/null | tr -d '\r' | grep -i quickactions | tail -n 20 || true)"
+fi
+echo "warm tap on '$TAP_ID' came back as Performed"
+
+step "8/8 simulate a COLD tap on '$COLD_TAP_ID' (app force-stopped first)"
+# The other half of delivery. Step 6 tapped into a LIVE process, so the id only
+# had to survive a resume (OnApplicationPause/Focus). A launcher tap on a quit
+# app instead STARTS the process: the id rides the launch intent and has to
+# still be there once the runtime is up and the game has subscribed. Nothing
+# above can fail if that path is broken, which is why this step exists.
+#
+# force-stop only, deliberately no `pm clear`: the shortcuts published in step 4
+# must stay registered, because the trampoline drops an id that is not a live
+# shortcut of ours. Clearing data would turn a delivery bug into a gate
+# rejection and this step would blame the wrong thing.
+adb_ shell am force-stop "$APP_ID" >/dev/null 2>&1 || true
+# The `|| true` above is right — force-stop's exit status proves nothing either
+# way — but the PRECONDITION it exists to establish must be proven, or this
+# step silently degrades into a second warm tap and passes while testing
+# nothing new. Only an empty pidof says the process is really gone.
+poll "$LOG_ATTEMPTS" app_stopped \
+  || fail "'am force-stop $APP_ID' did not stop the app within $((LOG_ATTEMPTS * POLL_INTERVAL))s: it is still running (pid $(adb_ shell pidof "$APP_ID" 2>/dev/null | tr -d '\r\n')).
+Without a dead process this step would send its intent into a LIVE app — i.e.
+repeat step 6's warm tap — and say nothing about the cold-launch path."
+# Same fresh-log mechanism as steps 4 and 6 — clear, then read the whole buffer
+# back with `logcat -d`. The assertion also taps a DIFFERENT id than step 6
+# (see COLD_TAP_ID at the top): `logcat -c` alone is not trusted to isolate the
+# two, because it can under-clear on emulators while exiting 0.
+adb_ logcat -c >/dev/null 2>&1 || fail "could not clear logcat before the cold tap."
+if ! out="$(adb_ shell am start -n "$APP_ID/$TRAMPOLINE" \
+    -a android.intent.action.VIEW \
+    --es "$EXTRA_ACTION_ID" "$COLD_TAP_ID" 2>&1 | tr -d '\r')"; then
+  fail "adb could not start the trampoline $APP_ID/$TRAMPOLINE for the cold tap:
+$out"
+fi
+case "$out" in
+  *Error*|*Exception*) fail "am start reported an error for the cold trampoline tap:
+$out" ;;
+esac
+echo "cold-started $APP_ID/$TRAMPOLINE with $EXTRA_ACTION_ID=$COLD_TAP_ID"
+if ! poll "$COLD_LOG_ATTEMPTS" performed_logged "$COLD_TAP_ID"; then
+  fail "no \"Performed quick action '$COLD_TAP_ID'\" in logcat within $((COLD_LOG_ATTEMPTS * POLL_INTERVAL))s of the COLD tap.
+The equivalent tap passed in step 7 against a running app, so the trampoline and
+its ownership gate are fine: what failed is the launch path — the id did not
+survive the process start, or it was consumed before the game subscribed. (If
+the device is simply slow, raise COLD_LOG_ATTEMPTS.)
+$(app_diagnostics)
+QuickActions lines seen since the cold tap:
 $(adb_ logcat -d 2>/dev/null | tr -d '\r' | grep -i quickactions | tail -n 20 || true)"
 fi
 
-printf '\nPASS: %s on API %s — %s registered with ShortcutManager, and a tap on '\''%s'\'' came back as Performed.\n' \
-  "$APP_ID" "$API_LEVEL" "$SHORTCUT_IDS" "$TAP_ID"
+printf '\nPASS: %s on API %s — %s registered with ShortcutManager; a WARM tap on '\''%s'\'' and a COLD (force-stopped) tap on '\''%s'\'' both came back as Performed.\n' \
+  "$APP_ID" "$API_LEVEL" "$SHORTCUT_IDS" "$TAP_ID" "$COLD_TAP_ID"

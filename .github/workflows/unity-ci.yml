@@ -2,10 +2,14 @@ name: unity
 
 # Real-Unity CI via GameCI (game.ci): the stub harness in ci.yml proves the C#
 # type-checks; this workflow runs the REAL editor — Unity Test Runner (EditMode)
-# on all three Examples~ testbeds, an Android IL2CPP APK per testbed fed into
-# the adb device smoke, and an iOS Simulator-SDK Xcode export per testbed with
-# an unsigned xcodebuild compile on macOS for the lines whose simulator support
-# allows it.
+# on all three Examples~ testbeds, an Android IL2CPP APK per testbed (aapt2 then
+# asserts the package's baked shortcuts, keep file and trampoline really are in
+# it) fed into the adb device smoke, and an iOS Simulator-SDK Xcode export per
+# testbed with an unsigned xcodebuild compile on macOS for the lines whose
+# simulator support allows it. One further Android leg, `android-shrink-verify`,
+# exports the Gradle project on 2022.3 and assembles a minified release build to
+# settle the question no APK leg can — whether AGP's resource shrinker honours
+# the keep rule the package ships for its icon drawables.
 #
 # Split by cost: the EditMode tests run on every code push/PR (~15 min a leg,
 # the signal worth having per change), while the build-heavy legs — Android
@@ -209,6 +213,81 @@ jobs:
           path: ${{ matrix.testbed.path }}/Builds/QuickActionsDemo-phone.apk
           if-no-files-found: error
           retention-days: 14
+      # The upload above runs FIRST on purpose: the assertion below is the step
+      # meant to turn red, and red must not discard its own evidence — a failed
+      # assertion with no APK artifact cannot be re-examined with a local aapt2.
+      # The upload keeps its implicit success() gate relative to the BUILD, and
+      # if-no-files-found: error still catches a build that claimed success
+      # while writing the APK elsewhere.
+      # "The package's Android bake really reaches a shipped APK" was proven
+      # once, by hand, with one aapt2 session on one machine (README "Status").
+      # This makes it an assertion on every line, every run — the half of that
+      # proof a machine can do, leaving only "a launcher renders them" for human
+      # eyes. Every miss prints the dump it could not match: these steps are
+      # newer than the workflow's first live run, so their own first run is the
+      # validation, and a surprise has to arrive as evidence, not a bare exit 1.
+      - name: Assert the APK carries the package's baked output
+        env:
+          APK: ${{ matrix.testbed.path }}/Builds/QuickActionsDemo-phone.apk
+        run: |
+          set -euo pipefail
+          # Ubuntu runners preinstall the Android SDK, but the build-tools
+          # version drifts with the image, so take the newest one present
+          # instead of pinning a directory name.
+          # (`find`, not `ls */aapt2`: shellcheck rejects parsing ls output, and
+          # actionlint shellchecks every run: block in this workflow.)
+          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+          # `|| true`: with an unset/absent SDK the find exits non-zero, and
+          # under pipefail that would kill this step through `set -e` with no
+          # message at all — the empty-AAPT2 branch below must get to speak.
+          AAPT2="$(find "$SDK/build-tools" -maxdepth 2 -name aapt2 -type f 2>/dev/null | sort -V | tail -1 || true)"
+          if [ -z "$AAPT2" ]; then
+            echo "no aapt2 under '${SDK:-<ANDROID_HOME and ANDROID_SDK_ROOT both unset>}'/build-tools/*/."
+            echo "The runner image no longer ships the Android SDK where this step expects it."
+            ls -la "${SDK:-/opt}"/build-tools 2>/dev/null || true
+            exit 1
+          fi
+          echo "using $AAPT2 on $APK"
+          # Capture then `case` — never `| grep -q`: grep exits at its first
+          # match and the SIGPIPE that sends upstream becomes a spurious failure
+          # under `set -o pipefail` (same rule as the adb smoke).
+          RES="$("$AAPT2" dump resources "$APK")" \
+            || { echo "aapt2 could not read the resource table of $APK"; exit 1; }
+          missing=""
+          # xml/ + string/ are the static-shortcut bake (the testbeds' demo ships
+          # 3, so qa_short_0 must exist); raw/ is 0.4.7's resource-shrinker keep
+          # file, which every enabled Android build writes.
+          for want in xml/quickactions_shortcuts raw/quickactions_keep string/qa_short_0; do
+            case "$RES" in
+              *"$want"*) echo "ok: resource table carries $want" ;;
+              *) missing="$missing $want" ;;
+            esac
+          done
+          if [ -n "$missing" ]; then
+            echo "MISSING from the APK resource table:$missing"
+            echo "--- every quickactions/qa_short line aapt2 did report ---"
+            printf '%s\n' "$RES" | grep -iE 'quickactions|qa_short' || echo "(none at all)"
+            echo "--- first 200 lines of the resource dump ---"
+            printf '%s\n' "$RES" | head -200
+            exit 1
+          fi
+          MANIFEST="$("$AAPT2" dump xmltree --file AndroidManifest.xml "$APK" 2>&1)" \
+            || { echo "aapt2 could not dump AndroidManifest.xml of $APK:"; printf '%s\n' "$MANIFEST"; exit 1; }
+          # The trampoline <activity> is injected by the package's manifest
+          # injector, and android.app.shortcuts is the meta-data that points the
+          # launcher at the baked static set. Neither is written by hand
+          # anywhere in the testbeds, so both are the package's own output.
+          for want in QuickActionsTrampolineActivity android.app.shortcuts; do
+            case "$MANIFEST" in
+              *"$want"*) echo "ok: manifest carries $want" ;;
+              *)
+                echo "MISSING from the APK manifest: $want"
+                echo "--- AndroidManifest.xml as built ---"
+                printf '%s\n' "$MANIFEST"
+                exit 1
+                ;;
+            esac
+          done
 
   # The same adb smoke device-ci.yml runs on a user-supplied APK, but fed from
   # the build above: shortcuts must reach ShortcutManager and a tap must come
@@ -249,11 +328,549 @@ jobs:
           sudo udevadm trigger --name-match=kvm
       - name: Device smoke (API 30 emulator)
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        # The wait budgets are raised well above the script's defaults because
+        # this emulator runs the APK's ARM code under translation on a
+        # software-rendered GPU: the first live run (2026-08-21, run 7) saw the
+        # unity6 leg reach the foreground and then time out at the default 45s
+        # with zero ShortcutManager calls, while 2021/2022 passed. A raised
+        # budget only stretches the FAILURE case — the poll returns the moment
+        # the condition holds — so a healthy leg pays nothing for it.
+        env:
+          SHORTCUT_ATTEMPTS: "240"
+          COLD_LOG_ATTEMPTS: "180"
         with:
           api-level: 30
           arch: x86_64
           target: google_apis
           script: tools~/device-smoke/android_device_smoke.sh "$RUNNER_TEMP/apk/QuickActionsDemo-phone.apk" com.quickactions.testbed
+
+  # ROADMAP verification item (c), automated: does AGP's resource shrinker
+  # actually HONOUR the keep rule the package ships? 0.4.7 made every enabled
+  # Android build write res/raw/quickactions_keep.xml
+  # (tools:keep="@drawable/ic_quickaction_*") because the icon drawables are
+  # reached only through getIdentifier("ic_quickaction_" + name, ...) — no
+  # static reference for a shrinker to find. Eight headless tests pin that the
+  # file is written and what it contains; NOTHING anywhere has ever run a
+  # minified release build to see whether it works. This job is that build.
+  #
+  # Method: export the Gradle project (TestbedBuilder.ExportAndroidGradle),
+  # plant two unreferenced 1x1 PNGs into the exported unityLibrary — one named
+  # to match the keep glob, one named to match nothing — then flip
+  # minifyEnabled + shrinkResources on POST-export and assemble release. The
+  # control must be shrunk (else the shrinker never ran and the run proves
+  # nothing) and the probe must come back byte-identical. Flipping those flags
+  # inside the testbed instead would ship experiment-only build configuration
+  # to every reader of the example.
+  #
+  # What a green run does NOT prove: that the KEEP RULE is what saved the
+  # probe. AGP's default *safe* mode also carries a DEX string-prefix heuristic
+  # that can retain "ic_quickaction_*" on its own (0.4.7's changelog says so).
+  # Isolating the two would need tools:shrinkMode="strict", which the package
+  # deliberately never sets. Green here means "the icons survive a minified
+  # release build", which is the user-visible claim.
+  #
+  # One line only (2022.3 — the line whose Android bake was proven on a real
+  # APK) and manual/cron only: this is an IL2CPP export plus a full Gradle
+  # release build, and it answers a question about AGP, not about a Unity
+  # version. This job has never run — it is newer than the workflow's first
+  # live run. Every step therefore fails LOUDLY and prints what it could not
+  # parse instead of skipping — the first real run is this job's validation.
+  # Two known first-run risks, both visible in the log if they bite: the JDK
+  # below vs the Gradle version Unity baked into the export, and the SDK/NDK
+  # paths Unity wrote from inside the builder's docker image.
+  android-shrink-verify:
+    name: android shrink verify (2022.3)
+    needs: license
+    if: ${{ needs.license.outputs.available == 'true' && (github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      TESTBED: Examples~/Testbed2022
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Same import as android-build: the build scene lives under
+      # Assets/Samples/QuickActionsDemo/, and the copy dirties the checkout.
+      - name: Import the Demo sample into the testbed
+        run: |
+          mkdir -p "$TESTBED/Assets/Samples/QuickActionsDemo"
+          cp -R Samples~/Demo/. "$TESTBED/Assets/Samples/QuickActionsDemo/"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: Examples~/Testbed2022/Library
+          key: Library-2022.3-export-${{ hashFiles('Examples~/Testbed2022/Packages/**', 'Examples~/Testbed2022/ProjectSettings/**') }}
+          restore-keys: |
+            Library-2022.3-export-
+            Library-2022.3-
+      # AGP needs a JDK; the runner default drifts, so pin one.
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: game-ci/unity-builder@1d4ee0697f193f54668e98961d79907911f4b4f2 # v4.8.1
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+        with:
+          projectPath: Examples~/Testbed2022
+          targetPlatform: Android
+          buildMethod: TestbedBuilder.ExportAndroidGradle
+          versioning: None
+          allowDirtyBuild: true
+      # unity-builder runs Unity as root inside its docker image (runAsHostUser
+      # defaults to false, in v5.0.0 as in v4) and only `chmod -R a+r`s the
+      # result, so the whole export comes back root-owned and read-only to this
+      # runner (uid 1001). android-build never notices — its post-build steps
+      # only READ the APK — but every step below WRITES into the export tree:
+      # the probe PNGs, the build.gradle rewrite, the .pro file,
+      # local.properties, gradlew's mode bit, and Gradle's own build/ dirs.
+      # Without this, the first write dies with EACCES as a bare traceback.
+      - name: Take ownership of the exported project
+        run: sudo chown -R "$(id -u):$(id -g)" "$TESTBED/Builds"
+      - name: Plant probe drawables in the exported project
+        run: |
+          set -euo pipefail
+          # Where Unity puts an exported Gradle project has changed between
+          # versions (a <productName> subfolder appears in some), so find the
+          # launcher module rather than assuming a path — and dump the tree if
+          # it is not there, because a wrong guess must not read as "no probes".
+          BUILDS="$TESTBED/Builds"
+          LAUNCHER_GRADLE="$(find "$BUILDS" -type f -path '*/launcher/build.gradle' -print -quit 2>/dev/null || true)"
+          if [ -z "$LAUNCHER_GRADLE" ]; then
+            echo "no launcher/build.gradle under $BUILDS — the Gradle export did not land where this job expects it."
+            find "$BUILDS" -maxdepth 4 -print 2>/dev/null || echo "($BUILDS does not exist at all)"
+            exit 1
+          fi
+          EXPORT="$(dirname "$(dirname "$LAUNCHER_GRADLE")")"
+          echo "exported project: $EXPORT"
+          if [ ! -d "$EXPORT/unityLibrary/src/main" ]; then
+            echo "no unityLibrary/src/main under $EXPORT — the export has a shape this job cannot use."
+            find "$EXPORT" -maxdepth 3 -print
+            exit 1
+          fi
+          {
+            echo "EXPORT=$EXPORT"
+            echo "LAUNCHER_GRADLE=$LAUNCHER_GRADLE"
+          } >> "$GITHUB_ENV"
+          export RES_DIR="$EXPORT/unityLibrary/src/main/res/drawable"
+          export SIZES_FILE="$RUNNER_TEMP/planted-sizes.txt"
+          echo "SIZES_FILE=$SIZES_FILE" >> "$GITHUB_ENV"
+          python3 - <<'PY'
+          import os
+          import pathlib
+          import struct
+          import zlib
+
+          # Two 1x1 PNGs that NOTHING references, planted into the exported Unity library
+          # module so the release build has to decide their fate on its own:
+          #   ic_quickaction_probe  matches the package's shipped keep glob
+          #                         (tools:keep="@drawable/ic_quickaction_*") and must
+          #                         come out of the shrinker byte-for-byte intact;
+          #   zz_shrink_control     matches nothing — no keep rule, and deliberately no
+          #                         qa_/ic_ prefix, so AGP's safe-mode DEX string-prefix
+          #                         heuristic cannot retain it either. It is the control:
+          #                         if IT survives unchanged the shrinker never ran and
+          #                         the probe proves nothing.
+          # Each is padded past 800 bytes with a tEXt chunk, because the shrinker's
+          # "dummy replacement" is a 67-byte 1x1 PNG — at this size a replaced file is
+          # unmistakable, and a size comparison needs no heuristics.
+          PROBES = ["ic_quickaction_probe", "zz_shrink_control"]
+          PAD_TARGET = 900
+
+
+          def chunk(tag, data):
+              return (struct.pack(">I", len(data)) + tag + data
+                      + struct.pack(">I", zlib.crc32(tag + data) & 0xFFFFFFFF))
+
+
+          def png_1x1(label):
+              # 1x1, 8-bit RGBA, no interlace; one filter byte + one opaque red pixel.
+              ihdr = struct.pack(">IIBBBBB", 1, 1, 8, 6, 0, 0, 0)
+              idat = zlib.compress(b"\x00\xff\x00\x00\xff", 9)
+              filler = ("quickactions-shrink-probe:" + label + ";") * 40
+              text = b"Comment\x00" + filler.encode("ascii")[:PAD_TARGET]
+              return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", ihdr) + chunk(b"tEXt", text)
+                      + chunk(b"IDAT", idat) + chunk(b"IEND", b""))
+
+
+          res_dir = pathlib.Path(os.environ["RES_DIR"])
+          res_dir.mkdir(parents=True, exist_ok=True)
+          lines = []
+          for name in PROBES:
+              target = res_dir / (name + ".png")
+              target.write_bytes(png_1x1(name))
+              size = target.stat().st_size
+              if size < 800:
+                  raise SystemExit("planted %s is only %d bytes — too close to the "
+                                   "shrinker's 67-byte dummy to tell them apart" % (name, size))
+              lines.append("%s %d" % (name, size))
+              print("planted %s (%d bytes)" % (target, size))
+
+          pathlib.Path(os.environ["SIZES_FILE"]).write_text("\n".join(lines) + "\n")
+          PY
+      - name: Force minify + resource shrinking on the exported release build
+        run: |
+          set -euo pipefail
+          export GRADLE_FILE="$LAUNCHER_GRADLE"
+          export PRO_NAME="quickactions-keep-all.pro"
+          python3 - <<'PY'
+          import os
+          import pathlib
+          import re
+          import sys
+
+          # Turn the EXPORTED launcher module into a minified, resource-shrinking release
+          # build. This is the whole point of exporting instead of building an APK: the
+          # testbeds stay ordinary examples, and the experiment's build configuration
+          # lives here, in CI, for one run.
+          #
+          # Three edits inside the release buildType:
+          #   minifyEnabled true    — AGP refuses to run the RESOURCE shrinker without
+          #                           code shrinking; it is a prerequisite, not the subject.
+          #   shrinkResources true  — the subject: does it honour our res/raw keep file?
+          #   crunchPngs false      — release builds re-encode PNGs by default, which
+          #                           would change the planted probes' bytes for a reason
+          #                           that has nothing to do with shrinking and make the
+          #                           size comparison meaningless.
+          # Plus a keep-everything ProGuard file: the code shrinker only has to SUCCEED,
+          # and keeping every class also keeps the DEX string constants, so the run
+          # matches a realistic app in AGP's default safe mode rather than an artificially
+          # stripped one.
+          GRADLE = pathlib.Path(os.environ["GRADLE_FILE"])
+          PRO_NAME = os.environ.get("PRO_NAME", "quickactions-keep-all.pro")
+
+          PRO_TEXT = """# Written by .github/workflows/unity-ci.yml (job android-shrink-verify).
+          # Keep-everything on purpose: this experiment is about the RESOURCE shrinker,
+          # which requires minifyEnabled but not aggressive code stripping. Keeping the
+          # classes also keeps their string constants in the DEX, which is what AGP's
+          # safe-mode resource heuristics read.
+          -dontoptimize
+          -dontobfuscate
+          -dontwarn **
+          -keep class ** { *; }
+          """
+
+
+          def die(message):
+              # Loud, with the file that could not be parsed: the first real run of this
+              # job IS its validation, so a surprise must arrive as evidence, never as a
+              # silent skip or a clever guess.
+              sys.stderr.write("FAIL: %s\n" % message)
+              sys.stderr.write("----- %s -----\n%s\n----- end -----\n"
+                               % (GRADLE, GRADLE.read_text()))
+              raise SystemExit(1)
+
+
+          def block_span(text, header, start=0):
+              """Span of a `header {` ... `}` block: (open-brace index, close index)."""
+              m = re.compile(header).search(text, start)
+              if not m:
+                  return None
+              open_idx = text.index("{", m.end() - 1)
+              depth = 0
+              for i in range(open_idx, len(text)):
+                  if text[i] == "{":
+                      depth += 1
+                  elif text[i] == "}":
+                      depth -= 1
+                      if depth == 0:
+                          return open_idx, i
+              return None
+
+
+          text = GRADLE.read_text()
+
+          build_types = block_span(text, r"\bbuildTypes\s*\{")
+          if not build_types:
+              die("no `buildTypes {` block in the exported launcher build.gradle")
+          release = block_span(text, r"\brelease\s*\{", build_types[0])
+          if not release or release[1] > build_types[1]:
+              die("no `release {` block inside `buildTypes` of the exported launcher build.gradle")
+
+          lines = text[release[0] + 1:release[1]].split("\n")
+          indent = "        "
+          for line in lines:
+              if line.strip():
+                  indent = line[:len(line) - len(line.lstrip())]
+                  break
+          # lines[0] is whatever trailed `release {` on its own line (normally nothing),
+          # so new statements go after it.
+          insert_at = 1 if not lines[0].strip() else 0
+
+
+          def set_flag(name, value):
+              global insert_at
+              pattern = re.compile(r"^(\s*)" + name + r"\b.*$")
+              for i, line in enumerate(lines):
+                  m = pattern.match(line)
+                  if m:
+                      lines[i] = m.group(1) + "%s %s" % (name, value)
+                      print("replaced: %s -> %s %s" % (line.strip(), name, value))
+                      return
+              lines.insert(insert_at, indent + "%s %s" % (name, value))
+              insert_at += 1
+              print("inserted: %s %s" % (name, value))
+
+
+          set_flag("minifyEnabled", "true")
+          set_flag("shrinkResources", "true")
+          set_flag("crunchPngs", "false")
+
+          for i, line in enumerate(lines):
+              if not re.match(r"^\s*proguardFiles?\b", line):
+                  continue
+              code, sep, comment = line.partition("//")
+              code = code.rstrip()
+              if code.endswith(")"):          # proguardFiles(a, b) — extend inside the call
+                  code = code[:-1] + ", '%s')" % PRO_NAME
+              else:                           # proguardFiles a, b — extend the list
+                  code = code + ", '%s'" % PRO_NAME
+              lines[i] = code + ((" " + sep + comment) if sep else "")
+              print("appended %s to: %s" % (PRO_NAME, line.strip()))
+              break
+          else:
+              lines.insert(insert_at, indent + "proguardFiles getDefaultProguardFile("
+                           "'proguard-android.txt'), '%s'" % PRO_NAME)
+              print("inserted proguardFiles with %s" % PRO_NAME)
+
+          body = "\n".join(lines)
+          GRADLE.write_text(text[:release[0] + 1] + body + text[release[1]:])
+          (GRADLE.parent / PRO_NAME).write_text(PRO_TEXT)
+
+          print("----- release block after the edit -----")
+          print("release {" + body + "}")
+          print("----- end -----")
+          PY
+      - name: Gradle release build of the exported project
+        run: |
+          set -euo pipefail
+          cd "$EXPORT"
+          # Unity writes local.properties from inside the unity-builder docker
+          # image, so sdk.dir points at a path that does not exist on this
+          # runner. Replace that one line and keep the rest.
+          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+          if [ -z "$SDK" ]; then
+            echo "neither ANDROID_HOME nor ANDROID_SDK_ROOT is set — no Android SDK to build against."
+            exit 1
+          fi
+          if [ -f local.properties ]; then
+            grep -v '^sdk\.dir=' local.properties > "$RUNNER_TEMP/local.properties" || true
+          else
+            : > "$RUNNER_TEMP/local.properties"
+          fi
+          printf 'sdk.dir=%s\n' "$SDK" >> "$RUNNER_TEMP/local.properties"
+          cp "$RUNNER_TEMP/local.properties" local.properties
+          echo "--- local.properties ---"
+          cat local.properties
+          # The export normally carries its own wrapper (pinning the Gradle
+          # version Unity tested); the runner's `gradle` is the fallback.
+          if [ -f ./gradlew ]; then
+            chmod +x ./gradlew
+            GRADLE_CMD=./gradlew
+          elif command -v gradle >/dev/null 2>&1; then
+            GRADLE_CMD=gradle
+          else
+            echo "the export ships no gradlew and this runner has no gradle on PATH."
+            ls -la
+            exit 1
+          fi
+          echo "building with $GRADLE_CMD"
+          # Unsigned output is fine: nothing installs this APK, it is only read.
+          "$GRADLE_CMD" --no-daemon --stacktrace :launcher:assembleRelease
+      - name: Assert the shrinker ran AND the keep rule held
+        run: |
+          set -euo pipefail
+          OUT="$EXPORT/launcher/build/outputs/apk/release"
+          APK="$(find "$OUT" -type f -name '*.apk' -print -quit 2>/dev/null || true)"
+          if [ -z "$APK" ]; then
+            echo "no APK under $OUT — assembleRelease reported success but produced nothing here."
+            find "$EXPORT/launcher/build/outputs" -maxdepth 4 -print 2>/dev/null || echo "(no outputs directory at all)"
+            exit 1
+          fi
+          echo "release APK: $APK ($(wc -c < "$APK") bytes)"
+          # Same aapt2 resolution as the android-build job's assertion step.
+          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+          AAPT2="$(find "$SDK/build-tools" -maxdepth 2 -name aapt2 -type f 2>/dev/null | sort -V | tail -1 || true)"
+          if [ -z "$AAPT2" ]; then
+            echo "no aapt2 under '${SDK:-<unset>}'/build-tools/*/ — cannot read the resource table."
+            exit 1
+          fi
+          export ZIP_LIST="$RUNNER_TEMP/apk-listing.txt"
+          export RES_DUMP="$RUNNER_TEMP/apk-resources.txt"
+          export TABLE_FILE="$RUNNER_TEMP/shrink-sizes.txt"
+          unzip -l "$APK" > "$ZIP_LIST" \
+            || { echo "unzip could not list $APK"; exit 1; }
+          "$AAPT2" dump resources "$APK" > "$RES_DUMP" \
+            || { echo "aapt2 could not read the resource table of $APK"; exit 1; }
+          echo "APK_PATH=$APK" >> "$GITHUB_ENV"
+          python3 - <<'PY'
+          import os
+          import posixpath
+          import re
+          import sys
+
+          # Read the release APK two ways and cross them:
+          #   `unzip -l`             — the STORED size of every file in the APK;
+          #   `aapt2 dump resources` — the resource table, which maps a resource NAME to
+          #                            the file it ended up in. Needed because AGP's
+          #                            release pipeline shortens resource paths
+          #                            (res/drawable/ic_quickaction_probe.png -> res/AB.png),
+          #                            so matching zip entries by name alone would report
+          #                            a kept file as missing.
+          # Then two verdicts, from the planted sizes recorded before the build:
+          #   control (zz_shrink_control) must have SHRUNK or vanished — otherwise the
+          #     resource shrinker never ran and the whole run proves nothing;
+          #   probe (ic_quickaction_probe) must be byte-for-byte its planted size —
+          #     that is the package's keep rule doing its job.
+          CONTROL = "zz_shrink_control"
+          PROBE = "ic_quickaction_probe"
+          KEEP_RESOURCE = "raw/quickactions_keep"
+          KEEP_PATH = "res/raw/quickactions_keep.xml"
+          # AGP replaces a shrunk file resource with a ~67-byte 1x1 dummy; anything near
+          # that size is a replacement, not a re-encode.
+          DUMMY_CEILING = 200
+
+          zip_list = open(os.environ["ZIP_LIST"], encoding="utf-8", errors="replace").read()
+          res_dump = open(os.environ["RES_DUMP"], encoding="utf-8", errors="replace").read()
+
+          planted = {}
+          for line in open(os.environ["SIZES_FILE"], encoding="utf-8"):
+              if line.split():
+                  name, size = line.split()
+                  planted[name] = int(size)
+
+          # name -> uncompressed length, from the `unzip -l` table (header, separators and
+          # the totals line all fail the pattern, which is the point of parsing this way).
+          entries = {}
+          for line in zip_list.splitlines():
+              m = re.match(r"^\s*(\d+)\s+\S+\s+\S+\s+(\S.*?)\s*$", line)
+              if m:
+                  entries[m.group(2)] = int(m.group(1))
+
+          # resource name -> the res/ path it is stored as.
+          res_paths = {}
+          current = None
+          for line in res_dump.splitlines():
+              m = re.match(r"\s*resource\s+0x[0-9a-fA-F]+\s+(\S+)", line)
+              if m:
+                  current = m.group(1)
+                  continue
+              if re.match(r"\s*(type|Package|Binary|Proto)\b", line):
+                  current = None
+                  continue
+              if current:
+                  m = re.search(r"(res/[^\s\"]+)", line)
+                  if m and current not in res_paths:
+                      res_paths[current] = m.group(1)
+
+
+          def stored(name):
+              """(path, size) of a planted drawable in the built APK, or (None, None)."""
+              path = res_paths.get("drawable/" + name)
+              if path and path in entries:
+                  return path, entries[path]
+              for entry, size in entries.items():
+                  if posixpath.basename(entry).split(".")[0] == name:
+                      return entry, size
+              return path, None
+
+
+          rows = []
+          for name in (PROBE, CONTROL):
+              path, size = stored(name)
+              rows.append((name, planted.get(name), size, path))
+
+          table = ["", "resource                  planted    in APK  stored as",
+                   "------------------------  -------  --------  ---------"]
+          for name, before, after, path in rows:
+              table.append("%-24s  %7s  %8s  %s"
+                           % (name, before if before is not None else "?",
+                              after if after is not None else "GONE", path or "-"))
+          table.append("")
+          report = "\n".join(table)
+          print(report)
+          if os.environ.get("TABLE_FILE"):
+              open(os.environ["TABLE_FILE"], "w", encoding="utf-8").write(report + "\n")
+
+          failures = []
+
+          # (a) did the shrinker run at all?
+          control_before, control_after = planted.get(CONTROL), rows[1][2]
+          if control_after is None:
+              print("ok: the control resource was removed outright — the shrinker ran")
+          elif control_before is not None and control_after < control_before:
+              print("ok: the control resource shrank %d -> %d bytes — the shrinker ran"
+                    % (control_before, control_after))
+          else:
+              failures.append(
+                  "experiment inconclusive: the shrinker did not run. The unreferenced "
+                  "control '%s' came out of the release build at %s bytes, unchanged from "
+                  "the %s it was planted at. Nothing about the keep rule can be concluded "
+                  "from this run — check that `minifyEnabled true` and `shrinkResources "
+                  "true` really landed in the release buildType (the previous step prints "
+                  "the block it wrote)." % (CONTROL, control_after, control_before))
+
+          # (b) did the package's keep rule protect the icon drawable?
+          probe_before, probe_after, probe_path = planted.get(PROBE), rows[0][2], rows[0][3]
+          if probe_after is None:
+              failures.append(
+                  "the keep rule did not protect '%s': it is not in the release APK at "
+                  "all. res/raw/quickactions_keep.xml ships tools:keep=\"@drawable/"
+                  "ic_quickaction_*\" precisely to prevent this, so either AGP never read "
+                  "the keep file (does it require the name keep.xml?) or the file did not "
+                  "reach the merged resources." % PROBE)
+          elif probe_before is not None and probe_after == probe_before:
+              print("ok: '%s' survived at its planted %d bytes — the keep rule held"
+                    % (PROBE, probe_after))
+          elif probe_after <= DUMMY_CEILING:
+              failures.append(
+                  "the keep rule did not protect '%s': %s bytes in the APK against %s "
+                  "planted, i.e. dummy-replaced. This is exactly the failure mode 0.4.7's "
+                  "res/raw/quickactions_keep.xml was written to prevent — the resource "
+                  "entry survives so getIdentifier() still resolves, and the launcher "
+                  "draws a blank icon." % (PROBE, probe_after, probe_before))
+          else:
+              failures.append(
+                  "experiment inconclusive for '%s': %s bytes in the APK against %s "
+                  "planted, which is far too large to be the shrinker's dummy. Something "
+                  "else re-encoded the file — PNG crunching (`crunchPngs false` should "
+                  "have stopped it) or an aapt2 optimize pass. The keep rule is neither "
+                  "proven nor disproven." % (PROBE, probe_after, probe_before))
+
+          # (c) is the keep file itself in the shipped APK?
+          if KEEP_RESOURCE in res_paths or KEEP_PATH in entries:
+              print("ok: %s is present (stored as %s)"
+                    % (KEEP_PATH, res_paths.get(KEEP_RESOURCE, KEEP_PATH)))
+          else:
+              failures.append(
+                  "%s is not in the release APK. Either the package's Android "
+                  "post-processor did not write it into this export, or the shrinker "
+                  "dropped it after reading it — if this is the ONLY failure here, the "
+                  "keep mechanism still worked and only this assertion needs revisiting."
+                  % KEEP_PATH)
+
+          if failures:
+              sys.stderr.write("\n")
+              for f in failures:
+                  sys.stderr.write("FAIL: %s\n\n" % f)
+              raise SystemExit(1)
+          print("PASS: the resource shrinker ran, and the package's keep rule held.")
+          PY
+      # Uploaded on failure too: the size table IS the finding when this job is
+      # red, and the APK lets a human re-run aapt2 on the same bytes.
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        if: always()
+        with:
+          name: shrink-verify-2022.3
+          path: |
+            ${{ env.APK_PATH }}
+            ${{ runner.temp }}/shrink-sizes.txt
+            ${{ runner.temp }}/planted-sizes.txt
+          if-no-files-found: warn
+          retention-days: 14
 
   # iOS export per testbed on the ubuntu docker image: proves the package's
   # iOS build post-processor (static shortcuts + template-image sync + the
