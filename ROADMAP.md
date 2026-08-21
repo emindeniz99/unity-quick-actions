@@ -33,7 +33,7 @@ Delete an entry in the same commit that ships it.
   referenced by the build's shortcut set, so an app using none pays nothing.
   Cost if we emitted all four unconditionally: ~1.5 KB of APK.
 
-  *Resource shrinking is already handled (unreleased).* The post-processor now writes
+  *Resource shrinking is already handled (0.4.7).* The post-processor now writes
   `res/raw/quickactions_keep.xml` (`tools:keep="@drawable/ic_quickaction_*"`) on
   every enabled Android build, so an icon writer added here inherits it and needs
   no shrinker work of its own. The earlier diagnosis in this entry was partly
