@@ -11,6 +11,86 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 > as its own section because each is a distinct, self-contained set of API
 > additions; read them as the package's development log.
 
+## [Unreleased]
+
+### Added
+
+- **Every Android CI build now proves the package's bake reached the APK.**
+  That the static shortcuts, the strings behind them and the trampoline
+  `<activity>` really survive into a shipped APK was established once, by hand,
+  with a single `aapt2` session on one machine — a fact about one build, not a
+  property of the package. The `android-build` job asserts it on all three lines
+  on every run: `aapt2 dump resources` must show `xml/quickactions_shortcuts`,
+  `raw/quickactions_keep` and `string/qa_short_0`, and `aapt2 dump xmltree` must
+  show `QuickActionsTrampolineActivity` and the `android.app.shortcuts`
+  meta-data. A miss prints the dump it could not match rather than exiting on a
+  bare code: the workflow's first live run predates these steps, so their own
+  first run is where every one of these assumptions gets tested.
+
+- **`android-shrink-verify`: a CI job that finally puts the resource-shrinker
+  keep rule on trial.** 0.4.7 ships `res/raw/quickactions_keep.xml` so the icon
+  drawables — reachable only through `getIdentifier("ic_quickaction_" + name)` —
+  survive `shrinkResources`, and eight headless tests pin what the file
+  contains, but nothing has ever built a minified release APK to see whether AGP
+  *honours* it (ROADMAP verification item (c)). The new job exports the 2022.3
+  Gradle project (`TestbedBuilder.ExportAndroidGradle`, added to all three
+  testbeds), plants two unreferenced 1x1 PNGs — one matching the shipped keep
+  glob, one matching nothing — flips `minifyEnabled` + `shrinkResources` on the
+  *exported* release build, and compares what comes out: the control must be
+  shrunk, or the shrinker never ran and the run is declared inconclusive rather
+  than green; the keep-globbed probe must return byte-identical. Flipping those
+  flags inside the testbed instead would have shipped experiment-only build
+  configuration to everyone reading the example. **This job has never run** —
+  it is new in this change and gated to manual dispatch and the weekly cron —
+  and it is written to fail loudly and print the file, tree or dump it could
+  not parse rather than to skip, precisely because its first run is its own
+  validation.
+  Note also what a green run would and would not say: it would show the icons
+  surviving a minified release build, but not that the keep rule is what saved
+  them, since AGP's default safe mode also carries a string-prefix heuristic
+  that can retain `ic_quickaction_*` on its own.
+
+- **The adb smoke asserts the COLD-launch tap, not just the warm one.** Its tap
+  went to the trampoline while the app was already running, so it only ever
+  proved the resume path — a launcher tap on a quit app, which is how a shortcut
+  is usually used, starts the process and the id has to survive that start. The
+  script now repeats the tap after an `am force-stop`, first proving the
+  process is really gone (an empty `pidof` — force-stop's exit status says
+  nothing, and a still-alive app would silently turn the step into a second
+  warm tap), and asserts the `Performed quick action` line for a *different*
+  registered id than the warm tap used, because `logcat -c` can under-clear on
+  emulators and a leftover warm line must never satisfy the cold assertion.
+  Its own longer timeout (`COLD_LOG_ATTEMPTS`) covers the whole Unity boot a
+  cold start has in front of it. Asserted, not observed: the script has not
+  been run on a device or an emulator since the step was added.
+
+### Changed
+
+- **`game-ci/unity-builder` v4.8.1 → v5.0.0.** The major version extracts the
+  CloudRunner inputs into a separate orchestrator action and moves the runtime
+  from node20 to node24; every input this workflow passes (`projectPath`,
+  `targetPlatform`, `buildMethod`, `versioning`, `allowDirtyBuild`) and the
+  licence env contract (`UNITY_LICENSE`/`UNITY_EMAIL`/`UNITY_PASSWORD`) are
+  unchanged, verified against the v5.0.0 `action.yml` and compiled dist. The
+  companion pins were checked the same way and stay: `unity-test-runner` v4.3.1
+  and `android-emulator-runner` v2.38.0 are the latest stable releases.
+
+### Fixed
+
+- **The emulator smoke's failure output could not say WHY an app went silent.**
+  The workflow's first live run (2026-08-21) proved the point: the unity6 leg
+  timed out after 45s with the three static shortcuts healthy in `dumpsys` and
+  `Calls: 0` — a picture identical for "Unity 6 boots slower than 45s under ARM
+  translation on a software GPU" and "the player crashed on launch", and
+  nothing else was captured before the emulator was torn down. The script's
+  app-behaviour failure paths now print whether the process is alive, the
+  logcat crash buffer, and the engine/package log tail; the CI legs raise
+  `SHORTCUT_ATTEMPTS` to 240 and `COLD_LOG_ATTEMPTS` to 180, which stretches
+  only the failure case since the poll returns the moment its condition holds.
+  The 2021.3 and 2022.3 legs passed the same run end-to-end — the first
+  emulator proof of the smoke as then committed, warm-tap `Performed`
+  round-trip included; the cold-tap step added above remains unrun.
+
 ## [0.4.7] - 2026-08-21
 
 ### Fixed

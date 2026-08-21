@@ -60,8 +60,10 @@ Then in Unity Hub: **Add project from disk** → `unity-quick-actions/Examples~/
 unity test . --mode EditMode --output test-results.xml
 ```
 
-Uses [Unity's CLI](https://docs.unity.com/en-us/unity-cli/use-unity-cli). The
-full suite is 74 tests, and it has been run green on all three lines.
+Uses [Unity's CLI](https://docs.unity.com/en-us/unity-cli/unity-cli-reference)
+(experimental, and its published docs lag the binary — `unity --help` is the
+authoritative command list). The full suite is 74 tests, and it has been run
+green on all three lines.
 
 ## Build from the command line
 

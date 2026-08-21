@@ -64,6 +64,14 @@ Delete an entry in the same commit that ships it.
   (d) a `.androidlib` shipped *inside a UPM package* is picked up —
   Unity's notifications package does this, but it is undocumented behaviour.
 
+  Item **(c)** now has a dedicated CI job — `android-shrink-verify` in
+  [`unity-ci.yml`](./.github/workflows/unity-ci.yml) exports the 2022.3 Gradle
+  project, plants a keep-globbed drawable and an unreferenced control, forces
+  `minifyEnabled` + `shrinkResources` on the exported release build and compares
+  the sizes that come out — but the job has never run (it is gated to manual
+  dispatch and the weekly cron), so (c) is automated, not answered. (a), (b)
+  and (d) still need a hand-run editor.
+
 - **`.androidlib` does not survive `.unitypackage` export/import** (reported
   against 2022.3.15, re-confirmed 2024, unfixed). This is why the built-in icons
   must be written by the build post-processor rather than shipped as a
@@ -88,11 +96,14 @@ Delete an entry in the same commit that ships it.
   it straight into the adb smoke, and exports + compiles the iOS Simulator
   project on a macOS runner, cold-launching the app there. Both still need the
   `UNITY_LICENSE`/`UNITY_EMAIL`/`UNITY_PASSWORD` secrets to be configured
-  before a single Unity job has actually run. Remaining after that: asserting a
-  shortcut **tap** on iOS (no `simctl` API reads `UIApplicationShortcutItems`
-  or triggers a tap — it needs an XCUITest target driving SpringBoard; see the
-  device-smoke README), and asserting the Android **COLD-launch** path (the
-  smoke's tap is a warm resume).
+  before a single Unity job has actually run. The Android **COLD-launch** path
+  is no longer on this list: `android_device_smoke.sh` now force-stops the app
+  and taps the trampoline again as its last step, so the script asserts both the
+  warm resume and the launch-intent delivery — asserted, not yet observed, since
+  the script has not been run against a device or emulator since that step was
+  added. Remaining after the secrets: asserting a shortcut **tap** on iOS (no
+  `simctl` API reads `UIApplicationShortcutItems` or triggers a tap — it needs
+  an XCUITest target driving SpringBoard; see the device-smoke README).
 - **Documentation site (considered, deliberately deferred — revisit trigger now
   met)** — the reference docs live in a single **832-line** [README](./README.md)
   (590 when this entry was written; 0.4.6's placeholder section added ~130 of
