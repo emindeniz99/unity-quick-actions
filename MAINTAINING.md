@@ -99,16 +99,19 @@ x86_64-only simulator runtime on 2021 LTS.)
 
 **Android device pass**
 
-- [ ] The Demo sample builds and runs on a physical Android 7.1+ device
-      (API 25 is the floor for launcher shortcuts).
-- [ ] After the demo's "Add 3 shortcuts" button, a **long-press on the launcher
-      icon** shows the three dynamic shortcuts.
+- [x] The Demo sample builds and runs on a physical Android 7.1+ device
+      (API 25 is the floor for launcher shortcuts). *(Moto G Play 2024 /
+      Android 14, 2026-08-07.)*
+- [x] After the demo's "Add 3 shortcuts" button, a **long-press on the launcher
+      icon** shows the three dynamic shortcuts. *(Same run; the id-collision
+      rule was observed too — see `PRODUCTION_READINESS.md`.)*
 - [ ] **Warm tap**: with the app running, tapping a shortcut foregrounds it and
       logs the shortcut id.
 - [ ] **Cold tap**: with the app force-closed, tapping a shortcut cold-launches
       it and still logs the id.
-- [ ] A **static** shortcut configured in Project Settings ▸ Quick Actions
-      exists on first launch, before anything is pressed at runtime.
+- [x] A **static** shortcut configured in Project Settings ▸ Quick Actions
+      exists on first launch, before anything is pressed at runtime. *(Same
+      run, on a cold, never-opened install.)*
 
 **iOS device pass** (requires a Mac)
 

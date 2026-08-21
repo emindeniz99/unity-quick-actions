@@ -107,9 +107,12 @@ over:
   public `simctl` command triggers one, and the package uses no URL scheme, so
   `simctl openurl` cannot stand in for a tap.
 * The home-screen long-press menu is SpringBoard UI. Reaching it programmatically
-  means an XCUITest bundle driving SpringBoard, which needs an Xcode project, a
-  macOS runner, and a Unity licence to produce the app under test — none of which
-  this repo's CI has.
+  means an XCUITest bundle driving SpringBoard. Two of its three prerequisites
+  now exist: `.github/workflows/unity-ci.yml` builds the Xcode project on a
+  licensed Unity and compiles it on a macOS runner, where it also boots a
+  simulator and cold-launches the app. What is still missing is the XCUITest
+  target itself — and `simctl` still cannot read `UIApplicationShortcutItems`
+  or trigger a tap, so the assertion above remains out of reach.
 
 So the iOS half is run **by hand**:
 

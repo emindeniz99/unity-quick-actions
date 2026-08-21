@@ -7,7 +7,8 @@ Unity (the leading `.` means Unity ignores it) and never ships in a build.
 Run everything:
 
 ```bash
-tools~/verify.sh        # gen_meta + C# compile (x9) + unit tests + Java compile + smoke
+tools~/verify.sh        # gen_meta + C# compile (x10) + unit tests + Java compile + smoke
+                        # + frozen strings + release-notes coherence
 tools~/setup.sh         # one-time: install dotnet + JDK if missing
 ```
 
@@ -38,9 +39,11 @@ checklist in [`../MAINTAINING.md`](../MAINTAINING.md).
 
 ## Web sessions / CI
 
-The repo's `.devcontainer/Dockerfile` bakes in `dotnet-sdk-10.0` and a headless
-JDK, so Claude Code on the web can run `tools~/verify.sh` with no setup. On a
-plain machine, run `tools~/setup.sh` once first.
+Nothing in this repo provisions the toolchain — there is no devcontainer image
+(an earlier version of this paragraph claimed one, which never existed here).
+Run `tools~/setup.sh` once per machine or container; it is a fast no-op when a
+10.x `dotnet` SDK and `javac` are already on PATH. CI installs the same two
+prerequisites with `setup-dotnet` / `setup-java` (see `.github/workflows/ci.yml`).
 
 ### Optional: auto-prepare the toolchain on session start
 

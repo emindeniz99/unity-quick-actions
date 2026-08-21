@@ -776,8 +776,9 @@ is also what happens on a **fork** PR, where GitHub withholds secrets from the
 run by design, so an outside contributor's code never comes within reach of
 them. (Nothing here uses `pull_request_target`, the trigger that *would* hand
 secrets to untrusted code.) The workflow header documents the setup step by
-step. It has not produced a green run yet — it needs those secrets, and the
-triggers only fire once the file is on `main`.
+step. Both runs so far ended green exactly that way — the PR run and the `main`
+merge run each had the licence gate report *missing* and every Unity job skip.
+No real editor has been opened in CI yet.
 
 For a real device/emulator, `tools~/device-smoke/` has an adb-driven Android
 smoke (install a dev APK → assert the demo's shortcuts registered → simulate a

@@ -32,4 +32,4 @@ otherwise).
 - Dev-tooling dependencies never ship to consumers. The NuGet test packages and
   GitHub Actions are updated via Dependabot (see `.github/dependabot.yml`) with
   a release-age cooldown as malicious-release mitigation; Pillow (marketing
-  images only) is provisioned by the devcontainer and updated manually.
+  images only) is installed manually by whoever regenerates store art.

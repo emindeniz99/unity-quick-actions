@@ -5,8 +5,8 @@ cover it, the review that signed it off, and what (if anything) still gates it
 for production. Honest status — nothing marked "ready" that wasn't actually
 exercised.
 
-The short version — how far each Unity line is verified, and that no
-physical-device validation has happened — is the **Status** section of the
+The short version — how far each Unity line is verified, and how little of the
+physical-device work is done — is the **Status** section of the
 [README](./README.md#status). This file is the per-feature breakdown behind it;
 the two must not disagree.
 
@@ -195,7 +195,10 @@ says "6.3" for work dated later than 2026-07-17, the Editor was `6000.3.21f1`.
   the Editor refuses to launch with `com.unity.editor.access.xlts` missing.
   Unity's public release API lists only `.45f1` and `.45f2` for this line,
   which is the cheapest way to tell before downloading ~10 GB.
-- **Device gate: OPEN — no physical-device validation has been done on either
+- **Device gate: PARTLY OPEN — one Android handset, nothing on iOS.** The 2026-08-07
+  Moto G Play run (below) confirmed static shortcuts on a cold install, dynamic
+  `Add` and the same-id collision rule; tap delivery on hardware and every iPhone
+  check remain undone. The rest of this bullet is what is still missing on either
   platform.** Everything marked ⏳ above needs each claimed Unity line (2021.3,
   2022.3, 6.0, 6.3 — full pass on all) + an iOS device (via macOS/Xcode) + an
   Android API-25+ device. Editor coverage so far: **2022.3.9f1** — managed gate
@@ -247,14 +250,16 @@ What is left is physical hardware.
      the manifest-merge + `res/xml/quickactions_shortcuts.xml` path, which no
      simulator or stub run had ever exercised.
    - **Dynamic add**: "Add 3 shortcuts" and "Add 'settings'" both published.
-   - **Same-id collision, exactly as documented** at `README.md:373`: `new_game`
+   - **Same-id collision, exactly as documented** in README "Static shortcuts"
+     ("on Android the colliding dynamic item is dropped"): `new_game`
      and `continue` exist in both the static and dynamic sets, and the launcher
      kept the *manifest* entries while the dynamic duplicates were dropped —
      the remaining slots went to the dynamic-only `daily` and `settings`, with
      static `daily_reward` pushed out by the launcher's four-item cap.
    - **Android renders the long label** (our `Subtitle`), not the short one, so
-     the popup reads "Start a fresh run" rather than "New Game" — `README.md:322`
-     is correct, and it is worth knowing when authoring labels for Android.
+     the popup reads "Start a fresh run" rather than "New Game" — the README's
+     opening screenshot caption and the `Subtitle` row of the field table both
+     say so, and it is worth knowing when authoring labels for Android.
 
    Still open on Android: **tap delivery** — a shortcut tap arriving as
    `Performed` on a cold and on a warm launch. The device run above published
