@@ -72,7 +72,7 @@ done for you — jump to A4. See [`Examples~/README.md`](./Examples~/README.md).
 ```
 https://github.com/emindeniz99/unity-quick-actions.git
 ```
-Append `#v0.4.5` to pin a version; the plain URL tracks the default branch.
+Append `#v0.4.6` to pin a version; the plain URL tracks the default branch.
 
 Alternatives:
 - **OpenUPM** — `openupm add com.emindeniz99.quick-actions` (needs the Node CLI:

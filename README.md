@@ -136,7 +136,7 @@ https://github.com/emindeniz99/unity-quick-actions.git
 Pin a version by appending a tag, e.g.:
 
 ```
-https://github.com/emindeniz99/unity-quick-actions.git#v0.4.5
+https://github.com/emindeniz99/unity-quick-actions.git#v0.4.6
 ```
 
 (Without a tag you track the default branch. `v0.4.0` is the first tag, so
@@ -170,7 +170,7 @@ package under `dependencies`:
     }
   ],
   "dependencies": {
-    "com.emindeniz99.quick-actions": "0.4.5"
+    "com.emindeniz99.quick-actions": "0.4.6"
   }
 }
 ```
