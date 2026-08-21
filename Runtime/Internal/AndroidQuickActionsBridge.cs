@@ -14,7 +14,7 @@ namespace EminDeniz99.QuickActions.Internal
     {
         // Resolved by name over JNI. In a MINIFIED build R8 can rename/strip this
         // non-manifest class; ship a keep rule then — see the README "Known limits —
-        // Android minification (R8/ProGuard)".
+        // Android minification (R8/ProGuard + resource shrinking)".
         private const string BridgeClass = "com.emindeniz99.quickactions.QuickActionsBridge";
 
         private static AndroidJavaObject CurrentActivity()

@@ -33,18 +33,17 @@ Delete an entry in the same commit that ships it.
   referenced by the build's shortcut set, so an app using none pays nothing.
   Cost if we emitted all four unconditionally: ~1.5 KB of APK.
 
-  *Blocking sub-bug — must ship in the same release.* With `minifyEnabled` +
-  `shrinkResources` (Gradle's default safe mode), the drawables are marked
-  unreachable and their bytes replaced with a 67-byte dummy **while their
-  resource-table entries survive**. So `getIdentifier` returns non-zero,
-  `setIcon` is called, and the launcher still draws an empty square — a
-  release-only failure that looks exactly like the un-configured state. Cause is
-  our own naming: `QuickActionsBridge.java:505` builds the name by
-  concatenation (`"ic_quickaction_" + ICON_NAMES[i]`), so the string pool holds
-  only the bare prefix and the shrinker matches nothing. Fix is to emit
-  `res/raw/quickactions_keep.xml` carrying `tools:keep`. **This bug exists
-  today**, independently of shipping icons: any consumer who adds their own
-  drawable and builds a minified release hits it.
+  *Resource shrinking is already handled (0.4.7).* The post-processor now writes
+  `res/raw/quickactions_keep.xml` (`tools:keep="@drawable/ic_quickaction_*"`) on
+  every enabled Android build, so an icon writer added here inherits it and needs
+  no shrinker work of its own. The earlier diagnosis in this entry was partly
+  wrong and is corrected here: AGP's default *safe* mode does have a heuristic
+  (`PossibleResourcesMarker.possiblePrefixMatch`) for exactly this concatenation
+  shape, so the catalog names were likely retained there — but a custom
+  `AndroidDrawable` name supplied from C# at runtime is unprotectable by any
+  heuristic (it is never a constant in the compiled code), and one library
+  carrying `tools:shrinkMode="strict"` flips the whole app to strict mode where
+  nothing name-resolved survives; hence the explicit keep rule ships regardless.
 
   *Note:* even after this, 25 of the 29 catalog entries stay blank on Android —
   we only own art for add/compose/favorite/play. Either commission the rest,
@@ -58,8 +57,11 @@ Delete an entry in the same commit that ships it.
   (a) a `.androidlib` under `Assets/` lands its `src/main/res/drawable-*/`
   entries in the APK resource table (`aapt2 dump resources <apk> | grep -i
   quickaction`); (b) `res/` at the `.androidlib` root is silently dropped, as
-  the docs imply; (c) the `shrinkResources` failure reproduces, and `tools:keep`
-  fixes it; (d) a `.androidlib` shipped *inside a UPM package* is picked up —
+  the docs imply; (c) on a minified release build, a catalog-named drawable
+  survives with real bytes (compare sizes / `aapt2 dump`) with the shipped
+  `res/raw/quickactions_keep.xml` in place, and a custom-named runtime-only
+  drawable demonstrates the documented failure without a user keep rule;
+  (d) a `.androidlib` shipped *inside a UPM package* is picked up —
   Unity's notifications package does this, but it is undocumented behaviour.
 
 - **`.androidlib` does not survive `.unitypackage` export/import** (reported

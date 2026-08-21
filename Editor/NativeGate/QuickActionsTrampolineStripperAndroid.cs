@@ -34,6 +34,7 @@ namespace EminDeniz99.QuickActions.Editor.NativeGate
         private const string TrampolineClassShort = ".QuickActionsTrampolineActivity";
         private const string ShortcutsResource = "quickactions_shortcuts";
         private const string StringsResource = "quickactions_strings";
+        private const string KeepResource = "quickactions_keep";
 
         public int callbackOrder => 90;
 
@@ -100,6 +101,21 @@ namespace EminDeniz99.QuickActions.Editor.NativeGate
                 // Delete our generated (uniquely named) shortcut resources too.
                 SafeDelete(Path.Combine(module, "src", "main", "res", "xml", ShortcutsResource + ".xml"));
                 SafeDelete(Path.Combine(module, "src", "main", "res", "values", StringsResource + ".xml"));
+                // The gated post-processor writes the icon keep rule (define ON); with
+                // the define off it must not survive into a reused/exported project.
+                SafeDelete(Path.Combine(module, "src", "main", "res", "raw", KeepResource + ".xml"));
+                // ...and the per-locale copies the baker writes next to the base
+                // strings file (res/values-<qualifier>/quickactions_strings.xml).
+                // Ours by exact file name inside a values-* folder — a host app's
+                // own values-fr/strings.xml is never touched. This assembly cannot
+                // reuse the gated GeneratedLocalizedStringFiles helper (its asmdef
+                // is defineConstraint'ed away here), hence the local sweep; guarded
+                // because the sibling launcher module may have no res/ at all and
+                // GetDirectories on a missing path would throw out of the callback.
+                var resDir = Path.Combine(module, "src", "main", "res");
+                if (Directory.Exists(resDir))
+                    foreach (var localeDir in Directory.GetDirectories(resDir, "values-*"))
+                        SafeDelete(Path.Combine(localeDir, StringsResource + ".xml"));
             }
 #endif
         }
