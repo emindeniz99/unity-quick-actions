@@ -14,6 +14,16 @@ namespace EminDeniz99.QuickActions.Editor
     {
         private static UnityEditor.Editor _cachedEditor;
 
+        // GetOrNull does a project-wide AssetDatabase.FindAssets; the settings
+        // page repaints continuously, so calling it per GUI event scanned the
+        // whole project dozens of times a second — and its "found N settings
+        // assets" warning fired just as often. Cache it, and let Unity's
+        // fake-null tell us when the asset was deleted underneath us.
+        private static QuickActionsSettings _settings;
+
+        private static QuickActionsSettings CachedSettings() =>
+            _settings != null ? _settings : (_settings = QuickActionsSettings.GetOrNull());
+
         [SettingsProvider]
         public static SettingsProvider Create()
         {
@@ -23,7 +33,7 @@ namespace EminDeniz99.QuickActions.Editor
                 keywords = new[] { "quick", "actions", "shortcut", "ios", "android", "home screen" },
                 guiHandler = _ =>
                 {
-                    var settings = QuickActionsSettings.GetOrNull();
+                    var settings = CachedSettings();
                     if (settings == null)
                     {
                         EditorGUILayout.HelpBox(
@@ -32,7 +42,7 @@ namespace EminDeniz99.QuickActions.Editor
                             "runtime don't need it.",
                             MessageType.Info);
                         if (GUILayout.Button("Create settings asset"))
-                            QuickActionsSettings.GetOrCreate();
+                            _settings = QuickActionsSettings.GetOrCreate();
                         return;
                     }
 
@@ -74,6 +84,9 @@ namespace EminDeniz99.QuickActions.Editor
                         Object.DestroyImmediate(_cachedEditor);
                         _cachedEditor = null;
                     }
+                    // Drop the cached asset too, so reopening the page rescans
+                    // and picks up one created/moved while it was closed.
+                    _settings = null;
                 }
             };
         }

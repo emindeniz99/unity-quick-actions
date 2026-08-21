@@ -81,14 +81,21 @@ Delete an entry in the same commit that ships it.
   and it inherits the `.unitypackage` limitation above. Do this *after* the
   post-processor work, as documentation-by-example — not as the delivery path.
 
-- **Automated device CI, remaining scope** — v0.4.0 ships an adb-driven Android
-  smoke (`tools~/device-smoke/`) and a manually-dispatched emulator workflow
-  (needs a Unity-built dev APK — no Unity license in CI). Remaining: iOS
-  simulator automation (no adb analog for shortcut taps — see the device-smoke
-  README), asserting the COLD-launch path (the smoke's tap is a warm resume),
-  and wiring the smoke into always-on CI once a Unity license (game-ci) exists.
-- **Documentation site (considered, deliberately deferred)** — the reference
-  docs live in a single 590-line [README](./README.md) plus a task-oriented
+- **Automated device CI, remaining scope** — 0.4.6 closed the licence half:
+  `.github/workflows/unity-ci.yml` (GameCI) builds the dev APK in CI and feeds
+  it straight into the adb smoke, and exports + compiles the iOS Simulator
+  project on a macOS runner, cold-launching the app there. Both still need the
+  `UNITY_LICENSE`/`UNITY_EMAIL`/`UNITY_PASSWORD` secrets to be configured
+  before a single Unity job has actually run. Remaining after that: asserting a
+  shortcut **tap** on iOS (no `simctl` API reads `UIApplicationShortcutItems`
+  or triggers a tap — it needs an XCUITest target driving SpringBoard; see the
+  device-smoke README), and asserting the Android **COLD-launch** path (the
+  smoke's tap is a warm resume).
+- **Documentation site (considered, deliberately deferred — revisit trigger now
+  met)** — the reference docs live in a single **832-line** [README](./README.md)
+  (590 when this entry was written; 0.4.6's placeholder section added ~130 of
+  them, and the deferral below says to revisit "if the README keeps growing")
+  plus a task-oriented
   [GETTING_STARTED](./GETTING_STARTED.md); a GitHub Pages site (or a UPM
   `Documentation~/` folder, which the Package Manager surfaces as the package's
   "Documentation" link) would make that navigable, searchable and versioned per
@@ -102,10 +109,12 @@ Delete an entry in the same commit that ships it.
 
 The stub harness compiles the C#/Java but can't confirm Unity-only wiring:
 
-- Confirm the gated post-processor asmdefs (`Editor/iOS`, `Editor/Android`,
+- ~~Confirm the gated post-processor asmdefs (`Editor/iOS`, `Editor/Android`,
   `defineConstraints` `UNITY_IOS` / `UNITY_ANDROID`, with the extension DLLs in
   `precompiledReferences`) compile when that target is active and are skipped
-  cleanly otherwise.
+  cleanly otherwise.~~ **Done** — the 2021.3 / 2022.3 / 6.x Editor passes
+  imported with 0 errors and produced real Android APKs and Xcode projects,
+  which is exactly this seam resolving; see `PRODUCTION_READINESS.md`.
 - On-device: verify the Android trampoline reliably foregrounds the Unity task
   and fires `OnApplicationFocus(true)` (warm resume), that iOS warm taps land via
   the focus poll (performAction precedes didBecomeActive), and that static

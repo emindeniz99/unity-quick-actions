@@ -101,20 +101,28 @@ The condensed, day-of sequence. Details live in
 
 ## Phase 6 — stamp the release (10 min, back in the repo)
 
-The **first public release is `v0.4.0`** — the version this repo already carries.
-Tags are plain semver (`v0.4.0`), one tag per release. `v0.4.0` was pushed on
-2026-08-07 and CI created the Release with the `.unitypackage` attached; this
-phase is what every later release repeats.
+Releases are cut by **merging**, not by tagging.
+[`.github/workflows/release.yml`](./.github/workflows/release.yml) notices that
+main declares a version with no tag, runs `verify.sh`, packs the
+`.unitypackage`, creates `v<version>` at the merge commit and publishes the
+Release with your `CHANGELOG.md` section as its notes. Full procedure:
+[`MAINTAINING.md` § Cutting a release](./MAINTAINING.md#cutting-a-release).
+Tags are plain semver, one per release; `v0.4.0`, cut 2026-08-07, was the first.
 
-- [ ] `package.json` `version` and the top `CHANGELOG.md` heading agree, and the
-      heading has a real date (no `Unreleased` left).
+- [ ] **In the release PR itself, not afterwards:** `package.json` `version` and
+      the top `CHANGELOG.md` heading agree, and the heading has a real date (no
+      `Unreleased` left). `verify.sh` check 6 fails the PR otherwise — the
+      release is cut from those two files, so the bump must be in the commit
+      that gets tagged.
 - [ ] Stay in `0.x` until the matrix above has actually been walked on devices;
       a `1.0.0` is a claim of "validated on both ends of the supported range",
       not a mood. Bumping later is cheap.
-- [ ] `git tag v<version> && git push origin v<version>` (e.g. `v0.4.0`).
+- [ ] Merge the PR with a real merge commit (never squash), then watch the
+      **release** workflow. Do **not** push the tag by hand: the workflow
+      creates it, and a hand-pushed tag either collides or races the run.
 - [ ] Check the resulting **GitHub Release** carries the built
-      `QuickActions.unitypackage` asset (CI attaches it; if it's missing, build
-      it with `tools~/release.sh` and upload it to the release by hand) —
+      `QuickActions.unitypackage` asset (the workflow attaches it; if it's
+      missing, build it with `tools~/release.sh` and upload it by hand) —
       docs point downloaders at
       <https://github.com/emindeniz99/unity-quick-actions/releases>.
 - [ ] OpenUPM one-time submission: [`docs~/publishing-to-openupm.md`](./docs~/publishing-to-openupm.md).

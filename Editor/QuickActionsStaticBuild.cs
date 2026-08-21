@@ -71,9 +71,12 @@ namespace EminDeniz99.QuickActions.Editor
     /// </summary>
     public static class QuickActionsStaticBuild
     {
-        // The six built-in names, shared by BuiltinValues (real values for a
-        // build) and KnownPlaceholders (name probe for validation/preview) so
-        // the two can never drift apart.
+        // The six built-in names. BuiltinValues spells its own keys (it has to —
+        // each carries a value), so this array MIRRORS that table rather than
+        // feeding it; KnownPlaceholders is what reads it, to probe names without
+        // computing values in a GUI repaint. Nothing structural keeps the two in
+        // step, so a test asserts they hold the same key set per platform — add a
+        // built-in in one place only and it goes red.
         internal static readonly string[] BuiltinNames =
             { "version", "build", "bundleId", "productName", "unityVersion", "platform" };
 
@@ -234,7 +237,8 @@ namespace EminDeniz99.QuickActions.Editor
 
         // Name probe for validation: every resolvable name (built-in + custom)
         // mapped to "", so Interpolate can be reused to find unknown tokens
-        // without computing real values in a GUI repaint.
+        // without computing real values in a GUI repaint. Kept in step with
+        // BuiltinValues by test, not by construction — see BuiltinNames.
         internal static Dictionary<string, string> KnownPlaceholders()
         {
             var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);

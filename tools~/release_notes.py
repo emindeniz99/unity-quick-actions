@@ -56,11 +56,25 @@ def main():
         return 1
 
     top_version, _, _ = found[0]
-    # Mid-development the top section may still be [Unreleased]; that is a
-    # legal working state to commit, just not one that can be released.
+    # Mid-development the top section may still be [Unreleased] — a legal
+    # working state, but ONLY while package.json still names the last released
+    # version. Once the version is bumped, an [Unreleased] heading IS the
+    # mistake this check exists to catch: verify would go green, the merge
+    # would land, and release.yml would then die on a version whose notes do
+    # not exist. Exempting it unconditionally let exactly that through.
     if check and top_version.lower() == "unreleased":
-        print(f"release notes OK (top section is [Unreleased]; package.json is {version})")
-        return 0
+        released = [v for v, _, _ in found if v.lower() != "unreleased"]
+        if released and version == released[0]:
+            print(f"release notes OK (top section is [Unreleased]; package.json is {version})")
+            return 0
+        print(
+            f"release_notes: package.json says {version} but the top CHANGELOG "
+            f"section is still [Unreleased]. Rename it to '## [{version}] - <date>' "
+            f"in this same commit — the release is cut from these two files, so a "
+            f"bumped version with no dated section publishes nothing.",
+            file=sys.stderr,
+        )
+        return 1
 
     if top_version != version:
         print(

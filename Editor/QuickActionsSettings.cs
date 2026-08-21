@@ -88,7 +88,7 @@ namespace EminDeniz99.QuickActions.Editor
             var settings = CreateInstance<QuickActionsSettings>();
             // Create the folder through the AssetDatabase (not Directory.Create
             // Directory, which it doesn't know about) so CreateAsset persists on a
-            // clean project where Assets/QuickActions doesn't exist yet.
+            // clean project where DefaultAssetPath's folder doesn't exist yet.
             EnsureAssetFolder(Path.GetDirectoryName(DefaultAssetPath));
             AssetDatabase.CreateAsset(settings, DefaultAssetPath);
             AssetDatabase.SaveAssets();

@@ -11,6 +11,60 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 > as its own section because each is a distinct, self-contained set of API
 > additions; read them as the package's development log.
 
+## [Unreleased]
+
+### Fixed
+
+- **The release guard added in 0.4.6 did not catch the mistake it was added
+  for.** `verify.sh` check 6 exempted an `[Unreleased]` top heading
+  unconditionally, so the exact release-PR slip it exists to stop — bump
+  `package.json` to 0.4.7, forget to rename the section — passed verify green,
+  merged, and then killed the release workflow on main with no release cut. The
+  exemption is now conditional: an `[Unreleased]` heading is a legal
+  mid-development state only while `package.json` still names the *last
+  released* version. Verified against all four cases (bumped + `[Unreleased]`
+  now fails; un-bumped + `[Unreleased]` still passes; matching dated section
+  passes; mismatch fails).
+- **A comment claimed a structural invariant the code did not have, and its
+  test was a tautology.** `BuiltinNames` was described as "shared by
+  `BuiltinValues` … so the two can never drift apart"; `BuiltinValues` in fact
+  spells its own keys and never reads the array, and the test only asserted
+  that the probe built *from* `BuiltinNames` contained `BuiltinNames`. The test
+  now compares the two key sets per platform — a placeholder added to one side
+  alone turns it red (mutation-checked) — and the comment says what is true.
+- **Docs that stopped matching the repo.** README said the Unity CI lane had
+  never produced a green run (it has produced two, both green by the licence
+  gate exactly as designed); `PRODUCTION_READINESS.md` opened and signed off
+  with "no physical-device validation has happened" while recording an Android
+  handset run three sections later, and cited README line numbers that the
+  0.4.6 growth had moved; `MAINTAINING.md`'s pre-1.0 Android checklist left
+  three already-executed items unticked; `.verify/README.md` (and
+  `SECURITY.md`) documented a `.devcontainer/Dockerfile` that has never existed
+  in this repo, sending web sessions past the `setup.sh` they actually need;
+  `RELEASE_RUNBOOK.md` still told the maintainer to push the tag by hand, which
+  now collides with or races `release.yml`; and `release.yml`'s own header
+  claimed "--clobber semantics" its publish step does not have (`gh release
+  create` has no such flag).
+- **`ROADMAP.md` broke its own rule** ("Delete an entry in the same commit that
+  ships it"). The device-CI entry still said there was no Unity licence in CI
+  and listed the game-ci wiring as remaining work — 0.4.6 shipped it; the
+  documentation-site entry cited a 590-line README that is now 832 lines, which
+  is the very "keeps growing" trigger it defers on; and the real-Editor asmdef
+  confirmation was listed as open although `PRODUCTION_READINESS.md` records
+  the Editor passes that closed it.
+- **The install pins pointed at the previous release.** `v0.4.6` is tagged and
+  published, so README / `GETTING_STARTED.md` / `CONTRIBUTING.md` /
+  `CLAUDE.md` no longer tell readers to pin `v0.4.5` — a version that does not
+  contain the placeholder feature the same README documents.
+
+### Changed
+
+- **The settings page no longer rescans the whole project on every repaint.**
+  `Project Settings ▸ Quick Actions` called `AssetDatabase.FindAssets` once per
+  GUI event; on a project with two settings assets it also re-logged the
+  "found N" warning just as often. The asset is cached for as long as the page
+  is open and dropped when it closes.
+
 ## [0.4.6] - 2026-08-20
 
 ### Added

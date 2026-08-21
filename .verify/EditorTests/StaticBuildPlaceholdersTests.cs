@@ -125,6 +125,18 @@ namespace EminDeniz99.QuickActions.Tests
             // The settings-page validator flags only names NEITHER built-in NOR
             // registered; a drift between this probe and BuiltinValues would turn
             // every valid {build} into a false warning (or hide a real typo).
+            // BuiltinValues spells its own keys, so nothing structural keeps it
+            // and the name probe in step. Compare the two key sets directly —
+            // asserting only that the probe contains BuiltinNames would be a
+            // tautology (the probe is BUILT from BuiltinNames) and would not
+            // notice a token added to the value table alone. Both platforms
+            // define {build}, so each key set is exactly the six names.
+            foreach (var platform in new[] { BuildTarget.iOS, BuildTarget.Android })
+                CollectionAssert.AreEquivalent(
+                    QuickActionsStaticBuild.BuiltinNames,
+                    new List<string>(QuickActionsStaticBuild.BuiltinValues(platform).Keys),
+                    $"the {platform} value table and the name probe disagree");
+
             QuickActionsStaticBuild.RegisterPlaceholder("buildDate", () => "today");
             var known = QuickActionsStaticBuild.KnownPlaceholders();
             foreach (var name in QuickActionsStaticBuild.BuiltinNames)
