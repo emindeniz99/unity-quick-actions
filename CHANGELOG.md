@@ -99,6 +99,21 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **Unity 6 (GameActivity): a warm shortcut tap could sit undelivered until
+  the next real focus change.** The runtime drained its pending-id queue only
+  from `OnApplicationFocus(true)` and `OnApplicationPause(false)` — and CI's
+  third heavy run showed Unity 6's `UnityPlayerGameActivity` completing a
+  trampoline round-trip with **neither** callback reaching scripting: the
+  trampoline recorded the id (no gate warning), the player logged
+  `onNewIntent`/`onResume` and handled the native `APP_CMD_PAUSE`/`RESUME`
+  pair a millisecond apart, and no dispatch followed for 30 s. The classic
+  `UnityPlayerActivity` (2021.3/2022.3) fires the callbacks and was never
+  affected. The runtime's hidden singleton now also polls the queue on a slow
+  0.25 s unscaled-time beat — delivery no longer depends on which lifecycle
+  events an activity implementation emits, and an empty-queue tick is one
+  cheap native read. Found, diagnosed to the exact missing callback, and
+  soon re-provable entirely by the emulator smoke.
+
 - **The emulator smoke's failure output could not say WHY an app went silent.**
   The workflow's first live run (2026-08-21) proved the point: the unity6 leg
   timed out after 45s with the three static shortcuts healthy in `dumpsys` and

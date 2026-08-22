@@ -20,6 +20,8 @@ namespace UnityEngine
 
     public class Coroutine { }
 
+    public class WaitForSecondsRealtime { public WaitForSecondsRealtime(float time) { } }
+
     public class MonoBehaviour : Behaviour
     {
         public Coroutine StartCoroutine(System.Collections.IEnumerator routine) => new Coroutine();
