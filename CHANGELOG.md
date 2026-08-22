@@ -58,8 +58,11 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   runner's system Gradle (9.x) cannot load the AGP 7.1.2 the export pins. The
   job now supplies the combo Unity 2022.3 itself bundles (JDK 11, a
   sha256-pinned Gradle 7.2, NDK r23b) and re-points the docker-image paths
-  hardcoded in the export (`android.aapt2FromMavenOverride`, `ndkPath`); the
-  probe/control verdict itself is still pending its first complete run.
+  hardcoded in the export (`android.aapt2FromMavenOverride`, `ndkPath`). The
+  next run got exactly one step further — the pin step itself died on
+  `sdkmanager` not being on PATH for plain run steps, now called by full
+  path — and the probe/control verdict is still pending its first complete
+  run.
   Note also what a green run would and would not say: it would show the icons
   surviving a minified release build, but not that the keep rule is what saved
   them, since AGP's default safe mode also carries a string-prefix heuristic
@@ -84,7 +87,9 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   the whole budget (the emulator was still tearing down the dead process's
   Vulkan objects when the new one launched, so a GPU-settle delay now
   precedes the cold tap) and Unity 6 never reached the shortcut publish at
-  all (below). No real device has run the step yet.
+  all (below). The settle delay proved out one dispatch later: 2021.3 passed
+  all eight steps, so both classic-activity lines now clear the full smoke,
+  cold tap included. No real device has run the step yet.
 
 ### Changed
 
@@ -98,6 +103,21 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   and `android-emulator-runner` v2.38.0 are the latest stable releases.
 
 ### Fixed
+
+- **Unity 6 (GameActivity): a warm shortcut tap could sit undelivered until
+  the next real focus change.** The runtime drained its pending-id queue only
+  from `OnApplicationFocus(true)` and `OnApplicationPause(false)` — and CI's
+  third heavy run showed Unity 6's `UnityPlayerGameActivity` completing a
+  trampoline round-trip with **neither** callback reaching scripting: the
+  trampoline recorded the id (no gate warning), the player logged
+  `onNewIntent`/`onResume` and handled the native `APP_CMD_PAUSE`/`RESUME`
+  pair a millisecond apart, and no dispatch followed for 30 s. The classic
+  `UnityPlayerActivity` (2021.3/2022.3) fires the callbacks and was never
+  affected. The runtime's hidden singleton now also polls the queue on a slow
+  0.25 s unscaled-time beat — delivery no longer depends on which lifecycle
+  events an activity implementation emits, and an empty-queue tick is one
+  cheap native read. Found, diagnosed to the exact missing callback, and
+  soon re-provable entirely by the emulator smoke.
 
 - **The emulator smoke's failure output could not say WHY an app went silent.**
   The workflow's first live run (2026-08-21) proved the point: the unity6 leg
@@ -115,7 +135,9 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   — the Unity 6 *development* player dies during engine init under the API 30
   image's ARM-to-x86_64 translation, while 2021.3/2022.3 boot fine there. The
   unity6 smoke leg therefore now runs the API 35 system image, whose far
-  newer translator is the one variable that crash implicates.
+  newer translator is the one variable that crash implicates — and on it the
+  player boots and publishes its shortcuts, which is what let the same
+  diagnostics catch the GameActivity delivery bug fixed above.
 
 ## [0.4.7] - 2026-08-21
 

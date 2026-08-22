@@ -15,7 +15,9 @@ import android.os.Bundle;
  * Using a trampoline instead of subclassing Unity's activity keeps the plugin
  * working across Unity versions where the entry point differs
  * (UnityPlayerActivity in 2022 LTS vs UnityPlayerGameActivity in Unity 6+).
- * The Unity side reads the recorded id by polling on startup / focus.
+ * The Unity side reads the recorded id by polling on startup / focus, plus a
+ * slow safety-net poll for activity implementations that surface neither a
+ * focus nor an unpause event to scripting (Unity 6's GameActivity).
  *
  * The activity is standard launch mode and finishes inside onCreate, so every
  * tap arrives through a fresh onCreate (onNewIntent never fires here).
