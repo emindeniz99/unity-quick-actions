@@ -40,11 +40,16 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   shrunk, or the shrinker never ran and the run is declared inconclusive rather
   than green; the keep-globbed probe must return byte-identical. Flipping those
   flags inside the testbed instead would have shipped experiment-only build
-  configuration to everyone reading the example. **This job has never run** —
-  it is new in this change and gated to manual dispatch and the weekly cron —
-  and it is written to fail loudly and print the file, tree or dump it could
-  not parse rather than to skip, precisely because its first run is its own
-  validation.
+  configuration to everyone reading the example. The job is written to fail
+  loudly and print the file, tree or dump it could not parse rather than to
+  skip, and its first run (2026-08-21) validated exactly that design: export,
+  ownership hand-off, probe-planting and the minify flip all worked, and the
+  build then died on the toolchain — the export ships no gradlew, and the
+  runner's system Gradle (9.x) cannot load the AGP 7.1.2 the export pins. The
+  job now supplies the combo Unity 2022.3 itself bundles (JDK 11, a
+  sha256-pinned Gradle 7.2, NDK r23b) and re-points the docker-image paths
+  hardcoded in the export (`android.aapt2FromMavenOverride`, `ndkPath`); the
+  probe/control verdict itself is still pending its first complete run.
   Note also what a green run would and would not say: it would show the icons
   surviving a minified release build, but not that the keep rule is what saved
   them, since AGP's default safe mode also carries a string-prefix heuristic
@@ -61,8 +66,15 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   registered id than the warm tap used, because `logcat -c` can under-clear on
   emulators and a leftover warm line must never satisfy the cold assertion.
   Its own longer timeout (`COLD_LOG_ATTEMPTS`) covers the whole Unity boot a
-  cold start has in front of it. Asserted, not observed: the script has not
-  been run on a device or an emulator since the step was added.
+  cold start has in front of it. The step's first emulator run (2026-08-21)
+  split three ways: the 2022.3 leg passed all eight steps — the first
+  observation anywhere of a cold tap arriving as `Performed`, and live proof
+  of the different-id defence, since the log showed `logcat -c` really had
+  under-cleared — while the restarted 2021.3 player sat engine-silent past
+  the whole budget (the emulator was still tearing down the dead process's
+  Vulkan objects when the new one launched, so a GPU-settle delay now
+  precedes the cold tap) and Unity 6 never reached the shortcut publish at
+  all (below). No real device has run the step yet.
 
 ### Changed
 
@@ -87,9 +99,13 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   logcat crash buffer, and the engine/package log tail; the CI legs raise
   `SHORTCUT_ATTEMPTS` to 240 and `COLD_LOG_ATTEMPTS` to 180, which stretches
   only the failure case since the poll returns the moment its condition holds.
-  The 2021.3 and 2022.3 legs passed the same run end-to-end — the first
-  emulator proof of the smoke as then committed, warm-tap `Performed`
-  round-trip included; the cold-tap step added above remains unrun.
+  The diagnostics' own first exercise (the next dispatch, same day) settled
+  the unity6 question in one log: process DEAD, crash buffer showing a
+  SIGSEGV null dereference in `libunity.so` `profiling::Profiler::Initialize`
+  — the Unity 6 *development* player dies during engine init under the API 30
+  image's ARM-to-x86_64 translation, while 2021.3/2022.3 boot fine there. The
+  unity6 smoke leg therefore now runs the API 35 system image, whose far
+  newer translator is the one variable that crash implicates.
 
 ## [0.4.7] - 2026-08-21
 

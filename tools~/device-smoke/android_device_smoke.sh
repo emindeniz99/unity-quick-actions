@@ -296,6 +296,13 @@ poll "$LOG_ATTEMPTS" app_stopped \
   || fail "'am force-stop $APP_ID' did not stop the app within $((LOG_ATTEMPTS * POLL_INTERVAL))s: it is still running (pid $(adb_ shell pidof "$APP_ID" 2>/dev/null | tr -d '\r\n')).
 Without a dead process this step would send its intent into a LIVE app — i.e.
 repeat step 6's warm tap — and say nothing about the cold-launch path."
+# A dead app process is not yet a settled emulator: gfxstream tears the dead
+# process's Vulkan objects down asynchronously, and the first live CI run
+# showed "Destroyed VkDevice" logged AFTER the cold start had already been
+# issued — with the restarted 2021.3 player then sitting engine-silent past
+# the whole budget. Give the GPU side a moment before booting the next
+# process into it. Harmless on a real device.
+sleep "${COLD_SETTLE:-5}"
 # Same fresh-log mechanism as steps 4 and 6 — clear, then read the whole buffer
 # back with `logcat -d`. The assertion also taps a DIFFERENT id than step 6
 # (see COLD_TAP_ID at the top): `logcat -c` alone is not trusted to isolate the
