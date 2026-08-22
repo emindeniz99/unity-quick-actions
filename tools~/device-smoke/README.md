@@ -70,7 +70,11 @@ Every failure names the step that failed, prints the evidence it collected
 
 Waits are bounded and overridable by environment variable:
 `POLL_INTERVAL` (seconds, default 1), `BOOT_ATTEMPTS` (120),
-`SHORTCUT_ATTEMPTS` (45), `LOG_ATTEMPTS` (30), `COLD_LOG_ATTEMPTS` (60).
+`SHORTCUT_ATTEMPTS` (45), `LOG_ATTEMPTS` (30), `COLD_LOG_ATTEMPTS` (60), and
+`COLD_SETTLE` (seconds slept between the proven force-stop and the cold tap,
+default 5 — an emulator's GPU process tears the dead app's Vulkan objects
+down asynchronously, and launching the new process into that teardown left a
+restarted player engine-silent in CI).
 
 ### What it asserts — and what it does not
 

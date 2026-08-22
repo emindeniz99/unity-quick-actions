@@ -307,10 +307,18 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # Per-leg API level. The x86_64 emulator runs these ARM APKs under
+        # binary translation, and the translation layer is part of the system
+        # image: on the API 30 image the Unity 6 development player dies at
+        # boot with a SIGSEGV in libunity.so profiling::Profiler::Initialize
+        # (proven by the smoke's crash-buffer dump, 2026-08-21 run 10), while
+        # 2021.3/2022.3 boot fine there. The unity6 leg therefore uses the
+        # newest image and its far newer translator; the older lines stay on
+        # API 30, where they are proven.
         testbed:
-          - { name: "2021.3" }
-          - { name: "2022.3" }
-          - { name: "unity6" }
+          - { name: "2021.3", api: 30 }
+          - { name: "2022.3", api: 30 }
+          - { name: "unity6", api: 35 }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -339,7 +347,7 @@ jobs:
           SHORTCUT_ATTEMPTS: "240"
           COLD_LOG_ATTEMPTS: "180"
         with:
-          api-level: 30
+          api-level: ${{ matrix.testbed.api }}
           arch: x86_64
           target: google_apis
           script: tools~/device-smoke/android_device_smoke.sh "$RUNNER_TEMP/apk/QuickActionsDemo-phone.apk" com.quickactions.testbed
@@ -372,12 +380,15 @@ jobs:
   # One line only (2022.3 — the line whose Android bake was proven on a real
   # APK) and manual/cron only: this is an IL2CPP export plus a full Gradle
   # release build, and it answers a question about AGP, not about a Unity
-  # version. This job has never run — it is newer than the workflow's first
-  # live run. Every step therefore fails LOUDLY and prints what it could not
-  # parse instead of skipping — the first real run is this job's validation.
-  # Two known first-run risks, both visible in the log if they bite: the JDK
-  # below vs the Gradle version Unity baked into the export, and the SDK/NDK
-  # paths Unity wrote from inside the builder's docker image.
+  # version. Every step fails LOUDLY and prints what it could not parse
+  # instead of skipping. The job's first run (2026-08-21) validated its own
+  # design the hard way, exactly where the header had warned: export, chown,
+  # probe-planting and the minify flip all worked, and the build then died
+  # because the export ships NO gradlew and the runner's system Gradle (9.x)
+  # cannot load the AGP 7.1.2 the export pins (org.gradle.util.GUtil is gone
+  # in Gradle 9). The job now supplies the exact toolchain Unity 2022.3
+  # bundles — JDK 11, Gradle 7.2, NDK r23b — and re-points the docker-image
+  # paths the export hardcodes, instead of trusting the runner image's drift.
   android-shrink-verify:
     name: android shrink verify (2022.3)
     needs: license
@@ -403,11 +414,13 @@ jobs:
           restore-keys: |
             Library-2022.3-export-
             Library-2022.3-
-      # AGP needs a JDK; the runner default drifts, so pin one.
+      # JDK 11, not the runner default: it is the JDK Unity 2022.3 embeds,
+      # AGP 7.1.2 is certified on it, and the pinned Gradle 7.2 below cannot
+      # run on 17 at all.
       - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
         with:
           distribution: temurin
-          java-version: "17"
+          java-version: "11"
       - uses: game-ci/unity-builder@d829bfc901f2347c8fe18898f06712b66916ef42 # v5.0.0
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
@@ -644,36 +657,89 @@ jobs:
           print("release {" + body + "}")
           print("----- end -----")
           PY
+      # The toolchain the export actually expects, supplied rather than hoped
+      # for. Gradle 7.2 is the version Unity 2022.3 bundles (the export ships
+      # no wrapper to say so itself); sha256 is the published value from
+      # services.gradle.org/distributions/gradle-7.2-bin.zip.sha256. NDK r23b
+      # (23.1.7779620) is what Unity 2022.3 compiles IL2CPP with, and the
+      # export's BuildIl2CppTask needs a real NDK at gradle time.
+      - name: Pin the toolchain the export expects (Gradle 7.2, NDK r23b)
+        run: |
+          set -euo pipefail
+          curl -fsSL -o "$RUNNER_TEMP/gradle-7.2-bin.zip" https://services.gradle.org/distributions/gradle-7.2-bin.zip
+          echo "f581709a9c35e9cb92e16f585d2c4bc99b2b1a5f85d2badbd3dc6bff59e1e6dd  $RUNNER_TEMP/gradle-7.2-bin.zip" | sha256sum -c -
+          unzip -q "$RUNNER_TEMP/gradle-7.2-bin.zip" -d "$RUNNER_TEMP/gradle-dist"
+          echo "PINNED_GRADLE=$RUNNER_TEMP/gradle-dist/gradle-7.2/bin/gradle" >> "$GITHUB_ENV"
+          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+          sdkmanager --install 'ndk;23.1.7779620' > /dev/null
+          echo "NDK_FOR_EXPORT=$SDK/ndk/23.1.7779620" >> "$GITHUB_ENV"
+      # The export hardcodes paths from inside the builder's docker image: an
+      # android.aapt2FromMavenOverride into /opt/unity (dead here; with the
+      # override gone AGP fetches aapt2 from Maven) and an ndkPath for the
+      # IL2CPP build. Both are re-pointed at this runner's copies, loudly.
+      - name: Point the export at this runner's toolchain
+        run: |
+          set -euo pipefail
+          cd "$EXPORT"
+          python3 - <<'PY'
+          import os
+          import pathlib
+          import re
+
+          gp = pathlib.Path("gradle.properties")
+          if gp.exists():
+              kept = []
+              for line in gp.read_text().splitlines():
+                  if "/opt/unity" in line:
+                      print("stripped from gradle.properties:", line)
+                  else:
+                      kept.append(line)
+              gp.write_text("\n".join(kept) + "\n")
+
+          ndk = os.environ["NDK_FOR_EXPORT"]
+          for name in ("launcher/build.gradle", "unityLibrary/build.gradle"):
+              p = pathlib.Path(name)
+              if not p.exists():
+                  continue
+              text = p.read_text()
+              new = re.sub(r'ndkPath\s+"[^"]*"', 'ndkPath "%s"' % ndk, text)
+              if new != text:
+                  print("re-pointed ndkPath in", name)
+                  p.write_text(new)
+          PY
       - name: Gradle release build of the exported project
         run: |
           set -euo pipefail
           cd "$EXPORT"
           # Unity writes local.properties from inside the unity-builder docker
-          # image, so sdk.dir points at a path that does not exist on this
-          # runner. Replace that one line and keep the rest.
+          # image, so sdk.dir (and any ndk.dir) point at paths that do not
+          # exist on this runner. Replace those lines and keep the rest.
           SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
           if [ -z "$SDK" ]; then
             echo "neither ANDROID_HOME nor ANDROID_SDK_ROOT is set — no Android SDK to build against."
             exit 1
           fi
           if [ -f local.properties ]; then
-            grep -v '^sdk\.dir=' local.properties > "$RUNNER_TEMP/local.properties" || true
+            grep -vE '^(sdk|ndk)\.dir=' local.properties > "$RUNNER_TEMP/local.properties" || true
           else
             : > "$RUNNER_TEMP/local.properties"
           fi
           printf 'sdk.dir=%s\n' "$SDK" >> "$RUNNER_TEMP/local.properties"
+          printf 'ndk.dir=%s\n' "$NDK_FOR_EXPORT" >> "$RUNNER_TEMP/local.properties"
           cp "$RUNNER_TEMP/local.properties" local.properties
           echo "--- local.properties ---"
           cat local.properties
-          # The export normally carries its own wrapper (pinning the Gradle
-          # version Unity tested); the runner's `gradle` is the fallback.
+          # Prefer a wrapper if the export ever ships one; otherwise use the
+          # pinned Gradle 7.2 — NEVER the runner's system gradle, whose major
+          # version drifts (9.x today, which cannot load AGP 7.1.2; the first
+          # run died exactly there).
           if [ -f ./gradlew ]; then
             chmod +x ./gradlew
             GRADLE_CMD=./gradlew
-          elif command -v gradle >/dev/null 2>&1; then
-            GRADLE_CMD=gradle
+          elif [ -n "${PINNED_GRADLE:-}" ] && [ -x "$PINNED_GRADLE" ]; then
+            GRADLE_CMD="$PINNED_GRADLE"
           else
-            echo "the export ships no gradlew and this runner has no gradle on PATH."
+            echo "the export ships no gradlew and the pinned Gradle is missing — did the pin step run?"
             ls -la
             exit 1
           fi

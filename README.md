@@ -836,17 +836,24 @@ code never comes within reach of them. (Nothing here uses
 code.) The workflow header documents the setup step by step. The first live
 run with the secrets in place (2026-08-21) opened the real editors: all three
 EditMode legs, all three Android APK builds, all three iOS exports and both
-macOS simulator cold-launches were green on the first attempt; the emulator
-smoke passed end-to-end on 2021.3 and 2022.3 and timed out waiting for the
-Unity 6 app to publish — the cause (slow ARM-translated boot vs. a launch
-crash) was not distinguishable from what the script then captured, which is
-why its failure paths now print process-alive state, the crash buffer and the
-engine log tail, and the CI wait budgets were raised.
+macOS simulator cold-launches were green on the first attempt. The emulator
+smoke needed a second dispatch to explain itself: its failure paths now print
+process-alive state, the crash buffer and the engine log tail, and that
+output pinned the Unity 6 red as a boot crash (SIGSEGV in
+`Profiler::Initialize` under the API 30 image's ARM translation — that leg
+now runs the API 35 image), showed the 2021.3 leg passing warm but sitting
+engine-silent after the cold-tap restart (a GPU-settle delay now precedes the
+cold tap), and took the 2022.3 leg through all eight steps — the first
+observation anywhere of a cold tap arriving as `Performed`. The
+`android-shrink-verify` first run validated its loud-failure design and died
+on the export's toolchain, which the job now pins (JDK 11, Gradle 7.2, NDK
+r23b); its probe/control verdict is still pending.
 
 For a real device/emulator, `tools~/device-smoke/` has an adb-driven Android
 smoke (install a dev APK → assert the demo's shortcuts registered → simulate a
-tap → assert delivery, once warm and once more after a force-stop, though that
-second assertion has not been run on a device yet) and a manually-dispatched
+tap → assert delivery, once warm and once more after a force-stop — the cold
+assertion has run green on the 2022.3 emulator leg, never yet on a real
+device) and a manually-dispatched
 emulator CI workflow — see its
 README, including the honest iOS limitations. A green `verify.sh` proves
 everything compiles and the logic tests pass; it says nothing about on-device

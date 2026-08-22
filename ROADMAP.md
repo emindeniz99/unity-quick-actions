@@ -68,9 +68,12 @@ Delete an entry in the same commit that ships it.
   [`unity-ci.yml`](./.github/workflows/unity-ci.yml) exports the 2022.3 Gradle
   project, plants a keep-globbed drawable and an unreferenced control, forces
   `minifyEnabled` + `shrinkResources` on the exported release build and compares
-  the sizes that come out — but the job has never run (it is gated to manual
-  dispatch and the weekly cron), so (c) is automated, not answered. (a), (b)
-  and (d) still need a hand-run editor.
+  the sizes that come out. Its first run (2026-08-21) got through export,
+  probe-planting and the minify flip, then died on the toolchain — the export
+  ships no gradlew and the runner's Gradle 9 cannot load AGP 7.1.2 — so the
+  job now pins Unity 2022.3's own combo (JDK 11, Gradle 7.2, NDK r23b). The
+  probe/control verdict is still unanswered: (c) is automated, not answered.
+  (a), (b) and (d) still need a hand-run editor.
 
 - **`.androidlib` does not survive `.unitypackage` export/import** (reported
   against 2022.3.15, re-confirmed 2024, unfixed). This is why the built-in icons
@@ -94,14 +97,16 @@ Delete an entry in the same commit that ships it.
 - **Automated device CI, remaining scope** — 0.4.6 closed the licence half:
   `.github/workflows/unity-ci.yml` (GameCI) builds the dev APK in CI and feeds
   it straight into the adb smoke, and exports + compiles the iOS Simulator
-  project on a macOS runner, cold-launching the app there. Both still need the
-  `UNITY_LICENSE`/`UNITY_EMAIL`/`UNITY_PASSWORD` secrets to be configured
-  before a single Unity job has actually run. The Android **COLD-launch** path
-  is no longer on this list: `android_device_smoke.sh` now force-stops the app
-  and taps the trampoline again as its last step, so the script asserts both the
-  warm resume and the launch-intent delivery — asserted, not yet observed, since
-  the script has not been run against a device or emulator since that step was
-  added. Remaining after the secrets: asserting a shortcut **tap** on iOS (no
+  project on a macOS runner, cold-launching the app there — both live since the
+  licence secrets landed (2026-08-21). The Android **COLD-launch** path is no
+  longer on this list: `android_device_smoke.sh` force-stops the app and taps
+  the trampoline again as its last step, and that step's first emulator run
+  went green on the 2022.3 leg — the first observation anywhere of a cold tap
+  arriving as `Performed`. The same run left two emulator-specific reds under
+  investigation (the restarted 2021.3 player sat engine-silent past the
+  budget; the Unity 6 dev player SIGSEGVs in `Profiler::Initialize` under the
+  API 30 image's ARM translation), and no *real device* has run the cold step
+  yet. Remaining: asserting a shortcut **tap** on iOS (no
   `simctl` API reads `UIApplicationShortcutItems` or triggers a tap — it needs
   an XCUITest target driving SpringBoard; see the device-smoke README).
 - **Documentation site (considered, deliberately deferred — revisit trigger now
