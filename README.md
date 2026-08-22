@@ -815,7 +815,11 @@ for how the stubs work.
 Beyond the stubs, [`unity-ci.yml`](./.github/workflows/unity-ci.yml) runs the
 **real editors** via [GameCI](https://game.ci). It is split by cost: the
 EditMode suite runs on all three [`Examples~`](./Examples~) testbeds for every
-push and PR that touches code (docs-only changes trigger nothing), while the
+push and PR that touches code (docs-only changes trigger nothing), plus a
+`unity6-latest` canary leg that resolves the newest Unity 6 editor with a
+GameCI image at run time and upgrade-opens Testbed6 with it — so "the latest
+editor broke the package" surfaces here before it surfaces in a user's
+project, with no version pin for anyone to forget to bump — while the
 build-heavy legs — a development Android APK per line fed into the adb device
 smoke, and an iOS Simulator-SDK Xcode export per line, compiled unsigned and
 cold-launched on a macOS-runner simulator for 2022.3 and Unity 6 (2021.3

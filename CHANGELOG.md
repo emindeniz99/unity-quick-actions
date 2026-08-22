@@ -15,6 +15,16 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **A `unity6-latest` canary in CI.** The EditMode suite now also runs on the
+  newest Unity 6 editor that has a GameCI image, resolved at run time from
+  the `unityci/editor` Docker Hub tags — no pinned version for anyone to
+  forget to bump when Unity's quarterly updates land (6.5 today, 6.6/6.7
+  next). The canary upgrade-opens Testbed6, which stays serialized at 6.3
+  LTS, so the pinned legs keep proving the supported floor while this leg
+  proves the moving edge; its Library cache is keyed by the resolved version
+  because the upgrade rewrites it, and the resolver fails loudly rather than
+  silently falling back to an older editor.
+
 - **Every Android CI build now proves the package's bake reached the APK.**
   That the static shortcuts, the strings behind them and the trampoline
   `<activity>` really survive into a shipped APK was established once, by hand,
