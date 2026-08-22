@@ -12,7 +12,9 @@ name: unity
 # the keep rule the package ships for its icon drawables.
 #
 # Split by cost: the EditMode tests run on every code push/PR (~15 min a leg,
-# the signal worth having per change), while the build-heavy legs — Android
+# the signal worth having per change) — three pinned testbed legs plus a
+# unity6-latest canary that resolves the newest Unity 6 GameCI image at run
+# time and upgrade-opens Testbed6 with it — while the build-heavy legs — Android
 # IL2CPP, the emulator smoke, the iOS export and its macOS compile — stay on
 # manual dispatch and the weekly cron, because an hour of IL2CPP per line is
 # not what a one-line change needs. Docs-only changes trigger nothing (paths
@@ -154,6 +156,99 @@ jobs:
         if: always()
         with:
           name: test-results-${{ matrix.testbed.name }}
+          path: ${{ steps.tests.outputs.artifactsPath }}
+          retention-days: 14
+
+  # Canary: the same EditMode suite on the NEWEST Unity 6 editor that has a
+  # GameCI image — resolved at run time from Docker Hub, so nobody bumps a pin
+  # when Unity ships 6.6/6.7 (quarterly updates, per Unity's release model).
+  # Testbed6 stays serialized at 6.3 LTS and the newer editor upgrade-opens
+  # it, which is the supported direction; the Library cache is keyed by the
+  # resolved version because that upgrade rewrites it. This leg exists to see
+  # "the latest editor broke the package" before users do. The repo has no
+  # required checks, so a red here blocks nothing — it IS the early warning.
+  tests-unity6-latest:
+    name: tests (unity6-latest)
+    needs: license
+    if: needs.license.outputs.available == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      checks: write # unity-test-runner publishes a check run
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Newest 6000.x that unityci/editor actually ships, not newest Unity:
+      # a version the GameCI images lag on would fail the docker pull, so the
+      # image registry is the honest source. Walks minors downward and takes
+      # the highest patch of the first minor that has any -base- image; dies
+      # loudly (never silently pins backward) if nothing resolves.
+      - name: Resolve the newest Unity 6 with a GameCI image
+        id: resolve
+        run: |
+          set -euo pipefail
+          python3 - <<'PY' | tee -a "$GITHUB_OUTPUT"
+          import json
+          import re
+          import sys
+          import urllib.request
+
+          def pages(url, limit=5):
+              n = 0
+              while url and n < limit:
+                  with urllib.request.urlopen(url, timeout=30) as r:
+                      d = json.load(r)
+                  yield d
+                  url = d.get("next")
+                  n += 1
+
+          best = None
+          for minor in range(20, -1, -1):
+              versions = set()
+              base = ("https://hub.docker.com/v2/repositories/unityci/editor/tags"
+                      "?page_size=100&name=ubuntu-6000.%d." % minor)
+              for d in pages(base):
+                  for t in d.get("results", []):
+                      m = re.match(r"^ubuntu-(6000\.%d\.\d+f\d+)-base-" % minor, t["name"])
+                      if m:
+                          versions.add(m.group(1))
+              if versions:
+                  best = max(versions,
+                             key=lambda v: [int(x) for x in re.findall(r"\d+", v)])
+                  break
+          if not best:
+              print("no unityci/editor ubuntu-6000.* -base- tag found on Docker Hub "
+                    "(API change? outage?) — refusing to guess a version.",
+                    file=sys.stderr)
+              raise SystemExit(1)
+          print("resolved Unity %s" % best, file=sys.stderr)
+          print("version=%s" % best)
+          PY
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: Examples~/Testbed6/Library
+          key: Library-unity6latest-${{ steps.resolve.outputs.version }}-tests-${{ hashFiles('Examples~/Testbed6/Packages/**', 'Examples~/Testbed6/ProjectSettings/**') }}
+          restore-keys: |
+            Library-unity6latest-${{ steps.resolve.outputs.version }}-tests-
+      - id: tests
+        uses: game-ci/unity-test-runner@0ff419b913a3630032cbe0de48a0099b5a9f0ed9 # v4.3.1
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+        with:
+          projectPath: Examples~/Testbed6
+          unityVersion: ${{ steps.resolve.outputs.version }}
+          testMode: EditMode
+          checkName: unity tests (unity6-latest, ${{ steps.resolve.outputs.version }})
+          githubToken: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        if: always()
+        with:
+          name: test-results-unity6-latest
           path: ${{ steps.tests.outputs.artifactsPath }}
           retention-days: 14
 
