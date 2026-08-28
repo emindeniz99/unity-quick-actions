@@ -97,6 +97,17 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **`verify.sh` gains two guards that check what was previously remembered.**
+  Check 1 proved only that a `.meta` *exists*, so an orphaned one (asset gone,
+  meta shipped) or a wrong importer — an iOS plugin carrying the Android
+  platform flag, which builds a broken player instead of failing — passed
+  clean; `gen_meta.py --check` now compares every meta against what its path
+  routes to, exempting the `guid:` line because some assets legitimately keep a
+  GUID Unity assigned before they moved. Check 6 additionally fails when an
+  install pin disagrees with `package.json`: `release.yml` tags the merge
+  commit, so a `#v<version>` moved one commit later is wrong for everyone who
+  reads main in between — precisely what the 0.4.6 cycle shipped.
+
 - **`game-ci/unity-builder` v4.8.1 → v5.0.0.** The major version extracts the
   CloudRunner inputs into a separate orchestrator action and moves the runtime
   from node20 to node24; every input this workflow passes (`projectPath`,

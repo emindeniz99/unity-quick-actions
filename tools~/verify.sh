@@ -18,7 +18,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 VERIFY="$ROOT/.verify"
 fail=0
 
-echo "== 1/6  .meta presence (must already be committed, not generated here) =="
+echo "== 1/6  .meta completeness (must already be committed, not generated here) =="
 # gen_meta only CREATES missing metas and always exits 0, so running it can't
 # catch a missing/uncommitted meta. Fail if it had to create any — a committed
 # repo/UPM must ship every .meta (a fresh GUID assigned on the user's machine
@@ -29,6 +29,14 @@ if echo "$meta_out" | grep -qE 'created [1-9]'; then
   echo "!! .meta files were missing and had to be generated — commit them (git add)."
   fail=1
 fi
+# Presence alone was the whole gate, which passes a .meta whose asset is gone
+# (an orphan ships in the package) and a .meta routing to the wrong importer —
+# e.g. an iOS plugin with the Android platform flag set, which builds a broken
+# player rather than failing. --check compares each meta against what its path
+# routes to, ignoring the guid line: several committed metas legitimately carry
+# a GUID Unity assigned before the asset moved, and rewriting those would break
+# every reference to them.
+python3 "$ROOT/tools~/gen_meta.py" --check || fail=1
 
 echo
 echo "== 2/6  C# compile (UnityEngine/UnityEditor stubs) =="
