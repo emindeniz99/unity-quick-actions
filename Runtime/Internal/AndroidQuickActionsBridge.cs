@@ -17,6 +17,10 @@ namespace EminDeniz99.QuickActions.Internal
         // Android minification (R8/ProGuard + resource shrinking)".
         private const string BridgeClass = "com.emindeniz99.quickactions.QuickActionsBridge";
 
+        // Cached for the hot poll path only (see CallStringStatic); the methods that
+        // also need the Activity run at most once per user action and stay unbatched.
+        private static AndroidJavaClass _bridgeClass;
+
         private static AndroidJavaObject CurrentActivity()
         {
             using (var player = new AndroidJavaClass("com.unity3d.player.UnityPlayer"))
@@ -211,19 +215,26 @@ namespace EminDeniz99.QuickActions.Internal
         private static string CallStringStatic(string method)
         {
             // These poll/query methods are called from the runtime drain (cold-launch
-            // coroutine + every focus/pause). Never let a JNI exception (e.g. the class
-            // stripped by R8 / not packaged) escape into that path — degrade to null,
-            // matching the guarded SetShortcuts/GetShortcuts/RemoveAll.
+            // coroutine + every focus/pause + the safety-net beat). Never let a JNI
+            // exception (e.g. the class stripped by R8 / not packaged) escape into that
+            // path — degrade to null, matching the guarded
+            // SetShortcuts/GetShortcuts/RemoveAll.
+            //
+            // The class handle is cached for the process rather than rebuilt per call:
+            // `new AndroidJavaClass` is a JNI FindClass plus a NewGlobalRef, and the
+            // beat runs this several times a second for the app's whole lifetime, in
+            // every game that merely has the package installed. Caching leaves only the
+            // marshalled static call on that path. A failure drops the handle so a
+            // transient fault re-resolves on the next tick instead of sticking.
             try
             {
-                using (var bridge = new AndroidJavaClass(BridgeClass))
-                {
-                    var value = bridge.CallStatic<string>(method);
-                    return string.IsNullOrEmpty(value) ? null : value;
-                }
+                _bridgeClass ??= new AndroidJavaClass(BridgeClass);
+                var value = _bridgeClass.CallStatic<string>(method);
+                return string.IsNullOrEmpty(value) ? null : value;
             }
             catch (AndroidJavaException e)
             {
+                _bridgeClass = null;
                 Debug.LogWarning("[QuickActions] " + method + " failed: " + e.Message);
                 return null;
             }

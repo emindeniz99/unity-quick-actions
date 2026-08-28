@@ -131,8 +131,11 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `UnityPlayerActivity` (2021.3/2022.3) fires the callbacks and was never
   affected. The runtime's hidden singleton now also polls the queue on a slow
   0.25 s unscaled-time beat — delivery no longer depends on which lifecycle
-  events an activity implementation emits, and an empty-queue tick is one
-  cheap native read. Found, diagnosed to the exact missing callback, and
+  events an activity implementation emits, and an empty-queue tick is a single
+  query into the native queue (an `isEmpty` on Android, a count check on iOS),
+  with the Android class handle now cached for the process so the tick costs no
+  JNI `FindClass` or global-ref churn. Found, diagnosed to the exact missing
+  callback, and
   proven by the same harness two days later: the first cron run carrying the
   fix took the Unity 6 leg through all eight smoke steps, so every supported
   line now passes the full smoke, warm and cold taps included.
