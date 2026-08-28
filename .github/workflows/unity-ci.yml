@@ -423,6 +423,30 @@ jobs:
                 ;;
             esac
           done
+          # Resources and manifest are both written by the C# post-processor, so
+          # everything above would still pass with NONE of the package's Java in
+          # the APK — a manifest declaring an activity the dex does not contain,
+          # i.e. a crash on the first tap. The .java plugins reach a build only
+          # through their .meta platform flags, which nothing else here checks.
+          DEX="$(unzip -p "$APK" 'classes*.dex' 2>/dev/null | strings -a || true)"
+          if [ -z "$DEX" ]; then
+            echo "no readable classes*.dex in $APK — cannot verify the Java landed."
+            unzip -l "$APK" | head -40
+            exit 1
+          fi
+          for want in com/emindeniz99/quickactions/QuickActionsBridge \
+                      com/emindeniz99/quickactions/QuickActionsTrampolineActivity; do
+            case "$DEX" in
+              *"$want"*) echo "ok: dex carries $want" ;;
+              *)
+                echo "MISSING from classes.dex: $want"
+                echo "The manifest declares this class but the APK does not contain it —"
+                echo "check Plugins/Android/*.java.meta (the Android platform flag) and"
+                echo "that no minification stripped it."
+                exit 1
+                ;;
+            esac
+          done
 
   # The same adb smoke device-ci.yml runs on a user-supplied APK, but fed from
   # the build above: shortcuts must reach ShortcutManager and a tap must come

@@ -74,6 +74,17 @@ jobs:
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" dist~/QuickActions.unitypackage --clobber
           else
+            # Publish the CURATED CHANGELOG section, the same notes release.yml
+            # uses — --generate-notes would ship a commit list instead, which is
+            # not what MAINTAINING promises a reader of a release page. Guard the
+            # pairing first: release_notes.py reads package.json's version, and a
+            # tag naming a different one would attach the wrong section.
+            EXPECTED="v$(python3 tools~/release_notes.py --version)"
+            if [ "$TAG" != "$EXPECTED" ]; then
+              echo "::error::$TAG does not match package.json ($EXPECTED) — the curated notes would describe the wrong version."
+              exit 1
+            fi
+            python3 tools~/release_notes.py > "$RUNNER_TEMP/notes.md"
             gh release create "$TAG" dist~/QuickActions.unitypackage \
-              --verify-tag --generate-notes --title "$TAG"
+              --verify-tag --title "$TAG" --notes-file "$RUNNER_TEMP/notes.md"
           fi
