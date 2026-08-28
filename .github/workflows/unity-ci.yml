@@ -573,13 +573,15 @@ jobs:
           restore-keys: |
             Library-2022.3-export-
             Library-2022.3-
-      # JDK 11, not the runner default: it is the JDK Unity 2022.3 embeds,
-      # AGP 7.1.2 is certified on it, and the pinned Gradle 7.2 below cannot
-      # run on 17 at all.
+      # JDK 17: run 25 showed this export is not the AGP 7.1.2 combo an earlier
+      # comment here assumed — it compiles against SDK 36 and AGP rejected
+      # Gradle 7.2 outright ("Minimum supported Gradle version is 7.5"). Modern
+      # AGP runs on 17, and 17 is also what sdkmanager itself is compiled for,
+      # so the NDK install below no longer needs its own JAVA_HOME override.
       - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
         with:
           distribution: temurin
-          java-version: "11"
+          java-version: "17"
       - uses: game-ci/unity-builder@d829bfc901f2347c8fe18898f06712b66916ef42 # v5.0.0
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
@@ -822,13 +824,60 @@ jobs:
       # services.gradle.org/distributions/gradle-7.2-bin.zip.sha256. NDK r23b
       # (23.1.7779620) is what Unity 2022.3 compiles IL2CPP with, and the
       # export's BuildIl2CppTask needs a real NDK at gradle time.
-      - name: Pin the toolchain the export expects (Gradle 7.2, NDK r23b)
+      - name: Pin the toolchain the export expects (Gradle from the export, NDK r23b)
         run: |
           set -euo pipefail
-          curl -fsSL -o "$RUNNER_TEMP/gradle-7.2-bin.zip" https://services.gradle.org/distributions/gradle-7.2-bin.zip
-          echo "f581709a9c35e9cb92e16f585d2c4bc99b2b1a5f85d2badbd3dc6bff59e1e6dd  $RUNNER_TEMP/gradle-7.2-bin.zip" | sha256sum -c -
-          unzip -q "$RUNNER_TEMP/gradle-7.2-bin.zip" -d "$RUNNER_TEMP/gradle-dist"
-          echo "PINNED_GRADLE=$RUNNER_TEMP/gradle-dist/gradle-7.2/bin/gradle" >> "$GITHUB_ENV"
+          # ASK the export which Gradle it needs; do not guess. Run 25 died on
+          # "Minimum supported Gradle version is 7.5. Current version is 7.2"
+          # because 7.2 came from an assumption about Unity 2022.3's AGP that
+          # this export does not match — it compiles against SDK 36. Unity
+          # writes the version it tested into the wrapper properties, so that
+          # file is the authority; the AGP coordinate is the fallback, and a
+          # modern default is the last resort. Whatever is chosen is printed,
+          # so a wrong pick is diagnosable from the log alone.
+          GRADLE_VERSION=""
+          WRAPPER="$EXPORT/gradle/wrapper/gradle-wrapper.properties"
+          if [ -f "$WRAPPER" ]; then
+            echo "--- $WRAPPER ---"
+            cat "$WRAPPER"
+            # -E, not BRE (`\|` alternation inside `\(...\)` does not match on
+            # this sed), and `#` as the delimiter, not `|` — the alternation
+            # below contains a `|`, which would close an `s|...|` early.
+            GRADLE_VERSION="$(sed -nE 's#.*gradle-([0-9][0-9.]*)-(all|bin)\.zip.*#\1#p' "$WRAPPER" | head -1)"
+            # A plain `[ -n x ] && echo` would END this step under `set -e` when
+            # the capture is empty — silently, with no Gradle downloaded.
+            if [ -n "$GRADLE_VERSION" ]; then
+              echo "the export's wrapper asks for Gradle $GRADLE_VERSION"
+            else
+              echo "could not parse a version out of the wrapper properties"
+            fi
+          else
+            echo "no gradle-wrapper.properties in the export"
+          fi
+          if [ -z "$GRADLE_VERSION" ]; then
+            # `|| true`: a grep with no match exits 1, and under `pipefail` that
+            # would end the step instead of falling through to the default —
+            # i.e. the one path that exists for "the export gave no hint".
+            AGP="$(grep -rhoE 'com\.android\.tools\.build:gradle:[0-9][0-9.]*' "$EXPORT" \
+                     --include='*.gradle' 2>/dev/null | head -1 | awk -F: '{print $3}' || true)"
+            echo "AGP coordinate found in the export: ${AGP:-<none>}"
+            case "${AGP%%.*}" in
+              8|9) GRADLE_VERSION=8.7 ;;
+              7)   GRADLE_VERSION=7.5 ;;
+              *)   GRADLE_VERSION=8.7 ;;   # unknown/newer: modern default
+            esac
+            echo "no wrapper version; deriving Gradle $GRADLE_VERSION from AGP"
+          fi
+          ZIP="gradle-${GRADLE_VERSION}-bin.zip"
+          curl -fsSL -o "$RUNNER_TEMP/$ZIP" "https://services.gradle.org/distributions/$ZIP"
+          # The version is discovered, so its checksum cannot be pinned in this
+          # file. Verify against Gradle's published one: that catches a corrupt
+          # or truncated download, and is the strongest check available without
+          # hardcoding a version this job deliberately does not control.
+          curl -fsSL -o "$RUNNER_TEMP/$ZIP.sha256" "https://services.gradle.org/distributions/$ZIP.sha256"
+          echo "$(cat "$RUNNER_TEMP/$ZIP.sha256")  $RUNNER_TEMP/$ZIP" | sha256sum -c -
+          unzip -q "$RUNNER_TEMP/$ZIP" -d "$RUNNER_TEMP/gradle-dist"
+          echo "PINNED_GRADLE=$RUNNER_TEMP/gradle-dist/gradle-${GRADLE_VERSION}/bin/gradle" >> "$GITHUB_ENV"
           SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
           # Full path, not bare `sdkmanager`: the runner image does not put it
           # on PATH for plain run steps (run 13 died here with exit 127 — only
@@ -842,14 +891,7 @@ jobs:
             ls -la "$SDK" || true
             exit 1
           fi
-          # sdkmanager is compiled for Java 17+ (class file 61.0), while this
-          # job's JAVA_HOME is pinned to 11 for Gradle 7.2/AGP 7.1.2 — the
-          # weekly cron proved the two constraints collide
-          # (UnsupportedClassVersionError). Run just this install on the
-          # runner image's own 17 (21 as fallback); the Gradle build below
-          # keeps the 11 it needs.
-          JAVA_HOME="${JAVA_HOME_17_X64:-${JAVA_HOME_21_X64:-$JAVA_HOME}}" \
-            "$SDKM" --install 'ndk;23.1.7779620' > /dev/null
+          "$SDKM" --install 'ndk;23.1.7779620' > /dev/null
           echo "NDK_FOR_EXPORT=$SDK/ndk/23.1.7779620" >> "$GITHUB_ENV"
       # The export hardcodes paths from inside the builder's docker image: an
       # android.aapt2FromMavenOverride into /opt/unity (dead here; with the

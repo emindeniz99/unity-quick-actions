@@ -1,8 +1,10 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Text.RegularExpressions;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.TestTools;
 using EminDeniz99.QuickActions;
 using EminDeniz99.QuickActions.Internal;
 
@@ -859,6 +861,12 @@ namespace EminDeniz99.QuickActions.Tests
             QuickActions.Performed += Recorder;
             try
             {
+                // Containment means the exception is LOGGED, and Unity's test
+                // framework fails a test on any log it was not told to expect —
+                // which is how CI caught this test, since the headless stubs
+                // no-op Debug. Expect it: the log is the contract here, not an
+                // accident. (LogAssert is a no-op in the stub harness.)
+                LogAssert.Expect(LogType.Exception, new Regex("boom"));
                 Assert.DoesNotThrow(() => QuickActions.Dispatch("new_game"));
                 CollectionAssert.AreEqual(new[] { "new_game" }, received);
             }

@@ -213,3 +213,30 @@ namespace UnityEngine
         public AndroidJavaException(string message) : base(message) { }
     }
 }
+
+namespace UnityEngine
+{
+    // Unity's log categories. Only the members the tests name are declared; the
+    // numbering mirrors UnityEngine.LogType so a future switch over it cannot
+    // drift here.
+    public enum LogType { Error = 0, Assert = 1, Warning = 2, Log = 3, Exception = 4 }
+}
+
+namespace UnityEngine.TestTools
+{
+    /// <summary>
+    /// Stand-in for Unity's LogAssert. In a real Editor run this is load-bearing:
+    /// the Test Runner fails a test on any log it was not told to expect, which is
+    /// exactly how the throwing-subscriber test asserts that Dispatch CONTAINS and
+    /// logs the exception. Headlessly there is no log to intercept — UnityEngine.Debug
+    /// is a no-op here — so these are accepted and ignored, and the same test file
+    /// compiles and runs in both places.
+    /// </summary>
+    public static class LogAssert
+    {
+        public static bool ignoreFailingMessages { get; set; }
+        public static void Expect(LogType type, string message) { }
+        public static void Expect(LogType type, System.Text.RegularExpressions.Regex message) { }
+        public static void NoUnexpectedReceived() { }
+    }
+}
