@@ -34,8 +34,10 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `raw/quickactions_keep` and `string/qa_short_0`, and `aapt2 dump xmltree` must
   show `QuickActionsTrampolineActivity` and the `android.app.shortcuts`
   meta-data. A miss prints the dump it could not match rather than exiting on a
-  bare code: the workflow's first live run predates these steps, so their own
-  first run is where every one of these assumptions gets tested.
+  bare code, so a surprise arrives as evidence. Green on all three lines in
+  every heavy run since these steps landed — first the 2026-08-21 dispatch,
+  most recently the 2026-08-24 cron. That the bake reaches a shipped APK is now
+  a per-run fact; that a launcher renders it still needs human eyes.
 
 - **`android-shrink-verify`: a CI job that finally puts the resource-shrinker
   keep rule on trial.** 0.4.7 ships `res/raw/quickactions_keep.xml` so the icon

@@ -14,7 +14,7 @@ Delete an entry in the same commit that ships it.
   *Precedent worth copying:* Unity's own `com.unity.mobile.notifications`
   solves exactly this problem the same way. Its Java calls
   `res.getIdentifier(name, "drawable", context.getPackageName())` — identical
-  to `QuickActionsBridge.java:505` — and its editor code writes the icon bytes
+  to the lookup in `QuickActionsBridge.java` — and its editor code writes the icon bytes
   into the generated project. On 2021.3/2022.3 it uses
   `IPostGenerateGradleAndroidProject` writing to
   `<gradleProject>/<lib>.androidlib/src/main/res/…`; on Unity 6 it switched to
@@ -110,9 +110,11 @@ Delete an entry in the same commit that ships it.
   `simctl` API reads `UIApplicationShortcutItems` or triggers a tap — it needs
   an XCUITest target driving SpringBoard; see the device-smoke README).
 - **Documentation site (considered, deliberately deferred — revisit trigger now
-  met)** — the reference docs live in a single **832-line** [README](./README.md)
-  (590 when this entry was written; 0.4.6's placeholder section added ~130 of
-  them, and the deferral below says to revisit "if the README keeps growing")
+  met)** — the reference docs live in a single [README](./README.md) that has
+  roughly tripled since this entry was written (590 lines then, well past 900
+  now), which is precisely this entry's own "if the README keeps growing"
+  trigger — a rounded phrasing on purpose, since the exact count went stale
+  twice and a doc that lies about itself is worse than one that rounds —
   plus a task-oriented
   [GETTING_STARTED](./GETTING_STARTED.md); a GitHub Pages site (or a UPM
   `Documentation~/` folder, which the Package Manager surfaces as the package's

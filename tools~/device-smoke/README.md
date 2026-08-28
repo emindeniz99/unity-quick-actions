@@ -87,9 +87,11 @@ has to reach the game through the launch intent. Because the id it taps is a
 live registered shortcut, it also exercises the path the trampoline's spoof gate
 deliberately **allows** (`isKnownShortcut`).
 
-The cold step is new, and "asserts" is the operative word: the script has not
-been run against a device or an emulator since it was added, so nothing here is
-a report of observed behaviour.
+The cold step has run green on the CI emulator legs for all three Unity lines
+(2021.3 and 2022.3 on the API 30 image, Unity 6 on API 35) — the `android-smoke`
+job in [`unity-ci.yml`](../../.github/workflows/unity-ci.yml). It has never run
+against physical hardware, so a cold launcher tap on a real device remains
+unobserved.
 
 It does **not** prove:
 
@@ -116,11 +118,18 @@ tools~/device-smoke/android_device_smoke.sh ~/builds/demo.apk com.example.game e
 
 ### CI
 
-[`.github/workflows/device-ci.yml`](../../.github/workflows/device-ci.yml) runs
-exactly this script against
-an API 30 emulator, `workflow_dispatch`-only: it takes a URL to an already-built
-APK because there is no Unity licence in CI to build one. It is **experimental**
-and deliberately not attached to push/PR.
+[`.github/workflows/unity-ci.yml`](../../.github/workflows/unity-ci.yml) is
+where this script actually runs: its `android-build` job builds a development
+APK of the Demo sample per Unity line on a licensed Unity (GameCI), and
+`android-smoke` feeds each one to this script on an emulator — API 30 for
+2021.3 and 2022.3, API 35 for unity6, whose development player dies at engine
+init under the older image's ARM translation. Those legs are heavy, so they run
+on `workflow_dispatch` and the weekly cron rather than per push.
+
+[`.github/workflows/device-ci.yml`](../../.github/workflows/device-ci.yml) is
+the older, standalone lane: it takes a URL to an already-built APK and runs
+this script against an API 30 emulator, `workflow_dispatch`-only. It predates
+the licence secrets and is kept for driving an APK this repo did not build.
 
 ## iOS — no automation shipped
 

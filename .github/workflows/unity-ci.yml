@@ -358,9 +358,9 @@ jobs:
       # once, by hand, with one aapt2 session on one machine (README "Status").
       # This makes it an assertion on every line, every run — the half of that
       # proof a machine can do, leaving only "a launcher renders them" for human
-      # eyes. Every miss prints the dump it could not match: these steps are
-      # newer than the workflow's first live run, so their own first run is the
-      # validation, and a surprise has to arrive as evidence, not a bare exit 1.
+      # eyes. Every miss prints the dump it could not match, so a surprise
+      # arrives as evidence rather than a bare exit 1. Green on all three lines
+      # in every heavy run since the 2026-08-21 dispatch.
       - name: Assert the APK carries the package's baked output
         env:
           APK: ${{ matrix.testbed.path }}/Builds/QuickActionsDemo-phone.apk
