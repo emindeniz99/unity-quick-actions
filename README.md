@@ -852,10 +852,13 @@ observation anywhere of a cold tap arriving as `Performed`. The next dispatch
 cashed those fixes in: 2021.3 joined 2022.3 at all eight steps green, and on
 the API 35 image the Unity 6 player boots and publishes — which let the same
 diagnostics catch a real runtime bug, the GameActivity warm-tap delivery gap
-fixed in this change (see CHANGELOG). The `android-shrink-verify` job
-validated its loud-failure design across both runs and now pins the exact
-toolchain the export expects (JDK 11, Gradle 7.2, NDK r23b); its
-probe/control verdict is still pending.
+(see CHANGELOG). The first weekly cron carrying that fix then took the
+Unity 6 leg through all eight steps too, so **every supported line now
+passes the full emulator smoke, warm and cold taps included**. The
+`android-shrink-verify` job validated its loud-failure design run after run
+and now pins the exact toolchain the export expects (JDK 11, Gradle 7.2, NDK
+r23b — with the one `sdkmanager` call on the Java 17 it is compiled for);
+its probe/control verdict is still pending.
 
 For a real device/emulator, `tools~/device-smoke/` has an adb-driven Android
 smoke (install a dev APK → assert the demo's shortcuts registered → simulate a

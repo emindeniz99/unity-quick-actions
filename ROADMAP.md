@@ -102,11 +102,10 @@ Delete an entry in the same commit that ships it.
   longer on this list: `android_device_smoke.sh` force-stops the app and taps
   the trampoline again as its last step, and that step's first emulator run
   went green on the 2022.3 leg — the first observation anywhere of a cold tap
-  arriving as `Performed` — and, one fix-dispatch later, on the 2021.3 leg
-  too. The Unity 6 leg (API 35 image, after the API 30 translator killed the
-  dev player at boot) boots and publishes; its warm-tap red exposed the
-  GameActivity delivery gap fixed in the runtime (see CHANGELOG), re-run
-  pending. No *real device* has run the cold step yet. Remaining: asserting
+  arriving as `Performed` — then on 2021.3, and finally on Unity 6 (API 35
+  image; its earlier warm-tap red exposed the GameActivity delivery gap
+  fixed in the runtime, see CHANGELOG): **all three lines now pass the full
+  smoke**. No *real device* has run the cold step yet. Remaining: asserting
   a shortcut **tap** on iOS (no
   `simctl` API reads `UIApplicationShortcutItems` or triggers a tap — it needs
   an XCUITest target driving SpringBoard; see the device-smoke README).
