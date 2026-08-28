@@ -778,7 +778,14 @@ jobs:
             ls -la "$SDK" || true
             exit 1
           fi
-          "$SDKM" --install 'ndk;23.1.7779620' > /dev/null
+          # sdkmanager is compiled for Java 17+ (class file 61.0), while this
+          # job's JAVA_HOME is pinned to 11 for Gradle 7.2/AGP 7.1.2 — the
+          # weekly cron proved the two constraints collide
+          # (UnsupportedClassVersionError). Run just this install on the
+          # runner image's own 17 (21 as fallback); the Gradle build below
+          # keeps the 11 it needs.
+          JAVA_HOME="${JAVA_HOME_17_X64:-${JAVA_HOME_21_X64:-$JAVA_HOME}}" \
+            "$SDKM" --install 'ndk;23.1.7779620' > /dev/null
           echo "NDK_FOR_EXPORT=$SDK/ndk/23.1.7779620" >> "$GITHUB_ENV"
       # The export hardcodes paths from inside the builder's docker image: an
       # android.aapt2FromMavenOverride into /opt/unity (dead here; with the

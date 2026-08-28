@@ -59,10 +59,12 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   job now supplies the combo Unity 2022.3 itself bundles (JDK 11, a
   sha256-pinned Gradle 7.2, NDK r23b) and re-points the docker-image paths
   hardcoded in the export (`android.aapt2FromMavenOverride`, `ndkPath`). The
-  next run got exactly one step further — the pin step itself died on
-  `sdkmanager` not being on PATH for plain run steps, now called by full
-  path — and the probe/control verdict is still pending its first complete
-  run.
+  next two runs each got exactly one step further: first the pin step died
+  on `sdkmanager` not being on PATH for plain run steps (now called by full
+  path), then on `sdkmanager` being compiled for Java 17 while the job's
+  JAVA_HOME is deliberately 11 for Gradle 7.2/AGP 7.1.2 (that one install
+  now runs on the runner's own 17). The probe/control verdict is still
+  pending its first complete run.
   Note also what a green run would and would not say: it would show the icons
   surviving a minified release build, but not that the keep rule is what saved
   them, since AGP's default safe mode also carries a string-prefix heuristic
@@ -117,7 +119,9 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   0.25 s unscaled-time beat — delivery no longer depends on which lifecycle
   events an activity implementation emits, and an empty-queue tick is one
   cheap native read. Found, diagnosed to the exact missing callback, and
-  soon re-provable entirely by the emulator smoke.
+  proven by the same harness two days later: the first cron run carrying the
+  fix took the Unity 6 leg through all eight smoke steps, so every supported
+  line now passes the full smoke, warm and cold taps included.
 
 - **The emulator smoke's failure output could not say WHY an app went silent.**
   The workflow's first live run (2026-08-21) proved the point: the unity6 leg
