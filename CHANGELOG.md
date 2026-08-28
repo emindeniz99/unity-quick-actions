@@ -11,7 +11,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 > as its own section because each is a distinct, self-contained set of API
 > additions; read them as the package's development log.
 
-## [Unreleased]
+## [0.4.8] - 2026-08-28
 
 ### Added
 
