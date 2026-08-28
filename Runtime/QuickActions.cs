@@ -728,7 +728,24 @@ namespace EminDeniz99.QuickActions
             if (string.IsNullOrEmpty(actionId))
                 return;
             Log($"Performed quick action '{actionId}'.");
-            Performed?.Invoke(actionId);
+            // Walk the invocation list instead of Invoke: a throwing subscriber
+            // must not stop the id reaching the others, and must not propagate
+            // back into the runtime's polling coroutine, which Unity would end
+            // on an escaping exception — taking every later delivery with it.
+            var handlers = Performed;
+            if (handlers == null)
+                return;
+            foreach (var handler in handlers.GetInvocationList())
+            {
+                try
+                {
+                    ((Action<string>)handler)(actionId);
+                }
+                catch (Exception e)
+                {
+                    Debug.LogException(e);
+                }
+            }
         }
 
         /// <summary>

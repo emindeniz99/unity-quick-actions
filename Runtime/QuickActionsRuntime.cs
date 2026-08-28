@@ -50,7 +50,7 @@ namespace EminDeniz99.QuickActions
             // cold-launch event is raised before anyone is listening.
             yield return null;
             _ready = true;
-            PollPending();
+            PollPendingGuarded();
             // Safety net for the warm path. The two callbacks below are how a
             // resume normally drains the queue, but they are not universal:
             // Unity 6's GameActivity completed a trampoline round-trip on the
@@ -64,7 +64,12 @@ namespace EminDeniz99.QuickActions
             while (true)
             {
                 yield return beat;
-                PollPending();
+                // Guarded, and the try cannot wrap the yield (CS1626). Unity ends a
+                // coroutine whose MoveNext throws and never resumes it, so an
+                // exception escaping here would silently disable the beat — and on
+                // GameActivity the beat is the ONLY delivery path — for the rest of
+                // the session, over a fault in someone else's handler.
+                PollPendingGuarded();
             }
         }
 
@@ -86,6 +91,21 @@ namespace EminDeniz99.QuickActions
             // on resume. Draining is idempotent (the queue is consumed once).
             if (!paused && _ready)
                 PollPending();
+        }
+
+        // The coroutine's own containment. Dispatch already isolates one bad
+        // subscriber from the others; this catches everything else on the one
+        // path that gets no second chance if it dies.
+        private static void PollPendingGuarded()
+        {
+            try
+            {
+                PollPending();
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogException(e);
+            }
         }
 
         private static void PollPending()

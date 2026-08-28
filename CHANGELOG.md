@@ -106,6 +106,20 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **A throwing `Performed` subscriber could stop every later delivery.**
+  `Dispatch` raised the event with a plain `Performed?.Invoke`, so an exception
+  from any one handler — a null dereference in game code, a `MonoBehaviour`
+  destroyed by a scene load that never unsubscribed from this process-wide
+  static event — skipped the remaining subscribers and propagated back into the
+  caller. With the polling beat below that is not a logged nuisance but a
+  permanent stop: Unity ends a coroutine whose `MoveNext` throws and never
+  resumes it, and on Unity 6's GameActivity that coroutine is the *only*
+  delivery path, so one bad handler would silently disable every subsequent
+  quick action for the rest of the session. `Dispatch` now walks the invocation
+  list and contains each handler separately, and the coroutine guards its own
+  drain as belt-and-braces. Two headless tests pin both halves; each was
+  mutation-checked (reverting either fix turns its test red).
+
 - **Unity 6 (GameActivity): a warm shortcut tap could sit undelivered until
   the next real focus change.** The runtime drained its pending-id queue only
   from `OnApplicationFocus(true)` and `OnApplicationPause(false)` — and CI's
