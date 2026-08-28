@@ -30,6 +30,14 @@ upload by hand.
    not, because OpenUPM rejects a tag/`package.json` mismatch with error
    **E811** and the release notes are quoted from that section — so the bump
    belongs in the commit that gets tagged, never in a follow-up commit.
+   In that **same commit**, repoint every install pin: the `#v<version>` git
+   URLs in [`README.md`](./README.md),
+   [`GETTING_STARTED.md`](./GETTING_STARTED.md),
+   [`CONTRIBUTING.md`](./CONTRIBUTING.md) and `CLAUDE.md`, and the OpenUPM
+   `"com.emindeniz99.quick-actions": "<version>"` snippet in the README.
+   Check 6 enforces this too — `release.yml` tags the merge commit, so a pin
+   moved one commit later is wrong for every reader who sees main in between,
+   which is exactly what the 0.4.6 cycle shipped.
 2. Merge the PR with a real merge commit (never squash — see below).
 3. [`.github/workflows/release.yml`](./.github/workflows/release.yml) takes it
    from there: it notices that main declares a version with no tag, runs

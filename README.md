@@ -828,9 +828,10 @@ and a weekly cron. Each Android APK is also read back with `aapt2`, which must
 find the baked static shortcuts, the resource-shrinker keep file and the
 trampoline `<activity>` inside it, and a further 2022.3-only job
 (`android-shrink-verify`) exports the Gradle project and assembles a minified
-release build to test whether the shrinker honours that keep file — both of
-those assertions are newer than the workflow's first live run and have not yet
-executed. It needs the repo secrets `UNITY_LICENSE` (a Unity Hub
+release build to test whether the shrinker honours that keep file — the `aapt2`
+read-back has been green on all three lines in every heavy run that carried it;
+the shrink job's own verdict is still pending (below).
+It needs the repo secrets `UNITY_LICENSE` (a Unity Hub
 personal-licence `.ulf`'s contents), `UNITY_EMAIL` and `UNITY_PASSWORD` (Pro:
 `UNITY_SERIAL` instead of the `.ulf`); without them every Unity job skips and
 the run stays green — which is also what happens on a **fork** PR, where
@@ -863,8 +864,8 @@ its probe/control verdict is still pending.
 For a real device/emulator, `tools~/device-smoke/` has an adb-driven Android
 smoke (install a dev APK → assert the demo's shortcuts registered → simulate a
 tap → assert delivery, once warm and once more after a force-stop — the cold
-assertion has run green on the 2022.3 emulator leg, never yet on a real
-device) and a manually-dispatched
+assertion has run green on all three emulator legs (2021.3, 2022.3, Unity 6),
+never yet on a real device) and a manually-dispatched
 emulator CI workflow — see its
 README, including the honest iOS limitations. A green `verify.sh` proves
 everything compiles and the logic tests pass; it says nothing about on-device

@@ -33,8 +33,13 @@ name: release
 # property and needs none — the tag check below stops it before the publish step
 # whenever the tag already exists, so it never touches an existing release. The
 # flip side is that a tag existing WITHOUT a published release (a cancelled run,
-# a hand-pushed tag whose ci.yml job failed) reads here as "already released";
-# publish that one from ci.yml by re-pushing the tag, or with tools~/release.sh.
+# a hand-pushed tag whose ci.yml job failed) reads here as "already released".
+# Recover that one from ci.yml, not from here, and note that re-pushing an
+# existing tag emits no event at all: dispatch the CI workflow AT the tag —
+# `gh workflow run ci.yml --ref v<version>` — whose release job gates on
+# refs/tags/v* and whose `gh release view || gh release create --verify-tag`
+# step publishes against the tag that already exists. `tools~/release.sh` only
+# rebuilds the .unitypackage locally, for uploading by hand.
 
 on:
   push:

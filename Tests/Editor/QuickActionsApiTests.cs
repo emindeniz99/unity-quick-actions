@@ -1,5 +1,8 @@
+using System.Collections;
 using System.Collections.Generic;
+using System.Reflection;
 using NUnit.Framework;
+using UnityEngine;
 using EminDeniz99.QuickActions;
 using EminDeniz99.QuickActions.Internal;
 
@@ -840,6 +843,70 @@ namespace EminDeniz99.QuickActions.Tests
         }
 
         [Test]
+        public void Dispatch_ThrowingSubscriberDoesNotStopTheOthers_NorEscape()
+        {
+            // Delivery is a process-wide static event any consuming game subscribes to.
+            // One handler throwing (a null deref in game code, a destroyed MonoBehaviour
+            // that never unsubscribed) must not swallow the id for the rest — and must
+            // not escape Dispatch at all, because the runtime's polling coroutine calls
+            // this and Unity ENDS a coroutine whose MoveNext throws. On Unity 6's
+            // GameActivity that coroutine is the only delivery path, so an escaping
+            // exception would disable every later tap for the session.
+            var received = new List<string>();
+            void Thrower(string id) => throw new System.InvalidOperationException("boom");
+            void Recorder(string id) => received.Add(id);
+            QuickActions.Performed += Thrower;
+            QuickActions.Performed += Recorder;
+            try
+            {
+                Assert.DoesNotThrow(() => QuickActions.Dispatch("new_game"));
+                CollectionAssert.AreEqual(new[] { "new_game" }, received);
+            }
+            finally
+            {
+                QuickActions.Performed -= Thrower;
+                QuickActions.Performed -= Recorder;
+            }
+        }
+
+        [Test]
+        public void ColdLaunchCoroutine_KeepsPollingAfterTheInitialDrain()
+        {
+            // Pins the safety-net beat itself, not just the drain loop it calls. The
+            // iterator's frames are: #1 the one-frame wait, #2 sets _ready and drains
+            // the cold-launch queue, #3+ the beat. Queuing the id AFTER #2 is what makes
+            // this a test of the beat — it is the shape Unity 6's GameActivity produces,
+            // where a tap arrives with neither OnApplicationFocus nor OnApplicationPause
+            // reaching scripting, so nothing but the beat can deliver it.
+            var fake = new QueueBridge(new string[0]);
+            QuickActions.OverrideBridgeForTesting(fake);
+            var received = new List<string>();
+            void Handler(string id) => received.Add(id);
+            QuickActions.Performed += Handler;
+            var runtime = new GameObject("qa-runtime-test").AddComponent<QuickActionsRuntime>();
+            try
+            {
+                var coroutine = (IEnumerator)typeof(QuickActionsRuntime)
+                    .GetMethod("DispatchColdLaunch", BindingFlags.Instance | BindingFlags.NonPublic)
+                    .Invoke(runtime, null);
+
+                Assert.IsTrue(coroutine.MoveNext(), "frame wait");
+                Assert.IsTrue(coroutine.MoveNext(), "cold-launch drain");
+                CollectionAssert.IsEmpty(received, "nothing was queued yet");
+
+                fake.Enqueue("continue");                 // a tap with no lifecycle callback
+                Assert.IsTrue(coroutine.MoveNext(), "the beat must keep running");
+
+                CollectionAssert.AreEqual(new[] { "continue" }, received);
+            }
+            finally
+            {
+                QuickActions.Performed -= Handler;
+                QuickActions.OverrideBridgeForTesting(null);
+            }
+        }
+
+        [Test]
         public void Resolve_PrefersExactLocale_ThenLanguagePrefix_ThenBaseText()
         {
             // WHY this precedence: a pt-BR device must get the Brazilian string when
@@ -1311,6 +1378,9 @@ namespace EminDeniz99.QuickActions.Tests
         {
             private readonly Queue<string> _pending;
             public QueueBridge(IEnumerable<string> ids) => _pending = new Queue<string>(ids);
+            // Lets a test queue an id AFTER the drain has already run, i.e. exactly
+            // the situation the runtime's polling beat exists to cover.
+            public void Enqueue(string id) => _pending.Enqueue(id);
             public bool IsPlatformSupported => true;
             public int MaxShortcutCount => 4;
             public bool IsPinSupported => false;

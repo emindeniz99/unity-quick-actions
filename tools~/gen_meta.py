@@ -19,6 +19,7 @@ those — hidden dirs (incl. `.verify/`), the `store~/` and `dist~/` collateral
 dirs, and existing `.meta` files.
 """
 import hashlib
+import difflib
 import os
 import sys
 
@@ -170,7 +171,111 @@ def meta_for(rel_path: str, is_dir: bool) -> str:
     return default_meta(guid)
 
 
+def iter_assets():
+    """Every asset that needs a .meta, as (absolute path, package-relative, is_dir).
+
+    The single source of truth for what counts as an asset: both the generate
+    pass and --check walk this, so a skip rule can never drift between them.
+    """
+    for root, dirs, files in os.walk(PKG):
+        # Skip hidden/ignored dirs (Unity ignores names ending with ~ or starting .)
+        # (the store~/dist~ collateral dirs are covered by the ~ rule).
+        dirs[:] = [d for d in dirs
+                   if not d.endswith("~") and not d.startswith(".")
+                   and d != "__pycache__"  # python bytecode cache; gitignored, never an asset
+                   ]
+        for d in dirs:
+            abs_dir = os.path.join(root, d)
+            yield abs_dir, os.path.relpath(abs_dir, PKG).replace(os.sep, "/"), True
+        for name in files:
+            if name.endswith(".meta"):
+                continue
+            # Unity's importer ignores the same names it ignores for dirs, so a
+            # .meta for one (e.g. .gitignore.meta) would be an orphan.
+            if name.startswith(".") or name.endswith("~"):
+                continue
+            abs_file = os.path.join(root, name)
+            yield abs_file, os.path.relpath(abs_file, PKG).replace(os.sep, "/"), False
+
+    # Samples~ contents need .meta too (they are copied into Assets on import),
+    # but os.walk skipped the ~ dir above. Handle it explicitly.
+    samples = os.path.join(PKG, "Samples~")
+    if os.path.isdir(samples):
+        for root, dirs, files in os.walk(samples):
+            for d in dirs:
+                abs_dir = os.path.join(root, d)
+                yield abs_dir, os.path.relpath(abs_dir, PKG).replace(os.sep, "/"), True
+            for name in files:
+                if name.endswith(".meta"):
+                    continue
+                abs_file = os.path.join(root, name)
+                yield abs_file, os.path.relpath(abs_file, PKG).replace(os.sep, "/"), False
+
+
+def body(text):
+    """A .meta minus its guid line.
+
+    The guid is deliberately excluded: several committed .meta files carry a
+    GUID a real Unity assigned before the asset was moved, and rewriting those
+    would break every reference pointing at them. Everything else — the
+    importer the file routes to, and a plugin's platform flags — is generated
+    from the path and must match, which is what this check compares.
+    """
+    return [l for l in text.splitlines() if not l.startswith("guid:")]
+
+
+def check() -> int:
+    """Report metas that are missing, orphaned, or route to the wrong importer."""
+    problems = []
+    expected_metas = set()
+    for path, rel, is_dir in iter_assets():
+        meta = path + ".meta"
+        expected_metas.add(os.path.abspath(meta))
+        if not os.path.exists(meta):
+            problems.append(f"{rel}: no .meta (run tools~/gen_meta.py and commit it)")
+            continue
+        want = body(meta_for(rel, is_dir))
+        got = body(open(meta, encoding="utf-8").read())
+        if want != got:
+            # Show the differing lines, not the head of each file: the importer
+            # block is long and identical for pages, so a head-based message
+            # would print two blocks that look the same.
+            delta = [l for l in difflib.unified_diff(
+                got, want, fromfile="committed", tofile="expected", lineterm="", n=0)
+                if l.startswith(("+", "-")) and not l.startswith(("+++", "---"))]
+            problems.append(
+                f"{rel}.meta: importer/settings do not match what this path routes to.\n"
+                + "\n".join("      " + l for l in delta[:12]))
+
+    # Orphans: a .meta whose asset is gone. Unity re-creates the asset's meta on
+    # import, so a leftover is silent locally but ships in the package.
+    for root, dirs, files in os.walk(PKG):
+        dirs[:] = [d for d in dirs
+                   if not (d.endswith("~") and d != "Samples~") and not d.startswith(".")
+                   and d != "__pycache__"]
+        for name in files:
+            if not name.endswith(".meta"):
+                continue
+            meta = os.path.abspath(os.path.join(root, name))
+            if meta in expected_metas:
+                continue
+            asset = meta[: -len(".meta")]
+            if not os.path.exists(asset):
+                rel = os.path.relpath(meta, PKG).replace(os.sep, "/")
+                problems.append(f"{rel}: orphan — no asset at {os.path.basename(asset)}")
+
+    if problems:
+        print("gen_meta --check found %d problem(s):" % len(problems), file=sys.stderr)
+        for p in problems:
+            print("  " + p, file=sys.stderr)
+        return 1
+    print("gen_meta: .meta set is complete, orphan-free and correctly routed")
+    return 0
+
+
 def main() -> int:
+    if "--check" in sys.argv:
+        return check()
     created = 0
     for root, dirs, files in os.walk(PKG):
         # Skip hidden/ignored dirs (Unity ignores names ending with ~ or starting .)

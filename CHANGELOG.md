@@ -34,8 +34,10 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `raw/quickactions_keep` and `string/qa_short_0`, and `aapt2 dump xmltree` must
   show `QuickActionsTrampolineActivity` and the `android.app.shortcuts`
   meta-data. A miss prints the dump it could not match rather than exiting on a
-  bare code: the workflow's first live run predates these steps, so their own
-  first run is where every one of these assumptions gets tested.
+  bare code, so a surprise arrives as evidence. Green on all three lines in
+  every heavy run since these steps landed — first the 2026-08-21 dispatch,
+  most recently the 2026-08-24 cron. That the bake reaches a shipped APK is now
+  a per-run fact; that a launcher renders it still needs human eyes.
 
 - **`android-shrink-verify`: a CI job that finally puts the resource-shrinker
   keep rule on trial.** 0.4.7 ships `res/raw/quickactions_keep.xml` so the icon
@@ -95,6 +97,17 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **`verify.sh` gains two guards that check what was previously remembered.**
+  Check 1 proved only that a `.meta` *exists*, so an orphaned one (asset gone,
+  meta shipped) or a wrong importer — an iOS plugin carrying the Android
+  platform flag, which builds a broken player instead of failing — passed
+  clean; `gen_meta.py --check` now compares every meta against what its path
+  routes to, exempting the `guid:` line because some assets legitimately keep a
+  GUID Unity assigned before they moved. Check 6 additionally fails when an
+  install pin disagrees with `package.json`: `release.yml` tags the merge
+  commit, so a `#v<version>` moved one commit later is wrong for everyone who
+  reads main in between — precisely what the 0.4.6 cycle shipped.
+
 - **`game-ci/unity-builder` v4.8.1 → v5.0.0.** The major version extracts the
   CloudRunner inputs into a separate orchestrator action and moves the runtime
   from node20 to node24; every input this workflow passes (`projectPath`,
@@ -105,6 +118,20 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   and `android-emulator-runner` v2.38.0 are the latest stable releases.
 
 ### Fixed
+
+- **A throwing `Performed` subscriber could stop every later delivery.**
+  `Dispatch` raised the event with a plain `Performed?.Invoke`, so an exception
+  from any one handler — a null dereference in game code, a `MonoBehaviour`
+  destroyed by a scene load that never unsubscribed from this process-wide
+  static event — skipped the remaining subscribers and propagated back into the
+  caller. With the polling beat below that is not a logged nuisance but a
+  permanent stop: Unity ends a coroutine whose `MoveNext` throws and never
+  resumes it, and on Unity 6's GameActivity that coroutine is the *only*
+  delivery path, so one bad handler would silently disable every subsequent
+  quick action for the rest of the session. `Dispatch` now walks the invocation
+  list and contains each handler separately, and the coroutine guards its own
+  drain as belt-and-braces. Two headless tests pin both halves; each was
+  mutation-checked (reverting either fix turns its test red).
 
 - **Unity 6 (GameActivity): a warm shortcut tap could sit undelivered until
   the next real focus change.** The runtime drained its pending-id queue only
@@ -117,8 +144,11 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `UnityPlayerActivity` (2021.3/2022.3) fires the callbacks and was never
   affected. The runtime's hidden singleton now also polls the queue on a slow
   0.25 s unscaled-time beat — delivery no longer depends on which lifecycle
-  events an activity implementation emits, and an empty-queue tick is one
-  cheap native read. Found, diagnosed to the exact missing callback, and
+  events an activity implementation emits, and an empty-queue tick is a single
+  query into the native queue (an `isEmpty` on Android, a count check on iOS),
+  with the Android class handle now cached for the process so the tick costs no
+  JNI `FindClass` or global-ref churn. Found, diagnosed to the exact missing
+  callback, and
   proven by the same harness two days later: the first cron run carrying the
   fix took the Unity 6 leg through all eight smoke steps, so every supported
   line now passes the full smoke, warm and cold taps included.

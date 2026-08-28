@@ -100,13 +100,32 @@ jobs:
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
           UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+          # Passed through env, never interpolated into the script body: these
+          # carry event-payload strings.
+          EVENT: ${{ github.event_name }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          THIS_REPO: ${{ github.repository }}
+          ACTOR: ${{ github.actor }}
         run: |
           if { [ -n "$UNITY_LICENSE" ] || [ -n "$UNITY_SERIAL" ]; } \
              && [ -n "$UNITY_EMAIL" ] && [ -n "$UNITY_PASSWORD" ]; then
             echo "available=true" >> "$GITHUB_OUTPUT"
           else
             echo "available=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::No Unity licence secrets in reach — every Unity job was skipped (expected on a fork PR, where GitHub withholds secrets by design). On this repo's own branches, add UNITY_LICENSE + UNITY_EMAIL + UNITY_PASSWORD; see the header of .github/workflows/unity-ci.yml."
+            # Absent secrets are EXPECTED on a fork or Dependabot PR — GitHub
+            # withholds them by design there, and skipping every Unity job is the
+            # correct, green outcome. On any other event they are missing because
+            # something broke (a rotated .ulf, a deleted secret, an expired
+            # licence), and staying green would report "all Unity checks passed"
+            # for a run in which no editor ever opened. Fail the gate there, so
+            # the workflow says what actually happened.
+            if [ "$EVENT" = 'pull_request' ] \
+               && { [ "$HEAD_REPO" != "$THIS_REPO" ] || [ "$ACTOR" = 'dependabot[bot]' ]; }; then
+              echo "::notice::No Unity licence secrets in reach — every Unity job was skipped (expected on a fork or Dependabot PR, where GitHub withholds secrets by design)."
+            else
+              echo "::error::Unity licence secrets are missing on a trusted event ($EVENT) — every Unity job would be skipped and this run would otherwise report green. Re-add UNITY_LICENSE + UNITY_EMAIL + UNITY_PASSWORD (or UNITY_SERIAL); see the header of .github/workflows/unity-ci.yml."
+              exit 1
+            fi
           fi
 
   # Unity Test Runner (EditMode) on each testbed: the same 74-test suite the
@@ -193,13 +212,34 @@ jobs:
           import json
           import re
           import sys
+          import time
+          import urllib.error
           import urllib.request
+
+          # Docker Hub's anonymous tag API is rate-limited, and this leg runs on
+          # every push and PR: one 429 would turn the canary red for a reason that
+          # has nothing to do with the package. Retry only the transient statuses —
+          # a 404 or a changed JSON shape must still fail immediately, so the
+          # "refuse to guess a version" contract below keeps its teeth.
+          def _get(url, attempts=4):
+              for i in range(attempts):
+                  try:
+                      with urllib.request.urlopen(url, timeout=30) as r:
+                          return json.load(r)
+                  except urllib.error.HTTPError as e:
+                      if e.code not in (429, 500, 502, 503, 504) or i == attempts - 1:
+                          raise
+                      print("docker hub HTTP %d, retrying" % e.code, file=sys.stderr)
+                  except urllib.error.URLError as e:
+                      if i == attempts - 1:
+                          raise
+                      print("docker hub unreachable (%s), retrying" % e, file=sys.stderr)
+                  time.sleep(2 ** i)
 
           def pages(url, limit=5):
               n = 0
               while url and n < limit:
-                  with urllib.request.urlopen(url, timeout=30) as r:
-                      d = json.load(r)
+                  d = _get(url)
                   yield d
                   url = d.get("next")
                   n += 1
@@ -318,9 +358,9 @@ jobs:
       # once, by hand, with one aapt2 session on one machine (README "Status").
       # This makes it an assertion on every line, every run — the half of that
       # proof a machine can do, leaving only "a launcher renders them" for human
-      # eyes. Every miss prints the dump it could not match: these steps are
-      # newer than the workflow's first live run, so their own first run is the
-      # validation, and a surprise has to arrive as evidence, not a bare exit 1.
+      # eyes. Every miss prints the dump it could not match, so a surprise
+      # arrives as evidence rather than a bare exit 1. Green on all three lines
+      # in every heavy run since the 2026-08-21 dispatch.
       - name: Assert the APK carries the package's baked output
         env:
           APK: ${{ matrix.testbed.path }}/Builds/QuickActionsDemo-phone.apk
@@ -379,6 +419,30 @@ jobs:
                 echo "MISSING from the APK manifest: $want"
                 echo "--- AndroidManifest.xml as built ---"
                 printf '%s\n' "$MANIFEST"
+                exit 1
+                ;;
+            esac
+          done
+          # Resources and manifest are both written by the C# post-processor, so
+          # everything above would still pass with NONE of the package's Java in
+          # the APK — a manifest declaring an activity the dex does not contain,
+          # i.e. a crash on the first tap. The .java plugins reach a build only
+          # through their .meta platform flags, which nothing else here checks.
+          DEX="$(unzip -p "$APK" 'classes*.dex' 2>/dev/null | strings -a || true)"
+          if [ -z "$DEX" ]; then
+            echo "no readable classes*.dex in $APK — cannot verify the Java landed."
+            unzip -l "$APK" | head -40
+            exit 1
+          fi
+          for want in com/emindeniz99/quickactions/QuickActionsBridge \
+                      com/emindeniz99/quickactions/QuickActionsTrampolineActivity; do
+            case "$DEX" in
+              *"$want"*) echo "ok: dex carries $want" ;;
+              *)
+                echo "MISSING from classes.dex: $want"
+                echo "The manifest declares this class but the APK does not contain it —"
+                echo "check Plugins/Android/*.java.meta (the Android platform flag) and"
+                echo "that no minification stripped it."
                 exit 1
                 ;;
             esac
@@ -811,6 +875,7 @@ jobs:
               gp.write_text("\n".join(kept) + "\n")
 
           ndk = os.environ["NDK_FOR_EXPORT"]
+          repointed = []
           for name in ("launcher/build.gradle", "unityLibrary/build.gradle"):
               p = pathlib.Path(name)
               if not p.exists():
@@ -820,14 +885,43 @@ jobs:
               if new != text:
                   print("re-pointed ndkPath in", name)
                   p.write_text(new)
+                  repointed.append(name)
+          # A silent no-op here would surface much later as an opaque "NDK not
+          # configured" inside BuildIl2CppTask, so say it now. Not fatal: Unity also
+          # writes ndkVersion, which resolves to the same $SDK/ndk/<version> this
+          # job installed — but the log must show which of the two AGP will use.
+          if not repointed:
+              print("WARNING: no ndkPath found in either module — relying on ndkVersion.")
+          for name in ("launcher/build.gradle", "unityLibrary/build.gradle"):
+              p = pathlib.Path(name)
+              if p.exists():
+                  for line in p.read_text().splitlines():
+                      if "ndkPath" in line or "ndkVersion" in line:
+                          print("%s: %s" % (name, line.strip()))
           PY
+          # Diagnostics only, never fatal: the export was produced inside the
+          # builder's container, so any file still naming a container path
+          # (/opt/unity, /github/workspace) is a candidate cause for a Gradle
+          # failure later in this job. Surveying them here means the log already
+          # holds the answer instead of costing another heavy run to find. The
+          # `|| true` keeps a no-match grep (exit 1) from ending the step.
+          echo "--- container paths still present in the export ---"
+          grep -rn -e /opt/unity -e /github/workspace . \
+            --include='*.gradle' --include='*.properties' \
+            --include='*.cmake' --include='*.mk' 2>/dev/null | head -40 || true
+          echo "--- end survey ---"
       - name: Gradle release build of the exported project
         run: |
           set -euo pipefail
           cd "$EXPORT"
           # Unity writes local.properties from inside the unity-builder docker
           # image, so sdk.dir (and any ndk.dir) point at paths that do not
-          # exist on this runner. Replace those lines and keep the rest.
+          # exist on this runner. Strip both and re-add ONLY sdk.dir: the NDK is
+          # already expressed as ndkPath in build.gradle (re-pointed by the step
+          # above), and AGP 7 treats "both android.ndkPath and ndk.dir are set"
+          # as CXX1100 — it stops resolving the NDK entirely, which surfaces as
+          # a confusing "NDK is not installed" once BuildIl2CppTask runs. Even
+          # identical paths trip it; the check is presence, not value.
           SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
           if [ -z "$SDK" ]; then
             echo "neither ANDROID_HOME nor ANDROID_SDK_ROOT is set — no Android SDK to build against."
@@ -839,7 +933,6 @@ jobs:
             : > "$RUNNER_TEMP/local.properties"
           fi
           printf 'sdk.dir=%s\n' "$SDK" >> "$RUNNER_TEMP/local.properties"
-          printf 'ndk.dir=%s\n' "$NDK_FOR_EXPORT" >> "$RUNNER_TEMP/local.properties"
           cp "$RUNNER_TEMP/local.properties" local.properties
           echo "--- local.properties ---"
           cat local.properties
@@ -859,7 +952,17 @@ jobs:
           fi
           echo "building with $GRADLE_CMD"
           # Unsigned output is fine: nothing installs this APK, it is only read.
-          "$GRADLE_CMD" --no-daemon --stacktrace :launcher:assembleRelease
+          # precompileDependenciesResources=false routes unityLibrary's resources
+          # through the launcher's own mergeReleaseResources — where the
+          # `crunchPngs false` this job sets actually applies. Without it the
+          # library module compiles the planted probe PNGs under AGP's release
+          # default, re-encoding them, and the byte-exact probe comparison would
+          # report "inconclusive" for a reason that has nothing to do with the
+          # shrinker. shrinkResources still runs on the linked app resources, so
+          # the experiment is unchanged.
+          "$GRADLE_CMD" --no-daemon --stacktrace \
+            -Pandroid.precompileDependenciesResources=false \
+            :launcher:assembleRelease
       - name: Assert the shrinker ran AND the keep rule held
         run: |
           set -euo pipefail
@@ -982,8 +1085,25 @@ jobs:
           if control_after is None:
               print("ok: the control resource was removed outright — the shrinker ran")
           elif control_before is not None and control_after < control_before:
-              print("ok: the control resource shrank %d -> %d bytes — the shrinker ran"
-                    % (control_before, control_after))
+              # A shrink and a global re-encode look identical from the control alone.
+              # They differ in what happened to the PROBE: the shrinker dummy-replaces
+              # only what it drops, so a keep-protected probe should come out at its
+              # planted size. Both landing on the same smaller size means something
+              # re-encoded every PNG, and reading that as "the shrinker ran" would let
+              # the next assertion draw a conclusion from a corrupted experiment.
+              probe_now = rows[0][2]
+              if (probe_now is not None and probe_now == control_after
+                      and planted.get(PROBE) not in (None, probe_now)):
+                  failures.append(
+                      "experiment inconclusive: '%s' and '%s' both came out at %d bytes, "
+                      "neither at its planted size. That is a global re-encode (PNG "
+                      "crunching or an aapt2 optimize pass), not a shrink plus a "
+                      "dummy-replace, so neither the shrinker's activity nor the keep "
+                      "rule can be read off this run."
+                      % (CONTROL, PROBE, control_after))
+              else:
+                  print("ok: the control resource shrank %d -> %d bytes — the shrinker ran"
+                        % (control_before, control_after))
           else:
               failures.append(
                   "experiment inconclusive: the shrinker did not run. The unreferenced "
@@ -1045,8 +1165,17 @@ jobs:
         if: always()
         with:
           name: shrink-verify-2022.3
+          # Globs, not ${{ env.APK_PATH }}: that variable is only set by the assert
+          # step, so on the failure paths that matter most (the Gradle build died,
+          # the assert never ran) it expands to an empty line in this list and the
+          # artifact carries nothing but the planted sizes. The build.gradle and the
+          # keep file below are what a human needs to diagnose such a run without
+          # re-dispatching the whole job.
           path: |
-            ${{ env.APK_PATH }}
+            ${{ env.TESTBED }}/Builds/AndroidProject/launcher/build/outputs/apk/release/*.apk
+            ${{ env.TESTBED }}/Builds/AndroidProject/launcher/build.gradle
+            ${{ env.TESTBED }}/Builds/AndroidProject/local.properties
+            ${{ env.TESTBED }}/Builds/AndroidProject/unityLibrary/src/main/res/raw/quickactions_keep.xml
             ${{ runner.temp }}/shrink-sizes.txt
             ${{ runner.temp }}/planted-sizes.txt
           if-no-files-found: warn
@@ -1105,6 +1234,64 @@ jobs:
           path: ${{ matrix.testbed.path }}/Builds/iOSSimulator
           if-no-files-found: error
           retention-days: 14
+      # The Android legs read their APK back with aapt2; iOS had no equivalent, so
+      # the entire iOS bake — the post-processor's UIApplicationShortcutItems, the
+      # ownership marker, the icon-key exclusivity — was carried by headless tests
+      # against stubs and by nothing that runs a real editor. The compile job below
+      # proves the project builds, not that the shortcuts are in it. This asserts
+      # the plist Unity actually wrote. Ordering matches the Android leg: the
+      # upload above runs FIRST, because this is the step meant to turn red and
+      # red must not discard its own evidence.
+      - name: Assert the iOS bake reached Info.plist
+        env:
+          PLIST: ${{ matrix.testbed.path }}/Builds/iOSSimulator/Info.plist
+        run: |
+          set -euo pipefail
+          python3 - "$PLIST" <<'PY'
+          import plistlib
+          import sys
+
+          # Mirrors QuickActionsPlistShortcuts.MarkerKey — the value is a BOOLEAN
+          # under UIApplicationShortcutItemUserInfo, so test it with `is True`
+          # rather than key presence.
+          MARKER = "com.emindeniz99.quickactions.managed"
+          ICON_KEYS = ("UIApplicationShortcutItemIconSymbolName",
+                       "UIApplicationShortcutItemIconFile",
+                       "UIApplicationShortcutItemIconType")
+          EXPECTED = ["new_game", "continue", "daily_reward"]
+
+          path = sys.argv[1]
+          with open(path, "rb") as f:
+              root = plistlib.load(f)
+          items = root.get("UIApplicationShortcutItems") or []
+
+          problems = []
+          if not items:
+              problems.append("UIApplicationShortcutItems is missing or empty — the "
+                              "post-processor baked nothing into %s" % path)
+          ours = [d for d in items
+                  if isinstance(d, dict)
+                  and isinstance(d.get("UIApplicationShortcutItemUserInfo"), dict)
+                  and d["UIApplicationShortcutItemUserInfo"].get(MARKER) is True]
+          got = [d.get("UIApplicationShortcutItemType") for d in ours]
+          if got != EXPECTED:
+              problems.append("marked ids/order are %r, expected %r" % (got, EXPECTED))
+          for d in ours:
+              present = [k for k in ICON_KEYS if k in d]
+              if len(present) != 1:
+                  problems.append("%s carries %d icon keys %r — iOS accepts exactly one"
+                                  % (d.get("UIApplicationShortcutItemType"),
+                                     len(present), present))
+
+          if problems:
+              print("iOS bake assertion FAILED:")
+              for p in problems:
+                  print("  -", p)
+              print("--- UIApplicationShortcutItems as built ---")
+              print(plistlib.dumps(items).decode())
+              raise SystemExit(1)
+          print("ok: %d marked items %r, exactly one icon key each" % (len(ours), got))
+          PY
 
   # Compile the exported project for the iOS Simulator on macOS — unsigned
   # (CODE_SIGNING_ALLOWED=NO), then boot a simulator, install the .app and
