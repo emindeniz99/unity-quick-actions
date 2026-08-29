@@ -828,7 +828,8 @@ Nothing is held back for a manual step, and a weekly cron still runs it to
 catch drift with no commit behind it. Runner minutes are free on a public repo;
 the Unity-activating jobs are chained so at most `UNITY_MAX_PARALLEL`
 (repository variable, default 2) editors are ever activated at once, which
-costs wall clock — about an hour for a full run — and nothing else. Each Android APK is also read back with
+costs wall clock — 29 minutes on the first chained run, against 13 unchained —
+and nothing else. Each Android APK is also read back with
 `aapt2`, which must
 find the baked static shortcuts, the resource-shrinker keep file and the
 trampoline `<activity>` inside it, and a further 2022.3-only job

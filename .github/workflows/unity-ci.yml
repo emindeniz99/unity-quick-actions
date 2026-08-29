@@ -25,9 +25,10 @@ name: unity
 # whether it works — which is how a test that passes headlessly and fails in a
 # real Editor reached main.
 #
-# That 13.4 minutes was measured BEFORE the licence cap below; with the Unity
-# jobs chained it is roughly an hour. The argument is unchanged — free minutes,
-# no manual step — but the number is not, so do not quote 13 minutes.
+# That 13.4 minutes was measured BEFORE the licence cap below. Chained, run 31
+# took 29 minutes for every leg but the shrink experiment. The argument is
+# unchanged — free minutes, no manual step — but the number is, so do not quote
+# 13 minutes.
 #
 # Docs-only changes still trigger nothing (paths filter below), so the bill for
 # a README edit stays zero legs. The weekly cron remains, and is not redundant:
@@ -70,10 +71,11 @@ name: unity
 # tests leg still lets the Android build run, exactly as before; the
 # no-secrets path still propagates as skipped.
 #
-# What this costs, stated plainly: the legs no longer overlap, so a full run
-# goes from ~13 minutes to roughly an hour. Runner minutes are free on a public
-# repo, so the price is wall clock only. To undo, delete the three max-parallel
-# lines and put every Unity job back on `needs: license` with the plain gate.
+# What this costs, measured on run 31 rather than guessed: 29 minutes for every
+# leg but the shrink experiment, against 13.4 unchained. Runner minutes are free
+# on a public repo, so the price is wall clock only. To undo, delete the three
+# max-parallel lines and put every Unity job back on `needs: license` with the
+# plain gate.
 #
 # What the evidence says: no run of this workflow has EVER failed on Unity
 # activation. Across 30 runs, no game-ci step has conclusion "failure" — every
@@ -588,9 +590,11 @@ jobs:
   # release build", which is the user-visible claim.
   #
   # One line only (2022.3 — the line whose Android bake was proven on a real
-  # APK): this is an IL2CPP export plus a full Gradle release build, and it
-  # answers a question about AGP, not about a Unity version, so running it per
-  # line would buy nothing. Every step fails LOUDLY and prints what it could not parse
+  # APK): it answers a question about AGP, not about a Unity version, so running
+  # it per line would buy nothing. It builds the resource shrinker's own Gradle
+  # task rather than a whole APK — assembleRelease drags in the release IL2CPP
+  # native build, which overran a two-hour ceiling twice (runs 30 and 31) and
+  # produces nothing this experiment reads. Every step fails LOUDLY and prints what it could not parse
   # instead of skipping. The job's first run (2026-08-21) validated its own
   # design the hard way, exactly where the header had warned: export, chown,
   # probe-planting and the minify flip all worked, and the build then died
@@ -1004,6 +1008,10 @@ jobs:
             --include='*.cmake' --include='*.mk' 2>/dev/null | head -40 || true
           echo "--- end survey ---"
       - name: Gradle release build of the exported project
+        # The job's 120-minute ceiling is not a useful signal: it reports
+        # "cancelled" with no failing step. A tighter step ceiling turns a
+        # runaway build into a named failure with the log attached.
+        timeout-minutes: 30
         run: |
           set -euo pipefail
           cd "$EXPORT"
@@ -1044,7 +1052,20 @@ jobs:
             exit 1
           fi
           echo "building with $GRADLE_CMD"
-          # Unsigned output is fine: nothing installs this APK, it is only read.
+          # NOT assembleRelease. Two runs (30 and 31) proved that path unusable:
+          # the Gradle step hit the job's 120-minute ceiling both times, still
+          # running il2cpp/bee_backend when the runner killed it (the orphan
+          # processes are named in run 30's log tail). assembleRelease has to
+          # PACKAGE the app, so it pulls in the IL2CPP native build — in the
+          # release variant, fully optimised — which the android-build job never
+          # pays because its APK is a development build.
+          #
+          # The experiment does not need an APK. shrinkReleaseRes IS the resource
+          # shrinker: it consumes the linked resources plus R8's output to decide
+          # what is reachable, and writes a stripped resource archive. Its inputs
+          # are Java and resources; the native build is a sibling that only
+          # packaging joins. Skipping it removes hours and removes nothing the
+          # probe/control comparison reads.
           # precompileDependenciesResources=false routes unityLibrary's resources
           # through the launcher's own mergeReleaseResources — where the
           # `crunchPngs false` this job sets actually applies. Without it the
@@ -1053,20 +1074,38 @@ jobs:
           # report "inconclusive" for a reason that has nothing to do with the
           # shrinker. shrinkResources still runs on the linked app resources, so
           # the experiment is unchanged.
-          "$GRADLE_CMD" --no-daemon --stacktrace \
-            -Pandroid.precompileDependenciesResources=false \
-            :launcher:assembleRelease
+          if ! "$GRADLE_CMD" --no-daemon --console=plain --stacktrace \
+                 -Pandroid.precompileDependenciesResources=false \
+                 :launcher:shrinkReleaseRes; then
+            # Most likely cause of a hard failure here is the task name moving
+            # between AGP versions, so name the ones this export actually has
+            # rather than leaving the next reader to guess.
+            echo "::group::shrink-related tasks this export declares"
+            "$GRADLE_CMD" --no-daemon --console=plain -q :launcher:tasks --all 2>/dev/null \
+              | grep -i shrink || echo "(no task with 'shrink' in its name)"
+            echo "::endgroup::"
+            exit 1
+          fi
       - name: Assert the shrinker ran AND the keep rule held
         run: |
           set -euo pipefail
-          OUT="$EXPORT/launcher/build/outputs/apk/release"
-          APK="$(find "$OUT" -type f -name '*.apk' -print -quit 2>/dev/null || true)"
+          # shrinkReleaseRes writes a stripped resource archive under
+          # build/intermediates. The leaf directory has moved between AGP
+          # versions, so find it by shape rather than hardcoding a path that
+          # would silently start matching nothing.
+          INT="$EXPORT/launcher/build/intermediates"
+          APK="$(find "$INT" -type f -name '*.ap_' \
+                   \( -path '*shrunk*' -o -path '*stripped*' -o -name '*stripped*' \) \
+                   2>/dev/null | sort | tail -1 || true)"
           if [ -z "$APK" ]; then
-            echo "no APK under $OUT — assembleRelease reported success but produced nothing here."
-            find "$EXPORT/launcher/build/outputs" -maxdepth 4 -print 2>/dev/null || echo "(no outputs directory at all)"
+            echo "no stripped resource archive under $INT — shrinkReleaseRes reported"
+            echo "success but produced nothing this step recognises."
+            find "$INT" -name '*.ap_' -print 2>/dev/null || echo "(no .ap_ anywhere)"
             exit 1
           fi
-          echo "release APK: $APK ($(wc -c < "$APK") bytes)"
+          # An .ap_ is a zip with res/ and resources.arsc, which is exactly what
+          # both readers below want; it simply has no dex or native libs in it.
+          echo "shrunk resource archive: $APK ($(wc -c < "$APK") bytes)"
           # Same aapt2 resolution as the android-build job's assertion step.
           SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
           AAPT2="$(find "$SDK/build-tools" -maxdepth 2 -name aapt2 -type f 2>/dev/null | sort -V | tail -1 || true)"
@@ -1265,7 +1304,7 @@ jobs:
           # keep file below are what a human needs to diagnose such a run without
           # re-dispatching the whole job.
           path: |
-            ${{ env.TESTBED }}/Builds/AndroidProject/launcher/build/outputs/apk/release/*.apk
+            ${{ env.TESTBED }}/Builds/AndroidProject/launcher/build/intermediates/**/*.ap_
             ${{ env.TESTBED }}/Builds/AndroidProject/launcher/build.gradle
             ${{ env.TESTBED }}/Builds/AndroidProject/local.properties
             ${{ env.TESTBED }}/Builds/AndroidProject/unityLibrary/src/main/res/raw/quickactions_keep.xml

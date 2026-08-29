@@ -36,8 +36,9 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   exactly one is eligible, and `max-parallel` caps that one's legs. The chain
   gates on `!cancelled()` rather than the implicit `success()`, so a red tests
   leg still lets the Android build run, and the no-secrets path still
-  propagates as skipped. Cost: the legs no longer overlap, so a full run goes
-  from ~13 minutes to roughly an hour of wall clock; runner minutes stay free.
+  propagates as skipped. Cost, measured on the first chained run rather than
+  estimated: 29 minutes for every leg but the shrink experiment, against 13.4
+  unchained. Runner minutes stay free, so the price is wall clock only.
 
   This is a deliberate margin, not a fix for an observed failure, and the
   workflow header now says so: across 30 runs no `game-ci` step has ever failed
@@ -48,6 +49,19 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   contain the word "seat". The statement lives on the Docker-images page, is
   written per build platform rather than per job, and puts no number on how
   many parallel containers one activation covers.
+
+- **The shrink experiment builds the resource shrinker's task, not a whole APK.**
+  `assembleRelease` has to package the app, so it pulls in the release IL2CPP
+  native build — fully optimised, unlike the development APK the `android-build`
+  job produces in four minutes. Runs 30 and 31 both hit the job's two-hour
+  ceiling still running `il2cpp`/`bee_backend`, so the probe/control verdict has
+  never actually been reached. `shrinkReleaseRes` *is* the shrinker: it reads the
+  linked resources and R8's output and writes a stripped resource archive, and
+  the native build is a sibling that only packaging joins. The assertion now
+  reads that archive (an `.ap_` is a zip with `res/` and `resources.arsc`,
+  which is all it ever looked at), located by shape rather than a hardcoded
+  path. The Gradle step also gains a 30-minute ceiling, so a runaway build
+  fails by name instead of reporting `cancelled` with no failing step.
 
 ### Fixed
 
