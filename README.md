@@ -824,9 +824,11 @@ build-heavy legs — a development Android APK per line fed into the adb device
 smoke, and an iOS Simulator-SDK Xcode export per line, compiled unsigned and
 cold-launched on a macOS-runner simulator for 2022.3 and Unity 6 (2021.3
 exports only: its simulator support is x86_64-only) — run on the same events.
-The whole matrix is ~13 minutes of wall clock and free on a public repo, so
-nothing is held back for a manual step; a weekly cron still runs it to catch
-drift with no commit behind it. Each Android APK is also read back with
+Nothing is held back for a manual step, and a weekly cron still runs it to
+catch drift with no commit behind it. Runner minutes are free on a public repo;
+the Unity-activating jobs are chained so at most `UNITY_MAX_PARALLEL`
+(repository variable, default 2) editors are ever activated at once, which
+costs wall clock — about an hour for a full run — and nothing else. Each Android APK is also read back with
 `aapt2`, which must
 find the baked static shortcuts, the resource-shrinker keep file and the
 trampoline `<activity>` inside it, and a further 2022.3-only job

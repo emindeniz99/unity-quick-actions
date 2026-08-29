@@ -28,6 +28,27 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   commit behind it, and `tools~/device-smoke/**` joins the paths list so
   editing the smoke script actually runs the smoke.
 
+- **At most `UNITY_MAX_PARALLEL` Unity editors are activated at once** (repository
+  variable, default 2). `max-parallel` is a matrix-only key and cannot span job
+  definitions, so a cap alone would have left five concurrent activations — one
+  per Unity job. The five are therefore chained with `needs:` (tests →
+  android-build → ios-export → tests-unity6-latest → android-shrink-verify) so
+  exactly one is eligible, and `max-parallel` caps that one's legs. The chain
+  gates on `!cancelled()` rather than the implicit `success()`, so a red tests
+  leg still lets the Android build run, and the no-secrets path still
+  propagates as skipped. Cost: the legs no longer overlap, so a full run goes
+  from ~13 minutes to roughly an hour of wall clock; runner minutes stay free.
+
+  This is a deliberate margin, not a fix for an observed failure, and the
+  workflow header now says so: across 30 runs no `game-ci` step has ever failed
+  — every red is downstream of a successful activation — and run 25 activated
+  all eleven legs at once with every one logging a returned ULF licence. The
+  header's previous claim that parallel Linux jobs share one seat *"explicitly
+  … for free licences"* also cited the wrong page: GameCI's FAQ does not
+  contain the word "seat". The statement lives on the Docker-images page, is
+  written per build platform rather than per job, and puts no number on how
+  many parallel containers one activation covers.
+
 ### Fixed
 
 - **The 0.4.8 CI additions were themselves red on their first real run, in two

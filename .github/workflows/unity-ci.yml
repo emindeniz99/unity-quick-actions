@@ -20,11 +20,14 @@ name: unity
 # The heavy legs used to be dispatch/cron-only, on a "split by cost" rationale
 # that measurement disproved: run 25 ran the whole matrix — 17 jobs, macOS
 # included — in 13.4 minutes of wall clock, and GitHub billed 0 ms for all of
-# it, because runner minutes on a public repo are free. The jobs are parallel,
-# so the matrix costs about what its slowest leg costs, not the sum. What that
-# gating actually bought was a manual step between writing a change and
-# learning whether it works — which is how a test that passes headlessly and
-# fails in a real Editor reached main.
+# it, because runner minutes on a public repo are free. What that gating
+# actually bought was a manual step between writing a change and learning
+# whether it works — which is how a test that passes headlessly and fails in a
+# real Editor reached main.
+#
+# That 13.4 minutes was measured BEFORE the licence cap below; with the Unity
+# jobs chained it is roughly an hour. The argument is unchanged — free minutes,
+# no manual step — but the number is not, so do not quote 13 minutes.
 #
 # Docs-only changes still trigger nothing (paths filter below), so the bill for
 # a README edit stays zero legs. The weekly cron remains, and is not redundant:
@@ -54,11 +57,42 @@ name: unity
 # Without the secrets every Unity job is SKIPPED (gate job below), so the
 # workflow stays green instead of failing on activation.
 #
-# Licence seats: all parallel Linux docker jobs consume ONE seat, explicitly a
-# non-issue for free licences (https://game.ci/docs/faq/) — hence a full
-# fail-fast:false matrix with no max-parallel. A transient "Unity exits -1
-# within seconds" is a concurrent-activation hiccup: re-run the job after ~30s,
-# and never delete the Library cache for it.
+# Licence seats: at most UNITY_MAX_PARALLEL Unity activations run at once —
+# repository variable, default 2 if unset, so the number is tunable from
+# Settings without a commit. Two mechanisms together produce that number, and
+# neither alone would:
+#   * the five Unity jobs are chained with `needs:` (tests -> android-build ->
+#     ios-export -> tests-unity6-latest -> android-shrink-verify), so exactly
+#     ONE of them is ever eligible. max-parallel is a matrix-only key — it
+#     cannot span job definitions — so without the chain the floor is five.
+#   * max-parallel on each matrix caps that one job's legs.
+# The chain uses `!cancelled()` rather than the implicit success(), so a red
+# tests leg still lets the Android build run, exactly as before; the
+# no-secrets path still propagates as skipped.
+#
+# What this costs, stated plainly: the legs no longer overlap, so a full run
+# goes from ~13 minutes to roughly an hour. Runner minutes are free on a public
+# repo, so the price is wall clock only. To undo, delete the three max-parallel
+# lines and put every Unity job back on `needs: license` with the plain gate.
+#
+# What the evidence says: no run of this workflow has EVER failed on Unity
+# activation. Across 30 runs, no game-ci step has conclusion "failure" — every
+# red is downstream of a successful activation. Run 25 activated all eleven
+# legs simultaneously and every one logged "Successfully returned ULF license".
+# GameCI hardcodes one machine-id into its Linux images, so parallel containers
+# present to Unity as the same machine, and it states the split in one
+# sentence: "This is not an issue for free licenses, but for paid licenses, you
+# will need to be mindful of starting too many parallel jobs as activation will
+# fail" (https://game.ci/docs/docker/docker-images/#concurrent-builds-on-windows-and-macos
+# — NOT the FAQ, which an earlier version of this comment cited; the FAQ does
+# not contain the word "seat"). This repo uses a Personal .ulf with no
+# UNITY_SERIAL, so the hard "two activations per key" limit that GameCI's own
+# CI hit (game-ci/unity-builder#516) does not bind these credentials.
+# The cap is therefore a deliberate margin, not a fix for an observed failure.
+#
+# A transient "Unity exits -1 within seconds" is, per GameCI's troubleshooting
+# page, a concurrent-activation hiccup: re-run the job after ~30s, and never
+# delete the Library cache for it. That symptom has not appeared here.
 
 on:
   workflow_dispatch:
@@ -158,6 +192,7 @@ jobs:
       checks: write # unity-test-runner publishes a check run per matrix leg
     strategy:
       fail-fast: false
+      max-parallel: ${{ fromJSON(vars.UNITY_MAX_PARALLEL || '2') }}
       matrix:
         testbed:
           - { name: "2021.3", path: Examples~/Testbed2021 }
@@ -203,8 +238,8 @@ jobs:
   # required checks, so a red here blocks nothing — it IS the early warning.
   tests-unity6-latest:
     name: tests (unity6-latest)
-    needs: license
-    if: needs.license.outputs.available == 'true'
+    needs: [license, ios-export]
+    if: ${{ !cancelled() && needs.license.outputs.available == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
@@ -317,12 +352,13 @@ jobs:
   # project version out of git history.
   android-build:
     name: android build (${{ matrix.testbed.name }})
-    needs: license
-    if: needs.license.outputs.available == 'true'
+    needs: [license, tests]
+    if: ${{ !cancelled() && needs.license.outputs.available == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
     strategy:
       fail-fast: false
+      max-parallel: ${{ fromJSON(vars.UNITY_MAX_PARALLEL || '2') }}
       matrix:
         testbed:
           - { name: "2021.3", path: Examples~/Testbed2021 }
@@ -565,8 +601,8 @@ jobs:
   # paths the export hardcodes, instead of trusting the runner image's drift.
   android-shrink-verify:
     name: android shrink verify (2022.3)
-    needs: license
-    if: needs.license.outputs.available == 'true'
+    needs: [license, tests-unity6-latest]
+    if: ${{ !cancelled() && needs.license.outputs.available == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
@@ -1245,12 +1281,13 @@ jobs:
   # signing that way.
   ios-export:
     name: ios export (${{ matrix.testbed.name }})
-    needs: license
-    if: needs.license.outputs.available == 'true'
+    needs: [license, android-build]
+    if: ${{ !cancelled() && needs.license.outputs.available == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
     strategy:
       fail-fast: false
+      max-parallel: ${{ fromJSON(vars.UNITY_MAX_PARALLEL || '2') }}
       matrix:
         testbed:
           - { name: "2021.3", path: Examples~/Testbed2021 }
