@@ -11,6 +11,39 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 > as its own section because each is a distinct, self-contained set of API
 > additions; read them as the package's development log.
 
+## [Unreleased]
+
+### Fixed
+
+- **The 0.4.8 CI additions were themselves red on their first real run, in two
+  ways this repo's headless harness structurally cannot see.** The new
+  throwing-subscriber test failed all four Unity test legs: it asserts that
+  `Dispatch` *contains* the exception, containment means the exception is
+  **logged**, and Unity's Test Runner fails a test on any log it was not told
+  to expect — while the stub harness no-ops `Debug`, so it was green locally.
+  The log is the contract, so the test now declares it with `LogAssert.Expect`
+  (stubbed for the headless build); reverting the fix still turns the test red,
+  so the expectation did not blunt it.
+
+  And `android-shrink-verify` reached its Gradle build for the first time, where
+  AGP rejected the toolchain outright: *"Minimum supported Gradle version is
+  7.5. Current version is 7.2."* The JDK 11 / Gradle 7.2 pin — described in the
+  0.4.8 notes above as "the combo Unity 2022.3 itself bundles" — was an
+  assumption this export does not match: the job's own artifact shows it
+  compiling against **SDK 36**, i.e. a far newer AGP. Rather than guess again,
+  the step now asks the export which Gradle it needs (wrapper properties first,
+  the AGP coordinate second, a modern default last), prints which it chose,
+  and verifies the download against Gradle's published sha256 — a discovered
+  version cannot carry a pinned one. JDK moves to 17, which modern AGP needs
+  and which `sdkmanager` already wanted.
+
+  That run also confirmed the rest of the 0.4.8 CI work on real infrastructure:
+  the `ndk.dir` collision is gone, `minifyEnabled`/`shrinkResources`/
+  `crunchPngs false` and the keep-all ProGuard file all land in the release
+  buildType, and the new iOS `Info.plist` and dex assertions passed on all
+  three lines, as did the emulator smoke. The shrinker's probe/control verdict
+  is still the one open question.
+
 ## [0.4.8] - 2026-08-28
 
 ### Added
