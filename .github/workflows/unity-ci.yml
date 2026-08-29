@@ -808,22 +808,22 @@ jobs:
           set_flag("shrinkResources", "true")
           set_flag("crunchPngs", "false")
 
-          for i, line in enumerate(lines):
-              if not re.match(r"^\s*proguardFiles?\b", line):
-                  continue
-              code, sep, comment = line.partition("//")
-              code = code.rstrip()
-              if code.endswith(")"):          # proguardFiles(a, b) — extend inside the call
-                  code = code[:-1] + ", '%s')" % PRO_NAME
-              else:                           # proguardFiles a, b — extend the list
-                  code = code + ", '%s'" % PRO_NAME
-              lines[i] = code + ((" " + sep + comment) if sep else "")
-              print("appended %s to: %s" % (PRO_NAME, line.strip()))
-              break
-          else:
-              lines.insert(insert_at, indent + "proguardFiles getDefaultProguardFile("
-                           "'proguard-android.txt'), '%s'" % PRO_NAME)
-              print("inserted proguardFiles with %s" % PRO_NAME)
+          # The keep-everything file goes in as its OWN statement, last in the release
+          # block. AGP's proguardFiles(...) APPENDS to the list, so this composes with
+          # whatever the export already declares instead of rewriting it.
+          #
+          # Rewriting it is what failed in run 28. Unity's launcher template ends the
+          # line in `proguardFiles getDefaultProguardFile('proguard-android.txt')`, and
+          # extending "inside the trailing parenthesis" put the second file inside
+          # getDefaultProguardFile(), which takes exactly one argument — the build died
+          # at configuration time, before the shrinker it exists to test ever ran.
+          # Going LAST also survives an export that assigns (`proguardFiles = [...]`)
+          # rather than adds: an insert above such a line would be silently dropped.
+          tail = len(lines)
+          while tail > 0 and not lines[tail - 1].strip():
+              tail -= 1
+          lines.insert(tail, indent + "proguardFiles '%s'" % PRO_NAME)
+          print("added proguardFiles '%s' as the release block's last statement" % PRO_NAME)
 
           body = "\n".join(lines)
           GRADLE.write_text(text[:release[0] + 1] + body + text[release[1]:])
