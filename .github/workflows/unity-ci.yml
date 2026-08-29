@@ -11,14 +11,27 @@ name: unity
 # settle the question no APK leg can — whether AGP's resource shrinker honours
 # the keep rule the package ships for its icon drawables.
 #
-# Split by cost: the EditMode tests run on every code push/PR (~15 min a leg,
-# the signal worth having per change) — three pinned testbed legs plus a
-# unity6-latest canary that resolves the newest Unity 6 GameCI image at run
-# time and upgrade-opens Testbed6 with it — while the build-heavy legs — Android
-# IL2CPP, the emulator smoke, the iOS export and its macOS compile — stay on
-# manual dispatch and the weekly cron, because an hour of IL2CPP per line is
-# not what a one-line change needs. Docs-only changes trigger nothing (paths
-# filter). Public repo: GitHub-hosted runners, macOS included, are free.
+# EVERY leg runs on every code push and PR — the EditMode tests (three pinned
+# testbed legs plus a unity6-latest canary that resolves the newest Unity 6
+# GameCI image at run time and upgrade-opens Testbed6 with it) and the
+# build-heavy ones alike: Android IL2CPP, the emulator smoke, the iOS export
+# and its macOS compile, the shrink experiment.
+#
+# The heavy legs used to be dispatch/cron-only, on a "split by cost" rationale
+# that measurement disproved: run 25 ran the whole matrix — 17 jobs, macOS
+# included — in 13.4 minutes of wall clock, and GitHub billed 0 ms for all of
+# it, because runner minutes on a public repo are free. The jobs are parallel,
+# so the matrix costs about what its slowest leg costs, not the sum. What that
+# gating actually bought was a manual step between writing a change and
+# learning whether it works — which is how a test that passes headlessly and
+# fails in a real Editor reached main.
+#
+# Docs-only changes still trigger nothing (paths filter below), so the bill for
+# a README edit stays zero legs. The weekly cron remains, and is not redundant:
+# it catches drift with no commit behind it — a new Unity patch the canary
+# picks up, a changed base image, an expired credential.
+#
+# Public repo: GitHub-hosted runners, macOS included, are free.
 #
 # Fork PRs are safe by construction: GitHub does not pass secrets to a
 # workflow triggered from a fork, so the licence gate below reports "missing"
@@ -65,6 +78,7 @@ on:
       - "Tests/**"
       - "Examples~/**"
       - "package.json"
+      - "tools~/device-smoke/**"
       - ".github/workflows/unity-ci.yml"
   pull_request:
     paths:
@@ -74,6 +88,7 @@ on:
       - "Tests/**"
       - "Examples~/**"
       - "package.json"
+      - "tools~/device-smoke/**"
       - ".github/workflows/unity-ci.yml"
 
 permissions:
@@ -303,7 +318,7 @@ jobs:
   android-build:
     name: android build (${{ matrix.testbed.name }})
     needs: license
-    if: ${{ needs.license.outputs.available == 'true' && (github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') }}
+    if: needs.license.outputs.available == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 90
     strategy:
@@ -537,9 +552,9 @@ jobs:
   # release build", which is the user-visible claim.
   #
   # One line only (2022.3 — the line whose Android bake was proven on a real
-  # APK) and manual/cron only: this is an IL2CPP export plus a full Gradle
-  # release build, and it answers a question about AGP, not about a Unity
-  # version. Every step fails LOUDLY and prints what it could not parse
+  # APK): this is an IL2CPP export plus a full Gradle release build, and it
+  # answers a question about AGP, not about a Unity version, so running it per
+  # line would buy nothing. Every step fails LOUDLY and prints what it could not parse
   # instead of skipping. The job's first run (2026-08-21) validated its own
   # design the hard way, exactly where the header had warned: export, chown,
   # probe-planting and the minify flip all worked, and the build then died
@@ -551,7 +566,7 @@ jobs:
   android-shrink-verify:
     name: android shrink verify (2022.3)
     needs: license
-    if: ${{ needs.license.outputs.available == 'true' && (github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') }}
+    if: needs.license.outputs.available == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
@@ -1231,7 +1246,7 @@ jobs:
   ios-export:
     name: ios export (${{ matrix.testbed.name }})
     needs: license
-    if: ${{ needs.license.outputs.available == 'true' && (github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') }}
+    if: needs.license.outputs.available == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 90
     strategy:

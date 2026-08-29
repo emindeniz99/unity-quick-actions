@@ -13,6 +13,21 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- **Every CI leg now runs on every code push and PR, not just the light ones.**
+  The build-heavy legs — Android IL2CPP, the emulator smoke, the iOS export and
+  its macOS compile, the shrink experiment — were gated to manual dispatch and
+  the weekly cron on a "split by cost" rationale that measurement disproved:
+  the full matrix is 17 jobs in **13.4 minutes of wall clock**, and GitHub
+  billed **0 ms** for all of it, macOS included, because runner minutes on a
+  public repo are free. What the gate actually bought was a manual step between
+  writing a change and learning whether it works — which is how a test that
+  passes headlessly and fails in a real Editor reached main. Docs-only changes
+  still trigger nothing (paths filter), the weekly cron stays for drift with no
+  commit behind it, and `tools~/device-smoke/**` joins the paths list so
+  editing the smoke script actually runs the smoke.
+
 ### Fixed
 
 - **The 0.4.8 CI additions were themselves red on their first real run, in two

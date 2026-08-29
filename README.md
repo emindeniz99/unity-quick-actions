@@ -784,9 +784,9 @@ spoof a tap; on either platform the id is just a string the OS hands you. So:
 ## Limitations / roadmap
 
 See [`ROADMAP.md`](./ROADMAP.md). Notable remaining: always-on device CI (the
-shipped adb smoke + emulator workflow run on manual dispatch and a weekly cron
-only, and cover Android alone — warm *and* cold taps, the cold half not yet
-run on a device; iOS has no adb analog) and on-device
+the shipped adb smoke runs on every code push and PR but covers Android
+alone — warm *and* cold taps, neither yet run on physical hardware; iOS has no
+adb analog) and on-device
 validation of the newest native paths (UIScene hooks — including the
 subclass-shadowed fallback — and the Android localized static output). OS read-back can't recover icons natively; the package persists icon
 identity in its ownership-marker payload — Android extras, iOS `userInfo` — so
@@ -823,8 +823,11 @@ project, with no version pin for anyone to forget to bump — while the
 build-heavy legs — a development Android APK per line fed into the adb device
 smoke, and an iOS Simulator-SDK Xcode export per line, compiled unsigned and
 cold-launched on a macOS-runner simulator for 2022.3 and Unity 6 (2021.3
-exports only: its simulator support is x86_64-only) — run on manual dispatch
-and a weekly cron. Each Android APK is also read back with `aapt2`, which must
+exports only: its simulator support is x86_64-only) — run on the same events.
+The whole matrix is ~13 minutes of wall clock and free on a public repo, so
+nothing is held back for a manual step; a weekly cron still runs it to catch
+drift with no commit behind it. Each Android APK is also read back with
+`aapt2`, which must
 find the baked static shortcuts, the resource-shrinker keep file and the
 trampoline `<activity>` inside it, and a further 2022.3-only job
 (`android-shrink-verify`) exports the Gradle project and assembles a minified
