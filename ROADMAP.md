@@ -57,23 +57,20 @@ Delete an entry in the same commit that ships it.
   (a) a `.androidlib` under `Assets/` lands its `src/main/res/drawable-*/`
   entries in the APK resource table (`aapt2 dump resources <apk> | grep -i
   quickaction`); (b) `res/` at the `.androidlib` root is silently dropped, as
-  the docs imply; (c) on a minified release build, a catalog-named drawable
-  survives with real bytes (compare sizes / `aapt2 dump`) with the shipped
-  `res/raw/quickactions_keep.xml` in place, and a custom-named runtime-only
-  drawable demonstrates the documented failure without a user keep rule;
-  (d) a `.androidlib` shipped *inside a UPM package* is picked up —
-  Unity's notifications package does this, but it is undocumented behaviour.
+  the docs imply; (d) a `.androidlib` shipped *inside a UPM package* is picked
+  up — Unity's notifications package does this, but it is undocumented
+  behaviour.
 
-  Item **(c)** now has a dedicated CI job — `android-shrink-verify` in
-  [`unity-ci.yml`](./.github/workflows/unity-ci.yml) exports the 2022.3 Gradle
-  project, plants a keep-globbed drawable and an unreferenced control, forces
-  `minifyEnabled` + `shrinkResources` on the exported release build and compares
-  the sizes that come out. Its first run (2026-08-21) got through export,
-  probe-planting and the minify flip, then died on the toolchain — the export
-  ships no gradlew and the runner's Gradle 9 cannot load AGP 7.1.2 — so the
-  job now pins Unity 2022.3's own combo (JDK 11, Gradle 7.2, NDK r23b). The
-  probe/control verdict is still unanswered: (c) is automated, not answered.
-  (a), (b) and (d) still need a hand-run editor.
+  The old item (c) — does the resource shrinker honour the shipped
+  `res/raw/quickactions_keep.xml` — is **answered, and stays answered**: the
+  `android-shrink-verify` job in
+  [`unity-ci.yml`](./.github/workflows/unity-ci.yml) re-runs the experiment on
+  every code push. On 2026-08-29 it reported, on a real minified release
+  resource pipeline (AGP, `minifyEnabled` + `shrinkResources`, Unity 2022.3
+  export): the keep-globbed probe `ic_quickaction_probe` went in at 990 bytes
+  and came out at 990, while the unreferenced control `zz_shrink_control` went
+  from 990 to AGP's 67-byte dummy. The control proves the shrinker ran; the
+  probe proves the keep rule held. (a), (b) and (d) still need a hand-run editor.
 
 - **`.androidlib` does not survive `.unitypackage` export/import** (reported
   against 2022.3.15, re-confirmed 2024, unfixed). This is why the built-in icons

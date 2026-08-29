@@ -13,6 +13,26 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Verified
+
+- **The resource shrinker honours the icon keep rule — measured, not assumed.**
+  0.4.7 shipped `res/raw/quickactions_keep.xml` so that drawables reached only
+  through `getIdentifier("ic_quickaction_" + name)` survive `shrinkResources`,
+  and every doc since has said the shrinker's side of that was unconfirmed.
+  It is now confirmed. On 2026-08-29 the `android-shrink-verify` job completed
+  for the first time, against a Unity 2022.3 export with `minifyEnabled` and
+  `shrinkResources` on:
+
+  | planted drawable | before | after | meaning |
+  | --- | --- | --- | --- |
+  | `ic_quickaction_probe` (matches the keep glob) | 990 B | **990 B** | untouched — the keep rule held |
+  | `zz_shrink_control` (matches nothing) | 990 B | **67 B** | replaced by AGP's dummy — the shrinker ran |
+
+  Both halves are required: without the control shrinking, an intact probe
+  would only mean the shrinker never ran. The job re-runs on every code push,
+  so this is a standing check rather than a one-off observation. ROADMAP
+  verification item (c) is retired.
+
 ### Changed
 
 - **Every CI leg now runs on every code push and PR, not just the light ones.**

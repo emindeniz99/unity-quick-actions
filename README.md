@@ -758,10 +758,15 @@ retain it. Either:
 `AndroidBitmapFile` is unaffected — it is a path to a file on disk, not a
 resource, so the shrinker never sees it.
 
-*Honesty note:* the keep file's **emission** is covered by headless tests (it is
-written, well-formed, namespaced, idempotent, and survives the static-shortcut
-cleanup). That a real shrinker **honors** it has not yet been confirmed on a real
-minified Gradle build.
+The keep file's **emission** is covered by headless tests (it is written,
+well-formed, namespaced, idempotent, and survives the static-shortcut cleanup),
+and that a real shrinker **honors** it is no longer an assumption: CI's
+`android-shrink-verify` job runs the AGP resource shrinker on a Unity 2022.3
+export with `minifyEnabled` + `shrinkResources` and two planted drawables. On
+2026-08-29 the keep-globbed probe came out byte-identical (990 → 990 bytes)
+while the unreferenced control was replaced by AGP's 67-byte dummy — the
+control proving the shrinker ran, the probe proving the rule held. It re-runs
+on every code push.
 
 ## Security: a shortcut tap is not an authenticated action
 
@@ -833,10 +838,11 @@ and nothing else. Each Android APK is also read back with
 `aapt2`, which must
 find the baked static shortcuts, the resource-shrinker keep file and the
 trampoline `<activity>` inside it, and a further 2022.3-only job
-(`android-shrink-verify`) exports the Gradle project and assembles a minified
-release build to test whether the shrinker honours that keep file — the `aapt2`
-read-back has been green on all three lines in every heavy run that carried it;
-the shrink job's own verdict is still pending (below).
+(`android-shrink-verify`) exports the Gradle project and runs the AGP resource
+shrinker over it to test whether that keep file is honoured — the `aapt2`
+read-back has been green on all three lines in every heavy run that carried it,
+and the shrink job returned its first verdict on 2026-08-29: keep rule held,
+control shrunk (below).
 It needs the repo secrets `UNITY_LICENSE` (a Unity Hub
 personal-licence `.ulf`'s contents), `UNITY_EMAIL` and `UNITY_PASSWORD` (Pro:
 `UNITY_SERIAL` instead of the `.ulf`); without them every Unity job skips and
