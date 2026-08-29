@@ -949,27 +949,52 @@ jobs:
           "$SDKM" --install 'ndk;23.1.7779620' > /dev/null
           echo "NDK_FOR_EXPORT=$SDK/ndk/23.1.7779620" >> "$GITHUB_ENV"
       # The export hardcodes paths from inside the builder's docker image: an
-      # android.aapt2FromMavenOverride into /opt/unity (dead here; with the
-      # override gone AGP fetches aapt2 from Maven) and an ndkPath for the
+      # android.aapt2FromMavenOverride into /opt/unity and an ndkPath for the
       # IL2CPP build. Both are re-pointed at this runner's copies, loudly.
+      #
+      # The override must be RE-POINTED, not merely dropped. Dropping it makes
+      # AGP resolve its own aapt2 from Maven, and that AGP 7-era binary cannot
+      # read the SDK 36 android.jar this export compiles against — run 32 died
+      # in 34 seconds with "RES_TABLE_TYPE_TYPE entry offsets overlap actual
+      # entry data" / "failed to load include path .../android-36/android.jar".
+      # Unity does not hit it inside its container because the override it
+      # writes points at an aapt2 new enough; the runner's newest build-tools
+      # copy is the equivalent, and is the same binary the android-build job's
+      # assertion already reads SDK-36 APKs with.
       - name: Point the export at this runner's toolchain
         run: |
           set -euo pipefail
           cd "$EXPORT"
+          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+          AAPT2_FOR_EXPORT="$(find "$SDK/build-tools" -maxdepth 2 -name aapt2 -type f 2>/dev/null | sort -V | tail -1 || true)"
+          if [ -z "$AAPT2_FOR_EXPORT" ]; then
+            echo "no aapt2 under '${SDK:-<ANDROID_HOME and ANDROID_SDK_ROOT both unset>}'/build-tools/*/ —"
+            echo "AGP would fall back to its own Maven copy, which cannot read this export's compileSdk."
+            exit 1
+          fi
+          export AAPT2_FOR_EXPORT
           python3 - <<'PY'
           import os
           import pathlib
           import re
 
           gp = pathlib.Path("gradle.properties")
+          kept = []
           if gp.exists():
-              kept = []
               for line in gp.read_text().splitlines():
                   if "/opt/unity" in line:
                       print("stripped from gradle.properties:", line)
                   else:
                       kept.append(line)
-              gp.write_text("\n".join(kept) + "\n")
+          # Re-point rather than leave unset — see the note above this step.
+          # Written unconditionally, including when the export shipped no
+          # gradle.properties at all, so the aapt2 AGP uses is never whichever
+          # one Maven happens to hand it.
+          aapt2 = os.environ["AAPT2_FOR_EXPORT"]
+          kept = [l for l in kept if not l.startswith("android.aapt2FromMavenOverride")]
+          kept.append("android.aapt2FromMavenOverride=" + aapt2)
+          gp.write_text("\n".join(kept) + "\n")
+          print("aapt2FromMavenOverride ->", aapt2)
 
           ndk = os.environ["NDK_FOR_EXPORT"]
           repointed = []

@@ -63,6 +63,14 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   path. The Gradle step also gains a 30-minute ceiling, so a runaway build
   fails by name instead of reporting `cancelled` with no failing step.
 
+  With the build failing in 34 seconds instead of 120 minutes, the next cause
+  was legible: AGP's own error-rewriter had been NPE-ing while formatting the
+  message, hiding an aapt2 link failure. The step stripped the export's
+  `android.aapt2FromMavenOverride` as one more dead `/opt/unity` path, which
+  left AGP resolving its own AGP-7-era aapt2 from Maven — and that binary
+  cannot read the SDK 36 `android.jar` the export compiles against. It is now
+  re-pointed at the runner's newest build-tools aapt2 rather than dropped.
+
 ### Fixed
 
 - **The 0.4.8 CI additions were themselves red on their first real run, in two
