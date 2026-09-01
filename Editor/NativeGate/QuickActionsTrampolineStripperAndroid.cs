@@ -11,10 +11,11 @@
 // complement of the gated injector, so the two always agree. The gate itself is
 // never decided by a runtime PlayerSettings read; a runtime read exists only as a
 // stale-assembly COHERENCE check that fails the build loudly instead of choosing
-// a side. It only depends on UNITY_ANDROID. Note: the trampoline
-// .java still compiles into the APK as a dead, unreachable class (~1-2 KB) —
-// Unity cannot conditionally exclude a loose native source from compilation. For
-// a literally-zero production footprint, keep the package out of the prod project
+// a side. It only depends on UNITY_ANDROID. Note: both plugin .java files (this
+// trampoline and the bridge, ~20 KB of bytecode together) still compile into the
+// APK as dead, unreachable classes unless R8 minification removes them — Unity
+// cannot conditionally exclude a loose native source from compilation. For a
+// literally-zero production footprint, keep the package out of the prod project
 // entirely (see README "Dev-only").
 using System.IO;
 using System.Linq;

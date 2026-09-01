@@ -32,6 +32,30 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `BuildAndroidPhoneNoDefine` / `BuildiOSSimulatorNoDefine`, and its
   `DisableDefine` / `EnableDefine` now flip both mobile targets.
 
+### Fixed
+
+- **A hostile local app can no longer crash the game through the trampoline.**
+  `QuickActionsTrampolineActivity` is exported (the launcher has to start it),
+  so any app can start it with arbitrary extras — and reading the action id
+  unparcels the whole bundle, so a `Parcelable` this app cannot load threw
+  `BadParcelableException` out of `onCreate`: a process crash attributed to the
+  game. The read is now contained — a bundle that cannot be read is logged and
+  treated as no tap — and the launch-intent lookup sits inside the existing
+  catch too. A new Java smoke scenario drives the hostile bundle (111 checks).
+- **A failed native read is never mistaken for an empty shortcut set.**
+  `QuickActionList.Parse` returns `null` for a payload the real `JsonUtility`
+  rejects; it used to return an empty list, which the facade treats as
+  authoritative and prunes against, so a serializer failure would have removed
+  the user's real shortcuts on the next write. The Android bridge's
+  `SetShortcuts` propagates that null as a failed write, and the iOS
+  `QABuildShortcutsJson` returns `NULL` instead of `{"items":[]}` when
+  `NSJSONSerialization` fails. A Unity-only test pins the `Parse` contract
+  (the Test Runner suite is 77).
+- **`IsPlatformSupported` no longer throws out of the facade on Android.** The
+  `Build.VERSION` JNI read is guarded like every other JNI path in the bridge;
+  a failed read answers "unsupported", so `Add()` / `GetAll()` take their
+  documented no-op instead of surfacing an `AndroidJavaException`.
+
 ## [0.5.0] - 2026-09-01
 
 ### Added

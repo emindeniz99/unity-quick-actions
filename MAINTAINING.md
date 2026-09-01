@@ -75,7 +75,10 @@ package makes deliberately, not one to hand to a parser.
 ## OpenUPM
 
 OpenUPM distribution is a one-time submission, after which every new tag
-publishes automatically. The full procedure — the YAML entry, the empty
+publishes automatically. **The submission is done**: versions 0.4.0 through
+0.4.9 are listed on OpenUPM (checked 2026-09-01), so a new tag needs nothing
+beyond the tag itself — which is also why the tag / `package.json` coherence
+check above matters. The full procedure — the YAML entry, the empty
 `gitTagPrefix` requirement, and the "at least one release before submitting"
 rule — is in [`docs~/publishing-to-openupm.md`](./docs~/publishing-to-openupm.md).
 

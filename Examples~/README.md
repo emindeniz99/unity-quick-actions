@@ -62,8 +62,9 @@ unity test . --mode EditMode --output test-results.xml
 
 Uses [Unity's CLI](https://docs.unity.com/en-us/unity-cli/unity-cli-reference)
 (experimental, and its published docs lag the binary — `unity --help` is the
-authoritative command list). The full suite is 74 tests, and it has been run
-green on all three lines.
+authoritative command list). The full suite is 77 tests in the Test Runner; the
+last CI-measured run was 76/76 (run 38, 2026-09-01), and the 74-test suite of
+its day was run green by hand on all three lines.
 
 ## Build from the command line
 

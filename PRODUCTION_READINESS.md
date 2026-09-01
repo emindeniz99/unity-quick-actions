@@ -57,7 +57,7 @@ says "6.3" for work dated later than 2026-07-17, the Editor was `6000.3.21f1`.
 |---|---|---|---|
 | `QuickActionItem` ctor / `IsValid` / equality-by-id | unit + review | `Constructor_SetsFields`, `IsValid_RequiresIdAndTitle`, `Equality_IsByIdOnly` | ✅ |
 | `IconType` pinned 0..29 (native contract) | unit + review | `IconType_EveryValueIsPinned`, `IconType_NoneIsZero…` | ✅ |
-| JSON contract `{"items":[{"Id"…}]}` (exact keys, Icon as int) | unity-test + review + **editor-2022.3 + editor-6.x** | `SerializationTests` (5 tests) — **executed for real on 2022.3, 6.0 and 6.3** (the whole suite was 35/35 at the time; see Sign-off for today's counts) | ✅ |
+| JSON contract `{"items":[{"Id"…}]}` (exact keys, Icon as int) | unity-test + review + **editor-2022.3 + editor-6.x** | `SerializationTests` (6 tests) — **executed for real on 2022.3, 6.0 and 6.3** (the whole suite was 35/35 at the time; see Sign-off for today's counts) | ✅ |
 
 ## 3. Bridges / native (compiled; behavior is device-only, except the iOS path now proven on the Simulator)
 
@@ -88,35 +88,38 @@ says "6.3" for work dated later than 2026-07-17, the Editor was `6000.3.21f1`.
 |---|---|---|
 | Managed: gated asmdefs, define-OFF compiles to nothing | static + review + **editor-2022.3 + editor-6.x REAL BUILDS** | ✅ **build-proven 2026-07-17 on 2022.3, 6.0 and 6.3**: define ON → `EminDeniz99.QuickActions.dll` in the built Standalone player; define OFF → zero package trace in the entire build output (`grep -ri quickactions` = 0 hits) |
 | iOS: `.mm` `#if`-wrapped + macro injector (gated) + ungated cleanup (macro + plist strip when OFF) | static + review + **CI define-off export** | ✅ **CI** — the `gate-off` job in `unity-ci.yml` exports the 2022.3 testbed for the iOS Simulator with the define OFF on every code push and requires the `.pbxproj` to carry no `QUICKACTIONS_ENABLED` and Info.plist no marked `UIApplicationShortcutItems`, with the define-ON export from the same run as the positive control (the check fails itself if the control does not fire). Not covered: an *Append* build over a stale project (the cleanup path) — hand-run only. |
-| Android: trampoline `<activity>` absent when OFF (never injected + stripper defense-in-depth) | review + **CI define-off APK** + earlier hand-run builds | ✅ **CI** — the same `gate-off` job builds a define-OFF IL2CPP APK in `android-build`'s exact configuration and requires: no trampoline `<activity>` and no `android.app.shortcuts` in the manifest, no `quickactions_*` / `qa_*` / `ic_quickaction_builtin_*` resources, no `EminDeniz99.QuickActions` in the IL2CPP metadata (the define-ON APK is the positive control) — then diffs the two APKs byte for byte, which is the package's **measured footprint**, printed in the job summary and capped at 1 MiB. Hand-proven before CI: real prod Gradle build (define OFF) on 2022.3, re-proven on 2021.3.45f2 and 6000.3.21f1 (2026-07-17). The dead trampoline `.java` remains as ~4 unreachable strings in `classes.dex` (documented). |
+| Android: trampoline `<activity>` absent when OFF (never injected + stripper defense-in-depth) | review + **CI define-off APK** + earlier hand-run builds | ✅ **CI** — the same `gate-off` job builds a define-OFF IL2CPP APK in `android-build`'s exact configuration and requires: no trampoline `<activity>` and no `android.app.shortcuts` in the manifest, no `quickactions_*` / `qa_*` / `ic_quickaction_builtin_*` resources, no `EminDeniz99.QuickActions` in the IL2CPP metadata (the define-ON APK is the positive control) — then diffs the two APKs byte for byte, which is the package's **measured footprint**, printed in the job summary and capped at 1 MiB. Hand-proven before CI: real prod Gradle build (define OFF) on 2022.3, re-proven on 2021.3.45f2 and 6000.3.21f1 (2026-07-17). The two plugin `.java` classes (trampoline + bridge, ~20 KB of bytecode) remain in `classes.dex` as dead code unless R8 minifies them — the footprint diff reports the exact number (documented). |
+| Release-configuration player: Managed Stripping Level **High** + R8 `minifyEnabled` | — | ⏳ **not run.** Every CI player build uses the testbed's default stripping level and no R8. The package ships no `link.xml`: its only reflection-reached types are the `[Serializable]` JSON DTOs (`QuickActionList` / `QuickActionItem`), which `JsonUtility` reads without reflection-based stripping risk, and the Java bridge is reached through explicit `AndroidJavaObject` calls, not a proxy — so nothing *should* need preserving. That is reasoning, not a build; a stripping-High + R8 APK that still registers and receives a shortcut is the missing proof. |
 
 ## Sign-off
 
 - **Headless gate (closable without a Unity Editor): GREEN.** `tools~/verify.sh` → **VERIFY: PASS** —
-  10 C# configs compile with **0 warnings**, **98 unit tests pass** (`dotnet test`),
-  the Android plugin compiles and its Java smoke test passes **108 checks, 0
+  10 C# configs compile with **0 warnings**, **112 unit tests pass** (`dotnet test`),
+  the Android plugin compiles and its Java smoke test passes **111 checks, 0
   failed**, and every asset has a stable `.meta`. Every managed feature has a
   dedicated, intent-encoding test. Reviewed feature by feature across repeated
   adversarial rounds; every confirmed finding was fixed or explicitly
   documented, and **no ship-blocker remains open**.
-- **Test inventory (where each number comes from).** 103 distinct C# tests:
-  - **69 shared** — `Tests/Editor/QuickActionsApiTests.cs` (63) and
+- **Test inventory (where each number comes from).** 118 distinct C# tests:
+  - **71 shared** — `Tests/Editor/QuickActionsApiTests.cs` (65) and
     `QuickActionItemTests.cs` (6). Run by BOTH `dotnet test` and the Unity Test
     Runner.
-  - **5 Unity-only** — `Tests/Editor/SerializationTests.cs`. Needs real
+  - **6 Unity-only** — `Tests/Editor/SerializationTests.cs`. Needs real
     `JsonUtility`, so the headless harness excludes it (see the `Compile Include`
     list in `.verify/QuickActions.Tests.csproj`).
-  - **29 headless-only** — `.verify/EditorTests/AndroidStaticLocalizationTests.cs`
-    (4), `AndroidKeepRulesTests.cs` (8) and `StaticBuildPlaceholdersTests.cs`
-    (17). Live in the harness because
+  - **41 headless-only** — `.verify/EditorTests/AndroidStaticLocalizationTests.cs`
+    (4), `AndroidKeepRulesTests.cs` (8), `AndroidBuiltInIconsTests.cs` (12) and
+    `StaticBuildPlaceholdersTests.cs` (17). Live in the harness because
     the code under test sits in Editor assemblies a Unity test assembly cannot
     reference (the Android post-processor's asmdef is `defineConstraints`-gated
     to `UNITY_ANDROID`; the runtime-referencing test asmdef can't see the Editor
     assembly the placeholder pipeline lives in).
 
-  So `dotnet test` reports **98** (69 + 29) and a Unity Test Runner run reports
-  **74** (69 + 5) — and **74/74 is the measured result** on 2021.3.45f2,
-  2022.3.62f3 and 6000.3.21f1. The `35/35` real-editor runs cited below predate
+  So `dotnet test` reports **112** (71 + 41) and a Unity Test Runner run reports
+  **77** (71 + 6). The measured Test Runner results: **74/74** on 2021.3.45f2,
+  2022.3.62f3 and 6000.3.21f1 at the suite size of that day, and **76/76** on
+  the 2026-09-01 CI run (run 38), taken before the sixth serialization test
+  landed — 77 is not yet a measured number. The `35/35` real-editor runs cited below predate
   every test added from 2026-07-17 onward (cap-reconcile, failed-read/failed-write
   contracts, empty-accepted, and the later waves), so wherever `35/35` appears it
   is a historical measurement, not the current count. The only line not re-run
@@ -148,7 +151,7 @@ says "6.3" for work dated later than 2026-07-17, the Editor was `6000.3.21f1`.
   proven in **real Standalone builds** (define ON → `EminDeniz99.QuickActions.dll`
   present; OFF → zero `quickactions` trace in the whole build tree). This
   confirms no Unity-6 API deprecation breaks the package. (**35/35** is the
-  historical suite size at that date; the suite is 74 in the Test Runner now.)
+  historical suite size at that date; the suite is 77 in the Test Runner now.)
   The 6.x **Android** Gradle pass (GameActivity era) **has since been run**, on
   `6000.3.21f1`: the player builds with the trampoline `<activity>` injected on
   the `UnityPlayerGameActivity` path, and the define-off build carries no trace

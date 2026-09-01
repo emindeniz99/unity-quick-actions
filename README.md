@@ -91,10 +91,11 @@ covered by headless tests only — no device or Simulator run has happened since
 they landed, so what a resolved `v1.4.0 (37)` looks like on a real home screen
 is still unconfirmed.
 
-**Also true:** the suite is 98 headless tests (`dotnet test`) and 74 in Unity's
-Test Runner (it adds 5 `JsonUtility` serialization tests; 29 of the headless ones
-don't run there), plus an Android Java smoke of 108 checks, across 10 C# compile
-configurations with 0 warnings.
+**Also true:** the suite is 112 headless tests (`dotnet test`) and 77 in Unity's
+Test Runner (it adds 6 `JsonUtility` serialization tests; 41 of the headless ones
+don't run there), plus an Android Java smoke of 111 checks, across 10 C# compile
+configurations with 0 warnings. The last CI-measured Test Runner result was
+76/76 (run 38, 2026-09-01), taken before the sixth serialization test landed.
 The iOS `.mm` compiles cleanly against the current iOS SDK
 (ARC, arm64, deployment target iOS 13) with no deprecation or availability
 errors — a compile result, separate from the Simulator run above.
@@ -245,9 +246,11 @@ Constraints only work for managed code, **not** native plugins):
   nothing is injected, and an *ungated* post-processor
   (`Editor/NativeGate/QuickActionsTrampolineStripperAndroid`) additionally
   strips any pre-existing entry (defense in depth), so the trampoline can't be
-  launched (the package is **inert**). One caveat: the trampoline `.java` still
-  compiles into the APK as a small dead, unreachable class — Unity can't
-  conditionally exclude a loose native source. For a *literally*-zero Android
+  launched (the package is **inert**). One caveat: the two plugin `.java` files
+  (the trampoline and the bridge, ~20 KB of bytecode together) still compile
+  into the APK as dead, unreachable classes unless R8 minification removes
+  them — Unity can't conditionally exclude a loose native source. The `gate-off`
+  CI job's APK diff reports exactly what remains. For a *literally*-zero Android
   footprint, keep the package out of the prod project (see below). All these
   post-processors edit the **build output**, so they work for read-only UPM
   packages.
@@ -846,11 +849,11 @@ tools~/setup.sh     # install dotnet + JDK (once)
 tools~/verify.sh    # .meta + C# compile (10 configs) + unit tests + Android plugin + frozen strings + release coherence
 ```
 
-`verify.sh` compiles the C# in **10 configurations** (0 warnings), runs the **98**
+`verify.sh` compiles the C# in **10 configurations** (0 warnings), runs the **112**
 headless unit tests via `dotnet test`, and compiles and smoke-tests the Android
-Java plugin (**108** checks). Those tests (bar 29 headless-only ones) plus 5
+Java plugin (**111** checks). Those tests (bar 41 headless-only ones) plus 6
 `JsonUtility` serialization tests run in Unity's **Test Runner** from
-`Tests/Editor/` — **74** there. See [`.verify/README.md`](./.verify/README.md)
+`Tests/Editor/` — **77** there. See [`.verify/README.md`](./.verify/README.md)
 for how the stubs work.
 
 Beyond the stubs, [`unity-ci.yml`](./.github/workflows/unity-ci.yml) runs the
