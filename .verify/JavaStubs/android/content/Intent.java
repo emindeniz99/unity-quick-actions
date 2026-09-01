@@ -6,11 +6,14 @@ public class Intent {
   public static final int FLAG_ACTIVITY_NEW_TASK=2;
   // Field-backed so the .verify smoke test can drive the trampoline.
   private String action; private final HashMap<String,String> extras = new HashMap<>();
+  // Smoke-test hook: when set, getStringExtra throws it — the shape of a Bundle
+  // whose unparcel fails (a Parcelable class this app does not have).
+  public static RuntimeException failGetStringExtra;
   public Intent(){}
   public Intent(Context c, Class<?> cls){}
   public Intent setAction(String a){action=a; return this;}
   public Intent putExtra(String k,String v){extras.put(k,v); return this;}
-  public String getStringExtra(String k){return extras.get(k);}
+  public String getStringExtra(String k){ if (failGetStringExtra != null) throw failGetStringExtra; return extras.get(k);}
   public String getAction(){return action;}
   public Intent addFlags(int f){return this;}
 }

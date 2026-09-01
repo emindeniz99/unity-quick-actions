@@ -42,6 +42,7 @@ public final class QuickActionsBridgeSmokeTest {
         removedPinnedCopiesAreDisabledAndReAddReEnables();
         iconIdentityRoundTripsThroughExtras();
         trampolineAcceptsOursManifestAndPinnedOnly();
+        trampolineSurvivesAHostileExtrasBundle();
         bitmapIconIsChosenAndFallsBackWhenUndecodable();
         builtInIconYieldsToTheProjectsOwn();
         payloadRoundTripsThroughExtrasAndIntent();
@@ -293,6 +294,35 @@ public final class QuickActionsBridgeSmokeTest {
         check(QuickActionsBridge.consumePendingPerformed() == null, "an unknown id is rejected");
 
         QuickActionsBridge.resetLastPerformed();
+    }
+
+    private static void trampolineSurvivesAHostileExtrasBundle() throws Exception {
+        // The trampoline is exported with no permission, so any app can start it
+        // with any extras; reading them unparcels the sender's Bundle, which throws
+        // for a Parcelable this app does not have. That throw used to escape
+        // onCreate — a crash of the game's process from a hostile local app. It
+        // must be contained: no tap recorded, no exception, next tap unaffected.
+        ShortcutManager mgr = new ShortcutManager();
+        mgr.dynamic.add(ours("a", 0));
+        QuickActionsTrampolineActivity t = new QuickActionsTrampolineActivity();
+        t.testSystemService = mgr;
+        java.lang.reflect.Method handle = QuickActionsTrampolineActivity.class.getDeclaredMethod("handleIntent", Intent.class);
+        handle.setAccessible(true);
+        Intent.failGetStringExtra = new RuntimeException("BadParcelableException stand-in");
+        try {
+            boolean threw = false;
+            try {
+                handle.invoke(t, new Intent().putExtra(QuickActionsBridge.EXTRA_ACTION_ID, "a"));
+            } catch (java.lang.reflect.InvocationTargetException e) {
+                threw = true;
+            }
+            check(!threw, "a bundle whose extras cannot be read does not throw out of handleIntent");
+            check(QuickActionsBridge.consumePendingPerformed() == null, "…and records no tap");
+        } finally {
+            Intent.failGetStringExtra = null;
+        }
+        handle.invoke(t, new Intent().putExtra(QuickActionsBridge.EXTRA_ACTION_ID, "a"));
+        check("a".equals(QuickActionsBridge.consumePendingPerformed()), "a well-formed tap right after is still recorded");
     }
 
     private static void bitmapIconIsChosenAndFallsBackWhenUndecodable() throws Exception {

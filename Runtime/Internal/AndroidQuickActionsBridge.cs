@@ -27,13 +27,25 @@ namespace EminDeniz99.QuickActions.Internal
                 return player.GetStatic<AndroidJavaObject>("currentActivity");
         }
 
-        // ShortcutManager is API 25 (Android 7.1)+.
+        // ShortcutManager is API 25 (Android 7.1)+. Guarded like every other JNI
+        // path here: this property is evaluated AHEAD of the try blocks in the
+        // members below, so a throw from it would be the one JNI exception that
+        // could escape into the caller's Add()/GetAll(). "Unsupported" is the safe
+        // answer to a failed read — every member then takes its documented no-op.
         public bool IsPlatformSupported
         {
             get
             {
-                using (var version = new AndroidJavaClass("android.os.Build$VERSION"))
-                    return version.GetStatic<int>("SDK_INT") >= 25;
+                try
+                {
+                    using (var version = new AndroidJavaClass("android.os.Build$VERSION"))
+                        return version.GetStatic<int>("SDK_INT") >= 25;
+                }
+                catch (AndroidJavaException e)
+                {
+                    Debug.LogWarning("[QuickActions] IsPlatformSupported failed: " + e.Message);
+                    return false;
+                }
             }
         }
 
@@ -139,8 +151,12 @@ namespace EminDeniz99.QuickActions.Internal
             // just-added item by misreading a stale device state).
             if (string.IsNullOrEmpty(applied)) return null;
 
+            // A payload the parser cannot read is a failed write report, not an
+            // empty one — return null for the same re-sync as a failed call.
+            var appliedItems = QuickActionList.Parse(applied);
+            if (appliedItems == null) return null;
             var appliedIds = new HashSet<string>();
-            foreach (var s in QuickActionList.Parse(applied))
+            foreach (var s in appliedItems)
                 if (s != null) appliedIds.Add(s.Id);
 
             // Return the subset of the *input* (caller's own objects, icons intact), in

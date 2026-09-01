@@ -107,6 +107,22 @@ namespace EminDeniz99.QuickActions.Tests
         }
 
         [Test]
+        public void Parse_ReturnsNull_ForAMalformedPayload_NeverAnEmptyList()
+        {
+            // WHY: the facade treats null as "read failed, retry later" and an empty
+            // list as authoritative — and it prunes against an authoritative set. A
+            // native serializer hiccup that came back as [] would therefore wipe the
+            // user's real shortcuts on the next write. Real JsonUtility throws on this
+            // input (the headless stub returns default, so only this runner sees it).
+            Assert.IsNull(QuickActionList.Parse("{\"items\":[{\"Id\":"));
+            Assert.IsNull(QuickActionList.Parse("not json at all"));
+
+            // ...while the natives' "nothing" stays an authoritative empty set.
+            Assert.IsEmpty(QuickActionList.Parse(""));
+            Assert.IsEmpty(QuickActionList.Parse("{\"items\":[]}"));
+        }
+
+        [Test]
         public void RoundTrip_PreservesFields()
         {
             var original = new QuickActionList(new[]
