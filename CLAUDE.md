@@ -12,7 +12,12 @@ tools~/verify.sh        # must end with: VERIFY: PASS
 ```
 
 It checks `.meta` completeness, compiles the C# in 10 configs against Unity
-stubs, runs the NUnit suite, and compiles + smoke-tests the Android Java plugin.
+stubs, runs the NUnit suite, compiles + smoke-tests the Android Java plugin, and
+runs three more checks: the frozen device strings
+(`tools~/check_frozen_strings.py`), `package.json` / top `CHANGELOG.md` heading /
+install-pin coherence (`tools~/release_notes.py`), and the generated Android icon
+bytes (`tools~/gen_builtin_icons.py --check` — regenerate, never hand-edit
+`Editor/Android/QuickActionsBuiltInIcons.cs`).
 `tools~/setup.sh` installs the toolchain once. Never report a change as done on a
 red or unrun verify; say what failed.
 

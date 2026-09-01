@@ -52,7 +52,7 @@ hardware; iOS 13+ opens it with a plain long-press on every device.
 
 ## Status
 
-This is **0.4.8**, a pre-1.0 release. Here is exactly what has been proven and
+This is **0.4.9**, a pre-1.0 release. Here is exactly what has been proven and
 what has not — one place, no hedging. (Per-feature detail:
 [PRODUCTION_READINESS.md](./PRODUCTION_READINESS.md).)
 
@@ -808,8 +808,7 @@ spoof a tap; on either platform the id is just a string the OS hands you. So:
 ## Limitations / roadmap
 
 See [`ROADMAP.md`](./ROADMAP.md). Notable remaining: always-on device CI (the
-the shipped adb smoke runs on every code push and PR but covers Android
-alone — warm *and* cold taps, neither yet run on physical hardware; iOS has no
+shipped adb smoke runs on every code push and PR but covers Android alone — warm *and* cold taps, neither yet run on physical hardware; iOS has no
 adb analog) and on-device
 validation of the newest native paths (UIScene hooks — including the
 subclass-shadowed fallback — and the Android localized static output). OS read-back can't recover icons natively; the package persists icon
@@ -837,9 +836,9 @@ Java plugin (**103** checks). Those tests (bar 29 headless-only ones) plus 5
 for how the stubs work.
 
 Beyond the stubs, [`unity-ci.yml`](./.github/workflows/unity-ci.yml) runs the
-**real editors** via [GameCI](https://game.ci). It is split by cost: the
-EditMode suite runs on all three [`Examples~`](./Examples~) testbeds for every
-push and PR that touches code (docs-only changes trigger nothing), plus a
+**real editors** via [GameCI](https://game.ci). Every leg runs on every code
+push and PR that touches code (docs-only changes trigger nothing): the
+EditMode suite on all three [`Examples~`](./Examples~) testbeds, plus a
 `unity6-latest` canary leg that resolves the newest Unity 6 editor with a
 GameCI image at run time and upgrade-opens Testbed6 with it — so "the latest
 editor broke the package" surfaces here before it surfaces in a user's
@@ -852,8 +851,9 @@ Nothing is held back for a manual step, and a weekly cron still runs it to
 catch drift with no commit behind it. Runner minutes are free on a public repo;
 the Unity-activating jobs are chained so at most `UNITY_MAX_PARALLEL`
 (repository variable, default 2) editors are ever activated at once, which
-costs wall clock — 29 minutes on the first chained run, against 13 unchained —
-and nothing else. Each Android APK is also read back with
+costs wall clock — 29 minutes on the first chained run and 38 on the latest
+measured one (the 2026-08-31 cron, shrink leg included), against 13
+unchained — and nothing else. Each Android APK is also read back with
 `aapt2`, which must
 find the baked static shortcuts, the resource-shrinker keep file and the
 trampoline `<activity>` inside it, and a further 2022.3-only job
@@ -888,9 +888,10 @@ diagnostics catch a real runtime bug, the GameActivity warm-tap delivery gap
 Unity 6 leg through all eight steps too, so **every supported line now
 passes the full emulator smoke, warm and cold taps included**. The
 `android-shrink-verify` job validated its loud-failure design run after run
-and now pins the exact toolchain the export expects (JDK 11, Gradle 7.2, NDK
-r23b — with the one `sdkmanager` call on the Java 17 it is compiled for);
-its probe/control verdict is still pending.
+and now supplies the toolchain the export actually needs — JDK 17 and NDK
+r23b, with Gradle taken from the export's own wrapper pin; the earlier JDK 11 /
+Gradle 7.2 guess was disproved by run 25 — and its probe/control verdict came
+back green on 2026-08-29: probe 990 → 990 bytes, control 990 → 67.
 
 For a real device/emulator, `tools~/device-smoke/` has an adb-driven Android
 smoke (install a dev APK → assert the demo's shortcuts registered → simulate a

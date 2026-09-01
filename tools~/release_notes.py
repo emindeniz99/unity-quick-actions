@@ -48,6 +48,9 @@ def sections(text):
 PIN_FILES = ("README.md", "GETTING_STARTED.md", "CONTRIBUTING.md", "CLAUDE.md")
 GIT_PIN = re.compile(r"#v(\d+\.\d+\.\d+)")
 UPM_PIN = re.compile(r'"com\.emindeniz99\.quick-actions"\s*:\s*"(\d+\.\d+\.\d+)"')
+# The README's Status line names the version in prose; the 0.4.9 cut moved every
+# pin above and left this one at 0.4.8, because nothing matched it.
+PROSE_PIN = re.compile(r"This is \*\*(\d+\.\d+\.\d+)\*\*")
 
 
 def stale_pins(version):
@@ -58,7 +61,8 @@ def stale_pins(version):
         if not os.path.exists(path):
             continue
         for n, line in enumerate(open(path, encoding="utf-8"), 1):
-            for match in list(GIT_PIN.finditer(line)) + list(UPM_PIN.finditer(line)):
+            for match in (list(GIT_PIN.finditer(line)) + list(UPM_PIN.finditer(line))
+                          + list(PROSE_PIN.finditer(line))):
                 if match.group(1) != version:
                     stale.append((f"{name}:{n}", match.group(1)))
     return stale

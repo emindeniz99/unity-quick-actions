@@ -1,7 +1,7 @@
 # Quick Actions for Unity — Roadmap
 
-Follow-ups discussed but not shipped as of v0.4.0 (the first public release).
-Delete an entry in the same commit that ships it.
+Follow-ups discussed but not shipped. Delete an entry in the same commit that
+ships it.
 
 - **Verify the `.androidlib` icon recipe on a real build.** The README's
   recipe for a consumer's own icons — an `.androidlib` under `Assets/` — rests

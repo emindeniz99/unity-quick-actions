@@ -19,7 +19,7 @@ tools~/verify.sh    # must print: VERIFY: PASS
 ```
 
 `tools~/verify.sh` is the gate for every change and **needs no Unity install**.
-It runs six checks (see [`.verify/README.md`](./.verify/README.md) for the
+It runs seven checks (see [`.verify/README.md`](./.verify/README.md) for the
 rationale):
 
 1. every asset has a committed, stable `.meta`;
@@ -33,7 +33,10 @@ rationale):
    ownership marker) still match across C#, Java and Objective-C++;
 6. `package.json` and the top `CHANGELOG.md` heading agree on the version —
    the release is cut from those two, so a disagreement is caught here rather
-   than on main.
+   than on main;
+7. the Android icon bytes embedded in
+   `Editor/Android/QuickActionsBuiltInIcons.cs` still match their generator,
+   `tools~/gen_builtin_icons.py` — that file is generated, never hand-edited.
 
 Run it before you push. CI runs the same script, so a red local run is a red PR.
 

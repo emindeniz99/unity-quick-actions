@@ -65,6 +65,42 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   project — the catalog is iOS-complete and Android-partial, and the README
   says so in those words.
 
+### Fixed
+
+- **Docs and workflow comments that had drifted from the repo** — the sweep
+  an agent-run audit produced (30 findings, each checked against the file
+  before it was touched; the ones the evidence contradicted were dropped, e.g.
+  "the weekly cron did not fire" — it did, run 35 on 2026-08-31). README's
+  Status line still said 0.4.8: the 0.4.9 cut moved every install pin but that
+  one because nothing matched it, so `tools~/release_notes.py` now pins the
+  `This is **x.y.z**` line too, and MAINTAINING / the runbook list it. README
+  also called the shrink verdict "still pending" fifty lines after reporting
+  it, described a JDK 11 / Gradle 7.2 toolchain that run 25 had disproved
+  (the job supplies JDK 17 and takes Gradle from the export's own wrapper
+  pin), and kept the retired "split by cost" gating rationale; CONTRIBUTING,
+  MAINTAINING, CLAUDE.md, `.verify/README.md` and `ci.yml` described
+  `verify.sh` as four or six checks when it runs seven; `unity-ci.yml`'s
+  header still said the shrink job assembles a release build (it runs
+  `:launcher:shrinkReleaseRes`) and that a run without secrets "stays green"
+  (only a fork or Dependabot PR does; any other event fails the gate);
+  `device-ci.yml` still claimed there was no Unity licence in CI;
+  `RELEASE_RUNBOOK.md` Phase 5 told the maintainer to submit a package that
+  has been in Asset Store review since 2026-08-07; `ROADMAP.md` dated itself
+  "as of v0.4.0"; and `store~/listing/metadata.md`'s 0.4.4 now says it is the
+  submitted version, not the current one.
+
+### Changed
+
+- **CI: three gaps the same audit found.** A change to `Samples~/Demo` — the
+  scene every Android APK, aapt2 read-back and emulator smoke is built from —
+  did not trigger `unity-ci.yml` at all; it does now. `ci.yml` gains a
+  `lint-workflows` job that runs actionlint (shellcheck + pyflakes over every
+  `run:` block — two comments in `unity-ci.yml` had claimed this was enforced,
+  and nothing ran it) and asserts the hand-duplicated push / pull_request
+  `paths:` lists stay identical. `android-shrink-verify`'s 120-minute ceiling,
+  sized for the assembleRelease it no longer runs, is 45 — the job takes about
+  four minutes with a warm cache.
+
 ## [0.4.9] - 2026-08-29
 
 ### Verified
