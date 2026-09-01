@@ -89,6 +89,16 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **The `unity6-latest` canary made its first real catch — and it was the
+  harness, not the package.** On 2026-09-01 it resolved the freshly published
+  6000.6.0f1 image, whose editor aborts at start-up inside a container:
+  "Requested 1073741824 bytes, but only 67108864 bytes available … run the
+  container with --shm-size=1025M" (its asset database's UDS client). Docker's
+  default `/dev/shm` is 64 MB and GameCI's actions pass no `--shm-size`, so
+  every job in `unity-ci.yml` that runs an editor in a container now raises the
+  Docker daemon's `default-shm-size` to 2 GB first (merged into the runner's
+  existing `daemon.json`, then a daemon restart). The three pinned legs stay on
+  editors that do not need it, and will the day a testbed moves to 6.6+.
 - **Docs and workflow comments that had drifted from the repo** — the sweep
   an agent-run audit produced (30 findings, each checked against the file
   before it was touched; the ones the evidence contradicted were dropped, e.g.
