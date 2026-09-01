@@ -7,9 +7,11 @@ name: unity
 # it) fed into the adb device smoke, and an iOS Simulator-SDK Xcode export per
 # testbed with an unsigned xcodebuild compile on macOS for the lines whose
 # simulator support allows it. One further Android leg, `android-shrink-verify`,
-# exports the Gradle project on 2022.3 and assembles a minified release build to
-# settle the question no APK leg can — whether AGP's resource shrinker honours
-# the keep rule the package ships for its icon drawables.
+# exports the Gradle project on 2022.3 and runs the resource shrinker's own
+# task (`:launcher:shrinkReleaseRes`, never assembleRelease), reading the
+# stripped `.ap_` it emits, to settle the question no APK leg can — whether
+# AGP's resource shrinker honours the keep rule the package ships for its icon
+# drawables.
 #
 # EVERY leg runs on every code push and PR — the EditMode tests (three pinned
 # testbed legs plus a unity6-latest canary that resolves the newest Unity 6
@@ -26,9 +28,9 @@ name: unity
 # real Editor reached main.
 #
 # That 13.4 minutes was measured BEFORE the licence cap below. Chained, run 31
-# took 29 minutes for every leg but the shrink experiment. The argument is
-# unchanged — free minutes, no manual step — but the number is, so do not quote
-# 13 minutes.
+# took 29 minutes without the shrink leg, and the 2026-08-31 cron (run 35) took
+# 38 for the whole matrix, shrink leg included. The argument is unchanged —
+# free minutes, no manual step — but the number is, so do not quote 13 minutes.
 #
 # Docs-only changes still trigger nothing (paths filter below), so the bill for
 # a README edit stays zero legs. The weekly cron remains, and is not redundant:
@@ -55,13 +57,16 @@ name: unity
 #   UNITY_EMAIL     the Unity account e-mail (must be the e-mail, not a name)
 #   UNITY_PASSWORD  its password (avoid special characters — known GameCI issue)
 #   UNITY_SERIAL    Professional licences only; leave unset for Personal.
-# Without the secrets every Unity job is SKIPPED (gate job below), so the
-# workflow stays green instead of failing on activation.
+# Without the secrets every Unity job is SKIPPED (gate job below). On a fork or
+# Dependabot PR that is expected and the run stays green; on any other event
+# the gate FAILS, so a run with no editor behind it never reports green.
 #
 # Licence seats: at most UNITY_MAX_PARALLEL Unity activations run at once —
 # repository variable, default 2 if unset, so the number is tunable from
-# Settings without a commit. Two mechanisms together produce that number, and
-# neither alone would:
+# Settings without a commit. (The `|| '2'` default is spelled out at each of
+# the three max-parallel lines — `strategy:` cannot read `env:` — and quoted in
+# README.md and tools~/device-smoke/README.md; change all five together.)
+# Two mechanisms together produce that number, and neither alone would:
 #   * the five Unity jobs are chained with `needs:` (tests -> android-build ->
 #     ios-export -> tests-unity6-latest -> android-shrink-verify), so exactly
 #     ONE of them is ever eligible. max-parallel is a matrix-only key — it
@@ -71,8 +76,9 @@ name: unity
 # tests leg still lets the Android build run, exactly as before; the
 # no-secrets path still propagates as skipped.
 #
-# What this costs, measured on run 31 rather than guessed: 29 minutes for every
-# leg but the shrink experiment, against 13.4 unchained. Runner minutes are free
+# What this costs, measured rather than guessed: 29 minutes on run 31 (before
+# the shrink leg joined the chain) and 38 on run 35 for the whole matrix,
+# against 13.4 unchained. Runner minutes are free
 # on a public repo, so the price is wall clock only. To undo, delete the three
 # max-parallel lines and put every Unity job back on `needs: license` with the
 # plain gate.
@@ -113,6 +119,7 @@ on:
       - "Plugins/**"
       - "Tests/**"
       - "Examples~/**"
+      - "Samples~/**"
       - "package.json"
       - "tools~/device-smoke/**"
       - ".github/workflows/unity-ci.yml"
@@ -123,6 +130,7 @@ on:
       - "Plugins/**"
       - "Tests/**"
       - "Examples~/**"
+      - "Samples~/**"
       - "package.json"
       - "tools~/device-smoke/**"
       - ".github/workflows/unity-ci.yml"
@@ -605,15 +613,21 @@ jobs:
   # probe-planting and the minify flip all worked, and the build then died
   # because the export ships NO gradlew and the runner's system Gradle (9.x)
   # cannot load the AGP 7.1.2 the export pins (org.gradle.util.GUtil is gone
-  # in Gradle 9). The job now supplies the exact toolchain Unity 2022.3
-  # bundles — JDK 11, Gradle 7.2, NDK r23b — and re-points the docker-image
-  # paths the export hardcodes, instead of trusting the runner image's drift.
+  # in Gradle 9). The job now supplies JDK 17 and NDK r23b, downloads the
+  # Gradle the export's own wrapper properties name (checksum-verified against
+  # Gradle's published one) and re-points the docker-image paths the export
+  # hardcodes, instead of trusting the runner image's drift — the "JDK 11,
+  # Gradle 7.2" an earlier version of this comment promised was a guess about
+  # Unity 2022.3's bundle that run 25 disproved (see the JDK step below).
   android-shrink-verify:
     name: android shrink verify (2022.3)
     needs: [license, tests-unity6-latest]
     if: ${{ !cancelled() && needs.license.outputs.available == 'true' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    # 45: with a warm Library cache the whole job takes about four minutes (run
+    # 35) and the Gradle step carries its own 30-minute ceiling below. The 120
+    # it used to have was sized for assembleRelease, which it no longer runs.
+    timeout-minutes: 45
     env:
       TESTBED: Examples~/Testbed2022
     steps:
