@@ -102,6 +102,10 @@ FROZEN: dict[str, list[str]] = {
     "ic_quickaction_": [
         "Plugins/Android/QuickActionsBridge.java",
         "Editor/Android/QuickActionsBuildPostProcessorAndroid.cs",
+        # The define-off stripper sweeps drawable*/<prefix>*.png out of the
+        # generated modules; a drifted prefix there leaves built-in icons in a
+        # production build that was meant to carry nothing of this package.
+        "Editor/NativeGate/QuickActionsTrampolineStripperAndroid.cs",
     ],
 }
 

@@ -76,6 +76,10 @@ namespace EminDeniz99.QuickActions.Editor
             // project with ZERO static shortcuts still adds icons at runtime —
             // the dynamic-only case is exactly the one the returns below skip.
             WriteKeepRules(path);
+            // Same rule, same reason: the built-in icons are what that name lookup
+            // finds, a dynamic-only project needs them exactly as much as a static
+            // one, and they go in before any early return below.
+            WriteBuiltInIcons(path);
 
             // The applicationId also feeds the {bundleId} placeholder, so a label
             // and the intent it sits next to can never disagree about the id.
@@ -273,6 +277,99 @@ namespace EminDeniz99.QuickActions.Editor
                 "<resources xmlns:tools=\"" + ToolsNs + "\"\n" +
                 "    tools:keep=\"@drawable/" + IconPrefix + "*\" />\n");
         }
+
+        // Writes the built-in catalog icons (QuickActionsBuiltInIcons) into
+        // unityLibrary/src/main/res/drawable-<density>/ic_quickaction_<name>.png, so an
+        // IconType renders on Android with nothing added to the project: the Java
+        // lookup finds them by name, and the keep rule above carries them through
+        // shrinkResources. All of them, unconditionally — a runtime
+        // QuickActions.Add(...) with IconType.Play cannot be known at build time, so
+        // "only the ones the static set references" would leave the most common
+        // (dynamic-only) project blank. Cost: a few KB of APK.
+        //
+        // A project that already ships its own ic_quickaction_<name> — the .androidlib
+        // recipe the README documented before these existed, which becomes its own
+        // Gradle module — keeps it. AGP resolves two library modules declaring one
+        // drawable by priority, and unityLibrary OUTRANKS the modules it depends on,
+        // so writing ours regardless would silently replace theirs. Ours is skipped
+        // for that name, the skip is logged, and a copy of ours from an earlier build
+        // is removed so it cannot shadow theirs. Returns the number written.
+        internal static int WriteBuiltInIcons(string unityLibraryPath)
+        {
+            var drawableDir = Path.Combine(unityLibraryPath, "src", "main", "res",
+                "drawable-" + QuickActionsBuiltInIcons.DensityQualifier);
+            var gradleRoot = Path.GetFullPath(Path.Combine(unityLibraryPath, ".."));
+            var written = 0;
+            foreach (var entry in QuickActionsBuiltInIcons.Entries)
+            {
+                var fileName = IconPrefix + entry.Name;
+                var owner = FindProjectDrawable(gradleRoot, unityLibraryPath, fileName);
+                if (owner != null)
+                {
+                    Debug.Log($"[QuickActions] Kept the project's own drawable '{fileName}' ({owner}); " +
+                              "the built-in one was not written.");
+                    SafeDelete(Path.Combine(drawableDir, fileName + ".png"));
+                    continue;
+                }
+                Directory.CreateDirectory(drawableDir);
+                File.WriteAllBytes(Path.Combine(drawableDir, fileName + ".png"), entry.Bytes);
+                written++;
+            }
+            if (written > 0)
+                Debug.Log($"[QuickActions] Wrote {written} built-in shortcut icon(s) to the Android project.");
+            return written;
+        }
+
+        // Where a project's own drawable can live in the generated project, as a
+        // display path, or null. Three shapes, all checked:
+        //   <root>/unityLibrary/<Name>.androidlib/  — where Unity COPIES an .androidlib
+        //       from Assets/: nested under unityLibrary, not a root sibling (Unity's own
+        //       notifications package writes its icons to exactly this path);
+        //   <root>/<Name>.androidlib/               — a root-level module, in case a
+        //       template or a future Unity puts it there;
+        //   any `projectDir = new File('…')` in settings.gradle — an export with
+        //       "Symlink Sources" copies nothing and points the module at Assets/.
+        // unityLibrary's own src/main/res is never a candidate: anything there with
+        // our prefix is ours from an earlier build.
+        private static string FindProjectDrawable(string gradleRoot, string unityLibraryPath, string fileName)
+        {
+            foreach (var module in CandidateModules(gradleRoot, unityLibraryPath))
+            {
+                var res = Path.Combine(module, "src", "main", "res");
+                if (!Directory.Exists(res))
+                    continue;
+                foreach (var dir in Directory.GetDirectories(res, "drawable*"))
+                    if (Directory.GetFiles(dir, fileName + ".*").Length > 0)
+                        return Path.Combine(Path.GetFileName(module.TrimEnd(Path.DirectorySeparatorChar)),
+                            "src", "main", "res", Path.GetFileName(dir));
+            }
+            return null;
+        }
+
+        private static IEnumerable<string> CandidateModules(string gradleRoot, string unityLibraryPath)
+        {
+            var self = Normalize(unityLibraryPath);
+            foreach (var parent in new[] { gradleRoot, unityLibraryPath })
+            {
+                if (!Directory.Exists(parent))
+                    continue;
+                foreach (var dir in Directory.GetDirectories(parent))
+                    if (!string.Equals(Normalize(dir), self, System.StringComparison.OrdinalIgnoreCase))
+                        yield return dir;
+            }
+            var settings = Path.Combine(gradleRoot, "settings.gradle");
+            if (!File.Exists(settings))
+                yield break;
+            foreach (System.Text.RegularExpressions.Match m in System.Text.RegularExpressions.Regex.Matches(
+                         File.ReadAllText(settings), @"projectDir\s*=\s*new\s+File\(\s*(['""])(.+?)\1\s*\)"))
+            {
+                var dir = m.Groups[2].Value;
+                yield return Path.IsPathRooted(dir) ? dir : Path.Combine(gradleRoot, dir);
+            }
+        }
+
+        private static string Normalize(string path) =>
+            Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
 
         // Returns the number of shortcuts actually written (invalid/duplicate
         // items are skipped).

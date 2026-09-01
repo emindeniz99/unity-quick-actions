@@ -3,63 +3,25 @@
 Follow-ups discussed but not shipped as of v0.4.0 (the first public release).
 Delete an entry in the same commit that ships it.
 
-- **Android built-in icons: ship them from the build post-processor (0.5.0).**
-  The `IconType` catalog has 29 entries and *none* of them render on Android
-  unless the consumer adds a drawable themselves — the launcher draws a blank
-  square, which is what the Android screenshot in the README shows. 0.4.5
-  documented the manual `.androidlib` procedure, which is the honest fix but
-  still one manual step for every user. The real fix is to write the PNGs into
-  the generated Gradle project at build time, so nobody does anything.
-
-  *Precedent worth copying:* Unity's own `com.unity.mobile.notifications`
-  solves exactly this problem the same way. Its Java calls
-  `res.getIdentifier(name, "drawable", context.getPackageName())` — identical
-  to the lookup in `QuickActionsBridge.java` — and its editor code writes the icon bytes
-  into the generated project. On 2021.3/2022.3 it uses
-  `IPostGenerateGradleAndroidProject` writing to
-  `<gradleProject>/<lib>.androidlib/src/main/res/…`; on Unity 6 it switched to
-  `AndroidProjectFilesModifier` writing to `unityLibrary/src/main/res/…`. That
-  version split is the main implementation cost — we support both lines.
-
-  *Where our code already is:* `Editor/Android/QuickActionsBuildPostProcessorAndroid.cs`
-  already runs at exactly this point and already writes `res/xml/` and
-  `values-<qualifier>/` into the generated project. Adding `res/drawable-xhdpi/`
-  is the same code path, not a new mechanism.
-
-  *Plan:* move the four PNGs from `store~/example-shortcut-icons/` into
-  `Editor/Android/BuiltInIcons/` (normal imported assets with committed `.meta`,
-  so they survive `.unitypackage` export — `package.json`'s `files` already
-  includes `Editor`, so no allowlist change). Emit only the icons actually
-  referenced by the build's shortcut set, so an app using none pays nothing.
-  Cost if we emitted all four unconditionally: ~1.5 KB of APK.
-
-  *Resource shrinking is already handled (0.4.7).* The post-processor now writes
-  `res/raw/quickactions_keep.xml` (`tools:keep="@drawable/ic_quickaction_*"`) on
-  every enabled Android build, so an icon writer added here inherits it and needs
-  no shrinker work of its own. The earlier diagnosis in this entry was partly
-  wrong and is corrected here: AGP's default *safe* mode does have a heuristic
-  (`PossibleResourcesMarker.possiblePrefixMatch`) for exactly this concatenation
-  shape, so the catalog names were likely retained there — but a custom
-  `AndroidDrawable` name supplied from C# at runtime is unprotectable by any
-  heuristic (it is never a constant in the compiled code), and one library
-  carrying `tools:shrinkMode="strict"` flips the whole app to strict mode where
-  nothing name-resolved survives; hence the explicit keep rule ships regardless.
-
-  *Note:* even after this, 25 of the 29 catalog entries stay blank on Android —
-  we only own art for add/compose/favorite/play. Either commission the rest,
-  or document the catalog as "iOS-complete, Android-partial".
-
-- **Verify the Android drawable mechanism on a real build (blocks the above).**
-  Everything in the entry above rests on Unity documentation and on reading
-  Unity's first-party package — **not** on a build we ran. The APK proof was
-  attempted and could not run: the Unity editors live on `/Volumes/T7Data`,
-  which was unmounted. Before writing 0.5.0, mount it and confirm on 2022.3:
+- **Verify the `.androidlib` icon recipe on a real build.** The README's
+  recipe for a consumer's own icons — an `.androidlib` under `Assets/` — rests
+  on Unity documentation and on reading Unity's first-party notifications
+  package, **not** on a build we ran. (The built-in icons take a different
+  path: the post-processor writes them straight into `unityLibrary/src/main/res/`,
+  which CI reads back out of a real APK on every push, so that path needs no
+  entry here.) The APK proof was attempted and could not run: the Unity
+  editors live on `/Volumes/T7Data`, which was unmounted. Confirm on 2022.3:
   (a) a `.androidlib` under `Assets/` lands its `src/main/res/drawable-*/`
   entries in the APK resource table (`aapt2 dump resources <apk> | grep -i
   quickaction`); (b) `res/` at the `.androidlib` root is silently dropped, as
   the docs imply; (d) a `.androidlib` shipped *inside a UPM package* is picked
-  up — Unity's notifications package does this, but it is undocumented
-  behaviour.
+  up — Unity's own `com.unity.mobile.notifications` ships
+  `Runtime/Android/Plugins/mobilenotifications.androidlib/` with a committed
+  `.meta` and depends on exactly this, so the mechanism is established by
+  precedent even though no Unity manual page documents it; what remains is
+  only seeing it on a build of ours. (Confirmed on reading that package while
+  designing 0.5.0: Unity copies an `.androidlib` to
+  `unityLibrary/<Name>.androidlib/`, nested, not to the Gradle root.)
 
   The old item (c) — does the resource shrinker honour the shipped
   `res/raw/quickactions_keep.xml` — is **answered, and stays answered**: the
@@ -88,8 +50,10 @@ Delete an entry in the same commit that ships it.
   `Assets/`, so it would be picked up with no further action. Caveats: nobody
   ships this combination today (untested), `Samples~` content ships without
   `.meta` so the Android-only `PluginImporter` setting falls back to defaults,
-  and it inherits the `.unitypackage` limitation above. Do this *after* the
-  post-processor work, as documentation-by-example — not as the delivery path.
+  and it inherits the `.unitypackage` limitation above. The four built-in icons
+  now ship through the post-processor; this sample would be
+  documentation-by-example for the 25 catalog entries that still need the
+  consumer's own art, and for replacing a built-in one.
 
 - **Automated device CI, remaining scope** — 0.4.6 closed the licence half:
   `.github/workflows/unity-ci.yml` (GameCI) builds the dev APK in CI and feeds

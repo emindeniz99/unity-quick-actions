@@ -444,8 +444,13 @@ jobs:
           missing=""
           # xml/ + string/ are the static-shortcut bake (the testbeds' demo ships
           # 3, so qa_short_0 must exist); raw/ is 0.4.7's resource-shrinker keep
-          # file, which every enabled Android build writes.
-          for want in xml/quickactions_shortcuts raw/quickactions_keep string/qa_short_0; do
+          # file, which every enabled Android build writes; drawable/ is 0.5.0's
+          # built-in icons, written unconditionally by the same post-processor —
+          # the Demo uses exactly these four IconTypes, so a missing one here is
+          # a blank square on the emulator's launcher.
+          for want in xml/quickactions_shortcuts raw/quickactions_keep string/qa_short_0 \
+                      drawable/ic_quickaction_add drawable/ic_quickaction_compose \
+                      drawable/ic_quickaction_favorite drawable/ic_quickaction_play; do
             case "$RES" in
               *"$want"*) echo "ok: resource table carries $want" ;;
               *) missing="$missing $want" ;;
@@ -737,6 +742,23 @@ jobs:
                                    "shrinker's 67-byte dummy to tell them apart" % (name, size))
               lines.append("%s %d" % (name, size))
               print("planted %s (%d bytes)" % (target, size))
+
+          # 0.5.0: the built-in icons the package's post-processor wrote into this
+          # export (drawable-<density>/ic_quickaction_<name>.png). Recorded at their
+          # on-disk size so the assertion holds the SHIPPED art to the same
+          # byte-identical bar as the probe — they are real resources nothing
+          # references statically, i.e. exactly what the keep rule exists for.
+          # Their absence is a finding, not a skip: this export was produced with
+          # QUICKACTIONS_ENABLED, so the writer must have run.
+          shipped = sorted(res_dir.parent.glob("drawable-*/ic_quickaction_*.png"))
+          if not shipped:
+              raise SystemExit("no built-in ic_quickaction_*.png under %s/drawable-*/ — the "
+                               "package's post-processor did not write the 0.5.0 icons into "
+                               "this export" % res_dir.parent)
+          for icon in shipped:
+              size = icon.stat().st_size
+              lines.append("%s %d" % (icon.stem, size))
+              print("shipped %s (%d bytes)" % (icon, size))
 
           pathlib.Path(os.environ["SIZES_FILE"]).write_text("\n".join(lines) + "\n")
           PY
@@ -1222,6 +1244,13 @@ jobs:
           for name in (PROBE, CONTROL):
               path, size = stored(name)
               rows.append((name, planted.get(name), size, path))
+          # 0.5.0: the shipped built-in icons the plant step recorded. Same bar as
+          # the probe — present, and at their planted size. Indexed after the two
+          # experiment rows so the checks below can keep addressing those by position.
+          SHIPPED = sorted(n for n in planted if n.startswith("ic_quickaction_") and n != PROBE)
+          for name in SHIPPED:
+              path, size = stored(name)
+              rows.append((name, planted.get(name), size, path))
 
           table = ["", "resource                  planted    in APK  stored as",
                    "------------------------  -------  --------  ---------"]
@@ -1308,6 +1337,32 @@ jobs:
                   "dropped it after reading it — if this is the ONLY failure here, the "
                   "keep mechanism still worked and only this assertion needs revisiting."
                   % KEEP_PATH)
+
+          # (d) did the keep rule carry the SHIPPED icons through unchanged? This is
+          # the probe's question asked of the real art users get: the same prefix,
+          # the same lack of any static reference, and a blank launcher tile if the
+          # answer is no.
+          if not SHIPPED:
+              failures.append(
+                  "the plant step recorded no shipped ic_quickaction_* icons, so this run "
+                  "says nothing about the art the package actually ships.")
+          for name, before, after, path in rows[2:]:
+              if after is None:
+                  failures.append(
+                      "the shipped icon '%s' is not in the release resources at all." % name)
+              elif before is not None and after == before:
+                  print("ok: shipped '%s' survived at its %d bytes" % (name, after))
+              elif after <= DUMMY_CEILING:
+                  failures.append(
+                      "the shipped icon '%s' was dummy-replaced: %s bytes against %s written. "
+                      "The keep rule covers ic_quickaction_*, so either this name escaped it "
+                      "or the rule did not reach the merged resources." % (name, after, before))
+              else:
+                  failures.append(
+                      "the shipped icon '%s' was re-encoded: %s bytes against %s written. "
+                      "Something other than the shrinker touched it (crunchPngs?); a "
+                      "launcher would still draw it, but this job cannot call it intact."
+                      % (name, after, before))
 
           if failures:
               sys.stderr.write("\n")
