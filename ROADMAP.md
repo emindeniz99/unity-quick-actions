@@ -42,6 +42,37 @@ ships it.
   OpenUPM/Git and silently vanish for Asset Store users. Re-check whether Unity
   has fixed this before choosing any design that depends on it.
 
+- **Adaptive (`-v26`) variants of the built-in icons.** On API 26+ AOSP wraps a
+  legacy shortcut drawable onto a white plate at 0.70 of the viewport, so the
+  built-ins render as a disc inside a white ring, smaller than neighbouring
+  adaptive icons. A `res/drawable-anydpi-v26/ic_quickaction_builtin_<name>.xml`
+  `<adaptive-icon>` under the same name would escape that (the launcher takes
+  an `AdaptiveIconDrawable` as-is): full-bleed indigo background layer, glyph
+  foreground confined to the 66/72 safe zone (≤ ~61 % of the 108 dp canvas —
+  the current glyphs span ~71 % and would be clipped by a squircle mask if
+  reused as-is), child drawables prefix-named so the keep glob covers them, the
+  plain vector kept for API 25. Deliberately not in the first release of the
+  built-ins: nobody has seen even the legacy art on a launcher, and this
+  doubles the unseen surface.
+- **Emulator screenshot of the built-in icons.** The smoke leg proves the
+  shortcuts registered with an icon resource; a capture of the long-press sheet
+  (`adb shell input` long-press on the app icon, then `screencap`) attached as
+  a workflow artifact would be the first look anyone has had at the art. Flaky
+  to drive (the gesture is launcher-dependent); worth one attempt.
+- **Unity 6 incremental Android builds are unmeasured.** CI builds a clean
+  Gradle project on a fresh runner every time. A second player build over the
+  same project directory — where Unity may prune files it did not declare and
+  the `IPostGenerateGradleAndroidProject` path may not re-run — is unproven for
+  the icons, the keep rule and the shortcut resources alike. Build the Unity 6
+  leg twice and aapt2 the SECOND APK. Related: Unity's own notifications package
+  moved to `AndroidProjectFilesModifier` on Unity 6 "for better compatibility
+  with incremental build"; the built-ins' distinct-name design was chosen so
+  that port is mechanical (every output declared up front, nothing inspected in
+  the tree), but the port itself is not done.
+- **Mark which `IconType`s have Android art in the settings UI.** A consumer
+  choosing `IconType.Search` from the 29-entry dropdown learns only at build
+  time (a warning) that it renders blank on Android without a drawable of their
+  own; the settings page could say so next to the field.
 - **Teaching sample for custom Android icons (small, optional).** A
   `Samples~/AndroidIcons/` containing a ready-made `QuickActionIcons.androidlib`
   (correct `src/main/AndroidManifest.xml` + `src/main/res/drawable-xhdpi/`)

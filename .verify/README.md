@@ -8,7 +8,7 @@ Run everything:
 
 ```bash
 tools~/verify.sh        # gen_meta + C# compile (x10) + unit tests + Java compile + smoke
-                        # + frozen strings + release-notes coherence + built-in icon bytes
+                        # + frozen strings + release-notes coherence + built-in icons
 tools~/setup.sh         # one-time: install dotnet + JDK if missing
 ```
 
@@ -23,7 +23,7 @@ tools~/setup.sh         # one-time: install dotnet + JDK if missing
 | Static-shortcut build pipeline (C#) | `EditorTests/StaticBuildPlaceholdersTests.cs` — same mechanism: `QuickActionsStaticBuild` (the `{placeholder}` engine + `Customize` hook both bakers consume) lives in the Editor assembly the runtime-referencing Unity test asmdef can't see, so its escaping/precedence/per-locale contracts are pinned here, where a bug would otherwise only surface inside a shipped `Info.plist` / `res/xml`. |
 | Frozen device strings | `tools~/check_frozen_strings.py` — the literals that persist on a device (intent actions, extras keys, the ownership marker, the `ic_quickaction_` drawable prefix) are pinned across C#, Java and Objective-C++; a rename would orphan shortcuts an older build already installed. |
 | Release-notes coherence | `tools~/release_notes.py --check` — `package.json`, the top `CHANGELOG.md` heading and every install pin in the docs name the same version, because `release.yml` cuts the tag from the merge commit and publishes that CHANGELOG section as the notes. |
-| Built-in Android icon bytes | `tools~/gen_builtin_icons.py --check` — the base64 in `Editor/Android/QuickActionsBuiltInIcons.cs` is regenerated in memory and must match byte for byte, so the generated file cannot drift from the generator that documents it. |
+| Built-in Android icons | `tools~/gen_builtin_icons.py --check` — the VectorDrawable XML embedded in `Editor/Android/QuickActionsBuiltInIcons.cs` is regenerated in memory and must match character for character, so the generated file cannot drift from the generator that documents it. |
 
 ## Why stubs
 

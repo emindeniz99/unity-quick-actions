@@ -63,7 +63,9 @@ public final class QuickActionsBridge {
 
     // Names of bundled drawables looked up for IconType values (index = enum int).
     // Index 0 (None) is intentionally empty. Provide drawables named
-    // ic_quickaction_<name> in your project to use them.
+    // ic_quickaction_<name> in your project to use them; when the project has
+    // none, the lookup falls back to the package's own ic_quickaction_builtin_<name>,
+    // which the build post-processor writes for add, compose, favorite and play.
     private static final String[] ICON_NAMES = {
             "", "compose", "play", "pause", "add", "location", "search", "share",
             "prohibit", "contact", "home", "mark_location", "favorite", "love",
@@ -500,15 +502,23 @@ public final class QuickActionsBridge {
             }
         }
         String drawable = item.optString("AndroidDrawable", "");
+        String builtIn = null;
         if (drawable.isEmpty()) {
             int iconType = item.optInt("Icon", 0);
             if (iconType > 0 && iconType < ICON_NAMES.length) {
                 drawable = "ic_quickaction_" + ICON_NAMES[iconType];
+                builtIn = "ic_quickaction_builtin_" + ICON_NAMES[iconType];
             }
         }
         if (drawable.isEmpty()) return null;
 
+        // The project's own drawable first, the package's built-in second: the two
+        // names coexist in the merged resources, so precedence is decided here
+        // rather than by which Gradle module happened to win the merge.
         int resId = context.getResources().getIdentifier(drawable, "drawable", context.getPackageName());
+        if (resId == 0 && builtIn != null) {
+            resId = context.getResources().getIdentifier(builtIn, "drawable", context.getPackageName());
+        }
         return resId != 0 ? Icon.createWithResource(context, resId) : null;
     }
 

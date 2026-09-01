@@ -10,7 +10,7 @@
 #   4. javac              -> Android plugin compiles against Android SDK stubs
 #   5. check_frozen_strings.py -> device-persisted literals are unchanged
 #   6. release_notes.py   -> package.json and the top CHANGELOG heading agree
-#   7. gen_builtin_icons.py --check -> the embedded Android icon bytes match
+#   7. gen_builtin_icons.py --check -> the embedded Android icon drawables match
 #                            their generator (the .cs is generated, never edited)
 #
 # Exit non-zero on any failure. See .verify/README.md for the rationale.
@@ -115,7 +115,7 @@ echo "== 6/7  Release-notes coherence =="
 python3 "$ROOT/tools~/release_notes.py" --check || fail=1
 
 echo
-echo "== 7/7  Built-in Android icon bytes =="
+echo "== 7/7  Built-in Android icons =="
 # Editor/Android/QuickActionsBuiltInIcons.cs is GENERATED from the glyph
 # geometry in tools~/gen_builtin_icons.py (pure stdlib, so this runs anywhere
 # dotnet does). An edit to either side without regenerating would ship icons

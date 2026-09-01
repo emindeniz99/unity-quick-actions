@@ -43,6 +43,7 @@ public final class QuickActionsBridgeSmokeTest {
         iconIdentityRoundTripsThroughExtras();
         trampolineAcceptsOursManifestAndPinnedOnly();
         bitmapIconIsChosenAndFallsBackWhenUndecodable();
+        builtInIconYieldsToTheProjectsOwn();
         payloadRoundTripsThroughExtrasAndIntent();
         localizationBlobRoundTripsThroughExtras();
         pinRequestIsOwnershipGated();
@@ -322,6 +323,37 @@ public final class QuickActionsBridgeSmokeTest {
         check(b2 != null && b2.optBoolean("AndroidBitmapAdaptive", false),
                 "adaptive flag round-trips through extras");
         png.delete();
+    }
+
+    private static void builtInIconYieldsToTheProjectsOwn() throws Exception {
+        // The package writes ic_quickaction_builtin_<name>; a project may ship
+        // ic_quickaction_<name> through any channel (.androidlib, .aar, Maven). Both
+        // names coexist in the merged resources, so the LOOKUP decides precedence:
+        // the project's first, the built-in second, nothing third.
+        ShortcutManager mgr = new ShortcutManager();
+        java.util.Map<String, Integer> ids = android.content.res.Resources.identifiers;
+        ids.clear();
+        ids.put("ic_quickaction_builtin_add", 0x7f080001);   // IconType.Add == 4: built-in only
+        ids.put("ic_quickaction_play", 0x7f080002);          // IconType.Play == 2: the project's own...
+        ids.put("ic_quickaction_builtin_play", 0x7f080003);  // ...and the built-in, both present
+        String json = "{\"items\":["
+                + "{\"Id\":\"r1\",\"Title\":\"T\",\"Icon\":4},"
+                + "{\"Id\":\"r2\",\"Title\":\"T\",\"Icon\":2},"
+                + "{\"Id\":\"r3\",\"Title\":\"T\",\"Icon\":5},"
+                + "{\"Id\":\"r4\",\"Title\":\"T\",\"Icon\":2,\"AndroidDrawable\":\"ic_quickaction_builtin_add\"}]}";
+        try {
+            check(QuickActionsBridge.setShortcuts(activity(mgr), json) != null, "resource-icon write lands");
+            check(byId(mgr.dynamic, "r1").icon != null && byId(mgr.dynamic, "r1").icon.resId == 0x7f080001,
+                    "no project drawable for Add: the built-in resolves");
+            check(byId(mgr.dynamic, "r2").icon != null && byId(mgr.dynamic, "r2").icon.resId == 0x7f080002,
+                    "the project's ic_quickaction_play wins over the built-in");
+            check(byId(mgr.dynamic, "r3").icon == null,
+                    "a catalog value with neither name in the app stays iconless (no wrong-icon fallback)");
+            check(byId(mgr.dynamic, "r4").icon != null && byId(mgr.dynamic, "r4").icon.resId == 0x7f080001,
+                    "AndroidDrawable names a resource directly, with no fallback chain");
+        } finally {
+            ids.clear();
+        }
     }
 
     private static void payloadRoundTripsThroughExtrasAndIntent() throws Exception {

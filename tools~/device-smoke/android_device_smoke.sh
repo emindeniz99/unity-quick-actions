@@ -32,6 +32,13 @@ TRAMPOLINE="com.emindeniz99.quickactions.QuickActionsTrampolineActivity"
 EXTRA_ACTION_ID="com.emindeniz99.quickactions.ACTION_ID"
 AUTOTEST_EXTRA="com.emindeniz99.quickactions.AUTOTEST"
 SHORTCUT_IDS="new_game continue daily"
+# The subset of SHORTCUT_IDS that must carry an ICON RESOURCE once registered:
+# new_game is a static item with Icon=Add (the baked @drawable reference), daily
+# a runtime Add(...) with IconType.Favorite (the Java name lookup, which falls
+# back to the package's own ic_quickaction_builtin_favorite). `continue` is the
+# static item with no icon at all. This is the one observation that turns "the
+# drawable is in the APK" into "the lookup resolved it on an Android runtime".
+ICON_SHORTCUT_IDS="${ICON_SHORTCUT_IDS:-new_game daily}"
 TAP_ID="new_game"
 # The cold step taps a DIFFERENT registered id on purpose: its assertion reads
 # the whole `logcat -d` buffer, and `logcat -c` is known to under-clear on
@@ -245,6 +252,36 @@ dumpsys section for $APP_ID:
 $(our_shortcut_dump || true)"
 fi
 echo "registered: $SHORTCUT_IDS"
+
+# Same step, second assertion: the registered entries that should carry an icon
+# do. `dumpsys shortcut` prints each entry as one `ShortcutInfo {id=…, flags=0x…
+# […], …, iconRes=<id>[<name>], …}` line; a resolved resource icon shows as a
+# non-zero iconRes and an `Ic-r` flag, an absent one as `iconRes=0[null]`. Both
+# spellings are accepted, and a dump that carries neither token is reported as
+# such rather than read as a pass — the format is the platform's, not ours.
+icons_dump="$(our_shortcut_dump || true)"
+for id in $ICON_SHORTCUT_IDS; do
+  rest="${icons_dump#*"id=$id,"}"
+  block="${rest%%ShortcutInfo \{*}"
+  case "$block" in
+    *"iconRes=0["*|*"iconRes=0,"*)
+      fail "shortcut '$id' registered WITHOUT an icon resource (iconRes=0). Its icon
+comes from a drawable resolved by name — a static @drawable reference for a baked
+item, getIdentifier(\"ic_quickaction_<name>\") then the ic_quickaction_builtin_
+fallback for a runtime one — so the drawable is missing from the APK, misnamed,
+or the lookup did not run.
+dumpsys entry:
+$block" ;;
+    *"iconRes="[1-9]*|*"Ic-r"*)
+      echo "icon resource resolved for '$id'" ;;
+    *)
+      fail "cannot tell whether shortcut '$id' has an icon: its dumpsys entry carries
+neither an iconRes= field nor an Ic-r flag, so the format this script expects has
+changed. Read it and adjust the check; do not call this a pass.
+dumpsys entry:
+$block" ;;
+  esac
+done
 
 step "6/8 simulate a WARM tap on '$TAP_ID' (app already running)"
 # A launcher tap is an intent at the exported trampoline, so starting it directly

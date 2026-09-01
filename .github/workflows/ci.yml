@@ -4,7 +4,7 @@ name: CI
 # compiles the C# against UnityEngine/UnityEditor stubs (10 configs), runs the
 # NUnit suite via `dotnet test`, compiles the Android plugin against Android SDK
 # stubs, and checks the frozen device strings, the release-notes coherence and
-# the generated Android icon bytes. The iOS .mm and on-device behaviour still
+# the generated Android icons. The iOS .mm and on-device behaviour still
 # need a real Unity build (see PRODUCTION_READINESS.md). See .verify/README.md.
 #
 # On a pushed `v*` tag the same commit is verified and the `release` job packs
@@ -36,7 +36,7 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
-      - name: Verify (7 checks — meta, 10 C# configs, unit tests, Android plugin, frozen strings, release notes, icon bytes)
+      - name: Verify (7 checks — meta, 10 C# configs, unit tests, Android plugin, frozen strings, release notes, built-in icons)
         run: tools~/verify.sh
       - name: Pack .unitypackage (reproducible, no Unity needed)
         run: python3 tools~/pack_unitypackage.py

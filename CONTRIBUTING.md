@@ -34,9 +34,10 @@ rationale):
 6. `package.json` and the top `CHANGELOG.md` heading agree on the version —
    the release is cut from those two, so a disagreement is caught here rather
    than on main;
-7. the Android icon bytes embedded in
-   `Editor/Android/QuickActionsBuiltInIcons.cs` still match their generator,
-   `tools~/gen_builtin_icons.py` — that file is generated, never hand-edited.
+7. the built-in Android icons embedded in
+   `Editor/Android/QuickActionsBuiltInIcons.cs` (VectorDrawable XML) still
+   match their generator, `tools~/gen_builtin_icons.py` — that file is
+   generated, never hand-edited.
 
 Run it before you push. CI runs the same script, so a red local run is a red PR.
 

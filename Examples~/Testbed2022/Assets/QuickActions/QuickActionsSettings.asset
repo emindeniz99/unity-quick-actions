@@ -18,7 +18,7 @@ MonoBehaviour:
     Subtitle: Start a fresh run
     LocalizedTitles: []
     LocalizedSubtitles: []
-    Icon: 0
+    Icon: 4
     AndroidDrawable: 
     IosSystemImage: plus.circle
     IosTemplateImage: 

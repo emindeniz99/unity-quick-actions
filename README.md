@@ -93,7 +93,7 @@ is still unconfirmed.
 
 **Also true:** the suite is 98 headless tests (`dotnet test`) and 74 in Unity's
 Test Runner (it adds 5 `JsonUtility` serialization tests; 29 of the headless ones
-don't run there), plus an Android Java smoke of 103 checks, across 10 C# compile
+don't run there), plus an Android Java smoke of 108 checks, across 10 C# compile
 configurations with 0 warnings.
 The iOS `.mm` compiles cleanly against the current iOS SDK
 (ARC, arm64, deployment target iOS 13) with no deprecation or availability
@@ -380,7 +380,7 @@ public class ShortcutRouter : MonoBehaviour
 | Field | Purpose |
 |-------|---------|
 | `Id` (required, unique) / `Title` (required) / `Subtitle` | Labels. `Subtitle` renders under the title on iOS and as the Android long label. In **static** (baked) items both may embed build-time `{placeholders}` — see [Build-time placeholders](#build-time-placeholders--app-info-on-long-press). |
-| `Icon` (`IconType`) | Built-in glyph catalog (29 entries). iOS uses Apple's system icons — nothing to ship. Android resolves `ic_quickaction_<name>` from a drawable in the app: **four ship built in** (`Add`, `Compose`, `Favorite`, `Play`), the other 25 need a drawable **you add**, and yours always wins over the built-in. Without one the launcher shows a blank square. See [Android icons](#android-icons). |
+| `Icon` (`IconType`) | Built-in glyph catalog (29 entries). iOS uses Apple's system icons — nothing to ship. Android resolves a drawable by name — your `ic_quickaction_<name>` first, then the package's own `ic_quickaction_builtin_<name>`: **four ship built in** (`Add`, `Compose`, `Favorite`, `Play`), the other 25 need a drawable **you add**. Without one the launcher shows a blank square. See [Android icons](#android-icons). |
 | `IosSystemImage` | SF Symbol name (`"star.fill"`, iOS 13+) — beats `IosTemplateImage` and `Icon`. Ignored on Android. |
 | `IosTemplateImage` | Template-image name shipped in the Xcode bundle (single-color, ~35×35 pt) — beats `Icon`. Ignored on Android. |
 | `AndroidBitmapFile` | Absolute path to a PNG/JPEG on device — runtime icons from a `Texture2D`: `File.WriteAllBytes(path, tex.EncodeToPNG())` under `Application.persistentDataPath` (keep the file alive; the launcher re-reads it). Beats `AndroidDrawable` and `Icon`. Ignored on iOS (no runtime-bitmap shortcut API). |
@@ -394,22 +394,29 @@ public class ShortcutRouter : MonoBehaviour
 `IconType` resolves differently per platform. **iOS** maps it to Apple's
 built-in `UIApplicationShortcutIconType` catalog — the OS owns those glyphs,
 nothing to ship. **Android has no system glyph catalog**, so the same
-`IconType` resolves to a drawable *name* looked up in the app:
+`IconType` resolves to a drawable *name* looked up in the app — yours first,
+then the package's own:
 
 ```java
-getResources().getIdentifier("ic_quickaction_add", "drawable", getPackageName())
+getIdentifier("ic_quickaction_add", "drawable", pkg)          // your drawable, if any
+getIdentifier("ic_quickaction_builtin_add", "drawable", pkg)  // else the built-in
 ```
 
 **Four catalog entries ship built in** — `Add`, `Compose`, `Favorite` and
 `Play`, the ones the demo uses. On every Android build with the define on, the
-package's post-processor writes `ic_quickaction_<name>.png` for each into the
-generated Gradle project (`unityLibrary/src/main/res/drawable-xhdpi/`), next to
-the keep rule that carries them through resource shrinking, so they render
-with nothing added to your project. They are 96×96 white glyphs on a coloured
-disc, so the icon carries its own contrast. Every CI build reads all four back
-out of the APK with `aapt2`, and the shrink experiment holds them to a
-byte-identical bar through `shrinkResources`; what nobody has done yet is look
-at them on a launcher — the screenshot at the top of this file predates them.
+package's post-processor writes `ic_quickaction_builtin_<name>.xml` for each
+into the generated Gradle project (`unityLibrary/src/main/res/drawable/`), next
+to the keep rule that carries them through resource shrinking. They are
+VectorDrawables — one density-independent file each, about 2 KB for all four —
+of a white glyph on a coloured disc, so the icon carries its own contrast
+(API 26+ launchers wrap a legacy shortcut icon onto a white plate, where a
+glyph alone would vanish). A **static** item with one of those four as its
+`Icon` and no `AndroidDrawable` bakes a reference to the built-in, so it
+renders on a cold install too. Every CI build reads all four back out of the
+APK with `aapt2`, the shrink experiment holds them unchanged through
+`shrinkResources`, and the emulator smoke requires the registered shortcuts to
+have resolved an icon resource; what nobody has done yet is look at them on a
+launcher — the screenshot at the top of this file predates them.
 
 **The other 25 entries stay blank until you add a drawable**, and so does any
 built-in one you would rather draw yourself. Create an **Android Library
@@ -423,20 +430,24 @@ Assets/QuickActionIcons.androidlib/
 ```
 
 Then either name the drawable `ic_quickaction_<icontype>` so `Icon` finds it, or
-point at any resource explicitly with `AndroidDrawable = "my_icon"`.
+point at any resource explicitly with `AndroidDrawable = "my_icon"`. Draw it
+with its own background — a white glyph on transparent is invisible on the
+white plate API 26+ launchers wrap it onto (`store~/example-shortcut-icons/`
+shows the four built-ins as PNGs, in the style that works).
 
-**Your drawable always wins.** If your project provides an `ic_quickaction_<name>`
-for one of the four built-in names — this very recipe, which the README
-documented before the built-ins existed — the package does not write its own
-for that name: it logs the skip and removes a copy of its own that an earlier
-build may have left. This matters because the Android Gradle Plugin resolves
-two modules declaring one drawable by priority and `unityLibrary` outranks the
-modules it depends on — written regardless, ours would silently replace yours.
-The scan covers the module wherever Unity puts it (nested under
-`unityLibrary/`, at the Gradle root, or reached only through a `projectDir`
-in `settings.gradle` when exporting with *Symlink Sources*), and any extension
-or density bucket counts (`.png`, `.webp`, an `<adaptive-icon>` `.xml` under
-`drawable-anydpi-v26`).
+**Your drawable always wins — by name, not by luck.** The built-ins live under
+their own prefix, `ic_quickaction_builtin_`, so the package never writes,
+overwrites or even looks for a file under yours; the two coexist in the merged
+resources and the runtime lookup asks for `ic_quickaction_<name>` first. That
+holds however your drawable reaches the build — an `.androidlib`, an `.aar`, a
+Maven dependency in `mainTemplate.gradle` — because nothing depends on the
+package seeing it. One asymmetry to know: a **static** item cannot be resolved
+at runtime, so with `Icon` alone it bakes the built-in; to bake yours instead,
+set `AndroidDrawable = "ic_quickaction_<name>"` on that item (or any name you
+like). Want no package art in your APK at all? Untick **Write built-in Android
+icons** in *Project Settings ▸ Quick Actions*: nothing is written, a copy an
+earlier build left behind is removed, and those four render blank unless you
+ship your own. A define-off production build carries none of this either way.
 
 Three traps worth knowing:
 
@@ -751,7 +762,8 @@ define on it writes `res/raw/quickactions_keep.xml` carrying
 `tools:keep="@drawable/ic_quickaction_*"` into the generated Gradle project, so
 every `ic_quickaction_<name>` drawable survives even **strict** shrink mode —
 which any *one* library in your app can switch the whole app into, with no way
-for a package to opt out. No action needed for `ic_quickaction_*` names.
+for a package to opt out. No action needed for `ic_quickaction_*` names — the
+built-in `ic_quickaction_builtin_*` ones included, same glob.
 
 A **custom `AndroidDrawable`** name used only from a runtime `Add(...)` is
 different: it has no static reference *and* never appears as a string constant in
@@ -830,7 +842,7 @@ tools~/verify.sh    # .meta + C# compile (10 configs) + unit tests + Android plu
 
 `verify.sh` compiles the C# in **10 configurations** (0 warnings), runs the **98**
 headless unit tests via `dotnet test`, and compiles and smoke-tests the Android
-Java plugin (**103** checks). Those tests (bar 29 headless-only ones) plus 5
+Java plugin (**108** checks). Those tests (bar 29 headless-only ones) plus 5
 `JsonUtility` serialization tests run in Unity's **Test Runner** from
 `Tests/Editor/` — **74** there. See [`.verify/README.md`](./.verify/README.md)
 for how the stubs work.

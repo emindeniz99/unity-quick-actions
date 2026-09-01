@@ -17,7 +17,7 @@ runs seven checks — `.meta` completeness, the C# in 10 configurations against
 the Unity stubs in `.verify/`, the NUnit suite, the Android Java plugin compile
 plus smoke test, the frozen device strings, the `package.json` / `CHANGELOG` /
 install-pin coherence that step 1 below leans on as "check 6", and the
-generated Android icon bytes (see [`CONTRIBUTING.md`](./CONTRIBUTING.md) §1
+generated Android icons (see [`CONTRIBUTING.md`](./CONTRIBUTING.md) §1
 for each). Anything short of `VERIFY: PASS` blocks the release —
 the failing check is fixed first, not worked around.
 

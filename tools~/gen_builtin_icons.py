@@ -1,38 +1,40 @@
 #!/usr/bin/env python3
 """Generate Editor/Android/QuickActionsBuiltInIcons.cs — the built-in Android
-shortcut icons as PNG bytes embedded in C#.
+shortcut icons the build post-processor writes into the generated Gradle project.
 
-Why embed
----------
-On Android the Java bridge resolves an IconType by NAME: getIdentifier(
-"ic_quickaction_" + name, "drawable", pkg). The package therefore has to get a
-drawable with that name into the app, and the build post-processor already
-writes into the generated Gradle project. Shipping the PNGs as package assets
-would mean resolving the package's own path at build time — which differs
-between a Git/OpenUPM install (Packages/…) and a .unitypackage one (Assets/…) —
-plus a .meta per binary. Embedding the bytes makes every channel deliver the
-same bytes, and lets the headless harness compare what the post-processor
-wrote against the source of truth. ~2 KB of generated source.
+Why this exists. On Android an IconType is resolved BY NAME at runtime
+(QuickActionsBridge.java: getIdentifier("ic_quickaction_" + name), then
+getIdentifier("ic_quickaction_builtin_" + name)), so a drawable has to exist in
+the app or the launcher shows a blank square. The package ships four, under the
+second prefix — its own, which no project writes — so a project's
+ic_quickaction_<name> from any delivery channel (.androidlib, .aar, Maven) is
+never overwritten or shadowed; precedence is the lookup order, not AGP's module
+ranking.
 
-Why no Pillow
--------------
-tools~/verify.sh runs `--check` on every push, in CI containers that install
-only dotnet and a JDK. The glyphs are a few polygons, so they are rasterised
-here directly (supersampled, even-odd fill) and encoded with zlib. The output
-is byte-deterministic: same source, same file.
+What it emits. One VectorDrawable per icon: density-independent, so a single
+res/drawable/ file renders crisp at every launcher icon density (a raster bucket
+would be upsampled on xxhdpi/xxxhdpi phones), and plain text, so the generated
+C# carries readable XML rather than base64. The art is a white glyph on a
+full-bleed indigo disc: a legacy (non-adaptive) shortcut drawable is drawn raw
+on API 25 and wrapped onto a WHITE plate by API 26+ launchers (Launcher3's
+BaseIconFactory hardcodes Color.WHITE), so the icon must carry its own contrast
+— white-on-transparent is invisible there.
 
-Usage
------
-  python3 tools~/gen_builtin_icons.py            # (re)write the .cs
-  python3 tools~/gen_builtin_icons.py --check    # exit 1 if the .cs is stale
-  python3 tools~/gen_builtin_icons.py --preview  # ASCII proof of each glyph
-  python3 tools~/gen_builtin_icons.py --png-out DIR   # dump the PNGs
+Why embedded in a .cs. A Git/OpenUPM install and a .unitypackage one deliver the
+same bytes with no package-path resolution, and tools~/verify.sh check 7 holds
+the file to this generator byte for byte.
+
+    python3 tools~/gen_builtin_icons.py                 # (re)write the .cs
+    python3 tools~/gen_builtin_icons.py --check         # verify.sh: stale => exit 1
+    python3 tools~/gen_builtin_icons.py --preview       # ASCII proof of each glyph
+    python3 tools~/gen_builtin_icons.py --png-out DIR   # the same art as 96x96 PNGs
+                                                        # (store collateral, and what a
+                                                        # user's own .androidlib could
+                                                        # carry under the user prefix)
 """
 from __future__ import annotations
 
 import argparse
-import base64
-import hashlib
 import math
 import pathlib
 import struct
@@ -42,18 +44,14 @@ import zlib
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 OUTPUT = ROOT / "Editor" / "Android" / "QuickActionsBuiltInIcons.cs"
 
-# drawable-xhdpi: 48dp at 2x. One density only — a white/dark glyph upscales
-# cleanly, and this is the qualifier the README tells users to use for their
-# own drawables, so a user file and ours land in the same bucket.
+# The vector's viewport (and the PNG preview's pixel size). 48dp is Google's
+# app-shortcut icon size; the launcher scales the drawable to whatever it needs.
 SIZE = 96
-DENSITY = "xhdpi"
-SUPERSAMPLE = 4  # per axis → 16 coverage samples per pixel
+DP = 48
+SUPERSAMPLE = 4  # PNG preview only: per axis → 16 coverage samples per pixel
 
 # ---- ART STYLE --------------------------------------------------------------
-# A legacy (non-adaptive) shortcut drawable is shown RAW on API 25 and WRAPPED
-# onto an adaptive background by API 26+ launchers (Launcher3 wraps onto white),
-# so the icon must carry its own contrast: a filled disc behind the glyph.
-# Change these and re-run; the harness compares bytes, not looks.
+# Change these and re-run; the harness compares text, not looks.
 BACKGROUND = (0x3F, 0x51, 0xB5)   # indigo disc; None = transparent (glyph only)
 BACKGROUND_RADIUS = 46            # of 48 — a 2 px transparent margin
 GLYPH = (0xFF, 0xFF, 0xFF)
@@ -68,8 +66,8 @@ ICONS = [
     ("Play", "play", "play"),
 ]
 
-# Same geometry as tools~/gen_store_images.py make_shortcut_icons(), on a 96
-# canvas, so the store screenshots and the shipped icons agree.
+# Same glyph GEOMETRY as tools~/gen_store_images.py once drew (that script now
+# delegates here, so the store's example PNGs are this art too), on a 96 canvas.
 
 
 def star_points():
@@ -82,8 +80,8 @@ def star_points():
 
 
 def rect(x0, y0, x1, y1):
-    # PIL's rectangle() is inclusive of x1/y1, so the drawn box is one pixel
-    # wider than the coordinates; mirror that so the two renderers agree.
+    # PIL's rectangle() was inclusive of x1/y1, so the drawn box was one pixel
+    # wider than the coordinates; kept so the art does not shift by a pixel.
     return [(x0, y0), (x1 + 1, y0), (x1 + 1, y1 + 1), (x0, y1 + 1)]
 
 
@@ -95,7 +93,137 @@ GLYPHS = {
 }
 
 
-# ---- rasteriser -------------------------------------------------------------
+# ---- VectorDrawable ---------------------------------------------------------
+
+def num(v):
+    """Shortest exact-enough decimal: 48 → '48', 33.5 → '33.5', 12.345 → '12.35'."""
+    s = "%.2f" % v
+    s = s.rstrip("0").rstrip(".")
+    return "0" if s in ("", "-0") else s
+
+
+def polygon_path(polys):
+    """Every polygon as a closed subpath; nonzero fill unions overlapping ones."""
+    parts = []
+    for poly in polys:
+        parts.append("M" + "L".join("%s,%s" % (num(x), num(y)) for x, y in poly) + "Z")
+    return "".join(parts)
+
+
+def disc_path():
+    c = SIZE / 2
+    r = BACKGROUND_RADIUS
+    return "M%s,%sA%s,%s 0 1,1 %s,%sA%s,%s 0 1,1 %s,%sZ" % (
+        num(c - r), num(c), num(r), num(r), num(c + r), num(c), num(r), num(r), num(c - r), num(c))
+
+
+def hex_color(rgb):
+    return "#%02X%02X%02X" % rgb
+
+
+def vector_xml(kind):
+    lines = [
+        '<?xml version="1.0" encoding="utf-8"?>',
+        "<!-- Written by com.emindeniz99.quick-actions (tools~/gen_builtin_icons.py). A",
+        "     project's own ic_quickaction_<name> takes precedence over this file. -->",
+        '<vector xmlns:android="http://schemas.android.com/apk/res/android"',
+        '    android:width="%ddp"' % DP,
+        '    android:height="%ddp"' % DP,
+        '    android:viewportWidth="%d"' % SIZE,
+        '    android:viewportHeight="%d">' % SIZE,
+    ]
+    if BACKGROUND is not None:
+        lines += [
+            "  <path",
+            '      android:fillColor="%s"' % hex_color(BACKGROUND),
+            '      android:pathData="%s" />' % disc_path(),
+        ]
+    lines += [
+        "  <path",
+        '      android:fillColor="%s"' % hex_color(GLYPH),
+        '      android:pathData="%s" />' % polygon_path(GLYPHS[kind]),
+        "</vector>",
+    ]
+    return "\n".join(lines) + "\n"
+
+
+def icons():
+    """→ [(member, suffix, xml_text)] in ICONS order."""
+    return [(member, suffix, vector_xml(kind)) for member, suffix, kind in ICONS]
+
+
+# ---- C# ---------------------------------------------------------------------
+
+def cs_literal(text, indent):
+    """The XML as one C# string: a concatenation of escaped "…\\n" line literals."""
+    out = []
+    for line in text.split("\n")[:-1]:  # the text ends in "\n", so the last split is ""
+        out.append('"%s\\n"' % line.replace("\\", "\\\\").replace('"', '\\"'))
+    return (" +\n" + indent).join(out)
+
+
+def generate():
+    out = []
+    w = out.append
+    w("// <auto-generated>")
+    w("//   Written by tools~/gen_builtin_icons.py. Do not edit by hand: change the")
+    w("//   generator and re-run it. tools~/verify.sh fails when this file is stale.")
+    w("// </auto-generated>")
+    w("//")
+    w("// The built-in Android shortcut icons as VectorDrawable XML. On Android an")
+    w("// IconType is resolved BY NAME at runtime — QuickActionsBridge.java tries the")
+    w("// project's ic_quickaction_<name> first, then ic_quickaction_builtin_<name> —")
+    w("// so the drawable has to exist in the app, and the build post-processor writes")
+    w("// these into the generated Gradle project under the second prefix. Vectors,")
+    w("// so one density-independent file per icon; embedded rather than shipped as")
+    w("// assets so a Git/OpenUPM install and a .unitypackage one deliver the same")
+    w("// bytes with no package-path resolution, and so the headless harness can hold")
+    w("// the post-processor to this source of truth byte for byte.")
+    w("//")
+    w("// %ddp on a %d viewport, %s glyph%s." % (
+        DP, SIZE,
+        "white" if GLYPH == (255, 255, 255) else hex_color(GLYPH),
+        "" if BACKGROUND is None else " on a %s disc" % hex_color(BACKGROUND)))
+    w("namespace EminDeniz99.QuickActions.Editor")
+    w("{")
+    w("    internal static class QuickActionsBuiltInIcons")
+    w("    {")
+    w("        internal sealed class Entry")
+    w("        {")
+    w("            /// <summary>The catalog value this drawable renders.</summary>")
+    w("            public readonly IconType Icon;")
+    w("            /// <summary>The &lt;name&gt; in ic_quickaction_builtin_&lt;name&gt; — must equal")
+    w("            /// the Java ICON_NAMES entry for <see cref=\"Icon\"/>'s value.</summary>")
+    w("            public readonly string Name;")
+    w("            /// <summary>The VectorDrawable, verbatim.</summary>")
+    w("            public readonly string Xml;")
+    w("")
+    w("            public Entry(IconType icon, string name, string xml)")
+    w("            {")
+    w("                Icon = icon;")
+    w("                Name = name;")
+    w("                Xml = xml;")
+    w("            }")
+    w("        }")
+    w("")
+    w("        /// <summary>The res/ subdirectory the entries are written under: a vector is")
+    w("        /// density-independent, so the unqualified one.</summary>")
+    w("        internal const string ResourceDirectory = \"drawable\";")
+    w("        /// <summary>The viewport every entry draws on (width and height).</summary>")
+    w("        internal const int Viewport = %d;" % SIZE)
+    w("")
+    w("        internal static readonly Entry[] Entries =")
+    w("        {")
+    for member, suffix, xml in icons():
+        w("            new Entry(IconType.%s, \"%s\"," % (member, suffix))
+        w("                %s)," % cs_literal(xml, "                "))
+    w("        };")
+    w("    }")
+    w("}")
+    return "\n".join(out) + "\n"
+
+
+# ---- PNG preview (same art, rasterised) --------------------------------------
 
 def inside(poly, x, y):
     """Even-odd point-in-polygon."""
@@ -156,8 +284,6 @@ def render(kind):
     return rows
 
 
-# ---- PNG --------------------------------------------------------------------
-
 def chunk(tag, data):
     return (struct.pack(">I", len(data)) + tag + data
             + struct.pack(">I", zlib.crc32(tag + data) & 0xFFFFFFFF))
@@ -174,90 +300,23 @@ def encode_png(rows):
             + chunk(b"IDAT", zlib.compress(bytes(raw), 9)) + chunk(b"IEND", b""))
 
 
-def icons():
-    """→ [(member, suffix, png_bytes)] in ICONS order."""
-    return [(member, suffix, encode_png(render(kind))) for member, suffix, kind in ICONS]
+def write_pngs(directory):
+    """ic_quickaction_<name>.png — the USER prefix: these are examples of what a
+    project's own drawable could be, not the built-ins (those are vectors)."""
+    d = pathlib.Path(directory)
+    d.mkdir(parents=True, exist_ok=True)
+    for member, suffix, kind in ICONS:
+        target = d / ("ic_quickaction_%s.png" % suffix)
+        target.write_bytes(encode_png(render(kind)))
+        print("wrote %s (%d bytes)" % (target, target.stat().st_size))
 
-
-# ---- C# ---------------------------------------------------------------------
-
-def cs_literal(data, indent):
-    """A base64 string, split into 76-char concatenated segments."""
-    b64 = base64.b64encode(data).decode("ascii")
-    parts = [b64[i:i + 76] for i in range(0, len(b64), 76)]
-    return (" +\n" + indent).join('"%s"' % p for p in parts)
-
-
-def generate():
-    out = []
-    w = out.append
-    w("// <auto-generated>")
-    w("//   Written by tools~/gen_builtin_icons.py. Do not edit by hand: change the")
-    w("//   generator and re-run it. tools~/verify.sh fails when this file is stale.")
-    w("// </auto-generated>")
-    w("//")
-    w("// The built-in Android shortcut icons as PNG bytes. On Android an IconType is")
-    w("// resolved BY NAME at runtime — getIdentifier(\"ic_quickaction_\" + name) in")
-    w("// QuickActionsBridge.java — so the drawable has to exist in the app, and the")
-    w("// build post-processor writes these into the generated Gradle project. They")
-    w("// are embedded rather than shipped as assets so a Git/OpenUPM install and a")
-    w("// .unitypackage one deliver the same bytes with no package-path resolution,")
-    w("// and so the headless harness can hold the post-processor to this source of")
-    w("// truth byte for byte.")
-    w("//")
-    w("// %dx%d RGBA, one density bucket (drawable-%s), %s glyph%s." % (
-        SIZE, SIZE, DENSITY,
-        "white" if GLYPH == (255, 255, 255) else "#%02X%02X%02X" % GLYPH,
-        "" if BACKGROUND is None else " on a #%02X%02X%02X disc" % BACKGROUND))
-    w("namespace EminDeniz99.QuickActions.Editor")
-    w("{")
-    w("    internal static class QuickActionsBuiltInIcons")
-    w("    {")
-    w("        internal sealed class Entry")
-    w("        {")
-    w("            /// <summary>The catalog value this drawable renders.</summary>")
-    w("            public readonly IconType Icon;")
-    w("            /// <summary>The &lt;name&gt; in ic_quickaction_&lt;name&gt; — must equal the")
-    w("            /// Java ICON_NAMES entry for <see cref=\"Icon\"/>'s value.</summary>")
-    w("            public readonly string Name;")
-    w("            private readonly string _base64;")
-    w("")
-    w("            public Entry(IconType icon, string name, string base64)")
-    w("            {")
-    w("                Icon = icon;")
-    w("                Name = name;")
-    w("                _base64 = base64;")
-    w("            }")
-    w("")
-    w("            /// <summary>The PNG, decoded fresh on every call.</summary>")
-    w("            public byte[] Bytes => System.Convert.FromBase64String(_base64);")
-    w("        }")
-    w("")
-    w("        /// <summary>Pixel width and height of every entry.</summary>")
-    w("        internal const int PixelSize = %d;" % SIZE)
-    w("        /// <summary>The res/ qualifier the entries are written under.</summary>")
-    w("        internal const string DensityQualifier = \"%s\";" % DENSITY)
-    w("")
-    w("        internal static readonly Entry[] Entries =")
-    w("        {")
-    for member, suffix, png in icons():
-        w("            // sha256 %s" % hashlib.sha256(png).hexdigest())
-        w("            new Entry(IconType.%s, \"%s\"," % (member, suffix))
-        w("                %s)," % cs_literal(png, "                "))
-    w("        };")
-    w("    }")
-    w("}")
-    return "\n".join(out) + "\n"
-
-
-# ---- CLI --------------------------------------------------------------------
 
 def preview(rows):
-    """ASCII: '#' glyph, 'o' disc, '.' transparent (2 columns per pixel row-pair)."""
+    """ASCII: '#' glyph, 'o' disc, '.' transparent (one row per two pixel rows)."""
     lines = []
     for y in range(0, SIZE, 2):
         line = []
-        for x in range(0, SIZE, 1):
+        for x in range(SIZE):
             r, g, b, a = rows[y][x]
             if a < 64:
                 line.append(".")
@@ -269,6 +328,8 @@ def preview(rows):
     return "\n".join(lines)
 
 
+# ---- CLI --------------------------------------------------------------------
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n", 1)[0])
     ap.add_argument("--check", action="store_true", help="fail if the generated file is stale")
@@ -278,16 +339,12 @@ def main():
 
     if args.preview:
         for member, suffix, kind in ICONS:
-            print("ic_quickaction_%s (IconType.%s):" % (suffix, member))
+            print("ic_quickaction_builtin_%s (IconType.%s):" % (suffix, member))
             print(preview(render(kind)))
             print()
 
     if args.png_out:
-        d = pathlib.Path(args.png_out)
-        d.mkdir(parents=True, exist_ok=True)
-        for member, suffix, png in icons():
-            (d / ("ic_quickaction_%s.png" % suffix)).write_bytes(png)
-            print("wrote %s (%d bytes)" % (d / ("ic_quickaction_%s.png" % suffix), len(png)))
+        write_pngs(args.png_out)
 
     text = generate()
     if args.check:

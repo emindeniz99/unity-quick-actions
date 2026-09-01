@@ -35,9 +35,11 @@ namespace EminDeniz99.QuickActions.Editor.NativeGate
         private const string ShortcutsResource = "quickactions_shortcuts";
         private const string StringsResource = "quickactions_strings";
         private const string KeepResource = "quickactions_keep";
-        // The built-in icon prefix the gated post-processor writes under; pinned
-        // across files by tools~/check_frozen_strings.py.
-        private const string IconPrefix = "ic_quickaction_";
+        // The prefix the gated post-processor writes the package's OWN drawables
+        // under — distinct from the ic_quickaction_ a project's icons carry, which
+        // is what makes a prefix sweep safe. Pinned across files by
+        // tools~/check_frozen_strings.py.
+        private const string BuiltInIconPrefix = "ic_quickaction_builtin_";
 
         public int callbackOrder => 90;
 
@@ -131,15 +133,15 @@ namespace EminDeniz99.QuickActions.Editor.NativeGate
                     foreach (var localeDir in Directory.GetDirectories(resDir, "values-*"))
                         SafeDelete(Path.Combine(localeDir, StringsResource + ".xml"));
                     // ...and the built-in shortcut icons the gated post-processor writes
-                    // (drawable*/ic_quickaction_<name>.png). A prefix glob is safe here
-                    // and only here: nothing but this package writes that prefix into
-                    // the two generated modules' own src/main/res, and a project's own
-                    // icons live in its .androidlib — a separate module (Unity nests it
-                    // under unityLibrary/<Name>.androidlib/) whose res this loop never
-                    // visits.
-                    foreach (var drawableDir in Directory.GetDirectories(resDir, "drawable*"))
-                        foreach (var icon in Directory.GetFiles(drawableDir, IconPrefix + "*.png"))
-                            SafeDelete(icon);
+                    // (drawable/ic_quickaction_builtin_<name>.xml). Only in the module it
+                    // writes to (unityLibrary — the `path` this callback is handed), by
+                    // its own prefix, in any extension: no project writes
+                    // ic_quickaction_builtin_, and a project's ic_quickaction_<name> —
+                    // wherever it lives, this module's res included — never matches.
+                    if (module == path)
+                        foreach (var drawableDir in Directory.GetDirectories(resDir, "drawable*"))
+                            foreach (var icon in Directory.GetFiles(drawableDir, BuiltInIconPrefix + "*"))
+                                SafeDelete(icon);
                 }
             }
         }
