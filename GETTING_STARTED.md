@@ -198,6 +198,7 @@ Make a **production** build with the define **removed**:
 |---|---|
 | `QuickActions` type not found in your scripts / sample inert | `QUICKACTIONS_ENABLED` define missing (step A3) — add it for that platform |
 | Imported it and nothing happens | Same thing: the package is opt-in by design. Add the define (step A3). |
+| Define is on, but `QuickActions` is still not found | Your script sits in an assembly definition that doesn't reference `EminDeniz99.QuickActions` — add it under the asmdef's *Assembly Definition References* (`Assembly-CSharp` needs nothing). |
 | Nothing happens in the Editor Play mode | Expected — the OS menu only exists on a device, or on the iOS Simulator (Part B). Use the Quick Actions Simulator window (step A5) to test tap handling in-Editor |
 | Long-press shows no shortcuts | Did you press "Add 3 shortcuts" first? Android < 7.1 (API 25) isn't supported |
 | The package's tests don't show in the Test Runner | Add `"testables": ["com.emindeniz99.quick-actions"]` to your `Packages/manifest.json` |

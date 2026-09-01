@@ -13,8 +13,23 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **`AGENTS.md`** — the shortest correct integration path for an AI coding
+  agent (or a hurried human): install, define, asmdef reference, the guarded
+  snippet, the checks that prove it worked, and the don'ts. The README gains a
+  60-second quickstart with the same guarded snippet, a contents list, and an
+  embedded-package (vendoring) install option.
+
 ### Changed
 
+- **The `.unitypackage` carries the docs the README links to.** The classic
+  install now includes `GETTING_STARTED.md`, `SECURITY.md`,
+  `PRODUCTION_READINESS.md` and `AGENTS.md` next to the four root docs it
+  already shipped, so a reader of the packed README no longer hits dangling
+  links. The README's usage example is `#if QUICKACTIONS_ENABLED`-guarded,
+  says where the settings asset lives, and the API table states that a `null`
+  item throws — the one way any call throws.
 - **CI proves the gate and measures the footprint on every push.** A new
   `gate-off` job builds the 2022.3 testbed with `QUICKACTIONS_ENABLED` off —
   an IL2CPP APK in `android-build`'s exact configuration and an iOS Simulator

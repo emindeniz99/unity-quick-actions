@@ -50,6 +50,58 @@ hardware; iOS 13+ opens it with a plain long-press on every device.
   Unity's activity, so it works on both `UnityPlayerActivity` (2021/2022) and
   `UnityPlayerGameActivity` (6+).
 
+## 60-second quickstart
+
+1. **Install** — Package Manager ▸ *Add package from git URL…*:
+   `https://github.com/emindeniz99/unity-quick-actions.git#v0.5.0`
+2. **Turn it on** — **Window ▸ Quick Actions ▸ Enable Quick Actions** adds the
+   `QUICKACTIONS_ENABLED` define for Standalone, Android and iOS. The package is
+   inert without it, by design.
+3. **Wire it up** from a script in your first scene — guarded, so the project
+   still compiles when the define is off:
+
+   ```csharp
+   #if QUICKACTIONS_ENABLED
+   using EminDeniz99.QuickActions;
+   #endif
+   using UnityEngine;
+
+   public class ShortcutSetup : MonoBehaviour
+   {
+   #if QUICKACTIONS_ENABLED
+       void Awake()
+       {
+           // Fires on every tap, including the cold launch that started the app.
+           QuickActions.Performed += id => Debug.Log($"Tapped: {id}");
+       }
+
+       void Start()
+       {
+           QuickActions.Add(new QuickActionItem(
+               id: "new_game", title: "New Game",
+               subtitle: "Start fresh", icon: IconType.Add));
+       }
+   #endif
+   }
+   ```
+
+   If that script lives in its own assembly definition, add
+   `EminDeniz99.QuickActions` to the asmdef's references; `Assembly-CSharp`
+   sees the package with no setup.
+4. **See it** — **Window ▸ Quick Actions ▸ Simulator** fires taps in the
+   Editor; build to a device (or the iOS Simulator) and long-press the app icon
+   for the real menu.
+
+Longer walk-through: [GETTING_STARTED](./GETTING_STARTED.md). Handing the
+integration to an AI coding agent: [AGENTS.md](./AGENTS.md).
+
+## Contents
+
+- [Status](#status) · [Install](#install) · [Dev-only — excluding it from production](#dev-only--excluding-it-completely-from-production-builds)
+- [Usage](#usage) · [API](#api) · [Android icons](#android-icons) · [Test in the Editor](#test-in-the-editor--no-device-needed) · [Static shortcuts](#static-shortcuts-baked-into-the-build) · [Build-time placeholders](#build-time-placeholders--app-info-on-long-press)
+- [How it works](#how-it-works) · [The OS shortcut cap](#known-limits--the-os-shortcut-cap) · [Host coexistence](#host-coexistence--the-package-touches-only-its-own-shortcuts) · [Localization](#known-limits--localization) · [Android build variants](#known-limits--android-build-variants-and-static-shortcuts) · [Android minification](#known-limits--android-minification-r8proguard--resource-shrinking)
+- [Security](#security-a-shortcut-tap-is-not-an-authenticated-action) · [Limitations / roadmap](#limitations--roadmap) · [Verification](#verification--running-the-checks-yourself) · [Notes / learnings](#notes--learnings)
+
 ## Status
 
 This is **0.5.0**, a pre-1.0 release. Here is exactly what has been proven and
@@ -206,6 +258,18 @@ or:
 "com.emindeniz99.quick-actions": "file:../path/to/unity-quick-actions"
 ```
 
+### 5. Vendor the source (embedded package)
+
+Copy the repository — a release tag's tree, ideally — into your project as
+`Packages/com.emindeniz99.quick-actions/` (the folder name must be the package
+name; `package.json` sits at its root). Unity treats a folder under `Packages/`
+as an **embedded package**: no `manifest.json` entry, the source is editable
+and versioned with your game, and the `~`-suffixed folders (`tools~/`,
+`Examples~/`, `Samples~/`) are ignored by the importer exactly as in any other
+install. Upgrade by replacing the folder. Pick this if your team keeps every
+dependency in the repo or expects to patch the package — it is the same
+assemblies as methods 1–4, so the one-copy rule above still applies.
+
 ---
 
 After installing, import the **Demo** sample from the package page to try it on a
@@ -331,6 +395,7 @@ up later, or only in a scene loaded afterward, and you'll miss the cold-launch
 tap (warm taps still arrive).
 
 ```csharp
+#if QUICKACTIONS_ENABLED
 using System.Collections.Generic;
 using EminDeniz99.QuickActions;
 using UnityEngine;
@@ -359,7 +424,15 @@ public class ShortcutRouter : MonoBehaviour
     // Fires on every tap, including the cold launch that started the app.
     void OnShortcut(string id) => Route(id);
 }
+#endif
 ```
+
+The `#if` keeps the game compiling in a build where the define is off — the
+recommended production setup (see [Dev-only](#dev-only--excluding-it-completely-from-production-builds)).
+If the script lives in its own assembly definition, add
+`EminDeniz99.QuickActions` to that asmdef's references (and
+`EminDeniz99.QuickActions.Editor` to an Editor asmdef that uses the build-time
+hooks); scripts in `Assembly-CSharp` see the package with no setup.
 
 ### API
 
@@ -370,11 +443,11 @@ public class ShortcutRouter : MonoBehaviour
 | `event Action<string> Performed` | Tapped action id (main thread; includes cold launch). |
 | `string LastPerformed` | Id the app was last launched/resumed from, or null. |
 | `void ResetLastPerformed()` | Clear `LastPerformed`. |
-| `bool Add(QuickActionItem)` | Add one; false if invalid, id already added, or the OS set couldn't be read / the OS rejected the write (transient — retry later). |
-| `void AddList(IList<QuickActionItem>)` | Add several in one OS update (same transient no-op cases as `Add`). |
+| `bool Add(QuickActionItem)` | Add one; false if invalid, id already added, or the OS set couldn't be read / the OS rejected the write (transient — retry later). A `null` item throws `ArgumentNullException` — the only way any call here throws. |
+| `void AddList(IList<QuickActionItem>)` | Add several in one OS update (same transient no-op cases as `Add`; a `null` list throws). |
 | `List<QuickActionItem> GetAll()` | Snapshot of the currently installed dynamic actions (OS-reconciled). |
 | `QuickActionItem GetById(string)` | Lookup by id. |
-| `bool Update(QuickActionItem)` | Replace the added action with the same `Id` **in place** — list position (launcher rank) preserved, one OS update, Android user-pinned copies refresh too. False when not added (use `Add`), invalid, the OS set couldn't be read, or the OS refused the write (all leave the previous item in place) — or when the OS **dropped** the pushed item (budget shrank; the shortcut is then gone, re-`Add` when there's room). |
+| `bool Update(QuickActionItem)` | `null` throws `ArgumentNullException`. Replace the added action with the same `Id` **in place** — list position (launcher rank) preserved, one OS update, Android user-pinned copies refresh too. False when not added (use `Add`), invalid, the OS set couldn't be read, or the OS refused the write (all leave the previous item in place) — or when the OS **dropped** the pushed item (budget shrank; the shortcut is then gone, re-`Add` when there's room). |
 | `bool Remove(QuickActionItem)` / `RemoveById(string)` | Remove one. |
 | `void RemoveAll()` | Remove every action. |
 | `bool IsAdded(QuickActionItem)` / `IsAdded(string)` | Membership test. |
@@ -493,7 +566,11 @@ where the long-press menu works — only to verify the OS menu itself.
 
 For shortcuts that must exist on the **first** launch (before any runtime
 `Add`), open **Project Settings ▸ Quick Actions**, click *Create settings
-asset*, and add entries. At build time:
+asset*, and add entries. The asset is created at
+`Assets/Settings/QuickActionsSettings.asset` — commit it with the project. It
+is found by type, not path, so it can live anywhere under `Assets/` (the
+testbeds keep theirs under `Assets/QuickActions/`); deliberately not the
+`.unitypackage` install folder, so a re-import never deletes it. At build time:
 
 <img src="https://raw.githubusercontent.com/emindeniz99/unity-quick-actions/main/store~/device-android-dynamic.jpg" alt="Four shortcuts on Android after the demo added two at runtime" width="240" align="right">
 
