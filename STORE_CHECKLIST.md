@@ -129,7 +129,8 @@ because it's a build output; the identical artifact is attached to every
       licensed editor — see [`PRODUCTION_READINESS.md`](./PRODUCTION_READINESS.md);
       2021.3 is in fact the most thoroughly verified line, down to an Android
       player build and an Xcode compile of the generated iOS project.)
-- [ ] `tools~/verify.sh` is green (compile + unit tests + Android plugin).
+- [x] `tools~/verify.sh` is green (7 checks) — enforced by `ci.yml` on every
+      push and PR.
 - [ ] Switch build target to **iOS** and **Android** → Editor still compiles
       (confirms the asmdef extension-DLL references resolve — see ROADMAP).
 - [ ] Build to an **iOS device** (needs macOS/Xcode) and an **Android device**:

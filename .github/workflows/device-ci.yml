@@ -1,11 +1,12 @@
 name: device smoke
 
-# EXPERIMENTAL — manual only. It needs two things this repo cannot supply on its
-# own: repository Actions enabled, and a URL to a Unity-built DEVELOPMENT APK of
-# the Demo sample (Scripting Define Symbols must contain QUICKACTIONS_ENABLED).
-# There is no Unity licence in CI, so nothing here can build that APK — wiring
-# this to push/pull_request would fail every commit for a reason that says
-# nothing about the package. Hence workflow_dispatch and nothing else.
+# Manual lane for an APK this repo did not build. The per-push emulator smoke
+# lives in unity-ci.yml (android-build -> android-smoke, on every code push and
+# PR since the Unity licence secrets landed on 2026-08-21); this workflow exists
+# only to drive the same script against an arbitrary URL to a Unity-built
+# DEVELOPMENT APK of the Demo sample (Scripting Define Symbols must contain
+# QUICKACTIONS_ENABLED) — a build from someone's machine, an older commit, an
+# editor the matrix does not carry. Hence workflow_dispatch and nothing else.
 #
 # Runs tools~/device-smoke/android_device_smoke.sh
 # against an emulator: shortcuts must reach ShortcutManager, and a tap on one

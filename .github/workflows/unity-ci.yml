@@ -7,9 +7,11 @@ name: unity
 # it) fed into the adb device smoke, and an iOS Simulator-SDK Xcode export per
 # testbed with an unsigned xcodebuild compile on macOS for the lines whose
 # simulator support allows it. One further Android leg, `android-shrink-verify`,
-# exports the Gradle project on 2022.3 and assembles a minified release build to
-# settle the question no APK leg can — whether AGP's resource shrinker honours
-# the keep rule the package ships for its icon drawables.
+# exports the Gradle project on 2022.3 and runs the resource shrinker's own
+# task (`:launcher:shrinkReleaseRes`, never assembleRelease), reading the
+# stripped `.ap_` it emits, to settle the question no APK leg can — whether
+# AGP's resource shrinker honours the keep rule the package ships for its icon
+# drawables.
 #
 # EVERY leg runs on every code push and PR — the EditMode tests (three pinned
 # testbed legs plus a unity6-latest canary that resolves the newest Unity 6
@@ -26,14 +28,17 @@ name: unity
 # real Editor reached main.
 #
 # That 13.4 minutes was measured BEFORE the licence cap below. Chained, run 31
-# took 29 minutes for every leg but the shrink experiment. The argument is
-# unchanged — free minutes, no manual step — but the number is, so do not quote
-# 13 minutes.
+# took 29 minutes without the shrink leg, and the 2026-08-31 cron (run 35) took
+# 38 for the whole matrix, shrink leg included. The argument is unchanged —
+# free minutes, no manual step — but the number is, so do not quote 13 minutes.
 #
 # Docs-only changes still trigger nothing (paths filter below), so the bill for
 # a README edit stays zero legs. The weekly cron remains, and is not redundant:
 # it catches drift with no commit behind it — a new Unity patch the canary
 # picks up, a changed base image, an expired credential.
+# (Its first real catch, run 37 on 2026-09-01: 6000.6.0f1's editor aborts in a
+# container with Docker's 64 MB /dev/shm — see the shared-memory step in each
+# Unity job.)
 #
 # Public repo: GitHub-hosted runners, macOS included, are free.
 #
@@ -55,13 +60,16 @@ name: unity
 #   UNITY_EMAIL     the Unity account e-mail (must be the e-mail, not a name)
 #   UNITY_PASSWORD  its password (avoid special characters — known GameCI issue)
 #   UNITY_SERIAL    Professional licences only; leave unset for Personal.
-# Without the secrets every Unity job is SKIPPED (gate job below), so the
-# workflow stays green instead of failing on activation.
+# Without the secrets every Unity job is SKIPPED (gate job below). On a fork or
+# Dependabot PR that is expected and the run stays green; on any other event
+# the gate FAILS, so a run with no editor behind it never reports green.
 #
 # Licence seats: at most UNITY_MAX_PARALLEL Unity activations run at once —
 # repository variable, default 2 if unset, so the number is tunable from
-# Settings without a commit. Two mechanisms together produce that number, and
-# neither alone would:
+# Settings without a commit. (The `|| '2'` default is spelled out at each of
+# the three max-parallel lines — `strategy:` cannot read `env:` — and quoted in
+# README.md and tools~/device-smoke/README.md; change all five together.)
+# Two mechanisms together produce that number, and neither alone would:
 #   * the five Unity jobs are chained with `needs:` (tests -> android-build ->
 #     ios-export -> tests-unity6-latest -> android-shrink-verify), so exactly
 #     ONE of them is ever eligible. max-parallel is a matrix-only key — it
@@ -71,8 +79,9 @@ name: unity
 # tests leg still lets the Android build run, exactly as before; the
 # no-secrets path still propagates as skipped.
 #
-# What this costs, measured on run 31 rather than guessed: 29 minutes for every
-# leg but the shrink experiment, against 13.4 unchained. Runner minutes are free
+# What this costs, measured rather than guessed: 29 minutes on run 31 (before
+# the shrink leg joined the chain) and 38 on run 35 for the whole matrix,
+# against 13.4 unchained. Runner minutes are free
 # on a public repo, so the price is wall clock only. To undo, delete the three
 # max-parallel lines and put every Unity job back on `needs: license` with the
 # plain gate.
@@ -113,6 +122,7 @@ on:
       - "Plugins/**"
       - "Tests/**"
       - "Examples~/**"
+      - "Samples~/**"
       - "package.json"
       - "tools~/device-smoke/**"
       - ".github/workflows/unity-ci.yml"
@@ -123,6 +133,7 @@ on:
       - "Plugins/**"
       - "Tests/**"
       - "Examples~/**"
+      - "Samples~/**"
       - "package.json"
       - "tools~/device-smoke/**"
       - ".github/workflows/unity-ci.yml"
@@ -204,6 +215,33 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      # Unity 6000.6's editor asks for 1 GB of /dev/shm at start-up (its asset
+      # database's UDS client: "Requested 1073741824 bytes, but only 67108864
+      # available … run the container with --shm-size=1025M") and aborts without
+      # it; Docker's default is 64 MB and GameCI's actions pass no --shm-size, so
+      # the daemon's default is raised instead. Merged into the runner's existing
+      # daemon.json rather than overwriting it (the image ships cgroup settings
+      # there). Same step in every job that runs an editor in a container — the
+      # unity6-latest canary was the first to hit it (run 37, 2026-09-01), and
+      # the pinned legs will the day a testbed moves to 6.6+.
+      - name: Give Unity's container the shared memory 6000.6+ needs
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+
+          path = "/etc/docker/daemon.json"
+          cfg = json.load(open(path)) if os.path.exists(path) else {}
+          cfg["default-shm-size"] = "2g"
+          with open("daemon.json.new", "w") as f:
+              json.dump(cfg, f, indent=2)
+          print(json.dumps(cfg, indent=2))
+          PY
+          sudo mv daemon.json.new /etc/docker/daemon.json
+          sudo systemctl restart docker
+          docker info --format '{{.Name}}: docker restarted, default shm raised' \
+            || { echo "docker did not come back after the restart"; exit 1; }
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ matrix.testbed.path }}/Library
@@ -318,6 +356,33 @@ jobs:
           print("resolved Unity %s" % best, file=sys.stderr)
           print("version=%s" % best)
           PY
+      # Unity 6000.6's editor asks for 1 GB of /dev/shm at start-up (its asset
+      # database's UDS client: "Requested 1073741824 bytes, but only 67108864
+      # available … run the container with --shm-size=1025M") and aborts without
+      # it; Docker's default is 64 MB and GameCI's actions pass no --shm-size, so
+      # the daemon's default is raised instead. Merged into the runner's existing
+      # daemon.json rather than overwriting it (the image ships cgroup settings
+      # there). Same step in every job that runs an editor in a container — the
+      # unity6-latest canary was the first to hit it (run 37, 2026-09-01), and
+      # the pinned legs will the day a testbed moves to 6.6+.
+      - name: Give Unity's container the shared memory 6000.6+ needs
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+
+          path = "/etc/docker/daemon.json"
+          cfg = json.load(open(path)) if os.path.exists(path) else {}
+          cfg["default-shm-size"] = "2g"
+          with open("daemon.json.new", "w") as f:
+              json.dump(cfg, f, indent=2)
+          print(json.dumps(cfg, indent=2))
+          PY
+          sudo mv daemon.json.new /etc/docker/daemon.json
+          sudo systemctl restart docker
+          docker info --format '{{.Name}}: docker restarted, default shm raised' \
+            || { echo "docker did not come back after the restart"; exit 1; }
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: Examples~/Testbed6/Library
@@ -376,6 +441,33 @@ jobs:
         run: |
           mkdir -p "$TESTBED/Assets/Samples/QuickActionsDemo"
           cp -R Samples~/Demo/. "$TESTBED/Assets/Samples/QuickActionsDemo/"
+      # Unity 6000.6's editor asks for 1 GB of /dev/shm at start-up (its asset
+      # database's UDS client: "Requested 1073741824 bytes, but only 67108864
+      # available … run the container with --shm-size=1025M") and aborts without
+      # it; Docker's default is 64 MB and GameCI's actions pass no --shm-size, so
+      # the daemon's default is raised instead. Merged into the runner's existing
+      # daemon.json rather than overwriting it (the image ships cgroup settings
+      # there). Same step in every job that runs an editor in a container — the
+      # unity6-latest canary was the first to hit it (run 37, 2026-09-01), and
+      # the pinned legs will the day a testbed moves to 6.6+.
+      - name: Give Unity's container the shared memory 6000.6+ needs
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+
+          path = "/etc/docker/daemon.json"
+          cfg = json.load(open(path)) if os.path.exists(path) else {}
+          cfg["default-shm-size"] = "2g"
+          with open("daemon.json.new", "w") as f:
+              json.dump(cfg, f, indent=2)
+          print(json.dumps(cfg, indent=2))
+          PY
+          sudo mv daemon.json.new /etc/docker/daemon.json
+          sudo systemctl restart docker
+          docker info --format '{{.Name}}: docker restarted, default shm raised' \
+            || { echo "docker did not come back after the restart"; exit 1; }
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ matrix.testbed.path }}/Library
@@ -444,8 +536,13 @@ jobs:
           missing=""
           # xml/ + string/ are the static-shortcut bake (the testbeds' demo ships
           # 3, so qa_short_0 must exist); raw/ is 0.4.7's resource-shrinker keep
-          # file, which every enabled Android build writes.
-          for want in xml/quickactions_shortcuts raw/quickactions_keep string/qa_short_0; do
+          # file, which every enabled Android build writes; drawable/ is 0.5.0's
+          # built-in icons, written unconditionally by the same post-processor —
+          # the Demo uses exactly these four IconTypes, so a missing one here is
+          # a blank square on the emulator's launcher.
+          for want in xml/quickactions_shortcuts raw/quickactions_keep string/qa_short_0 \
+                      drawable/ic_quickaction_builtin_add drawable/ic_quickaction_builtin_compose \
+                      drawable/ic_quickaction_builtin_favorite drawable/ic_quickaction_builtin_play; do
             case "$RES" in
               *"$want"*) echo "ok: resource table carries $want" ;;
               *) missing="$missing $want" ;;
@@ -600,15 +697,21 @@ jobs:
   # probe-planting and the minify flip all worked, and the build then died
   # because the export ships NO gradlew and the runner's system Gradle (9.x)
   # cannot load the AGP 7.1.2 the export pins (org.gradle.util.GUtil is gone
-  # in Gradle 9). The job now supplies the exact toolchain Unity 2022.3
-  # bundles — JDK 11, Gradle 7.2, NDK r23b — and re-points the docker-image
-  # paths the export hardcodes, instead of trusting the runner image's drift.
+  # in Gradle 9). The job now supplies JDK 17 and NDK r23b, downloads the
+  # Gradle the export's own wrapper properties name (checksum-verified against
+  # Gradle's published one) and re-points the docker-image paths the export
+  # hardcodes, instead of trusting the runner image's drift — the "JDK 11,
+  # Gradle 7.2" an earlier version of this comment promised was a guess about
+  # Unity 2022.3's bundle that run 25 disproved (see the JDK step below).
   android-shrink-verify:
     name: android shrink verify (2022.3)
     needs: [license, tests-unity6-latest]
     if: ${{ !cancelled() && needs.license.outputs.available == 'true' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    # 45: with a warm Library cache the whole job takes about four minutes (run
+    # 35) and the Gradle step carries its own 30-minute ceiling below. The 120
+    # it used to have was sized for assembleRelease, which it no longer runs.
+    timeout-minutes: 45
     env:
       TESTBED: Examples~/Testbed2022
     steps:
@@ -621,6 +724,33 @@ jobs:
         run: |
           mkdir -p "$TESTBED/Assets/Samples/QuickActionsDemo"
           cp -R Samples~/Demo/. "$TESTBED/Assets/Samples/QuickActionsDemo/"
+      # Unity 6000.6's editor asks for 1 GB of /dev/shm at start-up (its asset
+      # database's UDS client: "Requested 1073741824 bytes, but only 67108864
+      # available … run the container with --shm-size=1025M") and aborts without
+      # it; Docker's default is 64 MB and GameCI's actions pass no --shm-size, so
+      # the daemon's default is raised instead. Merged into the runner's existing
+      # daemon.json rather than overwriting it (the image ships cgroup settings
+      # there). Same step in every job that runs an editor in a container — the
+      # unity6-latest canary was the first to hit it (run 37, 2026-09-01), and
+      # the pinned legs will the day a testbed moves to 6.6+.
+      - name: Give Unity's container the shared memory 6000.6+ needs
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+
+          path = "/etc/docker/daemon.json"
+          cfg = json.load(open(path)) if os.path.exists(path) else {}
+          cfg["default-shm-size"] = "2g"
+          with open("daemon.json.new", "w") as f:
+              json.dump(cfg, f, indent=2)
+          print(json.dumps(cfg, indent=2))
+          PY
+          sudo mv daemon.json.new /etc/docker/daemon.json
+          sudo systemctl restart docker
+          docker info --format '{{.Name}}: docker restarted, default shm raised' \
+            || { echo "docker did not come back after the restart"; exit 1; }
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: Examples~/Testbed2022/Library
@@ -737,6 +867,25 @@ jobs:
                                    "shrinker's 67-byte dummy to tell them apart" % (name, size))
               lines.append("%s %d" % (name, size))
               print("planted %s (%d bytes)" % (target, size))
+
+          # 0.5.0: the built-in icons the package's post-processor wrote into this
+          # export (drawable/ic_quickaction_builtin_<name>.xml). Recorded by NAME so
+          # the assertion holds the SHIPPED art to the same bar as the probe — real
+          # resources that only the runtime lookup references, i.e. exactly what the
+          # keep rule exists for. The source size below is informational: aapt2
+          # compiles XML, so the assertion compares the linked archive against the
+          # stripped one instead of against the file on disk. Their absence is a
+          # finding, not a skip: this export was produced with QUICKACTIONS_ENABLED,
+          # so the writer must have run.
+          shipped = sorted(res_dir.parent.glob("drawable*/ic_quickaction_builtin_*.xml"))
+          if not shipped:
+              raise SystemExit("no built-in ic_quickaction_builtin_*.xml under %s/drawable*/ — the "
+                               "package's post-processor did not write the 0.5.0 icons into "
+                               "this export" % res_dir.parent)
+          for icon in shipped:
+              size = icon.stat().st_size
+              lines.append("%s %d" % (icon.stem, size))
+              print("shipped %s (%d bytes)" % (icon, size))
 
           pathlib.Path(os.environ["SIZES_FILE"]).write_text("\n".join(lines) + "\n")
           PY
@@ -1131,6 +1280,20 @@ jobs:
           # An .ap_ is a zip with res/ and resources.arsc, which is exactly what
           # both readers below want; it simply has no dex or native libs in it.
           echo "shrunk resource archive: $APK ($(wc -c < "$APK") bytes)"
+          # The LINKED archive the shrinker read — same layout, pre-shrink. The
+          # shipped icons are compiled XML, so "unchanged" for them can only mean
+          # "the same size in here as in the stripped one"; the planted PNGs are
+          # stored verbatim and keep using their on-disk size.
+          LINKED="$(find "$INT" -type f -name '*.ap_' \
+                      ! -path '*shrunk*' ! -path '*stripped*' ! -name '*stripped*' \
+                      2>/dev/null | sort | tail -1 || true)"
+          if [ -z "$LINKED" ]; then
+            echo "no pre-shrink resource archive under $INT — cannot tell what the"
+            echo "shrinker was handed, so the shipped-icon rows below cannot be judged."
+            find "$INT" -name '*.ap_' -print 2>/dev/null || echo "(no .ap_ anywhere)"
+            exit 1
+          fi
+          echo "linked resource archive: $LINKED ($(wc -c < "$LINKED") bytes)"
           # Same aapt2 resolution as the android-build job's assertion step.
           SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
           AAPT2="$(find "$SDK/build-tools" -maxdepth 2 -name aapt2 -type f 2>/dev/null | sort -V | tail -1 || true)"
@@ -1143,6 +1306,9 @@ jobs:
           export TABLE_FILE="$RUNNER_TEMP/shrink-sizes.txt"
           unzip -l "$APK" > "$ZIP_LIST" \
             || { echo "unzip could not list $APK"; exit 1; }
+          export LINKED_LIST="$RUNNER_TEMP/linked-listing.txt"
+          unzip -l "$LINKED" > "$LINKED_LIST" \
+            || { echo "unzip could not list $LINKED"; exit 1; }
           "$AAPT2" dump resources "$APK" > "$RES_DUMP" \
             || { echo "aapt2 could not read the resource table of $APK"; exit 1; }
           echo "APK_PATH=$APK" >> "$GITHUB_ENV"
@@ -1174,6 +1340,7 @@ jobs:
           DUMMY_CEILING = 200
 
           zip_list = open(os.environ["ZIP_LIST"], encoding="utf-8", errors="replace").read()
+          linked_list = open(os.environ["LINKED_LIST"], encoding="utf-8", errors="replace").read()
           res_dump = open(os.environ["RES_DUMP"], encoding="utf-8", errors="replace").read()
 
           planted = {}
@@ -1184,11 +1351,17 @@ jobs:
 
           # name -> uncompressed length, from the `unzip -l` table (header, separators and
           # the totals line all fail the pattern, which is the point of parsing this way).
-          entries = {}
-          for line in zip_list.splitlines():
-              m = re.match(r"^\s*(\d+)\s+\S+\s+\S+\s+(\S.*?)\s*$", line)
-              if m:
-                  entries[m.group(2)] = int(m.group(1))
+          def sizes(listing):
+              out = {}
+              for line in listing.splitlines():
+                  m = re.match(r"^\s*(\d+)\s+\S+\s+\S+\s+(\S.*?)\s*$", line)
+                  if m:
+                      out[m.group(2)] = int(m.group(1))
+              return out
+
+
+          entries = sizes(zip_list)
+          linked = sizes(linked_list)
 
           # resource name -> the res/ path it is stored as.
           res_paths = {}
@@ -1222,11 +1395,21 @@ jobs:
           for name in (PROBE, CONTROL):
               path, size = stored(name)
               rows.append((name, planted.get(name), size, path))
+          # 0.5.0: the shipped built-in icons the plant step recorded. Same bar as
+          # the probe — present, and unchanged by the shrinker — but measured
+          # against the LINKED archive, because they are XML that aapt2 compiled
+          # (their on-disk size means nothing in here). Indexed after the two
+          # experiment rows so the checks below can keep addressing those by position.
+          SHIPPED = sorted(n for n in planted if n.startswith("ic_quickaction_builtin_"))
+          for name in SHIPPED:
+              path, size = stored(name)
+              rows.append((name, linked.get(path) if path else None, size, path))
 
-          table = ["", "resource                  planted    in APK  stored as",
-                   "------------------------  -------  --------  ---------"]
+          table = ["", "resource                   before    in APK  stored as",
+                   "-------------------------  -------  --------  ---------",
+                   "(before = planted size for the two probes, linked-archive size for the shipped icons)"]
           for name, before, after, path in rows:
-              table.append("%-24s  %7s  %8s  %s"
+              table.append("%-25s  %7s  %8s  %s"
                            % (name, before if before is not None else "?",
                               after if after is not None else "GONE", path or "-"))
           table.append("")
@@ -1309,6 +1492,41 @@ jobs:
                   "keep mechanism still worked and only this assertion needs revisiting."
                   % KEEP_PATH)
 
+          # (d) did the keep rule carry the SHIPPED icons through unchanged? This is
+          # the probe's question asked of the real art users get: the same keep
+          # glob, referenced by the runtime lookup only (the demo's one static
+          # reference to ic_quickaction_builtin_add aside), and a blank launcher
+          # tile if the answer is no. "Unchanged" is judged between the linked and
+          # the stripped archive: the shrinker rewrites in place, so a kept entry
+          # keeps its size and a dropped one becomes a tiny dummy.
+          if not SHIPPED:
+              failures.append(
+                  "the plant step recorded no shipped ic_quickaction_builtin_* icons, so "
+                  "this run says nothing about the art the package actually ships.")
+          for name, before, after, path in rows[2:]:
+              if after is None:
+                  failures.append(
+                      "the shipped icon '%s' is not in the release resources at all." % name)
+              elif before is None:
+                  failures.append(
+                      "the shipped icon '%s' is stored as %s in the stripped archive but that "
+                      "entry is not in the linked one, so the two cannot be compared."
+                      % (name, path))
+              elif after == before:
+                  print("ok: shipped '%s' came through the shrinker at its linked %d bytes"
+                        % (name, after))
+              elif after < before:
+                  failures.append(
+                      "the shipped icon '%s' shrank from %s to %s bytes across the shrinker, "
+                      "i.e. was dummy-replaced. The keep rule covers ic_quickaction_*, so "
+                      "either this name escaped it or the rule did not reach the merged "
+                      "resources." % (name, before, after))
+              else:
+                  failures.append(
+                      "the shipped icon '%s' GREW from %s to %s bytes across the shrinker, "
+                      "which no shrink-or-keep outcome explains; the archives being compared "
+                      "are probably not the pair this job assumes." % (name, before, after))
+
           if failures:
               sys.stderr.write("\n")
               for f in failures:
@@ -1367,6 +1585,33 @@ jobs:
         run: |
           mkdir -p "$TESTBED/Assets/Samples/QuickActionsDemo"
           cp -R Samples~/Demo/. "$TESTBED/Assets/Samples/QuickActionsDemo/"
+      # Unity 6000.6's editor asks for 1 GB of /dev/shm at start-up (its asset
+      # database's UDS client: "Requested 1073741824 bytes, but only 67108864
+      # available … run the container with --shm-size=1025M") and aborts without
+      # it; Docker's default is 64 MB and GameCI's actions pass no --shm-size, so
+      # the daemon's default is raised instead. Merged into the runner's existing
+      # daemon.json rather than overwriting it (the image ships cgroup settings
+      # there). Same step in every job that runs an editor in a container — the
+      # unity6-latest canary was the first to hit it (run 37, 2026-09-01), and
+      # the pinned legs will the day a testbed moves to 6.6+.
+      - name: Give Unity's container the shared memory 6000.6+ needs
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+
+          path = "/etc/docker/daemon.json"
+          cfg = json.load(open(path)) if os.path.exists(path) else {}
+          cfg["default-shm-size"] = "2g"
+          with open("daemon.json.new", "w") as f:
+              json.dump(cfg, f, indent=2)
+          print(json.dumps(cfg, indent=2))
+          PY
+          sudo mv daemon.json.new /etc/docker/daemon.json
+          sudo systemctl restart docker
+          docker info --format '{{.Name}}: docker restarted, default shm raised' \
+            || { echo "docker did not come back after the restart"; exit 1; }
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ matrix.testbed.path }}/Library

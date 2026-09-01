@@ -13,9 +13,12 @@ tools~/verify.sh        # must end with: VERIFY: PASS
 ```
 
 `tools~/setup.sh` installs the toolchain once (dotnet SDK + a JDK). `verify.sh`
-checks `.meta` completeness, compiles the C# in 10 configurations against the
-Unity stubs in `.verify/`, runs the NUnit suite, and compiles plus smoke-tests
-the Android Java plugin. Anything short of `VERIFY: PASS` blocks the release —
+runs seven checks — `.meta` completeness, the C# in 10 configurations against
+the Unity stubs in `.verify/`, the NUnit suite, the Android Java plugin compile
+plus smoke test, the frozen device strings, the `package.json` / `CHANGELOG` /
+install-pin coherence that step 1 below leans on as "check 6", and the
+generated Android icons (see [`CONTRIBUTING.md`](./CONTRIBUTING.md) §1
+for each). Anything short of `VERIFY: PASS` blocks the release —
 the failing check is fixed first, not worked around.
 
 ## Cutting a release
@@ -33,8 +36,9 @@ upload by hand.
    In that **same commit**, repoint every install pin: the `#v<version>` git
    URLs in [`README.md`](./README.md),
    [`GETTING_STARTED.md`](./GETTING_STARTED.md),
-   [`CONTRIBUTING.md`](./CONTRIBUTING.md) and `CLAUDE.md`, and the OpenUPM
-   `"com.emindeniz99.quick-actions": "<version>"` snippet in the README.
+   [`CONTRIBUTING.md`](./CONTRIBUTING.md) and `CLAUDE.md`, the OpenUPM
+   `"com.emindeniz99.quick-actions": "<version>"` snippet in the README, and
+   the README's Status line (`This is **<version>**`).
    Check 6 enforces this too — `release.yml` tags the merge commit, so a pin
    moved one commit later is wrong for every reader who sees main in between,
    which is exactly what the 0.4.6 cycle shipped.

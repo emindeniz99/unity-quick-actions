@@ -35,6 +35,11 @@ namespace EminDeniz99.QuickActions.Editor.NativeGate
         private const string ShortcutsResource = "quickactions_shortcuts";
         private const string StringsResource = "quickactions_strings";
         private const string KeepResource = "quickactions_keep";
+        // The prefix the gated post-processor writes the package's OWN drawables
+        // under — distinct from the ic_quickaction_ a project's icons carry, which
+        // is what makes a prefix sweep safe. Pinned across files by
+        // tools~/check_frozen_strings.py.
+        private const string BuiltInIconPrefix = "ic_quickaction_builtin_";
 
         public int callbackOrder => 90;
 
@@ -62,6 +67,16 @@ namespace EminDeniz99.QuickActions.Editor.NativeGate
                 "editor invocations (so scripts recompile), or re-add the define. If you supply the define " +
                 "only via csc.rsp, mirror it in Player Settings or the active Build Profile so this check can see it.");
 #else
+            Strip(path);
+#endif
+        }
+
+        // The define-off branch, as a method the harness can reach: the .verify test
+        // assembly compiles WITH QUICKACTIONS_ENABLED (it has to, to reach the gated
+        // post-processor), which makes the #else above unreachable there. Kept
+        // outside the #if for the same reason EffectiveDefinesStillContainGate is.
+        internal static void Strip(string path)
+        {
             // unityLibrary (given) or the sibling launcher module may hold the manifest.
             var modules = new[] { path, Path.GetFullPath(Path.Combine(path, "..", "launcher")) };
             foreach (var module in modules)
@@ -114,10 +129,21 @@ namespace EminDeniz99.QuickActions.Editor.NativeGate
                 // GetDirectories on a missing path would throw out of the callback.
                 var resDir = Path.Combine(module, "src", "main", "res");
                 if (Directory.Exists(resDir))
+                {
                     foreach (var localeDir in Directory.GetDirectories(resDir, "values-*"))
                         SafeDelete(Path.Combine(localeDir, StringsResource + ".xml"));
+                    // ...and the built-in shortcut icons the gated post-processor writes
+                    // (drawable/ic_quickaction_builtin_<name>.xml). Only in the module it
+                    // writes to (unityLibrary — the `path` this callback is handed), by
+                    // its own prefix, in any extension: no project writes
+                    // ic_quickaction_builtin_, and a project's ic_quickaction_<name> —
+                    // wherever it lives, this module's res included — never matches.
+                    if (module == path)
+                        foreach (var drawableDir in Directory.GetDirectories(resDir, "drawable*"))
+                            foreach (var icon in Directory.GetFiles(drawableDir, BuiltInIconPrefix + "*"))
+                                SafeDelete(icon);
+                }
             }
-#endif
         }
 
         private static void SafeDelete(string filePath)

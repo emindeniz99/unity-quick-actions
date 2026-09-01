@@ -19,10 +19,12 @@ The demo's three shortcuts, from the same C# code on both platforms. Note the
 platform difference the screenshots make obvious: **iOS renders `Title` and
 `Subtitle` on two lines with an icon; Android's launcher shows a single label**
 — the *long* one, which is our `Subtitle`. Worth knowing when you write labels.
-The blank icons on the Android side are also expected: Android has no system
-glyph catalog, so icons come from drawables **you** add to your project — see
-[Android icons](#android-icons-need-a-drawable-in-your-project). The demo ships
-none, so you are seeing the un-configured state.
+The blank icons on the Android side are the pre-0.5.0 state: Android has no
+system glyph catalog, so icons come from drawables in the app — and until 0.5.0
+the package shipped none. It now ships the four the demo uses (`Add`, `Play`,
+`Favorite`, `Compose`), written into every build automatically; the screenshot
+has not been retaken since, so nobody has seen them on a launcher yet — see
+[Android icons](#android-icons).
 
 | Platform | Mechanism | Min OS |
 |----------|-----------|--------|
@@ -50,7 +52,7 @@ hardware; iOS 13+ opens it with a plain long-press on every device.
 
 ## Status
 
-This is **0.4.8**, a pre-1.0 release. Here is exactly what has been proven and
+This is **0.4.9**, a pre-1.0 release. Here is exactly what has been proven and
 what has not — one place, no hedging. (Per-feature detail:
 [PRODUCTION_READINESS.md](./PRODUCTION_READINESS.md).)
 
@@ -91,7 +93,7 @@ is still unconfirmed.
 
 **Also true:** the suite is 98 headless tests (`dotnet test`) and 74 in Unity's
 Test Runner (it adds 5 `JsonUtility` serialization tests; 29 of the headless ones
-don't run there), plus an Android Java smoke of 103 checks, across 10 C# compile
+don't run there), plus an Android Java smoke of 108 checks, across 10 C# compile
 configurations with 0 warnings.
 The iOS `.mm` compiles cleanly against the current iOS SDK
 (ARC, arm64, deployment target iOS 13) with no deprecation or availability
@@ -378,7 +380,7 @@ public class ShortcutRouter : MonoBehaviour
 | Field | Purpose |
 |-------|---------|
 | `Id` (required, unique) / `Title` (required) / `Subtitle` | Labels. `Subtitle` renders under the title on iOS and as the Android long label. In **static** (baked) items both may embed build-time `{placeholders}` — see [Build-time placeholders](#build-time-placeholders--app-info-on-long-press). |
-| `Icon` (`IconType`) | Built-in glyph catalog (29 entries). iOS uses Apple's system icons — nothing to ship. Android resolves `ic_quickaction_<name>` from a drawable **you add**; without one the launcher shows a blank square. See [Android icons](#android-icons-need-a-drawable-in-your-project). |
+| `Icon` (`IconType`) | Built-in glyph catalog (29 entries). iOS uses Apple's system icons — nothing to ship. Android resolves a drawable by name — your `ic_quickaction_<name>` first, then the package's own `ic_quickaction_builtin_<name>`: **four ship built in** (`Add`, `Compose`, `Favorite`, `Play`), the other 25 need a drawable **you add**. Without one the launcher shows a blank square. See [Android icons](#android-icons). |
 | `IosSystemImage` | SF Symbol name (`"star.fill"`, iOS 13+) — beats `IosTemplateImage` and `Icon`. Ignored on Android. |
 | `IosTemplateImage` | Template-image name shipped in the Xcode bundle (single-color, ~35×35 pt) — beats `Icon`. Ignored on Android. |
 | `AndroidBitmapFile` | Absolute path to a PNG/JPEG on device — runtime icons from a `Texture2D`: `File.WriteAllBytes(path, tex.EncodeToPNG())` under `Application.persistentDataPath` (keep the file alive; the launcher re-reads it). Beats `AndroidDrawable` and `Icon`. Ignored on iOS (no runtime-bitmap shortcut API). |
@@ -387,34 +389,65 @@ public class ShortcutRouter : MonoBehaviour
 | `Payload` | App-defined string riding the shortcut (iOS `userInfo`, Android extras), restored across cold starts. Not pushed with the tap — read it via `GetById(id)?.Payload` from the id `Performed` reports (`GetById` is null for a **static**-shortcut tap or an id removed since: static items never join the runtime list and carry no payload). |
 | `LocalizedTitles` / `LocalizedSubtitles` | Per-locale label replacements (`LocalizedText { Locale, Text }` pairs). Resolution: exact locale match > language prefix (`"pt-BR"` matches a `"pt"` entry) > base `Title`/`Subtitle`, case-insensitive. The tables survive cold starts (they ride the ownership-marker payload), so labels re-resolve after a device-language change. Static (baked) shortcuts localize on **Android only** (`values-<qualifier>/` string resources); iOS static shortcuts render in their base language — see "Known limits". |
 
-### Android icons need a drawable in your project
+### Android icons
 
-`IconType` resolves differently per platform, and this is the one step Android
-users must do by hand. **iOS** maps it to Apple's built-in
-`UIApplicationShortcutIconType` catalog — the OS owns those glyphs, nothing to
-ship. **Android has no system glyph catalog**, so the same `IconType` resolves
-to a drawable *name* looked up in **your** project:
+`IconType` resolves differently per platform. **iOS** maps it to Apple's
+built-in `UIApplicationShortcutIconType` catalog — the OS owns those glyphs,
+nothing to ship. **Android has no system glyph catalog**, so the same
+`IconType` resolves to a drawable *name* looked up in the app — yours first,
+then the package's own:
 
 ```java
-getResources().getIdentifier("ic_quickaction_add", "drawable", getPackageName())
+getIdentifier("ic_quickaction_add", "drawable", pkg)          // your drawable, if any
+getIdentifier("ic_quickaction_builtin_add", "drawable", pkg)  // else the built-in
 ```
 
-No such drawable → no icon, and the launcher draws an empty placeholder square.
-That is why the Android screenshot at the top of this file shows blank icons:
-the demo project ships no drawables.
+**Four catalog entries ship built in** — `Add`, `Compose`, `Favorite` and
+`Play`, the ones the demo uses. On every Android build with the define on, the
+package's post-processor writes `ic_quickaction_builtin_<name>.xml` for each
+into the generated Gradle project (`unityLibrary/src/main/res/drawable/`), next
+to the keep rule that carries them through resource shrinking. They are
+VectorDrawables — one density-independent file each, about 2 KB for all four —
+of a white glyph on a coloured disc, so the icon carries its own contrast
+(API 26+ launchers wrap a legacy shortcut icon onto a white plate, where a
+glyph alone would vanish). A **static** item with one of those four as its
+`Icon` and no `AndroidDrawable` bakes a reference to the built-in, so it
+renders on a cold install too. Every CI build reads all four back out of the
+APK with `aapt2`, the shrink experiment holds them unchanged through
+`shrinkResources`, and the emulator smoke requires the registered shortcuts to
+have resolved an icon resource; what nobody has done yet is look at them on a
+launcher — the screenshot at the top of this file predates them.
 
-To supply one, create an **Android Library plug-in** anywhere under `Assets/`
-(this is Unity's supported mechanism on 2021.3, 2022.3 and 6.x alike — the
-import instructions are identical across all three):
+**The other 25 entries stay blank until you add a drawable**, and so does any
+built-in one you would rather draw yourself. Create an **Android Library
+plug-in** anywhere under `Assets/` (Unity's supported mechanism on 2021.3,
+2022.3 and 6.x alike — the import instructions are identical across all three):
 
 ```
 Assets/QuickActionIcons.androidlib/
   src/main/AndroidManifest.xml     <manifest package="com.yourcompany.qaicons"/>
-  src/main/res/drawable-xhdpi/ic_quickaction_add.png
+  src/main/res/drawable-xhdpi/ic_quickaction_search.png
 ```
 
 Then either name the drawable `ic_quickaction_<icontype>` so `Icon` finds it, or
-point at any resource explicitly with `AndroidDrawable = "my_icon"`.
+point at any resource explicitly with `AndroidDrawable = "my_icon"`. Draw it
+with its own background — a white glyph on transparent is invisible on the
+white plate API 26+ launchers wrap it onto (`store~/example-shortcut-icons/`
+shows the four built-ins as PNGs, in the style that works).
+
+**Your drawable always wins — by name, not by luck.** The built-ins live under
+their own prefix, `ic_quickaction_builtin_`, so the package never writes,
+overwrites or even looks for a file under yours; the two coexist in the merged
+resources and the runtime lookup asks for `ic_quickaction_<name>` first. That
+holds however your drawable reaches the build — an `.androidlib`, an `.aar`, a
+Maven dependency in `mainTemplate.gradle` — because nothing depends on the
+package seeing it. One asymmetry to know: a **static** item cannot be resolved
+at runtime, so with `Icon` alone it bakes the built-in; to bake yours instead,
+set `AndroidDrawable = "ic_quickaction_<name>"` on that item (or any name you
+like). Want no package art in your APK at all? Untick **Write built-in Android
+icons** in *Project Settings ▸ Quick Actions*: nothing is written, a copy an
+earlier build left behind is removed, and those four render blank unless you
+ship your own. A define-off production build carries none of this either way.
 
 Three traps worth knowing:
 
@@ -429,9 +462,6 @@ Three traps worth knowing:
   `AndroidDrawable` bakes a real `@drawable` reference the shrinker follows.
   Only a custom name used **only** from a runtime `Add(...)` needs your own; see
   [Known limits](#known-limits--android-minification-r8proguard--resource-shrinking).
-
-For runtime art (a `Texture2D` you generate or download) skip drawables
-entirely and use `AndroidBitmapFile` — see the field table above.
 
 ### Test in the Editor — no device needed
 
@@ -732,7 +762,8 @@ define on it writes `res/raw/quickactions_keep.xml` carrying
 `tools:keep="@drawable/ic_quickaction_*"` into the generated Gradle project, so
 every `ic_quickaction_<name>` drawable survives even **strict** shrink mode —
 which any *one* library in your app can switch the whole app into, with no way
-for a package to opt out. No action needed for `ic_quickaction_*` names.
+for a package to opt out. No action needed for `ic_quickaction_*` names — the
+built-in `ic_quickaction_builtin_*` ones included, same glob.
 
 A **custom `AndroidDrawable`** name used only from a runtime `Add(...)` is
 different: it has no static reference *and* never appears as a string constant in
@@ -742,7 +773,7 @@ retain it. Either:
 - name your drawable with the `ic_quickaction_` prefix, and the shipped rule
   covers it; or
 - ship your own keep rule inside your `.androidlib` (see
-  [Android icons](#android-icons-need-a-drawable-in-your-project)) —
+  [Android icons](#android-icons)) —
   `src/main/res/raw/myapp_keep.xml`:
 
   ```xml
@@ -789,8 +820,7 @@ spoof a tap; on either platform the id is just a string the OS hands you. So:
 ## Limitations / roadmap
 
 See [`ROADMAP.md`](./ROADMAP.md). Notable remaining: always-on device CI (the
-the shipped adb smoke runs on every code push and PR but covers Android
-alone — warm *and* cold taps, neither yet run on physical hardware; iOS has no
+shipped adb smoke runs on every code push and PR but covers Android alone — warm *and* cold taps, neither yet run on physical hardware; iOS has no
 adb analog) and on-device
 validation of the newest native paths (UIScene hooks — including the
 subclass-shadowed fallback — and the Android localized static output). OS read-back can't recover icons natively; the package persists icon
@@ -812,15 +842,15 @@ tools~/verify.sh    # .meta + C# compile (10 configs) + unit tests + Android plu
 
 `verify.sh` compiles the C# in **10 configurations** (0 warnings), runs the **98**
 headless unit tests via `dotnet test`, and compiles and smoke-tests the Android
-Java plugin (**103** checks). Those tests (bar 29 headless-only ones) plus 5
+Java plugin (**108** checks). Those tests (bar 29 headless-only ones) plus 5
 `JsonUtility` serialization tests run in Unity's **Test Runner** from
 `Tests/Editor/` — **74** there. See [`.verify/README.md`](./.verify/README.md)
 for how the stubs work.
 
 Beyond the stubs, [`unity-ci.yml`](./.github/workflows/unity-ci.yml) runs the
-**real editors** via [GameCI](https://game.ci). It is split by cost: the
-EditMode suite runs on all three [`Examples~`](./Examples~) testbeds for every
-push and PR that touches code (docs-only changes trigger nothing), plus a
+**real editors** via [GameCI](https://game.ci). Every leg runs on every code
+push and PR that touches code (docs-only changes trigger nothing): the
+EditMode suite on all three [`Examples~`](./Examples~) testbeds, plus a
 `unity6-latest` canary leg that resolves the newest Unity 6 editor with a
 GameCI image at run time and upgrade-opens Testbed6 with it — so "the latest
 editor broke the package" surfaces here before it surfaces in a user's
@@ -833,8 +863,9 @@ Nothing is held back for a manual step, and a weekly cron still runs it to
 catch drift with no commit behind it. Runner minutes are free on a public repo;
 the Unity-activating jobs are chained so at most `UNITY_MAX_PARALLEL`
 (repository variable, default 2) editors are ever activated at once, which
-costs wall clock — 29 minutes on the first chained run, against 13 unchained —
-and nothing else. Each Android APK is also read back with
+costs wall clock — 29 minutes on the first chained run and 38 on the latest
+measured one (the 2026-08-31 cron, shrink leg included), against 13
+unchained — and nothing else. Each Android APK is also read back with
 `aapt2`, which must
 find the baked static shortcuts, the resource-shrinker keep file and the
 trampoline `<activity>` inside it, and a further 2022.3-only job
@@ -869,9 +900,10 @@ diagnostics catch a real runtime bug, the GameActivity warm-tap delivery gap
 Unity 6 leg through all eight steps too, so **every supported line now
 passes the full emulator smoke, warm and cold taps included**. The
 `android-shrink-verify` job validated its loud-failure design run after run
-and now pins the exact toolchain the export expects (JDK 11, Gradle 7.2, NDK
-r23b — with the one `sdkmanager` call on the Java 17 it is compiled for);
-its probe/control verdict is still pending.
+and now supplies the toolchain the export actually needs — JDK 17 and NDK
+r23b, with Gradle taken from the export's own wrapper pin; the earlier JDK 11 /
+Gradle 7.2 guess was disproved by run 25 — and its probe/control verdict came
+back green on 2026-08-29: probe 990 → 990 bytes, control 990 → 67.
 
 For a real device/emulator, `tools~/device-smoke/` has an adb-driven Android
 smoke (install a dev APK → assert the demo's shortcuts registered → simulate a

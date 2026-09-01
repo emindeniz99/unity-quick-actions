@@ -8,7 +8,7 @@ Run everything:
 
 ```bash
 tools~/verify.sh        # gen_meta + C# compile (x10) + unit tests + Java compile + smoke
-                        # + frozen strings + release-notes coherence
+                        # + frozen strings + release-notes coherence + built-in icons
 tools~/setup.sh         # one-time: install dotnet + JDK if missing
 ```
 
@@ -21,6 +21,9 @@ tools~/setup.sh         # one-time: install dotnet + JDK if missing
 | Android plugin (Java) | `javac` against the Android SDK **stubs** in `JavaStubs/`, then the stateful smoke test in `JavaSmoke/` runs the compiled plugin against them (coexistence, budget, trampoline gate, null-vs-empty reads). |
 | Android static-shortcut resources (C#) | `EditorTests/` — NUnit tests compiled into the `dotnet test` assembly only. They drive `QuickActionsBuildPostProcessorAndroid`'s per-locale resource generation, whose failures (duplicate `<string>` names, case-colliding locale qualifiers) are aapt2 build-breakers invisible until Gradle runs, **and** its resource-shrinker keep rule (`res/raw/quickactions_keep.xml`), whose absence is invisible until a *minified release* build draws blank icons. They live here rather than in `Tests/` because that post-processor's asmdef is `defineConstraint`ed to `UNITY_ANDROID`, so a Unity test assembly cannot reference it on any other build target. |
 | Static-shortcut build pipeline (C#) | `EditorTests/StaticBuildPlaceholdersTests.cs` — same mechanism: `QuickActionsStaticBuild` (the `{placeholder}` engine + `Customize` hook both bakers consume) lives in the Editor assembly the runtime-referencing Unity test asmdef can't see, so its escaping/precedence/per-locale contracts are pinned here, where a bug would otherwise only surface inside a shipped `Info.plist` / `res/xml`. |
+| Frozen device strings | `tools~/check_frozen_strings.py` — the literals that persist on a device (intent actions, extras keys, the ownership marker, the `ic_quickaction_` drawable prefix) are pinned across C#, Java and Objective-C++; a rename would orphan shortcuts an older build already installed. |
+| Release-notes coherence | `tools~/release_notes.py --check` — `package.json`, the top `CHANGELOG.md` heading and every install pin in the docs name the same version, because `release.yml` cuts the tag from the merge commit and publishes that CHANGELOG section as the notes. |
+| Built-in Android icons | `tools~/gen_builtin_icons.py --check` — the VectorDrawable XML embedded in `Editor/Android/QuickActionsBuiltInIcons.cs` is regenerated in memory and must match character for character, so the generated file cannot drift from the generator that documents it. |
 
 ## Why stubs
 

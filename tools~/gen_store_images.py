@@ -279,35 +279,13 @@ def make_shot3():
 
 
 def make_shortcut_icons():
-    """White glyphs on transparent — drop into res/drawable on Android."""
-    specs = {
-        "ic_quickaction_play": "play",
-        "ic_quickaction_add": "add",
-        "ic_quickaction_favorite": "star",
-        "ic_quickaction_compose": "pencil",
-    }
-    for name, kind in specs.items():
-        s = 96
-        img = Image.new("RGBA", (s, s), (0, 0, 0, 0))
-        d = ImageDraw.Draw(img)
-        w = (255, 255, 255, 255)
-        if kind == "play":
-            d.polygon([(34, 26), (34, 70), (72, 48)], fill=w)
-        elif kind == "add":
-            d.rectangle([44, 24, 52, 72], fill=w)
-            d.rectangle([24, 44, 72, 52], fill=w)
-        elif kind == "star":
-            import math
-            pts = []
-            for k in range(10):
-                ang = math.pi / 2 + k * math.pi / 5
-                r = 34 if k % 2 == 0 else 15
-                pts.append((48 + r * math.cos(ang), 48 - r * math.sin(ang)))
-            d.polygon(pts, fill=w)
-        elif kind == "pencil":
-            d.polygon([(28, 70), (32, 56), (60, 28), (72, 40), (44, 68)], fill=w)
-        img.save(os.path.join(ICONS, name + ".png"))
-
+    """The four built-in glyphs as 96x96 PNGs — the same art the package ships as
+    vectors (white glyph on the indigo disc), rendered by the generator that owns
+    it, so the store's examples cannot drift from the shipped icons. Under the
+    USER prefix: they are examples of what a project's own drawable can be."""
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import gen_builtin_icons
+    gen_builtin_icons.write_pngs(ICONS)
 
 def main():
     os.makedirs(OUT, exist_ok=True)

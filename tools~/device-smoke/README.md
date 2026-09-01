@@ -85,7 +85,11 @@ event inside the game — **twice**: once into a running process
 app that was force-stopped first, where the tap starts the process and the id
 has to reach the game through the launch intent. Because the id it taps is a
 live registered shortcut, it also exercises the path the trampoline's spoof gate
-deliberately **allows** (`isKnownShortcut`).
+deliberately **allows** (`isKnownShortcut`). Step 5 also requires the registered
+`new_game` (static, `Icon = Add`) and `daily` (runtime `Add`, `IconType.Favorite`)
+entries to carry a resolved icon resource in `dumpsys shortcut` — the one place
+the by-name drawable lookup (yours first, then the package's built-in) is
+observed on an Android runtime. `ICON_SHORTCUT_IDS` overrides that list.
 
 The cold step has run green on the CI emulator legs for all three Unity lines
 (2021.3 and 2022.3 on the API 30 image, Unity 6 on API 35) — the `android-smoke`

@@ -2,9 +2,10 @@ name: CI
 
 # Unity asset verified WITHOUT Unity: tools~/verify.sh generates .meta files,
 # compiles the C# against UnityEngine/UnityEditor stubs (10 configs), runs the
-# NUnit suite via `dotnet test`, and compiles the Android plugin against Android
-# SDK stubs. The iOS .mm and on-device behaviour still need a real Unity build
-# (see PRODUCTION_READINESS.md). See .verify/README.md.
+# NUnit suite via `dotnet test`, compiles the Android plugin against Android SDK
+# stubs, and checks the frozen device strings, the release-notes coherence and
+# the generated Android icons. The iOS .mm and on-device behaviour still
+# need a real Unity build (see PRODUCTION_READINESS.md). See .verify/README.md.
 #
 # On a pushed `v*` tag the same commit is verified and the `release` job packs
 # dist~/QuickActions.unitypackage and attaches it to the GitHub Release. The
@@ -35,7 +36,7 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
-      - name: Verify (meta + 10 C# configs + unit tests + Android plugin)
+      - name: Verify (7 checks — meta, 10 C# configs, unit tests, Android plugin, frozen strings, release notes, built-in icons)
         run: tools~/verify.sh
       - name: Pack .unitypackage (reproducible, no Unity needed)
         run: python3 tools~/pack_unitypackage.py
@@ -44,6 +45,42 @@ jobs:
           name: QuickActions.unitypackage
           path: dist~/QuickActions.unitypackage
           if-no-files-found: error
+
+  # unity-ci.yml's comments lean on actionlint ("actionlint shellchecks every
+  # run: block in this workflow"); this is the job that makes that true in CI
+  # rather than on whoever remembers to run it locally. The official image
+  # carries shellcheck and pyflakes, so every run: block gets both passes.
+  # The second step guards the one hand-maintained duplication in that file:
+  # its push and pull_request paths filters must stay identical (a YAML
+  # anchor would do it, but actionlint cannot resolve the alias).
+  lint-workflows:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: actionlint (shellcheck + pyflakes over every run block)
+        run: docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.12 -color
+      - name: unity-ci.yml push and pull_request paths filters are identical
+        run: |
+          python3 - <<'PY'
+          import re
+          import sys
+
+          text = open(".github/workflows/unity-ci.yml", encoding="utf-8").read()
+          block = r"^  {0}:\n(?:    branches: \[main\]\n)?    paths:\n((?:      - .*\n)+)"
+          found = {}
+          for event in ("push", "pull_request"):
+              m = re.search(block.format(event), text, re.M)
+              if not m:
+                  sys.exit(f"could not find the {event} paths filter — the layout this check parses has changed")
+              found[event] = m.group(1).splitlines()
+          if found["push"] != found["pull_request"]:
+              print("push:", *found["push"], sep="\n  ")
+              print("pull_request:", *found["pull_request"], sep="\n  ")
+              sys.exit("unity-ci.yml: the push and pull_request paths filters differ — keep them identical")
+          print(f"ok: both paths filters list the same {len(found['push'])} patterns")
+          PY
 
   # Tag pushes only. Runs after `verify`, so nothing is published from a commit
   # that does not compile and pass its tests. Packs from a clean checkout with

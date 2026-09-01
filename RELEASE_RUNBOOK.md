@@ -82,14 +82,19 @@ The condensed, day-of sequence. Details live in
 
 ## Phase 5 — submit (1 h) *(SC §§1–6)*
 
-- [ ] publisher.unity.com → create the free Publisher profile, accept agreement.
-- [ ] Portal ▸ Create new package draft.
-- [ ] Paste from `store~/listing/`: title/metadata (`metadata.md`),
+> **SUBMITTED 2026-08-07** — done, as [`STORE_CHECKLIST.md`](./STORE_CHECKLIST.md)
+> records (package 0.4.4, Free, auto-publish ON). The boxes below are ticked as
+> the record of that submission; do not re-submit — a later version goes
+> through the portal's *update* flow for the existing package.
+
+- [x] publisher.unity.com → create the free Publisher profile, accept agreement.
+- [x] Portal ▸ Create new package draft.
+- [x] Paste from `store~/listing/`: title/metadata (`metadata.md`),
       `summary.txt`, `description.md` (keep the **"One switch to turn it on"**
       section — the gate is the product), `tags.txt`.
-- [ ] Upload images from `store~/` (icon/card/cover/social + screenshots incl.
+- [x] Upload images from `store~/` (icon/card/cover/social + screenshots incl.
       your real one).
-- [ ] Upload the `.unitypackage` via Asset Store Publishing Tools **from a
+- [x] Upload the `.unitypackage` via Asset Store Publishing Tools **from a
       2022.3+ editor** — store rule 1.3.a bans uploading from older editors, so
       the listing floor reads 2022.3 while OpenUPM keeps serving 2021.3. It is a build output,
       not a repo file: build it with `python3 tools~/pack_unitypackage.py` (or
@@ -97,7 +102,7 @@ The condensed, day-of sequence. Details live in
       the one attached to the
       [GitHub Release](https://github.com/emindeniz99/unity-quick-actions/releases)
       — `v0.4.0` is the first release and carries it.
-- [ ] Price: **Free**. Submit for review. (Review: days → ~2 weeks.)
+- [x] Price: **Free**. Submit for review. (Review: days → ~2 weeks.)
 
 ## Phase 6 — stamp the release (10 min, back in the repo)
 
@@ -114,9 +119,9 @@ Tags are plain semver, one per release; `v0.4.0`, cut 2026-08-07, was the first.
       `Unreleased` left). `verify.sh` check 6 fails the PR otherwise — the
       release is cut from those two files, so the bump must be in the commit
       that gets tagged. The same commit moves the `#v<version>` install pins
-      (README, GETTING_STARTED, CONTRIBUTING, CLAUDE.md) and the README's
-      OpenUPM version snippet — check 6 fails the PR when any of them still
-      names the previous version.
+      (README, GETTING_STARTED, CONTRIBUTING, CLAUDE.md), the README's
+      OpenUPM version snippet and its Status line (`This is **<version>**`) —
+      check 6 fails the PR when any of them still names the previous version.
 - [ ] Stay in `0.x` until the matrix above has actually been walked on devices;
       a `1.0.0` is a claim of "validated on both ends of the supported range",
       not a mood. Bumping later is cheap.

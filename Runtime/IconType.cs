@@ -10,8 +10,13 @@ namespace EminDeniz99.QuickActions
     /// underscores between words, e.g. <see cref="MarkLocation"/> →
     /// <c>ic_quickaction_mark_location</c>, <see cref="Play"/> →
     /// <c>ic_quickaction_play</c> (the exact names in the Java <c>ICON_NAMES</c>
-    /// table). When the drawable is absent the app icon is used. See
-    /// <see cref="QuickActionItem.AndroidDrawable"/> to override it explicitly.
+    /// table). Four members ship a built-in drawable — <see cref="Add"/>,
+    /// <see cref="Compose"/>, <see cref="Favorite"/> and <see cref="Play"/>, written
+    /// into every Android build as <c>ic_quickaction_builtin_&lt;name&gt;</c>; a
+    /// project's own <c>ic_quickaction_&lt;name&gt;</c> takes precedence. For the
+    /// others, with no drawable in the app the shortcut renders <b>without an
+    /// icon</b> — a blank tile on every launcher observed so far. See
+    /// <see cref="QuickActionItem.AndroidDrawable"/> to name a drawable explicitly.
     /// </summary>
     // The integer values are a load-bearing contract: the iOS native layer casts
     // (value - 1) to UIApplicationShortcutIconType, and the Android side indexes

@@ -103,6 +103,16 @@ FROZEN: dict[str, list[str]] = {
         "Plugins/Android/QuickActionsBridge.java",
         "Editor/Android/QuickActionsBuildPostProcessorAndroid.cs",
     ],
+    # The package's OWN four drawables: the name the Java lookup falls back to,
+    # the post-processor that writes them, and the define-off stripper that
+    # sweeps them back out of unityLibrary — a drifted prefix there leaves
+    # built-in icons in a production build that was meant to carry nothing of
+    # this package. Same keep glob as above (ic_quickaction_* covers both).
+    "ic_quickaction_builtin_": [
+        "Plugins/Android/QuickActionsBridge.java",
+        "Editor/Android/QuickActionsBuildPostProcessorAndroid.cs",
+        "Editor/NativeGate/QuickActionsTrampolineStripperAndroid.cs",
+    ],
 }
 
 # The Java package the trampoline and bridge live in — the first half of every

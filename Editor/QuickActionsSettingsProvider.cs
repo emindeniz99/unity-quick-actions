@@ -180,8 +180,10 @@ namespace EminDeniz99.QuickActions.Editor
             settings.AddStaticShortcut(new QuickActionItem(AppInfoId, "App info", "v{version} ({build})")
             {
                 // SF Symbol on iOS 13+ (a static item renders iconless on iOS 12 —
-                // documented on IosSystemImage). No Android icon preset: static
-                // Android icons need a drawable shipped in the user's project.
+                // documented on IosSystemImage). No Android icon preset: none of the
+                // four built-in Android drawables (Add, Compose, Favorite, Play) says
+                // "app info", and any other static Android icon needs a drawable
+                // shipped in the user's project.
                 IosSystemImage = "info.circle",
             });
             EditorUtility.SetDirty(settings);

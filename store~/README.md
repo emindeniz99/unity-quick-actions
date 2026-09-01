@@ -14,7 +14,7 @@ Regenerate with `python3 tools~/gen_store_images.py`.
 | `screenshot-1.jpg` | 2400×1600 | **Real capture** — iOS Simulator long-press menu, composited by `tools~/make_store_screenshot.py` |
 | `screenshot-2.png` | 2400×1600 | Screenshot — C# API |
 | `screenshot-3.png` | 2400×1600 | Screenshot — feature grid |
-| `example-shortcut-icons/*.png` | 96×96 | Example Android shortcut drawables |
+| `example-shortcut-icons/*.png` | 96×96 | The four built-in glyphs as PNGs (white on the indigo disc), rendered by `tools~/gen_builtin_icons.py` — examples of a project's own `ic_quickaction_<name>` |
 | `device-ios.jpg` | 720×746 | **Real capture** — iOS long-press menu (README) |
 | `device-android.jpg` | 440×580 | **Real capture** — Android static shortcuts on a cold install (README) |
 | `device-android-dynamic.jpg` | 440×680 | **Real capture** — Android after a runtime `Add` (README) |
@@ -34,13 +34,17 @@ where relative paths are unreliable.
   `python3 tools~/make_store_screenshot.py <capture.png> store~/screenshot-1.jpg`.
 - Images contain minimal text and no watermarks (guideline-compliant). Keep the
   icon text-free.
-- `example-shortcut-icons/` are functional PNGs, but the instruction that used
-  to be here was **wrong and harmful**: it named
+- `example-shortcut-icons/` are the same art the package ships as vectors,
+  rendered to PNG by the same generator (`gen_store_images.py` delegates to it,
+  so the two cannot drift). One rule for anyone drawing the other 25: a shortcut
+  drawable must **carry its own background** — API 26+ launchers wrap a legacy
+  icon onto a white plate, so a white-on-transparent glyph is invisible there.
+  The instruction that used to be here was **wrong and harmful**: it named
   `Assets/.../Plugins/Android/res/drawable/`, a path Unity **removed in 2021.2**
   — one minor version below this package's 2021.3 floor. Files placed there do
   not silently fail to load; they **fail the consumer's build**
   ("OBSOLETE - Providing Android resources in Assets/Plugins/Android/res was
   removed"). The correct procedure is in the root
-  [README](../README.md#android-icons-need-a-drawable-in-your-project); use that.
+  [README](../README.md#android-icons); use that.
 
 See [`../MAINTAINING.md`](../MAINTAINING.md) for the release procedure.

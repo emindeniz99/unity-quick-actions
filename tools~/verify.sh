@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Full static verification for the Quick Actions package, runnable without a
-# Unity install. Six checks (the header used to say four and list four; it has
+# Unity install. Seven checks (the header used to say four and list four; it has
 # run more than that since the frozen-string scan landed):
 #   1. gen_meta.py        -> every asset has a stable .meta
 #   2. dotnet build x10   -> Runtime/Editor C# type-checks against UnityEngine/
@@ -10,6 +10,8 @@
 #   4. javac              -> Android plugin compiles against Android SDK stubs
 #   5. check_frozen_strings.py -> device-persisted literals are unchanged
 #   6. release_notes.py   -> package.json and the top CHANGELOG heading agree
+#   7. gen_builtin_icons.py --check -> the embedded Android icon drawables match
+#                            their generator (the .cs is generated, never edited)
 #
 # Exit non-zero on any failure. See .verify/README.md for the rationale.
 set -uo pipefail
@@ -18,7 +20,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 VERIFY="$ROOT/.verify"
 fail=0
 
-echo "== 1/6  .meta completeness (must already be committed, not generated here) =="
+echo "== 1/7  .meta completeness (must already be committed, not generated here) =="
 # gen_meta only CREATES missing metas and always exits 0, so running it can't
 # catch a missing/uncommitted meta. Fail if it had to create any — a committed
 # repo/UPM must ship every .meta (a fresh GUID assigned on the user's machine
@@ -39,7 +41,7 @@ fi
 python3 "$ROOT/tools~/gen_meta.py" --check || fail=1
 
 echo
-echo "== 2/6  C# compile (UnityEngine/UnityEditor stubs) =="
+echo "== 2/7  C# compile (UnityEngine/UnityEditor stubs) =="
 if command -v dotnet >/dev/null 2>&1; then
   export DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_NOLOGO=1
   for proj in Editor EditoriOS EditorAndroid NativeGate NativeGateiOS Bootstrap iOS Android Sample SampleAndroid; do
@@ -55,7 +57,7 @@ else
 fi
 
 echo
-echo "== 3/6  C# unit tests (dotnet test) =="
+echo "== 3/7  C# unit tests (dotnet test) =="
 if command -v dotnet >/dev/null 2>&1; then
   out="$(dotnet test "$VERIFY/QuickActions.Tests.csproj" -v q --nologo 2>&1)"; rc=$?
   echo "$out" | grep -E 'Passed!|Failed!|error|Passed:|Failed:' || true
@@ -65,7 +67,7 @@ else
 fi
 
 echo
-echo "== 4/6  Java compile + smoke test (Android SDK stubs) =="
+echo "== 4/7  Java compile + smoke test (Android SDK stubs) =="
 if command -v javac >/dev/null 2>&1; then
   TMP="$(mktemp -d)"
   mkdir -p "$TMP/out"
@@ -95,7 +97,7 @@ fi
 
 echo
 echo
-echo "== 5/6  Frozen device-facing strings =="
+echo "== 5/7  Frozen device-facing strings =="
 # These literals are persisted by the OS on end-user devices (pinned shortcut
 # intents, PersistableBundle extras, UIApplicationShortcutItemUserInfo, and the
 # res/xml baked into every shipped APK). Renaming one is silent: the app still
@@ -104,13 +106,22 @@ echo "== 5/6  Frozen device-facing strings =="
 python3 "$ROOT/tools~/check_frozen_strings.py" || fail=1
 
 echo
-echo "== 6/6  Release-notes coherence =="
+echo "== 6/7  Release-notes coherence =="
 # The version in package.json and the version in the top CHANGELOG heading must
 # agree: OpenUPM rejects a tag/package.json mismatch with E811, and the release
 # workflow quotes that section as the release notes. Catching it here means the
 # PR goes red, not main after the merge that would have cut the release. A top
 # section still called [Unreleased] is a legal mid-development state and passes.
 python3 "$ROOT/tools~/release_notes.py" --check || fail=1
+
+echo
+echo "== 7/7  Built-in Android icons =="
+# Editor/Android/QuickActionsBuiltInIcons.cs is GENERATED from the glyph
+# geometry in tools~/gen_builtin_icons.py (pure stdlib, so this runs anywhere
+# dotnet does). An edit to either side without regenerating would ship icons
+# that disagree with their source of truth; --check regenerates in memory and
+# fails on any byte of difference.
+python3 "$ROOT/tools~/gen_builtin_icons.py" --check || fail=1
 
 if [ "$fail" = "0" ]; then echo "VERIFY: PASS"; else echo "VERIFY: FAIL"; fi
 exit $fail

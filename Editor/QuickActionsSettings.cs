@@ -29,6 +29,24 @@ namespace EminDeniz99.QuickActions.Editor
         // Undo/SetDirty bookkeeping — this only mutates the serialized list.
         internal void AddStaticShortcut(QuickActionItem item) => staticShortcuts.Add(item);
 
+        [Tooltip("Write the package's four built-in Android shortcut drawables " +
+                 "(ic_quickaction_builtin_{add,compose,favorite,play}, ~2 KB of vector XML) " +
+                 "into every Android build, so IconType.Add/Compose/Favorite/Play render with " +
+                 "nothing added to the project. Your own ic_quickaction_<name> takes precedence " +
+                 "either way. Off: no package art reaches the APK, and those four render blank " +
+                 "unless the project ships its own drawable.")]
+        [SerializeField]
+        private bool writeBuiltInAndroidIcons = true;
+
+        /// <summary>
+        /// Whether the Android build post-processor writes the package's built-in
+        /// drawables (<c>ic_quickaction_builtin_&lt;name&gt;</c>) into the generated
+        /// Gradle project. Default true. A project's own <c>ic_quickaction_&lt;name&gt;</c>
+        /// takes precedence at runtime either way; this is the escape hatch for a
+        /// project that wants no package art in its APK at all.
+        /// </summary>
+        public bool WriteBuiltInAndroidIcons => writeBuiltInAndroidIcons;
+
         [Tooltip("PNG (preferred) or JPEG textures copied into the iOS build (app " +
                  "target). A PNG resolves as IosTemplateImage = \"<file name without " +
                  "extension>\"; a JPEG must include its extension (bare-name bundle " +
