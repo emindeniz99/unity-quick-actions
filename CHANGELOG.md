@@ -11,6 +11,27 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 > as its own section because each is a distinct, self-contained set of API
 > additions; read them as the package's development log.
 
+## [Unreleased]
+
+### Changed
+
+- **CI proves the gate and measures the footprint on every push.** A new
+  `gate-off` job builds the 2022.3 testbed with `QUICKACTIONS_ENABLED` off —
+  an IL2CPP APK in `android-build`'s exact configuration and an iOS Simulator
+  export — and asserts the package left nothing behind: no trampoline
+  `<activity>` or shortcuts meta-data in the manifest, no `quickactions_*` /
+  `qa_*` / `ic_quickaction_builtin_*` resources, no `EminDeniz99.QuickActions`
+  in the IL2CPP metadata, no `QUICKACTIONS_ENABLED` macro in the `.pbxproj`, no
+  marked `UIApplicationShortcutItems`. Every negative is paired with a positive
+  control — the define-on artifacts from the same run must trip the same
+  probes, or the check declares itself blind instead of green. The two APKs
+  are then diffed byte for byte: that difference is the package's footprint,
+  printed in the job summary and held under 1 MiB, so an asset or code path
+  that starts shipping turns the job red. `PRODUCTION_READINESS.md`'s two gate
+  rows move from "build-proven once, 2026-07-17" to CI. `TestbedBuilder` gains
+  `BuildAndroidPhoneNoDefine` / `BuildiOSSimulatorNoDefine`, and its
+  `DisableDefine` / `EnableDefine` now flip both mobile targets.
+
 ## [0.5.0] - 2026-09-01
 
 ### Added

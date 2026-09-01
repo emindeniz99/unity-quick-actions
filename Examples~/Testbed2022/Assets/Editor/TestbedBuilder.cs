@@ -19,32 +19,49 @@ public static class TestbedBuilder
     // Step 1 of 2 — the package refuses to build if the define changes inside the
     // same invocation, because the editor assemblies would still be compiled
     // with it and the "no trace" claim would be a lie. So this only flips it.
+    // Both mobile targets at once: CI's gate-off job builds an Android APK AND an
+    // iOS export from one flipped project, and iOS has its own gate (the macro
+    // injector) to prove inert.
     public static void DisableDefine()
     {
         PlayerSettings.SetScriptingDefineSymbols(UnityEditor.Build.NamedBuildTarget.Android, "");
+        PlayerSettings.SetScriptingDefineSymbols(UnityEditor.Build.NamedBuildTarget.iOS, "");
         AssetDatabase.SaveAssets();
     }
 
     public static void EnableDefine()
     {
         PlayerSettings.SetScriptingDefineSymbols(UnityEditor.Build.NamedBuildTarget.Android, "QUICKACTIONS_ENABLED");
+        PlayerSettings.SetScriptingDefineSymbols(UnityEditor.Build.NamedBuildTarget.iOS, "QUICKACTIONS_ENABLED");
         AssetDatabase.SaveAssets();
     }
 
     // Step 2 of 2 — run in a SEPARATE invocation, after scripts recompiled.
     public static void BuildAndroidNoDefine() => Build(BuildTarget.Android, "Builds/NoDefine.apk");
 
+    // The same in BuildAndroidPhone's configuration (IL2CPP, both ABIs), so the
+    // two APKs differ in nothing but the define: their byte difference is the
+    // package's footprint, which CI's gate-off job measures on every push.
+    public static void BuildAndroidPhoneNoDefine() => BuildPhone("Builds/NoDefine-phone.apk");
+
+    // ...and the iOS Simulator export with the define off, for the negative
+    // half of the iOS gate (no QUICKACTIONS_ENABLED macro in the .pbxproj, no
+    // marked UIApplicationShortcutItems).
+    public static void BuildiOSSimulatorNoDefine() => BuildSimulator("Builds/iOSSimulatorNoDefine");
+
     // Sideload build for a real handset. BuildAndroid() inherits the project
     // default (Mono, armeabi-v7a), which will not install on the 64-bit-only
     // SoCs shipping since ~2023 — Mono has no ARM64 backend on Android, so
     // reaching arm64 means IL2CPP. Both ABIs go in one APK so the same file
     // works on any phone from 7.1 up.
-    public static void BuildAndroidPhone()
+    public static void BuildAndroidPhone() => BuildPhone("Builds/QuickActionsDemo-phone.apk");
+
+    private static void BuildPhone(string relativeOutput)
     {
         PlayerSettings.SetScriptingBackend(UnityEditor.Build.NamedBuildTarget.Android, ScriptingImplementation.IL2CPP);
         PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARMv7 | AndroidArchitecture.ARM64;
         EditorUserBuildSettings.buildAppBundle = false;   // .apk, never .aab
-        Build(BuildTarget.Android, "Builds/QuickActionsDemo-phone.apk");
+        Build(BuildTarget.Android, relativeOutput);
     }
 
     // Gradle-project export, for the resource-shrinker experiment in
@@ -69,7 +86,9 @@ public static class TestbedBuilder
 
     // Simulator variant: the default iOS build targets the device SDK, whose
     // IL2CPP output will not link for a simulator run.
-    public static void BuildiOSSimulator()
+    public static void BuildiOSSimulator() => BuildSimulator("Builds/iOSSimulator");
+
+    private static void BuildSimulator(string relativeOutput)
     {
         PlayerSettings.iOS.sdkVersion = iOSSdkVersion.SimulatorSDK;
         // 2 = Universal. Unity ships baselib-sim-arm64.a and a fat
@@ -77,7 +96,7 @@ public static class TestbedBuilder
         // x86_64 project here, which cannot install on an Apple-silicon
         // simulator, so build fat and let the simulator pick its slice.
         PlayerSettings.SetArchitecture(UnityEditor.Build.NamedBuildTarget.iOS, 2);
-        Build(BuildTarget.iOS, "Builds/iOSSimulator");
+        Build(BuildTarget.iOS, relativeOutput);
     }
 
     private static void Build(BuildTarget target, string relativeOutput, bool exportAndroidProject = false)

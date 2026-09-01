@@ -295,11 +295,17 @@ on import)? Remove the `defineConstraints` from the asmdefs, drop the
 mechanical steps if your project wants the opposite trade-off.
 
 > The native gating edits the generated Xcode/Gradle project and can't be
-> exercised by the stub harness — verify it once in a real build. Concretely, in a
-> **prod build (define off)**: the generated Xcode project should contain **no**
-> `QUICKACTIONS_ENABLED` (grep the `.pbxproj`) and the merged Android manifest
-> should contain **no** `QuickActionsTrampolineActivity` (never injected, and
-> stripped if stale). In a **dev build (define on)** both are present.
+> exercised by the stub harness. CI does the real-build check on every code
+> push: the `gate-off` job in [`unity-ci.yml`](./.github/workflows/unity-ci.yml)
+> builds the 2022.3 testbed with the define **off** — an IL2CPP APK and an iOS
+> Simulator export — and requires the `.pbxproj` to contain **no**
+> `QUICKACTIONS_ENABLED`, the merged Android manifest **no**
+> `QuickActionsTrampolineActivity` and no shortcuts meta-data, the resource
+> table nothing of the package's, and the IL2CPP metadata no
+> `EminDeniz99.QuickActions` — each against the define-**on** build from the same
+> run as a positive control. It then diffs the two APKs byte for byte: that
+> number, printed in the job summary, is the package's footprint (held under
+> 1 MiB). To repeat it by hand, do the same in your own project.
 
 > **Static-shortcuts caveat when toggling the define.** If you configured static
 > shortcuts (Project Settings ▸ Quick Actions), the `QuickActionsSettings.asset`
@@ -868,9 +874,12 @@ measured one (the 2026-08-31 cron, shrink leg included), against 13
 unchained — and nothing else. Each Android APK is also read back with
 `aapt2`, which must
 find the baked static shortcuts, the resource-shrinker keep file and the
-trampoline `<activity>` inside it, and a further 2022.3-only job
+trampoline `<activity>` inside it, a further 2022.3-only job
 (`android-shrink-verify`) exports the Gradle project and runs the AGP resource
-shrinker over it to test whether that keep file is honoured — the `aapt2`
+shrinker over it to test whether that keep file is honoured, and a last one
+(`gate-off`) rebuilds the same testbed with `QUICKACTIONS_ENABLED` off, requires
+nothing of the package in the APK or the Xcode export, and diffs the two APKs
+to measure the package's footprint — the `aapt2`
 read-back has been green on all three lines in every heavy run that carried it,
 and the shrink job returned its first verdict on 2026-08-29: keep rule held,
 control shrunk (below).

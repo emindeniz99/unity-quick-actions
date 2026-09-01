@@ -78,8 +78,12 @@ around 2023 — Mono has no ARM64 backend on Android, so reaching arm64 means
 IL2CPP. Use `TestbedBuilder.BuildAndroidPhone` for a sideload build that carries
 both ABIs in one APK and installs on any phone from 7.1 up.
 
-`TestbedBuilder` also carries `DisableDefine` / `EnableDefine`. Those exist
-because the package **refuses** to build if the define is flipped inside the
+`TestbedBuilder` also carries `DisableDefine` / `EnableDefine` (both mobile
+targets at once) and the define-off builds CI's `gate-off` job runs after
+flipping — `BuildAndroidPhoneNoDefine` (IL2CPP, both ABIs, so the APK differs
+from `BuildAndroidPhone`'s in nothing but the define) and
+`BuildiOSSimulatorNoDefine`. The flip is separate because the package
+**refuses** to build if the define is flipped inside the
 same editor invocation as the build — the editor assemblies would still be
 compiled with it, so the resulting player would quietly still contain the
 dev-only pieces. Flip the define in one invocation, build in the next. (This is

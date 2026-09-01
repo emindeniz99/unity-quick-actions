@@ -177,10 +177,15 @@ The stub harness compiles the C#/Java but can't confirm Unity-only wiring:
   no `QuickActions` symbols. Android: `QuickActionsTrampolineInjectorAndroid`
   (gated) injects the trampoline `<activity>` only when the define is on, and
   `QuickActionsTrampolineStripperAndroid` (ungated) strips any stale entry when
-  it is off — the build-output half is CONFIRMED on 2021.3 and 6.3 (a player
-  built with the define removed contains no trace of the trampoline); on device,
-  verify the prod manifest has no `QuickActionsTrampolineActivity` (the `.java` dead
-  class remains; literally-zero needs the package excluded from the prod project).
+  it is off — the build-output half is now proven on every code push by the
+  `gate-off` CI job (define-off APK: no trampoline `<activity>`, no shortcuts
+  meta-data, no package resources, no `EminDeniz99.QuickActions` in the IL2CPP
+  metadata; define-off Xcode export: no macro, no marked plist items — each
+  with the define-on build as the positive control), and was hand-confirmed
+  earlier on 2021.3 and 6.3. What remains is the device: install that prod
+  build and confirm no shortcut menu appears and the app is untouched (the
+  `.java` dead class remains; literally-zero needs the package excluded from
+  the prod project).
   Both ungated cleanups gate on compile-time `#if QUICKACTIONS_ENABLED` (the
   same truth as the gated injectors), with a stale-assembly coherence check
   that FAILS the build if the define was removed without a script recompile.
