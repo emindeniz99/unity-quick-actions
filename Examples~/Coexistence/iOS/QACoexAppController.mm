@@ -56,12 +56,36 @@ int gQACoexSubclassSuperCalls = 0;
                 [NSString stringWithFormat:@"super returned %@ for a marked launch item",
                                            result ? @"YES" : @"NO"]);
 
+    // When the app delegate returns YES for a launch item — which this host is about
+    // to do on the package's behalf — Apple ALSO delivers that item through the warm
+    // selector. UIKit will not do that for an item we injected into launchOptions
+    // ourselves, so the redelivery is driven by hand, through this class's own
+    // override and down the chain (subclass -> category swizzle -> package). This is
+    // the duplicate the package's consume-once cold marker exists to collapse: the
+    // queue must hand back the id exactly once, and the handler must run exactly once
+    // (the category swizzle owns it). Reading the queue without this send would be
+    // "once" for any implementation, dedup or not.
+    __block int dupCompletions = 0;
+    [self application:application
+        performActionForShortcutItem:item
+                   completionHandler:^(BOOL handled) {
+                       dupCompletions++;
+                       QACoexNote([NSString stringWithFormat:
+                           @"warm redelivery of the launch item completed handled=%d",
+                           (int)handled]);
+                   }];
+
     NSString *first = QACoexConsume();
     NSString *second = QACoexConsume();
     QACoexCheck([first isEqualToString:@"qa_ci_cold"], @"cold-queued-id",
                 [NSString stringWithFormat:@"queue handed back %@", first ?: @"(nothing)"]);
-    QACoexCheck(second == nil, @"cold-queued-once",
-                [NSString stringWithFormat:@"a second read returned %@", second ?: @"(nothing)"]);
+    QACoexCheck(second == nil, @"cold-warm-dedup",
+                [NSString stringWithFormat:@"the warm redelivery of the launch item was "
+                                           @"queued again: a second read returned %@",
+                                           second ?: @"(nothing)"]);
+    QACoexCheck(dupCompletions == 1, @"cold-warm-dedup-completion-once",
+                [NSString stringWithFormat:@"the redelivery's completion handler ran %d "
+                                           @"time(s)", dupCompletions]);
 
     // GoogleUtilities applies its proxy from component init — after every +load, around
     // this point in the launch. Match that timing rather than swizzling at load.

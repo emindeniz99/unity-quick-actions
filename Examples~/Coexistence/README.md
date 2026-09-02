@@ -33,6 +33,13 @@ them anyway compiles them to nothing.
   entry and a `NO` return, and the host discarding that `NO` does not double-deliver.
 * **Exactly-once completion**: the category wrapper owns the completion handler and
   calls it once; if the package ever completed while wrapped, the counter would read 2.
+* **Cold/warm dedup, driven**: a delegate that returns YES for a launch item is also
+  handed that item through the warm selector, and this host returns YES. UIKit will not
+  redeliver an item the host injected into `launchOptions` itself, so the subclass sends
+  the same marked item through its own warm override right after `super` returns; the
+  queue must hand the id back once (`cold-warm-dedup`) and the handler must run once
+  (`cold-warm-dedup-completion-once`). Without that send, "once" would hold for any
+  implementation, dedup or not.
 * **GoogleUtilities' own gate**: its `class_getInstanceSize` equality condition holds
   for a proxy built over the class we hooked, so this leg stops where Firebase would
   stop rather than sailing past it.
