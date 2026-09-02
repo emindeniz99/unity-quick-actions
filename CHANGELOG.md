@@ -51,7 +51,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   sheet on API 35: the icon it pressed was the hotseat's *prediction* of the
   app, which never opens the shortcut popup, and on API 30 no opener moved
   the launcher off the home screen. A predicted-app match now counts as a
-  miss, so the drawer escalation runs and a real icon gets the press.
+  miss, so the drawer escalation runs and tries to find, and then press, a
+  real icon — an attempt whose first run is still ahead.
 - **The settings page says what an `Icon` does on Android, next to the field.**
   A property drawer for `IconType` adds one line under the popup: "built-in
   drawable" for `Add` / `Compose` / `Favorite` / `Play`, or the exact

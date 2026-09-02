@@ -32,7 +32,8 @@ ships it.
   space / Settings" sheet, never the app's shortcut popup: the screenshot
   shows exactly that sheet. Third attempt, in the script: a match that is
   only a launcher prediction counts as a miss, so the drawer escalation
-  runs and the real icon gets the press. If `longpress-unity6` still shows
+  runs and tries to find, and then press, a real icon — an attempt, not yet
+  run. If `longpress-unity6` still shows
   no sheet after that, the remaining unknown is whether the API 35 image's
   launcher opens its drawer for `KEYCODE_ALL_APPS` at all. The verdict never
   depends on it.
