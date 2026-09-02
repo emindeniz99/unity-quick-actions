@@ -132,10 +132,19 @@ carries the trampoline on the `UnityPlayerActivity` path. **Unity 6.0 LTS** was
 verified earlier (0 console errors, Test Runner green at 35/35 — a *historical*
 number, from when the suite was that size).
 
-**Verified on the iOS Simulator (Unity 6.3).** Long-pressing the app icon shows
-the static shortcuts baked into `Info.plist` alongside one added at runtime
-through the C# API; tapping one cold-launches the app, and the action id
-arrives on the `Performed` event. The same run is not possible on 2021.3:
+**Verified on the iOS Simulator (Unity 6.3 / iOS 26.5).** Long-pressing the app
+icon shows the static shortcuts baked into `Info.plist` alongside one added at
+runtime through the C# API; tapping one cold-launches the app, and the action id
+arrives on the `Performed` event. **Which of the two iOS delivery paths that tap
+took is not recorded**: the run was logged as "Unity 6.3" with no patch number
+(the only 6.3 project in this repo is `Examples~/Testbed6`, on **6000.3.21f1**)
+and the exported `Info.plist` was never inspected for a
+`UIApplicationSceneManifest` — the key that decides whether iOS routes the tap to
+the app delegate or to the *scene* delegate, and which Unity begins emitting at
+6000.3.8f1. Read it as one green end-to-end run, not as coverage of both paths;
+see [Coexisting with other native iOS
+plugins](#coexisting-with-other-native-ios-plugins). The same run is not possible
+on 2021.3:
 Unity ships an x86_64-only simulator runtime for that line, and Apple silicon
 cannot run it (Unity added arm64 Simulator support in Unity 6 and stated it
 will not be backported to 2021 LTS).
@@ -758,10 +767,24 @@ their tokens show raw there.
 
 ## How it works
 
-- **iOS** — `Plugins/iOS/QuickActions.mm` swizzles `UnityAppController` at
-  `+load`: both cold launches (`didFinishLaunchingWithOptions:`) and warm taps
-  (an injected `application:performActionForShortcutItem:completionHandler:`)
-  enqueue the id. Dynamic shortcut items are set on `UIApplication.shortcutItems`.
+- **iOS** — `Plugins/iOS/QuickActions.mm` installs its hooks on
+  `UnityAppController` from a **class `+load`**, so every
+  `IMPL_APP_CONTROLLER_SUBCLASS` subclass inherits them and later plugin
+  swizzlers chain *through* them (an Objective-C class `+load` runs before every
+  category `+load` in the same image). Cold launches arrive in
+  `didFinishLaunchingWithOptions:` and warm taps on an injected
+  `application:performActionForShortcutItem:completionHandler:`; both enqueue the
+  id. **From Unity 2022.3.72f1 / 6000.0.68f1 / 6000.3.8f1 the generated project
+  adopts the UIScene lifecycle** (`UIApplicationSceneManifest` naming
+  `UnityScene`), and Apple routes both taps to the *scene* delegate instead —
+  cold in `scene:willConnectToSession:options:`, warm in
+  `windowScene:performActionForShortcutItem:completionHandler:` — so the package
+  learns that delegate class from the connecting session's `UISceneConfiguration`
+  and installs the same two hooks there. Dynamic shortcut items are set on
+  `UIApplication.shortcutItems`. **Not supported:** Unity as a Library (the host
+  owns the `UIApplicationDelegate`, so taps never reach `UnityAppController`) and
+  Unity 6.5's Swift Xcode project type — see [Coexisting with other native iOS
+  plugins](#coexisting-with-other-native-ios-plugins).
 - **Android** — `Plugins/Android/QuickActionsBridge.java` builds `ShortcutInfo`s
   whose intents target `QuickActionsTrampolineActivity`. The trampoline records
   the tapped id and brings the Unity activity forward.
@@ -828,6 +851,111 @@ republished with this package's intents, and never removed. Three consequences:
   host's entry in place. On iOS an unmarked same-id item is always preserved
   (the id then renders twice — the honest result of two publishers claiming
   one id); the package never removes anything it didn't mark.
+
+#### Coexisting with other native iOS plugins
+
+Quick actions are the one iOS feature Unity's sanctioned plug-in extension point
+cannot reach: `UnityRegisterAppDelegateListener` / `UnityRegisterLifeCycleListener`
+only re-publish a fixed list of callbacks as `NSNotification`s (`onOpenURL:`,
+`applicationWillFinishLaunchingWithOptions:`, `didBecomeActive:` …) and neither
+table has a shortcut-item or `UIScene` entry. So this package swizzles, and the
+question any mobile-SDK stack raises is whether that collides with somebody
+else's swizzle. It touches exactly **five** selectors:
+
+| Selector | Installed on | How |
+|---|---|---|
+| `application:didFinishLaunchingWithOptions:` | `UnityAppController` | wrap + chain (Unity implements it) |
+| `application:performActionForShortcutItem:completionHandler:` | `UnityAppController` | add — or wrap + chain if something already implements it |
+| `application:configurationForConnectingSceneSession:options:` | `UnityAppController` | add **only** when `Info.plist` has a `UIApplicationSceneManifest`; wrap + chain otherwise |
+| `scene:willConnectToSession:options:` | the scene-delegate class | wrap + chain |
+| `windowScene:performActionForShortcutItem:completionHandler:` | the scene-delegate class | add — or wrap + chain |
+
+**Why the root class, from a class `+load`.** Unity offers three extension
+points: a `UnityAppController` subclass via
+[`IMPL_APP_CONTROLLER_SUBCLASS`](https://docs.unity3d.com/Manual/StructureOfXcodeProject.html)
+(which is itself a *category* `+load` that assigns the `AppControllerClassName`
+global), the `AppDelegateListener` notifications above, and plain swizzling.
+This package hooks `NSClassFromString("UnityAppController")` — the root class,
+never `AppControllerClassName` — from a **class** `+load`, because
+[objc4](https://github.com/apple-oss-distributions/objc4) runs every pending
+class `+load` before any category `+load` in the same image. Three consequences:
+every app-controller subclass *inherits* our implementations; a vendor category
+swizzler installs *on top of* ours and captures our IMP as its "original"; and a
+vendor that reads `AppControllerClassName` at class-`+load` time still sees the
+default, while we do not care. The guarantee is scoped to one image — a vendor
+shipping a dynamic `.xcframework` that loads before `UnityFramework` can still
+run a class `+load` first — but no surveyed SDK touches these selectors, so the
+ordering only has to hold for the ones that swizzle *around* us.
+
+**What the surveyed SDKs do** (source read, not inferred, except where noted):
+
+- **Firebase / GoogleUtilities** —
+  [`GULAppDelegateSwizzler`](https://github.com/google/GoogleUtilities/blob/main/GoogleUtilities/AppDelegateSwizzler/GULAppDelegateSwizzler.m)
+  *isa*-swizzles the live delegate into a `GUL_<Class>-<UUID>` subclass for
+  `openURL`, `continueUserActivity`, `handleEventsForBackgroundURLSession` and
+  (opt-in) the APNS selectors. It never touches ours, and its subclass
+  **inherits** them: we only add and replace methods on an already-realized class
+  (the runtime forbids adding ivars there at all), so GoogleUtilities' own
+  "subclass size must equal original class size" gate is unaffected. [`GULSceneDelegateSwizzler`](https://github.com/google/GoogleUtilities/blob/main/GoogleUtilities/AppDelegateSwizzler/GULSceneDelegateSwizzler.m)
+  proxies only `scene:openURLContexts:`.
+- **Firebase C++ / Unity** —
+  [`util_ios.mm`](https://github.com/firebase/firebase-cpp-sdk/blob/main/app/src/util_ios.mm)
+  swizzles `application:didFinishLaunchingWithOptions:` from a `UIApplication`
+  *category* `+load` plus `setDelegate:`, i.e. after ours, so it captures our IMP
+  and returns our value verbatim — including the `NO` that suppresses the
+  duplicate warm delivery.
+- **OneSignal (Unity)** — same shape: a category `+load` on `UIApplication`, then
+  `class_addMethod` + `method_exchangeImplementations` at `setDelegate:` time. It
+  chains to us and returns our result.
+- **AppsFlyer** — the default path is an `IMPL_APP_CONTROLLER_SUBCLASS`
+  subclass that *inherits* our hooks (it uses `UnityRegisterAppDelegateListener`
+  for everything except `application:continueUserActivity:restorationHandler:`,
+  which it overrides and does **not** call `[super …]` on — a selector we do not
+  touch). Its opt-in swizzle mode
+  ([`AppsFlyer+AppController.m`](https://github.com/AppsFlyerSDK/appsflyer-unity-plugin/tree/master/Assets/AppsFlyer/Plugins/iOS))
+  is a category `+load` covering `applicationDidBecomeActive:`,
+  `applicationDidEnterBackground:`, `didReceiveRemoteNotification:`,
+  `application:openURL:options:` and `continueUserActivity` — no overlap.
+- **Listeners, structurally unable to collide** — Facebook for Unity, Helpshift
+  SDK X, Unity IAP's `UnityEarlyTransactionObserver`,
+  `com.unity.mobile.notifications` and Branch's Unity wrapper register through
+  `UnityRegisterAppDelegateListener` and modify no method table at all. (Those
+  notifications are posted from *inside* Unity's `didFinishLaunching`, which is
+  why our hook always calls the captured original.)
+- **No contact with any of our five selectors** — Adjust, Branch's
+  `BranchAppController`, Singular's app-delegate half, Braze, AppLovin MAX,
+  IronSource / LevelPlay, Google Mobile Ads, GameAnalytics, Amplitude, Kochava,
+  Airship, Pushwoosh, Unity Ads. (For the closed-binary members of that list the
+  evidence is absence-of-source, not a symbol scan.)
+- **The one genuine overlap** — Singular's
+  [`SingularSceneDelegate.m`](https://github.com/singular-labs/Singular-Unity-SDK/blob/main/SingularSDK/Plugins/iOS/SingularSceneDelegate.m)
+  swizzles `scene:willConnectToSession:options:` on `UnityScene` from a `+load`.
+  It composes: we install at scene-configuration time, strictly *after* every
+  `+load`, so we capture Singular's IMP and chain to it, which chains to Unity's.
+
+**If you ship your own `UnityAppController` subclass**, two rules keep the cold
+tap working: call `[super application:didFinishLaunchingWithOptions:]` and
+return its value (discarding it is tolerated — a consume-once marker collapses
+the duplicate delivery — but returning it is the contract); and if you implement
+`application:configurationForConnectingSceneSession:options:`, call
+`[super …]` there too, or your subclass shadows our hook and the *first* cold tap
+after install can be missed while the `UISceneWillConnectNotification` fallback
+catches up.
+
+**Two shapes are unsupported.** In **Unity as a Library** the host owns the
+`UIApplicationDelegate` and `UnityAppController` is reachable only through
+`[ufw appController]`, so warm taps never reach our hooks; the shortcuts still
+appear (they are written straight to `UIApplication.shortcutItems`), which makes
+this the half-working shape to watch for. Unity 6.5's **Swift Xcode project
+type** replaces the Objective-C trampoline and its plug-in notification table has
+no shortcut-item entry; neither has been run here, and `IMPL_APP_CONTROLLER_SUBCLASS`
+is documented by Unity as Objective-C-only.
+
+**Status of this section:** it is a *source-and-documentation audit*, not a test
+result. No vendor SDK has ever been linked into a build of this package, and no
+device or Simulator run has exercised any of these combinations. The mock-host
+coexistence CI leg added alongside this text is the first thing that will — once
+it has actually run green.
 
 ### Known limits — localization
 
@@ -951,9 +1079,16 @@ spoof a tap; on either platform the id is just a string the OS hands you. So:
 
 See [`ROADMAP.md`](./ROADMAP.md). Notable remaining: always-on device CI (the
 shipped adb smoke runs on every code push and PR but covers Android alone — warm *and* cold taps, neither yet run on physical hardware; iOS has no
-adb analog) and on-device
+adb analog) and
 validation of the newest native paths (UIScene hooks — including the
-subclass-shadowed fallback — and the Android localized static output). OS read-back can't recover icons natively; the package persists icon
+subclass-shadowed fallback — and the Android localized static output). The iOS
+UIScene path is **unexercised, not merely un-device-tested**: the `ios-simulator`
+leg builds and launches Testbed6 (6000.3.21f1, inside the range where Unity emits
+a scene manifest), but its only assertion is that the process is still registered
+with `launchctl` — which stays true for an app whose scene connected without a
+delegate. The coexistence leg added with this note is the first check that asserts
+on the native hooks themselves; until it has run green, treat the scene path as
+unexercised. OS read-back can't recover icons natively; the package persists icon
 identity in its ownership-marker payload — Android extras, iOS `userInfo` — so
 reconciled items keep their icons on both platforms.
 
@@ -1081,6 +1216,16 @@ behaviour, which cannot run in the Editor.
   handler" (check the installed IMP at call time before owning the
   completionHandler). Returning `NO` from `didFinishLaunchingWithOptions` is
   what dedupes a cold shortcut tap.
+- **Install from a class `+load`, never a category `+load`** — objc4 runs every
+  pending *class* `+load` before any *category* `+load` in the same image, and
+  Unity's `IMPL_APP_CONTROLLER_SUBCLASS` **is** a category `+load`. That one
+  choice is why vendor swizzlers (AppsFlyer, Firebase C++, OneSignal) capture our
+  IMP and chain to it instead of racing us, and why every app-controller subclass
+  inherits our hooks. Corollary: hook `NSClassFromString("UnityAppController")`,
+  never Unity's `AppControllerClassName` global — that global is assigned from a
+  category `+load`, so a class `+load` reading it still sees the default. The
+  guarantee is scoped to one image: a vendor whose dynamic framework loads before
+  `UnityFramework` can still run a class `+load` first.
 - **Compile-only stubs miss contract bugs.** The classes of defect that
   slipped past `javac` + the NUnit suite (in-place pinned updates, null-vs-empty
   reads, rate-limit windows) were caught only by *running* the plugin against

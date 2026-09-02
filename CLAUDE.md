@@ -39,7 +39,13 @@ red or unrun verify; say what failed.
 - Quick actions cannot be observed in the Editor, but they **do** work on the
   iOS Simulator — verified on Unity 6.3 / iOS 26.5, where static and
   runtime-added shortcuts appeared on the Simulator home screen and a tap
-  cold-launched the app and delivered the id to `Performed`. (Android has no
+  cold-launched the app and delivered the id to `Performed`. That run's editor
+  patch was never recorded and its exported `Info.plist` was never inspected, so
+  it is NOT established which iOS path delivered the tap. The **UIScene** path
+  (Unity 2022.3.72f1+ / 6000.0.68f1+ / 6000.3.8f1+, where `Info.plist` names
+  `UnityScene` as the scene delegate and Apple stops calling the app-delegate
+  quick-action selector) has not been shown to run anywhere, on Simulator or
+  device — do not describe scene-lifecycle behaviour as verified. (Android has no
   simulator equivalent; the 2021.3 line cannot do a Simulator run at all —
   Unity ships an x86_64-only simulator runtime there.) **Physical hardware is
   partly covered**: one Android run (Moto G Play 2024 / Android 14) confirmed

@@ -159,7 +159,7 @@ The stub harness compiles the C#/Java but can't confirm Unity-only wiring:
   (re-enable the define), documented in README. A future cleanup could move the SO
   *type* into an always-compiled editor assembly so the asset never orphans.
 - **iOS scene lifecycle + cold dedup (SHIPPED in v0.4.0 — device-validate):** the
-  package now learns the scene-delegate class from the host's
+  package now learns the scene-delegate class from the connecting session's
   `UISceneConfiguration` and installs cold
   (`scene:willConnectToSession:options:`) + warm
   (`windowScene:performActionForShortcutItem:completionHandler:`) hooks, with a
@@ -168,7 +168,15 @@ The stub harness compiles the C#/Java but can't confirm Unity-only wiring:
   first real validation was an Xcode build, and it has now happened — the
   generated project compiles against the real iOS device SDK on 2021.3 and 6.3
   with zero warnings from `QuickActions.mm`, and a 6.3 / iOS 26.5 Simulator run
-  confirms a cold tap reaching `Performed`. On device, verify: a scene-manifest
+  confirms a cold tap reaching `Performed` (that run's editor patch was never
+  recorded, so which lifecycle it exercised is unknown). FIRST verify the app
+  still STARTS: on a scene-manifest project, confirm the connected scene's
+  delegate is a `UnityScene` instance and that
+  `session.configuration.delegateClass == UnityScene`. The package adds
+  `application:configurationForConnectingSceneSession:options:` where Unity has
+  none, which moves UIKit off the Info.plist path and onto our return value — if
+  that value were wrong the engine would never initialise, and no tap assertion
+  above it would mean anything. Then verify: a scene-manifest
   app delivers cold + warm taps exactly once each; a default (no-manifest) app
   behaves byte-identically to v0.3.0; a host UnityAppController subclass that
   discards our `NO` no longer double-delivers; multi-scene-delegate-class hosts
