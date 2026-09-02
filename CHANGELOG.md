@@ -62,6 +62,44 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   60-second quickstart with the same guarded snippet, a contents list, and an
   embedded-package (vendoring) install option.
 
+- **CI runs the iOS native hooks under a mock coexistence host.** Two new
+  legs, `ios-export-coex` and `ios-simulator-coex`, re-export Testbed2022 and
+  Testbed6 with four sources from `Examples~/Coexistence/iOS/` copied into
+  `Assets/Plugins/iOS`, so one app is at once an `IMPL_APP_CONTROLLER_SUBCLASS`
+  host, a category `+load` swizzle of the two app-delegate selectors, and a
+  GoogleUtilities-style isa proxy — the three shapes a project's own
+  `UnityAppController` subclass, AppsFlyer / OneSignal-style categories and
+  Firebase take. The Simulator launch must print every `QA-COEX: PASS` line by
+  name plus the package's own install line; the category `+load` requires
+  `performActionForShortcutItem` to already exist on `UnityAppController`,
+  the executable proof that a class `+load` runs before a category `+load`.
+  On the scene testbed a second launch shadows
+  `application:configurationForConnectingSceneSession:options:` without
+  calling super and requires the install line to flip from "via
+  configuration" to "via notification". Until now the `ios-simulator` leg
+  only required the process to still exist, which an app with no hooks
+  installed satisfies too. The lifecycle each leg exercises is asserted, not
+  described.
+- **One `NSLog` per launch names the branch each iOS hook took.**
+  `[QuickActions] iOS hooks: didFinishLaunching=… performAction=…
+  sceneConfig=… manifest=…` at the end of `+load`, and
+  `[QuickActions] iOS scene hooks installed on <class> via configuration` (or
+  `via notification`) when the scene hooks land — the only way an adopter, or
+  CI, can tell a working install from an inert one.
+
+- **`Samples~/AndroidIcons` — a working `.androidlib` icon example.** The
+  custom-Android-icon recipe as an importable plug-in rather than five written
+  steps: **Package Manager ▸ Samples ▸ Import** copies a bare
+  `QuickActionIcons.androidlib` — `AndroidManifest.xml` and `res/` at its root,
+  the shape CI measures on the 2022.3 testbed — with `ic_quickaction_search`
+  and `ic_quickaction_home` drawn like the built-ins, under `Assets/`, where
+  Unity picks it up on the next Android build. Its README says how a runtime
+  `Add` and a static item each reach the drawable, how to confirm it in the
+  APK with `aapt2`, the Unity 6 (AGP 8) `namespace` change, and that the
+  `.unitypackage` install cannot carry an `.androidlib`. The folder ships with
+  its Android-only `PluginImporter` `.meta`; `tools~/gen_meta.py` now treats a
+  `*.androidlib` as one plug-in (a `.meta` for the folder, none for its
+  contents) in both its generate and `--check` passes.
 ### Changed
 
 - **The Unity 6000.6 canary retries an editor that died before the suite
@@ -72,6 +110,25 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   first attempt left no `editmode-results.xml`; an attempt that produced
   results is final, so a real test failure is never retried, and a verdict
   step turns the job red unless the last attempt passed.
+- **The iOS status claims are scoped to the path that was actually run.** The
+  Simulator run every doc cited was logged as "Unity 6.3" with no patch number
+  and its exported `Info.plist` was never inspected, so which of the two iOS
+  delivery paths carried that tap is unknown — 6000.3.8f1 is where Unity
+  starts emitting `UIApplicationSceneManifest` and Apple stops calling the
+  app-delegate selector. README Status, `PRODUCTION_READINESS.md` (the one
+  iOS row becomes two: app-delegate ✅, UIScene ⏳ unexercised), `CLAUDE.md`
+  and `ROADMAP.md` now say so, and the ROADMAP's scene items start with
+  "confirm the app still starts": the package adds
+  `application:configurationForConnectingSceneSession:options:` where Unity
+  has none, so a wrong return value there would mean no engine at all. The
+  README gains **Coexisting with other native iOS plugins**: the five
+  selectors the package touches, why it hooks the root class from a class
+  `+load`, and what each surveyed SDK family does — Firebase / GoogleUtilities
+  isa-swizzling inherits the package's IMPs because it adds no ivars, Firebase
+  C++ / OneSignal / AppsFlyer category swizzles chain after it, the listener
+  SDKs (Facebook, Helpshift, Unity IAP) cannot collide, Singular's scene
+  swizzle composes, and Unity as a Library and the Swift project type are
+  unsupported. It is a source audit, and says so.
 - **The custom-asmdef integration shape is compiled by CI in both
   configurations.** README tells a project whose scripts live in their own
   assembly definition to reference `EminDeniz99.QuickActions`; with the define
@@ -191,6 +248,26 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   distinct from an unsupported device — the bridge's read and write members
   return their failed-read signal (null) for it, so the facade retries instead
   of adopting an empty set and pruning the user's real shortcuts against it.
+- **The `UISceneWillConnectNotification` fallback binds only to Unity's own
+  scene delegate.** It used to bind to the first scene that connected,
+  whatever it was, and burn its one-shot doing so; on a host that owns the
+  scene manifest — Unity as a Library, a SwiftUI `@main` app, a second iPad
+  window, an external-display or CarPlay scene — the real Unity scene was
+  never hooked, and because the package *adds*
+  `windowScene:performActionForShortcutItem:completionHandler:` to a class
+  that lacks it, it then looked terminal for the host's own quick actions:
+  adopted into a queue nothing on their side drains, completed `YES`. The
+  fallback now reads the declared class from the connecting session's
+  `UISceneConfiguration` (never a `GUL_` / `NSKVONotifying_` proxy; set before
+  the delegate exists) and binds only to `UnityScene` or a subclass when this
+  process has one. With no `UnityScene` class — a host-authored manifest on an
+  older trampoline — it keeps the first-connecting behaviour but marks the
+  owner unconfirmed: there it never adopts an unmarked item and completes
+  `NO`, which is what UIKit would have seen had the selector never been added.
+  The configuration-wrapper path is unchanged.
+- **The defensive `class_addMethod` type encoding is built from
+  `@encode(BOOL)`** rather than the hardcoded armv7-era `c` (`BOOL` is `bool`,
+  encoding `B`, on arm64).
 
 ## [0.5.0] - 2026-09-01
 

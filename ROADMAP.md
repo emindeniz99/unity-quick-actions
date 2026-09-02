@@ -34,18 +34,6 @@ ships it.
   54,951,670 bytes, every assertion green on both), so the current
   `IPostGenerateGradleAndroidProject` path is measured rather than assumed on
   every push — this is an API-alignment item, not a bug.
-- **Teaching sample for custom Android icons (small, optional).** A
-  `Samples~/AndroidIcons/` containing a ready-made `QuickActionIcons.androidlib`
-  (correct root-level `AndroidManifest.xml` + `res/drawable-xhdpi/`)
-  would let a user import a *working* example rather than follow a five-step
-  written recipe. Imports to `Assets/Samples/<pkg>/<version>/…`, which is under
-  `Assets/`, so it would be picked up with no further action. Caveats: nobody
-  ships this combination today (untested), `Samples~` content ships without
-  `.meta` so the Android-only `PluginImporter` setting falls back to defaults,
-  and it inherits the `.unitypackage` limitation above. The four built-in icons
-  now ship through the post-processor; this sample would be
-  documentation-by-example for the 25 catalog entries that still need the
-  consumer's own art, and for replacing a built-in one.
 
 - **Automated device CI, remaining scope** — 0.4.6 closed the licence half:
   `.github/workflows/unity-ci.yml` (GameCI) builds the dev APK in CI and feeds

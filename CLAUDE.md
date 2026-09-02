@@ -21,14 +21,23 @@ icons (`tools~/gen_builtin_icons.py --check` — regenerate, never hand-edit
 `tools~/setup.sh` installs the toolchain once. Never report a change as done on a
 red or unrun verify; say what failed.
 
+**Never push to a PR branch while its `unity` workflow run is still pending.**
+The `pull_request` `paths` filter is matched against the PR's *whole* diff, not
+the pushed commits, so even a docs-only push cancels the in-flight run
+(concurrency group per ref) and restarts every Unity job from scratch. Wait for
+the run to finish — read its result — then push.
+
 ## Unity discipline
 
 - **Every asset needs a committed `.meta`.** After adding/renaming/moving files,
   run `python3 tools~/gen_meta.py` and `git add` the `.meta` next to the asset.
   `verify.sh` fails if it had to generate one.
 - **`Samples~/`, `store~/`, `dist~/`** — folders ending in `~` are invisible to
-  Unity; the folders themselves get no `.meta`. Files inside `Samples~/Demo/` do
-  have `.meta`s (gen_meta handles that folder explicitly) — leave them.
+  Unity; the folders themselves get no `.meta`. Everything under `Samples~/`
+  (`Demo/`, `AndroidIcons/`) does have `.meta`s, because a sample is copied into
+  `Assets/` on import — gen_meta walks that one `~` folder explicitly, and gives
+  a `*.androidlib` a single `PluginImporter` `.meta` for the folder and none for
+  the files inside it — leave them.
 - **Never commit a `.unitypackage`.** It is a build output; `dist~/` is
   gitignored, `tools~/pack_unitypackage.py` produces it, CI attaches it to the
   GitHub Release (first one: `v0.4.0`).
