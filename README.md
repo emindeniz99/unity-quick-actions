@@ -967,10 +967,10 @@ The package is type-checked and compiled without Unity via a stub-based harness:
 
 ```bash
 tools~/setup.sh     # install dotnet + JDK (once)
-tools~/verify.sh    # .meta + C# compile (10 configs) + unit tests + Android plugin + frozen strings + release coherence
+tools~/verify.sh    # .meta + C# compile (11 configs) + unit tests + Android plugin + frozen strings + release coherence
 ```
 
-`verify.sh` compiles the C# in **10 configurations** (0 warnings), runs the **122**
+`verify.sh` compiles the C# in **11 configurations** (0 warnings), runs the **122**
 headless unit tests via `dotnet test`, and compiles and smoke-tests the Android
 Java plugin (**111** checks). Those tests (bar 51 headless-only ones) plus 6
 `JsonUtility` serialization tests run in Unity's **Test Runner** from

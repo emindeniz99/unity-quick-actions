@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- The Demo sample as a DEFINE-OFF device build compiles it: QUICKACTIONS_ENABLED
+       unset and the Runtime absent (the gated runtime assembly is not compiled at
+       all in that configuration), so the sample's #else branch — the inert IMGUI
+       shell — must stand on the stubs alone. CI's gate-off job builds exactly this;
+       this config catches a broken #else branch before the push. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <OutputType>Library</OutputType>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <DefineConstants>UNITY_ANDROID;UNITY_2021_3_OR_NEWER</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Stubs/**/*.cs" />
+    <Compile Include="../Samples~/Demo/**/*.cs" />
+  </ItemGroup>
+</Project>

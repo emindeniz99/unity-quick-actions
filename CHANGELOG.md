@@ -122,6 +122,29 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `BuildAndroidPhoneNoDefine` / `BuildiOSSimulatorNoDefine`, and its
   `DisableDefine` / `EnableDefine` now flip both mobile targets.
 
+  The first measurement (run 51) read 1,077,821 bytes and failed the ceiling —
+  and the entry-by-entry diff said why: `libunity.so` alone accounted for
+  1.4 MiB uncompressed, because the define-off build had dropped the IMGUI,
+  TextRendering, InputLegacy and both TextCore engine modules. Nothing in the
+  package uses them (its runtime reaches AndroidJNI and JSONSerialize, present
+  in both APKs); the **Demo sample** does, and the Demo wrapped its whole file
+  in `#if QUICKACTIONS_ENABLED`, so with the define off its `MonoBehaviour`
+  vanished from `Assembly-CSharp`, engine-code stripping removed the modules
+  only it used, and their weight was billed to the package. The Demo now keeps
+  its component and IMGUI shell compiled in both configurations and guards
+  only the package calls — the README's own guidance, and what the
+  `Testbed.Integration` component already did — so the same engine modules
+  stay on both sides of the diff. A new harness config, `SampleOff`, compiles
+  that `#else` branch the way a define-off device build does (no define, no
+  Runtime), which no config did before.
+- **The Demo sample survives a define-off build as a real component.** With
+  `QUICKACTIONS_ENABLED` off, `Samples~/Demo/QuickActionsDemo.cs` used to
+  compile to nothing, so a define-off build of its scene carried a "missing
+  script". The component and its on-screen shell now compile either way; with
+  the define off the buttons report that the package is not compiled instead
+  of calling it. Define-on behaviour is unchanged — the same catalog, log lines
+  and autotest hook the device smoke drives.
+
 ### Fixed
 
 - **A hostile local app can no longer crash the game through the trampoline.**

@@ -11,7 +11,7 @@ rules below are non-negotiable.
 tools~/verify.sh        # must end with: VERIFY: PASS
 ```
 
-It checks `.meta` completeness, compiles the C# in 10 configs against Unity
+It checks `.meta` completeness, compiles the C# in 11 configs against Unity
 stubs, runs the NUnit suite, compiles + smoke-tests the Android Java plugin, and
 runs three more checks: the frozen device strings
 (`tools~/check_frozen_strings.py`), `package.json` / top `CHANGELOG.md` heading /

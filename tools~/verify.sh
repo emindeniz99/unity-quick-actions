@@ -44,7 +44,7 @@ echo
 echo "== 2/7  C# compile (UnityEngine/UnityEditor stubs) =="
 if command -v dotnet >/dev/null 2>&1; then
   export DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_NOLOGO=1
-  for proj in Editor EditoriOS EditorAndroid NativeGate NativeGateiOS Bootstrap iOS Android Sample SampleAndroid; do
+  for proj in Editor EditoriOS EditorAndroid NativeGate NativeGateiOS Bootstrap iOS Android Sample SampleAndroid SampleOff; do
     echo "-- QuickActions.$proj.csproj"
     # Decide pass/fail on dotnet's exit code, not on whether grep matched output
     # (a quieter dotnet could otherwise mark a clean build FAIL).

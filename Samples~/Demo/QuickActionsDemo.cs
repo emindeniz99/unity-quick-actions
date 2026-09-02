@@ -1,9 +1,13 @@
 // Guarded by the package's opt-in define: the QuickActions types only exist when
-// QUICKACTIONS_ENABLED is set, so the demo (compiled into Assembly-CSharp) must
-// guard its call sites the same way your own game code does. See the README.
-#if QUICKACTIONS_ENABLED
+// QUICKACTIONS_ENABLED is set, so the demo (compiled into Assembly-CSharp) guards
+// its call sites the same way your own game code does — see the README. The
+// component and its IMGUI shell stay compiled either way: a define-off build of
+// this scene then carries a real (inert) component instead of a "missing
+// script", and only the package calls come and go with the define.
 using System.Collections.Generic;
+#if QUICKACTIONS_ENABLED
 using EminDeniz99.QuickActions;
+#endif
 using UnityEngine;
 
 namespace EminDeniz99.QuickActions.DemoSample
@@ -24,6 +28,7 @@ namespace EminDeniz99.QuickActions.DemoSample
         // refresh it once at startup and whenever a tap arrives.
         private string _lastPerformed;
 
+#if QUICKACTIONS_ENABLED
         private static readonly QuickActionItem[] Catalog =
         {
             new QuickActionItem("new_game", "New Game", "Start fresh", IconType.Add),
@@ -50,18 +55,31 @@ namespace EminDeniz99.QuickActions.DemoSample
             Add($"Performed '{id}'");
         }
 
-        private void Add(string line)
-        {
-            _log.Insert(0, line);
-            Debug.Log($"[QuickActionsDemo] {line}");
-        }
+        private static string Supported => QuickActions.IsPlatformSupported.ToString();
 
-        // The "Add 3 shortcuts" button's body, shared with the Android autotest hook
-        // below so the automated run can never drift from what a human tap does.
+        // The buttons' bodies. "Add 3 shortcuts" is shared with the Android autotest
+        // hook below so the automated run can never drift from what a human tap does.
         private void AddThree()
         {
             QuickActions.AddList(new List<QuickActionItem> { Catalog[0], Catalog[1], Catalog[2] });
             Add("Added new_game, continue, daily");
+        }
+
+        private void AddSettings() => Add(QuickActions.Add(Catalog[3]) ? "Added settings" : "settings already added");
+
+        private void RemoveDaily() => Add(QuickActions.RemoveById("daily") ? "Removed daily" : "daily not present");
+
+        private void RemoveAll()
+        {
+            QuickActions.RemoveAll();
+            Add("Removed all");
+        }
+
+        private void ResetLastPerformed()
+        {
+            QuickActions.ResetLastPerformed();
+            _lastPerformed = null;
+            Add("Reset LastPerformed");
         }
 
 #if UNITY_ANDROID && !UNITY_EDITOR
@@ -101,33 +119,56 @@ namespace EminDeniz99.QuickActions.DemoSample
             }
         }
 #endif
+#else
+        // The define is off: the package's assembly is not compiled, so there is
+        // nothing for the buttons to call. The shell below is drawn all the same —
+        // that is what keeps a define-off build of this scene free of a "missing
+        // script", and what lets CI's gate-off job measure the package's footprint
+        // as the package alone: the same IMGUI code on both sides of the diff, so
+        // engine-code stripping keeps the same engine modules in both APKs.
+        private const string OffLine = "QUICKACTIONS_ENABLED is off — the package is not compiled";
+
+        private void Awake() => Add(OffLine);
+
+        private static string Supported => "n/a (define off)";
+
+        private void AddThree() => Add(OffLine);
+        private void AddSettings() => Add(OffLine);
+        private void RemoveDaily() => Add(OffLine);
+        private void RemoveAll() => Add(OffLine);
+
+        private void ResetLastPerformed()
+        {
+            _lastPerformed = null;
+            Add(OffLine);
+        }
+#endif
+
+        private void Add(string line)
+        {
+            _log.Insert(0, line);
+            Debug.Log($"[QuickActionsDemo] {line}");
+        }
 
         private void OnGUI()
         {
             const float pad = 16f;
             using (new GUILayout.AreaScope(new Rect(pad, pad, Screen.width - pad * 2, Screen.height - pad * 2)))
             {
-                GUILayout.Label($"Quick Actions Demo   supported={QuickActions.IsPlatformSupported}");
+                GUILayout.Label($"Quick Actions Demo   supported={Supported}");
                 GUILayout.Label($"LastPerformed: {_lastPerformed ?? "(none)"}");
 
                 GUILayout.Space(8);
                 if (GUILayout.Button("Add 3 shortcuts", GUILayout.Height(56)))
                     AddThree();
                 if (GUILayout.Button("Add 'settings'", GUILayout.Height(56)))
-                    Add(QuickActions.Add(Catalog[3]) ? "Added settings" : "settings already added");
+                    AddSettings();
                 if (GUILayout.Button("Remove 'daily'", GUILayout.Height(56)))
-                    Add(QuickActions.RemoveById("daily") ? "Removed daily" : "daily not present");
+                    RemoveDaily();
                 if (GUILayout.Button("Remove all", GUILayout.Height(56)))
-                {
-                    QuickActions.RemoveAll();
-                    Add("Removed all");
-                }
+                    RemoveAll();
                 if (GUILayout.Button("Reset LastPerformed", GUILayout.Height(56)))
-                {
-                    QuickActions.ResetLastPerformed();
-                    _lastPerformed = null;
-                    Add("Reset LastPerformed");
-                }
+                    ResetLastPerformed();
 
                 GUILayout.Space(8);
                 GUILayout.Label("Log:");
@@ -141,4 +182,3 @@ namespace EminDeniz99.QuickActions.DemoSample
         }
     }
 }
-#endif
