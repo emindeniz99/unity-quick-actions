@@ -421,13 +421,17 @@ jobs:
   # allowDirtyBuild. versioning:None keeps the builder from rewriting the
   # project version out of git history.
   #
-  # The 2022.3 leg does one thing more, flagged `androidlib` in the matrix
-  # below: it also proves the recipe README.md gives a CONSUMER for their own
-  # icons. Testbed2022 carries an .androidlib under Assets/ and a second one
-  # inside an embedded UPM package, and the assertion step requires both their
-  # drawables in the APK plus the ABSENCE of a decoy planted at the .androidlib
-  # root. That recipe had never been run — it rested on Unity's documentation
-  # and on reading Unity's own notifications package.
+  # Two legs do more than the others, both flagged in the matrix below:
+  #   2022.3 (androidlib) also proves the recipe README.md gives a CONSUMER for
+  #     their own icons. Testbed2022 carries an .androidlib under Assets/ and a
+  #     second one inside an embedded UPM package, and the assertion step
+  #     requires both their drawables in the APK plus the absence of a decoy
+  #     planted at the .androidlib root. That recipe had never been run — it
+  #     rested on Unity's docs and on reading Unity's own notifications package.
+  #   unity6 (incremental) builds the player TWICE over the same project
+  #     directory and asserts the second APK as strictly as the first, because
+  #     everything CI knows about the package's Android output it knows from
+  #     clean builds on fresh runners.
   android-build:
     name: android build (${{ matrix.testbed.name }})
     needs: [license, tests]
@@ -438,16 +442,20 @@ jobs:
       fail-fast: false
       max-parallel: ${{ fromJSON(vars.UNITY_MAX_PARALLEL || '2') }}
       matrix:
-        # `androidlib` marks the leg whose testbed carries the consumer-side
-        # .androidlib fixtures, so the assertion step also holds README.md's
-        # own-icon recipe to the APK. 2022.3 only, because that line exports
-        # AGP 7.1.2, where an .androidlib may still name itself with the
-        # manifest's `package` attribute (AGP 8 removed it, and Testbed6
-        # exports AGP 8.x).
+        # Two per-leg flags, both read by steps below rather than by another job:
+        #   androidlib  — this testbed carries the consumer-side .androidlib
+        #                 fixtures, so the assertion step also holds the README's
+        #                 own-icon recipe to the APK. 2022.3 only, because that
+        #                 line exports AGP 7.1.2, where an .androidlib may still
+        #                 name itself with the manifest's `package` attribute
+        #                 (AGP 8 removed it, and Testbed6 exports AGP 8.x).
+        #   incremental — build the player TWICE in this job and assert the
+        #                 second APK too. Unity 6 only: the ROADMAP's open
+        #                 question is about Unity 6's Gradle staging.
         testbed:
           - { name: "2021.3", path: Examples~/Testbed2021 }
           - { name: "2022.3", path: Examples~/Testbed2022, androidlib: true }
-          - { name: "unity6", path: Examples~/Testbed6 }
+          - { name: "unity6", path: Examples~/Testbed6, incremental: true }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -510,6 +518,52 @@ jobs:
           path: ${{ matrix.testbed.path }}/Builds/QuickActionsDemo-phone.apk
           if-no-files-found: error
           retention-days: 14
+      # A SECOND player build, over the project directory the first one just
+      # left behind — the one thing this workflow has never done. Every leg
+      # elsewhere starts from a fresh runner, so what CI proves about the
+      # package's Android output is only ever proven about a CLEAN Gradle
+      # project. An incremental build is a different code path: Unity reuses
+      # the staged Gradle project under Library/, and whether its
+      # IPostGenerateGradleAndroidProject callbacks re-run — or whether files
+      # they wrote and Unity did not declare survive a re-stage — decides
+      # whether the icons, res/raw/quickactions_keep.xml, the baked shortcut
+      # resources and the trampoline <activity> are still in the second APK.
+      # Unity 6 because that is the line where Unity moved its own packages to
+      # AndroidProjectFilesModifier "for better compatibility with incremental
+      # build", so it is where the answer could differ.
+      #
+      # A separate output path rather than an overwrite: incrementality lives
+      # in Library/, not in the APK's file name, and keeping both APKs lets a
+      # human diff them. Shape copied from the gate-off job, which already runs
+      # unity-builder three times in one job — same pinned action, same four
+      # secrets, and the same two inputs that make a repeat invocation work
+      # (versioning: None, so the builder does not rewrite the project version
+      # between runs; allowDirtyBuild: true, because the Demo import and the
+      # first build's own output have dirtied the checkout).
+      - name: Build the Android player a second time (incremental)
+        if: ${{ matrix.testbed.incremental }}
+        uses: game-ci/unity-builder@d829bfc901f2347c8fe18898f06712b66916ef42 # v5.0.0
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+        with:
+          projectPath: ${{ matrix.testbed.path }}
+          targetPlatform: Android
+          buildMethod: TestbedBuilder.BuildAndroidPhoneSecond
+          versioning: None
+          allowDirtyBuild: true
+      # Its own artifact, uploaded before the assertion for the same reason the
+      # first one is: the assertion is the step meant to turn red, and red must
+      # not discard the bytes it judged.
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        if: ${{ matrix.testbed.incremental }}
+        with:
+          name: quickactions-demo-apk-${{ matrix.testbed.name }}-incremental
+          path: ${{ matrix.testbed.path }}/Builds/QuickActionsDemo-phone-2.apk
+          if-no-files-found: error
+          retention-days: 14
       # The upload above runs FIRST on purpose: the assertion below is the step
       # meant to turn red, and red must not discard its own evidence — a failed
       # assertion with no APK artifact cannot be re-examined with a local aapt2.
@@ -526,6 +580,8 @@ jobs:
       - name: Assert the APK carries the package's baked output
         env:
           APK: ${{ matrix.testbed.path }}/Builds/QuickActionsDemo-phone.apk
+          APK2: ${{ matrix.testbed.path }}/Builds/QuickActionsDemo-phone-2.apk
+          INCREMENTAL: ${{ matrix.testbed.incremental }}
           ANDROIDLIB: ${{ matrix.testbed.androidlib }}
         run: |
           set -euo pipefail
@@ -545,136 +601,208 @@ jobs:
             ls -la "${SDK:-/opt}"/build-tools 2>/dev/null || true
             exit 1
           fi
-          echo "using $AAPT2 on $APK"
-          # Capture then `case` — never `| grep -q`: grep exits at its first
-          # match and the SIGPIPE that sends upstream becomes a spurious failure
-          # under `set -o pipefail` (same rule as the adb smoke).
-          RES="$("$AAPT2" dump resources "$APK")" \
-            || { echo "aapt2 could not read the resource table of $APK"; exit 1; }
-          missing=""
-          # xml/ + string/ are the static-shortcut bake (the testbeds' demo ships
-          # 3, so qa_short_0 must exist); raw/ is 0.4.7's resource-shrinker keep
-          # file, which every enabled Android build writes; drawable/ is 0.5.0's
-          # built-in icons, written unconditionally by the same post-processor —
-          # the Demo uses exactly these four IconTypes, so a missing one here is
-          # a blank square on the emulator's launcher.
-          wants="xml/quickactions_shortcuts raw/quickactions_keep string/qa_short_0"
-          for icon in add compose favorite play; do
-            # Each icon is ONE resource name carrying two config-qualified files
-            # (drawable/ for API 25, drawable-anydpi-v26/ for the <adaptive-icon>),
-            # so the name below says nothing about which variants linked. The two
-            # LAYERS do: they exist only because the -v26 file references them, and
-            # an unresolved @drawable is a hard aapt2 link error — so all three
-            # names present is the resource table's account of the adaptive variant
-            # having shipped.
-            for res in "$icon" "${icon}_background" "${icon}_foreground"; do
-              wants="$wants drawable/ic_quickaction_builtin_$res"
-            done
-          done
-          for want in $wants; do
-            case "$RES" in
-              *"$want"*) echo "ok: resource table carries $want" ;;
-              *) missing="$missing $want" ;;
-            esac
-          done
-          if [ -n "$missing" ]; then
-            echo "MISSING from the APK resource table:$missing"
-            echo "--- every quickactions/qa_short line aapt2 did report ---"
-            printf '%s\n' "$RES" | grep -iE 'quickactions|qa_short' || echo "(none at all)"
-            echo "--- first 200 lines of the resource dump ---"
-            printf '%s\n' "$RES" | head -200
-            exit 1
-          fi
-          # 2022.3 only: the recipe README.md gives a consumer for their OWN
-          # icons — an .androidlib — which until now rested on Unity's
-          # documentation and on reading Unity's first-party
-          # com.unity.mobile.notifications, never on a build. ROADMAP
-          # sub-items (a), (b) and (d), in order:
-          #   (a) Assets/QuickActionIcons.androidlib/src/main/res/drawable/
-          #       must reach the APK          -> ic_quickaction_search PRESENT
-          #   (d) the same folder shape inside an embedded UPM package,
-          #       Packages/com.quickactions.testlib/Runtime/Android/Plugins/
-          #                                   -> ic_quickaction_frompkg PRESENT
-          #   (b) res/ at the .androidlib ROOT is silently dropped, which is
-          #       the first of README's "three traps"
-          #                                   -> ic_quickaction_decoy ABSENT
-          # The four built-in drawables asserted just above are the positive
-          # control: they prove this dump is being read correctly, so a miss
-          # below is about the .androidlib and not about aapt2. And (b) is
-          # ASSERTED, not assumed — without it a green run would equally
-          # describe a build that had been picking the root res/ up all along,
-          # i.e. a README trap that is simply wrong.
-          if [ "${ANDROIDLIB:-}" = "true" ]; then
-            consumer_missing=""
-            for want in drawable/ic_quickaction_search drawable/ic_quickaction_frompkg; do
-              case "$RES" in
-                *"$want"*) echo "ok: resource table carries $want (an .androidlib delivered it)" ;;
-                *) consumer_missing="$consumer_missing $want" ;;
-              esac
-            done
-            if [ -n "$consumer_missing" ]; then
-              echo "MISSING from the APK resource table:$consumer_missing"
-              echo "The .androidlib recipe README.md documents did not reach this APK."
-              echo "ic_quickaction_search comes from Assets/QuickActionIcons.androidlib/;"
-              echo "ic_quickaction_frompkg from the embedded package com.quickactions.testlib."
-              echo "--- every ic_quickaction_ line aapt2 did report ---"
-              printf '%s\n' "$RES" | grep -i 'ic_quickaction' || echo "(none at all)"
+          # One reader, applied to every APK this leg produced, rather than the
+          # forty lines below duplicated for the unity6 leg's second, incremental
+          # build. Same function shape as the gate-off job's `scan`: the caller
+          # names the file, everything else is read from the enclosing scope.
+          assert_apk() {
+            local apk="$1" label="$2"
+            local res manifest dex missing=""
+            echo "--- asserting the $label APK: $apk ---"
+            if [ ! -f "$apk" ]; then
+              echo "no APK at $apk — the build reported success but wrote nothing here."
+              ls -la "$(dirname "$apk")" 2>/dev/null || true
               exit 1
             fi
-            case "$RES" in
-              *ic_quickaction_decoy*)
-                echo "UNEXPECTED: ic_quickaction_decoy IS in the APK resource table."
-                echo "That file sits at res/drawable/ at the .androidlib ROOT, which"
-                echo "README.md documents as silently ignored — green build, no warning,"
-                echo "no icon. Either Unity changed or the trap was never real: fix"
-                echo "README.md's 'Three traps worth knowing' rather than this check."
-                printf '%s\n' "$RES" | grep -i 'ic_quickaction' || true
+            echo "using $AAPT2 on $apk"
+            # Capture then `case` — never `| grep -q`: grep exits at its first
+            # match and the SIGPIPE that sends upstream becomes a spurious failure
+            # under `set -o pipefail` (same rule as the adb smoke).
+            res="$("$AAPT2" dump resources "$apk")" \
+              || { echo "aapt2 could not read the resource table of $apk"; exit 1; }
+            # xml/ + string/ are the static-shortcut bake (the testbeds' demo ships
+            # 3, so qa_short_0 must exist); raw/ is 0.4.7's resource-shrinker keep
+            # file, which every enabled Android build writes; drawable/ is 0.5.0's
+            # built-in icons, written unconditionally by the same post-processor —
+            # the Demo uses exactly these four IconTypes, so a missing one here is
+            # a blank square on the emulator's launcher.
+            local wants="xml/quickactions_shortcuts raw/quickactions_keep string/qa_short_0"
+            local icon layer
+            for icon in add compose favorite play; do
+              # Each icon is ONE resource name carrying two config-qualified files
+              # (drawable/ for API 25, drawable-anydpi-v26/ for the <adaptive-icon>),
+              # so the name below says nothing about which variants linked. The two
+              # LAYERS do: they exist only because the -v26 file references them, and
+              # an unresolved @drawable is a hard aapt2 link error — so all three
+              # names present is the resource table's account of the adaptive variant
+              # having shipped.
+              for layer in "$icon" "${icon}_background" "${icon}_foreground"; do
+                wants="$wants drawable/ic_quickaction_builtin_$layer"
+              done
+            done
+            for want in $wants; do
+              case "$res" in
+                *"$want"*) echo "ok: resource table carries $want" ;;
+                *) missing="$missing $want" ;;
+              esac
+            done
+            if [ -n "$missing" ]; then
+              echo "MISSING from the APK resource table:$missing"
+              echo "--- every quickactions/qa_short line aapt2 did report ---"
+              printf '%s\n' "$res" | grep -iE 'quickactions|qa_short' || echo "(none at all)"
+              echo "--- first 200 lines of the resource dump ---"
+              printf '%s\n' "$res" | head -200
+              exit 1
+            fi
+            # 2022.3 only: the recipe README.md gives a consumer for their OWN
+            # icons — an .androidlib — which until now rested on Unity's
+            # documentation and on reading Unity's first-party
+            # com.unity.mobile.notifications, never on a build. ROADMAP
+            # sub-items (a), (b) and (d), in order:
+            #   (a) Assets/QuickActionIcons.androidlib/src/main/res/drawable/
+            #       must reach the APK          -> ic_quickaction_search PRESENT
+            #   (d) the same folder shape inside an embedded UPM package,
+            #       Packages/com.quickactions.testlib/Runtime/Android/Plugins/
+            #                                   -> ic_quickaction_frompkg PRESENT
+            #   (b) res/ at the .androidlib ROOT is silently dropped, which is
+            #       the first of README's "three traps"
+            #                                   -> ic_quickaction_decoy ABSENT
+            # The four built-in drawables just asserted above are the positive
+            # control: they prove this dump is being read correctly, so a miss
+            # below is about the .androidlib and not about aapt2. And (b) is
+            # ASSERTED, not assumed — without it a green run would equally
+            # describe a build that had been picking the root res/ up all along,
+            # i.e. a README trap that is simply wrong.
+            if [ "${ANDROIDLIB:-}" = "true" ]; then
+              local consumer_missing=""
+              for want in drawable/ic_quickaction_search drawable/ic_quickaction_frompkg; do
+                case "$res" in
+                  *"$want"*) echo "ok: resource table carries $want (an .androidlib delivered it)" ;;
+                  *) consumer_missing="$consumer_missing $want" ;;
+                esac
+              done
+              if [ -n "$consumer_missing" ]; then
+                echo "MISSING from the APK resource table:$consumer_missing"
+                echo "The .androidlib recipe README.md documents did not reach this APK."
+                echo "ic_quickaction_search comes from Assets/QuickActionIcons.androidlib/;"
+                echo "ic_quickaction_frompkg from the embedded package com.quickactions.testlib."
+                echo "--- every ic_quickaction_ line aapt2 did report ---"
+                printf '%s\n' "$res" | grep -i 'ic_quickaction' || echo "(none at all)"
                 exit 1
-                ;;
-              *) echo "ok: ic_quickaction_decoy is ABSENT — res/ at the .androidlib root is dropped" ;;
-            esac
+              fi
+              case "$res" in
+                *ic_quickaction_decoy*)
+                  echo "UNEXPECTED: ic_quickaction_decoy IS in the APK resource table."
+                  echo "That file sits at res/drawable/ at the .androidlib ROOT, which"
+                  echo "README.md documents as silently ignored — green build, no warning,"
+                  echo "no icon. Either Unity changed or the trap was never real: fix"
+                  echo "README.md's 'Three traps worth knowing' rather than this check."
+                  printf '%s\n' "$res" | grep -i 'ic_quickaction' || true
+                  exit 1
+                  ;;
+                *) echo "ok: ic_quickaction_decoy is ABSENT — res/ at the .androidlib root is dropped" ;;
+              esac
+            fi
+            manifest="$("$AAPT2" dump xmltree --file AndroidManifest.xml "$apk" 2>&1)" \
+              || { echo "aapt2 could not dump AndroidManifest.xml of $apk:"; printf '%s\n' "$manifest"; exit 1; }
+            # The trampoline <activity> is injected by the package's manifest
+            # injector, and android.app.shortcuts is the meta-data that points the
+            # launcher at the baked static set. Neither is written by hand
+            # anywhere in the testbeds, so both are the package's own output.
+            for want in QuickActionsTrampolineActivity android.app.shortcuts; do
+              case "$manifest" in
+                *"$want"*) echo "ok: manifest carries $want" ;;
+                *)
+                  echo "MISSING from the APK manifest: $want"
+                  echo "--- AndroidManifest.xml as built ---"
+                  printf '%s\n' "$manifest"
+                  exit 1
+                  ;;
+              esac
+            done
+            # Resources and manifest are both written by the C# post-processor, so
+            # everything above would still pass with NONE of the package's Java in
+            # the APK — a manifest declaring an activity the dex does not contain,
+            # i.e. a crash on the first tap. The .java plugins reach a build only
+            # through their .meta platform flags, which nothing else here checks.
+            dex="$(unzip -p "$apk" 'classes*.dex' 2>/dev/null | strings -a || true)"
+            if [ -z "$dex" ]; then
+              echo "no readable classes*.dex in $apk — cannot verify the Java landed."
+              unzip -l "$apk" | head -40
+              exit 1
+            fi
+            for want in com/emindeniz99/quickactions/QuickActionsBridge \
+                        com/emindeniz99/quickactions/QuickActionsTrampolineActivity; do
+              case "$dex" in
+                *"$want"*) echo "ok: dex carries $want" ;;
+                *)
+                  echo "MISSING from classes.dex: $want"
+                  echo "The manifest declares this class but the APK does not contain it —"
+                  echo "check Plugins/Android/*.java.meta (the Android platform flag) and"
+                  echo "that no minification stripped it."
+                  exit 1
+                  ;;
+              esac
+            done
+          }
+          assert_apk "$APK" "first (clean)"
+          # The unity6 leg built a second time over the same project directory.
+          # It gets the SAME assertions, not a shorter set: the whole question
+          # is whether an incremental build still writes everything a clean one
+          # does, so anything this loop skipped would be the thing that broke.
+          if [ "${INCREMENTAL:-}" = "true" ]; then
+            assert_apk "$APK2" "second (incremental)"
           fi
-          MANIFEST="$("$AAPT2" dump xmltree --file AndroidManifest.xml "$APK" 2>&1)" \
-            || { echo "aapt2 could not dump AndroidManifest.xml of $APK:"; printf '%s\n' "$MANIFEST"; exit 1; }
-          # The trampoline <activity> is injected by the package's manifest
-          # injector, and android.app.shortcuts is the meta-data that points the
-          # launcher at the baked static set. Neither is written by hand
-          # anywhere in the testbeds, so both are the package's own output.
-          for want in QuickActionsTrampolineActivity android.app.shortcuts; do
-            case "$MANIFEST" in
-              *"$want"*) echo "ok: manifest carries $want" ;;
-              *)
-                echo "MISSING from the APK manifest: $want"
-                echo "--- AndroidManifest.xml as built ---"
-                printf '%s\n' "$MANIFEST"
-                exit 1
-                ;;
-            esac
-          done
-          # Resources and manifest are both written by the C# post-processor, so
-          # everything above would still pass with NONE of the package's Java in
-          # the APK — a manifest declaring an activity the dex does not contain,
-          # i.e. a crash on the first tap. The .java plugins reach a build only
-          # through their .meta platform flags, which nothing else here checks.
-          DEX="$(unzip -p "$APK" 'classes*.dex' 2>/dev/null | strings -a || true)"
-          if [ -z "$DEX" ]; then
-            echo "no readable classes*.dex in $APK — cannot verify the Java landed."
-            unzip -l "$APK" | head -40
-            exit 1
-          fi
-          for want in com/emindeniz99/quickactions/QuickActionsBridge \
-                      com/emindeniz99/quickactions/QuickActionsTrampolineActivity; do
-            case "$DEX" in
-              *"$want"*) echo "ok: dex carries $want" ;;
-              *)
-                echo "MISSING from classes.dex: $want"
-                echo "The manifest declares this class but the APK does not contain it —"
-                echo "check Plugins/Android/*.java.meta (the Android platform flag) and"
-                echo "that no minification stripped it."
-                exit 1
-                ;;
-            esac
-          done
+      # Which of the two APKs was which is the whole finding of the incremental
+      # leg, and a job log nobody opens is not where it belongs. Runs after the
+      # assertion (implicit success()), so what it claims is a pass that
+      # happened, never a pass it is predicting.
+      - name: Record the incremental build in the job summary
+        if: ${{ matrix.testbed.incremental }}
+        env:
+          APK: ${{ matrix.testbed.path }}/Builds/QuickActionsDemo-phone.apk
+          APK2: ${{ matrix.testbed.path }}/Builds/QuickActionsDemo-phone-2.apk
+          TESTBED_NAME: ${{ matrix.testbed.name }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os
+
+          first, second = os.environ["APK"], os.environ["APK2"]
+          name = os.environ["TESTBED_NAME"]
+          first_size, second_size = os.path.getsize(first), os.path.getsize(second)
+
+          lines = [
+              "## Android build (%s): the second APK is the INCREMENTAL one" % name,
+              "",
+              "This job ran the Android player build twice in one runner, over the same "
+              "Unity project directory. The first build staged a fresh Gradle project; the "
+              "second reused what the first left in `Library/`, which is the path CI had "
+              "never exercised — every other leg starts from a clean checkout.",
+              "",
+              "| # | build | APK | bytes |",
+              "|---|---|---|---|",
+              "| 1 | clean | `%s` | %d |" % (os.path.basename(first), first_size),
+              "| 2 | **incremental** | `%s` | %d |" % (os.path.basename(second), second_size),
+              "",
+              "Both APKs passed the same aapt2 assertions: the four built-in icon "
+              "drawables, `res/xml/quickactions_shortcuts.xml`, `string/qa_short_0`, "
+              "`res/raw/quickactions_keep.xml`, the `android.app.shortcuts` meta-data and "
+              "the trampoline `<activity>` in the manifest, and both package classes in "
+              "`classes.dex`. So the package's `IPostGenerateGradleAndroidProject` output "
+              "survives a re-staged Gradle project, and is not something only a clean "
+              "build produces.",
+              "",
+              "Artifacts: `quickactions-demo-apk-%s` (clean) and "
+              "`quickactions-demo-apk-%s-incremental` (second)." % (name, name),
+          ]
+          report = "\n".join(lines)
+          print(report)
+          summary = os.environ.get("GITHUB_STEP_SUMMARY")
+          if summary:
+              with open(summary, "a", encoding="utf-8") as f:
+                  f.write(report + "\n")
+          PY
 
   # The same adb smoke device-ci.yml runs on a user-supplied APK, but fed from
   # the build above: shortcuts must reach ShortcutManager and a tap must come

@@ -56,6 +56,20 @@ public static class TestbedBuilder
     // works on any phone from 7.1 up.
     public static void BuildAndroidPhone() => BuildPhone("Builds/QuickActionsDemo-phone.apk");
 
+    // The SAME configuration as BuildAndroidPhone, invoked a second time in the
+    // same CI job over the same project directory, so the aapt2 assertions can be
+    // re-run against an INCREMENTAL build. Everything CI knows about the
+    // package's Android output it learned from clean builds on fresh runners;
+    // the second time round Unity reuses the Gradle project it staged under
+    // Library/, and whether the package's IPostGenerateGradleAndroidProject
+    // callback re-runs — or whether files it wrote and Unity never declared
+    // survive a re-stage — decides whether the icons, res/raw/quickactions_keep.xml,
+    // the baked shortcut resources and the trampoline activity are still there.
+    // A separate output path rather than an overwrite: incrementality lives in
+    // Library/, not in the APK's file name, so the first APK stays on disk for
+    // comparison and both are uploaded as their own artifacts.
+    public static void BuildAndroidPhoneSecond() => BuildPhone("Builds/QuickActionsDemo-phone-2.apk");
+
     private static void BuildPhone(string relativeOutput)
     {
         PlayerSettings.SetScriptingBackend(UnityEditor.Build.NamedBuildTarget.Android, ScriptingImplementation.IL2CPP);
