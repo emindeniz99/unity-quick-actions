@@ -28,10 +28,16 @@ namespace UnityEditor
     }
 
     // The PropertyDrawer surface the IconType drawer uses: compile-only, never drawn.
+    public class SerializedObject
+    {
+        public UnityEngine.Object targetObject;
+    }
+
     public class SerializedProperty
     {
         public int intValue;
         public bool hasMultipleDifferentValues;
+        public SerializedObject serializedObject;
     }
 
     public abstract class PropertyDrawer
@@ -51,12 +57,14 @@ namespace UnityEditor
     {
         public static bool PropertyField(Rect position, SerializedProperty property, GUIContent label) => false;
         public static void LabelField(Rect position, string label, GUIStyle style) { }
+        public static void LabelField(Rect position, GUIContent label, GUIStyle style) { }
     }
 
     public static class EditorGUIUtility
     {
         public static float singleLineHeight => 18f;
         public static float standardVerticalSpacing => 2f;
+        public static float currentViewWidth => 400f;
     }
 
     public static class EditorGUILayout

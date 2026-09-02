@@ -48,19 +48,19 @@ namespace EminDeniz99.QuickActions.Tests
         [Test]
         public void Note_IsSilentForNone_NamesTheBuiltIn_AndNamesTheMissingDrawableOtherwise()
         {
-            Assert.IsNull(QuickActionsIconTypeDrawer.NoteFor(IconType.None, true));
-            Assert.IsNull(QuickActionsIconTypeDrawer.NoteFor(IconType.None, false));
+            Assert.IsNull(QuickActionsIconTypeDrawer.NoteFor(IconType.None, true, false));
+            Assert.IsNull(QuickActionsIconTypeDrawer.NoteFor(IconType.None, false, false));
 
-            var builtIn = QuickActionsIconTypeDrawer.NoteFor(IconType.Add, true);
+            var builtIn = QuickActionsIconTypeDrawer.NoteFor(IconType.Add, true, false);
             StringAssert.Contains("built-in", builtIn);
             StringAssert.DoesNotContain("blank", builtIn);
 
-            var missing = QuickActionsIconTypeDrawer.NoteFor(IconType.Search, true);
+            var missing = QuickActionsIconTypeDrawer.NoteFor(IconType.Search, true, false);
             StringAssert.Contains("blank", missing);
             StringAssert.Contains("ic_quickaction_search", missing);
             // The compound name is the one that would betray a naive lower-casing.
             StringAssert.Contains("ic_quickaction_mark_location",
-                QuickActionsIconTypeDrawer.NoteFor(IconType.MarkLocation, true));
+                QuickActionsIconTypeDrawer.NoteFor(IconType.MarkLocation, true, false));
         }
 
         [Test]
@@ -70,12 +70,37 @@ namespace EminDeniz99.QuickActions.Tests
             // none of the four; a note still saying "ships with the package" would
             // steer a user into an iconless shortcut. The toggle changes the note for
             // the four only — the other 25 never had a built-in to lose.
-            var off = QuickActionsIconTypeDrawer.NoteFor(IconType.Add, false);
+            var off = QuickActionsIconTypeDrawer.NoteFor(IconType.Add, false, false);
             StringAssert.Contains("off", off);
             StringAssert.Contains("blank", off);
             StringAssert.Contains("ic_quickaction_add", off);
-            Assert.AreEqual(QuickActionsIconTypeDrawer.NoteFor(IconType.Search, true),
-                QuickActionsIconTypeDrawer.NoteFor(IconType.Search, false));
+            Assert.AreEqual(QuickActionsIconTypeDrawer.NoteFor(IconType.Search, true, false),
+                QuickActionsIconTypeDrawer.NoteFor(IconType.Search, false, false));
+        }
+
+        [Test]
+        public void Note_ForAStaticShortcut_SaysTheBakerNeedsAndroidDrawable()
+        {
+            // WHY: the static baker cannot reference a drawable that may not exist,
+            // so for a non-built-in Icon it bakes NO icon unless AndroidDrawable names
+            // one (QuickActionsBuildPostProcessorAndroid.WriteResources warns and
+            // moves on). "Ship ic_quickaction_search" — the right advice for a
+            // runtime Add — would leave a static shortcut blank; the note must say so
+            // where the static list is edited.
+            var staticNote = QuickActionsIconTypeDrawer.NoteFor(IconType.Search, true, true);
+            StringAssert.Contains("AndroidDrawable", staticNote);
+            StringAssert.Contains("ic_quickaction_search", staticNote);
+            StringAssert.DoesNotContain("AndroidDrawable",
+                QuickActionsIconTypeDrawer.NoteFor(IconType.Search, true, false));
+
+            // A built-in IS baked for a static item — no AndroidDrawable needed...
+            StringAssert.DoesNotContain("AndroidDrawable",
+                QuickActionsIconTypeDrawer.NoteFor(IconType.Add, true, true));
+            // ...unless the built-ins are switched off, when the static item is in
+            // the same position as any other: only AndroidDrawable bakes anything.
+            StringAssert.Contains("AndroidDrawable",
+                QuickActionsIconTypeDrawer.NoteFor(IconType.Add, false, true));
+            Assert.IsNull(QuickActionsIconTypeDrawer.NoteFor(IconType.None, true, true));
         }
 
         [Test]

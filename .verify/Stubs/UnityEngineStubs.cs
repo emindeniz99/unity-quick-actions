@@ -141,7 +141,13 @@ namespace UnityEngine
         public static int height => 0;
     }
 
-    public class GUIStyle { }
+    public class GUIStyle
+    {
+        public bool wordWrap;
+        public GUIStyle() { }
+        public GUIStyle(GUIStyle other) { }
+        public float CalcHeight(GUIContent content, float width) => 0f;
+    }
 
     public class GUIContent
     {
