@@ -53,8 +53,12 @@ the run to finish — read its result — then push.
   it is NOT established which iOS path delivered the tap. The **UIScene** path
   (Unity 2022.3.72f1+ / 6000.0.68f1+ / 6000.3.8f1+, where `Info.plist` names
   `UnityScene` as the scene delegate and Apple stops calling the app-delegate
-  quick-action selector) has not been shown to run anywhere, on Simulator or
-  device — do not describe scene-lifecycle behaviour as verified. (Android has no
+  quick-action selector) is exercised on the iOS Simulator by CI's
+  `ios-simulator-coex` leg on Testbed6 (6000.3.21f1): scene hooks installed on
+  `UnityScene` via the configuration wrapper and, shadowed, via the notification
+  fallback, the cold launch item and a warm tap each queued once — through
+  synthetic sends, never a SpringBoard tap, and never on a device. Say exactly
+  that; do not describe device behaviour as verified. (Android has no
   simulator equivalent; the 2021.3 line cannot do a Simulator run at all —
   Unity ships an x86_64-only simulator runtime there.) **Physical hardware is
   partly covered**: one Android run (Moto G Play 2024 / Android 14) confirmed

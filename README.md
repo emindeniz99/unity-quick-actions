@@ -1100,15 +1100,15 @@ spoof a tap; on either platform the id is just a string the OS hands you. So:
 See [`ROADMAP.md`](./ROADMAP.md). Notable remaining: always-on device CI (the
 shipped adb smoke runs on every code push and PR but covers Android alone — warm *and* cold taps, neither yet run on physical hardware; iOS has no
 adb analog) and
-validation of the newest native paths (UIScene hooks — including the
-subclass-shadowed fallback — and the Android localized static output). The iOS
-UIScene path is **unexercised, not merely un-device-tested**: the `ios-simulator`
-leg builds and launches Testbed6 (6000.3.21f1, inside the range where Unity emits
-a scene manifest), but its only assertion is that the process is still registered
-with `launchctl` — which stays true for an app whose scene connected without a
-delegate. The coexistence leg added with this note is the first check that asserts
-on the native hooks themselves; until it has run green, treat the scene path as
-unexercised. OS read-back can't recover icons natively; the package persists icon
+device validation of the newest native paths (the UIScene hooks and the Android
+localized static output). The iOS UIScene path is **Simulator-measured, not
+device-tested**: CI's `ios-simulator-coex` leg launches Testbed6 (6000.3.21f1,
+scene manifest) under a mock native host and asserts by name that the scene
+hooks land on `UnityScene` — via the configuration wrapper, and via the
+`UISceneWillConnectNotification` fallback when the host shadows the selector —
+and that a cold launch item and a warm tap are each queued exactly once. Every
+one of those is a synthetic send; a tap UIKit itself delivers (SpringBoard,
+`connectionOptions`) and any physical device remain open. OS read-back can't recover icons natively; the package persists icon
 identity in its ownership-marker payload — Android extras, iOS `userInfo` — so
 reconciled items keep their icons on both platforms.
 
