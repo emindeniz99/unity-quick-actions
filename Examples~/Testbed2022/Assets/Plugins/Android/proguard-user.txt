@@ -1,0 +1,22 @@
+# Custom Proguard File: README.md's own keep rule, under test.
+#
+# The C# runtime reaches the Java class com.emindeniz99.quickactions.QuickActionsBridge
+# BY NAME over JNI (Runtime/Internal/AndroidQuickActionsBridge.cs). Nothing in the
+# manifest or the compiled code references it, so in a minified build R8 is free
+# to rename or strip it: the JNI lookup then fails with no crash and no warning,
+# and shortcuts silently never register. README.md's section "Known limits -
+# Android minification (R8/ProGuard + resource shrinking)" tells every consumer
+# to answer that with exactly the rule below, in exactly this file.
+#
+# This copy is the one CI puts under test: TestbedBuilder.BuildAndroidPhoneRelease
+# builds this testbed with Managed Stripping High + minifyRelease, and the
+# 2022.3-release android-build / android-smoke legs then read the APK back and
+# run the emulator smoke on it. So what is proven is the recipe as WRITTEN HERE,
+# not a CI-only variation of it. Keep this file and the README rule identical.
+#
+# The file is only read when Publishing Settings > Minify > "Custom Proguard File"
+# is on (useCustomProguardFile in ProjectSettings.asset); the build method above
+# turns it on for its own build and leaves every other build of this project alone.
+#
+# ASCII only, deliberately: this is build-tool configuration, not prose.
+-keep class com.emindeniz99.quickactions.** { *; }

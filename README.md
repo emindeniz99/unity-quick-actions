@@ -1016,8 +1016,10 @@ unaffected.)
 **Code (R8/ProGuard).** The C# runtime reaches the Java helper `com.emindeniz99.quickactions.QuickActionsBridge`
 **by name** over JNI. If you build a **minified** dev/QA build (Player Settings ▸
 Publishing Settings ▸ *Minify*), R8 can rename or strip that non-manifest class, and
-the JNI lookup then fails so shortcuts silently don't get set. Add a keep rule to
-`Assets/Plugins/Android/proguard-user.txt`:
+the JNI lookup then fails so shortcuts silently don't get set. Enable *Publishing
+Settings ▸ Minify ▸ Custom Proguard File* (Unity creates
+`Assets/Plugins/Android/proguard-user.txt`; the file alone is not documented as
+enough) and add a keep rule to it:
 
 ```proguard
 -keep class com.emindeniz99.quickactions.** { *; }
@@ -1026,6 +1028,13 @@ the JNI lookup then fails so shortcuts silently don't get set. Add a keep rule t
 (The trampoline `<activity>` is kept automatically because it's declared in the
 manifest — only the JNI-only bridge needs this. Most dev builds don't enable
 minification, so this only matters if yours does.)
+
+CI's `android smoke (2022.3-release)` leg builds the 2022.3 testbed as a release
+player — Managed Stripping Level **High**, `minifyRelease` (R8) on, with that
+exact `proguard-user.txt` and nothing else — and then runs the emulator smoke on
+that APK, so registering a shortcut and receiving a tap have to survive the
+recipe as written above; that is what the leg *does*, and it is new enough that
+no result from it is claimed here yet.
 
 **Resources (`shrinkResources`) — icons.** Icon drawables are reached *only*
 through `getIdentifier(name, "drawable", …)`, so with `minifyEnabled` +

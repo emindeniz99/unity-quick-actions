@@ -3,8 +3,14 @@
 Follow-ups discussed but not shipped. Delete an entry in the same commit that
 ships it.
 
-- **`.androidlib` does not survive `.unitypackage` export/import** (reported
-  against 2022.3.15, re-confirmed 2024, unfixed). This is why the built-in icons
+- **`.androidlib` does not survive `.unitypackage` export/import** — reported
+  by other users, not by this project: a Unity Discussions thread opened
+  against 2022.3.15
+  (<https://discussions.unity.com/t/export-and-import-androidlib-file/935469>)
+  and a Unity Issue Tracker entry on bundled plugins not exporting into a
+  package
+  (<https://issuetracker.unity3d.com/issues/console-error-error-while-exporting-package-no-assets-to-export-only-folders-did-you-mean-to-use-exportpackageoptions-dot-recurse-when-trying-to-export-a-bundle-file-as-a-package>);
+  no fix version is recorded here. This is why the built-in icons
   must be written by the build post-processor rather than shipped as a
   `.androidlib` inside the package: the Asset Store channel delivers a
   `.unitypackage`, so anything relying on a shipped `.androidlib` would work on
@@ -32,11 +38,17 @@ ships it.
   script's own `shortcut sheet visible` line said `no` on that run because it
   matched the titles while the launcher drew the subtitles; it now accepts
   either. Still open: the API 35 Pixel launcher has never left its home screen
-  for any opener (not yet tried: a swipe that starts above the
-  gesture-navigation band, `KEYCODE_APP_SWITCH`, the launcher's all-apps
-  activity by component name), and on API 30 the swipe has opened the drawer
-  once in four runs, so the capture is a photograph when it lands, never a
-  check. The verdict does not depend on it.
+  for any opener, and on API 30 the swipe has opened the drawer once in five
+  runs, so the capture is a photograph when it lands, never a check. The dumps
+  say why the swipe is unreliable: it began at 90% of the display height, and
+  on both images that point is a search box — the hotseat's Google search bar
+  on API 35 (y 535–598 of 640), the collapsed all-apps search box on API 30
+  (574–630) — so the drag belonged to the widget, not the workspace. The
+  fourth attempt starts the swipe at 65%, on the empty workspace above the
+  hotseat and page indicator of both dumps; whether either drawer opens for it
+  is what its runs will show. Not yet tried: `KEYCODE_APP_SWITCH` and the
+  launcher's all-apps activity by component name. The verdict does not depend
+  on any of it.
 - **Port the Android post-processor to `AndroidProjectFilesModifier` (Unity 6).**
   Unity's own notifications package moved to it "for better compatibility with
   incremental build"; the built-ins' distinct-name design was chosen so that
