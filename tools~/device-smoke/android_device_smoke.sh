@@ -437,8 +437,27 @@ cap_dump_ui() {
   [ -s "$dest" ]
 }
 
+# Locate the app's icon by its launcher label in a fresh hierarchy dump. Sets
+# `xy` ("<x> <y>", or empty). Retried, not because the launcher is slow to
+# answer but because a dump taken mid-animation comes back as the previous
+# screen. Reads the caller's `dir` and `py`.
+cap_find_icon() {
+  local tries="$1" attempt
+  xy=""
+  for attempt in $(seq 1 "$tries"); do
+    if cap_dump_ui "$dir/ui-drawer.xml" \
+      && xy="$(python3 "$py" icon "$CAPTURE_LABEL" <"$dir/ui-drawer.xml")"; then
+      return 0
+    fi
+    xy=""
+    echo "capture: attempt $attempt — no '$CAPTURE_LABEL' icon in the hierarchy yet"
+    sleep 3
+  done
+  return 1
+}
+
 capture_longpress() {
-  local dir tmp py wh w h x y_from y_to xy ix iy out rc attempt
+  local dir tmp py wh w h x y_from y_to xy ix iy out rc handle hxy hx hy hold_s pressed
   local titles=()
 
   printf '\n== capture (best effort, NOT part of the verdict): the long-press sheet ==\n'
@@ -582,9 +601,17 @@ PY
   cap_adb shell input keyevent KEYCODE_HOME >/dev/null 2>&1 || true
   sleep 2
 
-  # 2. Open the all-apps drawer: a swipe up from NEAR the bottom, not from the
-  #    very edge — on a gesture-navigation device that band belongs to the
-  #    system and the swipe would only go home again.
+  # 2. Open the all-apps drawer, then find the app's icon in it. First a swipe
+  #    up from NEAR the bottom (not the very edge — on a gesture-navigation
+  #    device that band belongs to the system and the swipe would only go home
+  #    again). The first CI run showed the Pixel launcher on the API 30 image
+  #    ignoring that swipe outright, so when the icon is not found afterwards
+  #    the capture escalates through the launcher-independent ways of asking
+  #    for the drawer, each followed by a fresh search: the ALL_APPS key
+  #    (API 28+), a tap on the launcher's own drawer handle if the hierarchy
+  #    shows one ("Apps list" on that image), and finally the ALL_APPS intent.
+  #    On the API 35 image the icon sat in the predicted-apps row of the home
+  #    screen, which the first search already finds.
   if ! wh="$(cap_adb shell wm size 2>/dev/null | tr -d '\r' | python3 "$py" size)"; then
     echo "capture: could not read the display size from 'wm size'; skipped."
     return 0
@@ -597,35 +624,63 @@ PY
   echo "capture: display ${w}x${h} — swiping up at x=$x, y $y_from -> $y_to to open the app drawer"
   cap_adb shell input swipe "$x" "$y_from" "$x" "$y_to" 300 >/dev/null 2>&1 || true
   sleep 3
-
-  # 3. Find the app's icon by its launcher label. Retried, not because the
-  #    launcher is slow to answer but because a dump taken mid-animation comes
-  #    back as the previous screen.
-  xy=""
-  for attempt in 1 2 3; do
-    if cap_dump_ui "$dir/ui-drawer.xml" \
-      && xy="$(python3 "$py" icon "$CAPTURE_LABEL" <"$dir/ui-drawer.xml")"; then
-      break
-    fi
-    xy=""
-    echo "capture: attempt $attempt — no '$CAPTURE_LABEL' icon in the hierarchy yet"
+  cap_find_icon 3 || true
+  if [ -z "$xy" ]; then
+    echo "capture: the swipe surfaced no icon — sending KEYCODE_ALL_APPS"
+    cap_adb shell input keyevent KEYCODE_ALL_APPS >/dev/null 2>&1 || true
     sleep 3
-  done
+    cap_find_icon 2 || true
+  fi
+  if [ -z "$xy" ] && [ -s "$dir/ui-drawer.xml" ]; then
+    for handle in "Apps list" "All apps"; do
+      hxy="$(python3 "$py" icon "$handle" <"$dir/ui-drawer.xml" 2>/dev/null)" || continue
+      hx="${hxy%% *}"
+      hy="${hxy##* }"
+      echo "capture: tapping the launcher's '$handle' handle at $hx,$hy"
+      cap_adb shell input tap "$hx" "$hy" >/dev/null 2>&1 || true
+      sleep 3
+      cap_find_icon 2 || true
+      break
+    done
+  fi
+  if [ -z "$xy" ]; then
+    echo "capture: still no icon — starting the ALL_APPS intent"
+    cap_adb shell am start -a android.intent.action.ALL_APPS >/dev/null 2>&1 || true
+    sleep 3
+    cap_find_icon 2 || true
+  fi
 
-  # 4. Long-press it. A long press IS a swipe that never moves: the same point
-  #    twice, held for CAPTURE_PRESS_MS.
+  # 3. Long-press it: a real press — DOWN, hold, UP as separate events. The
+  #    first run's swipe-that-never-moves (`input swipe x y x y ms`) reached
+  #    the API 35 Pixel launcher as a gesture and opened nothing, and the
+  #    hierarchy after it was identical to the one before. The screenshot and
+  #    the hierarchy below are taken WHILE the finger is still down, so a sheet
+  #    that dismisses on release is captured all the same. `input motionevent`
+  #    needs API 28+; where the shell rejects it, the swipe form is the
+  #    fallback, and either way the log says which was used.
+  pressed=0
   if [ -n "$xy" ]; then
     ix="${xy%% *}"
     iy="${xy##* }"
-    echo "capture: app icon '$CAPTURE_LABEL' at $ix,$iy — long-pressing for ${CAPTURE_PRESS_MS}ms"
-    cap_adb shell input swipe "$ix" "$iy" "$ix" "$iy" "$CAPTURE_PRESS_MS" >/dev/null 2>&1 || true
-    sleep 3
+    hold_s=$(((CAPTURE_PRESS_MS + 999) / 1000))
+    echo "capture: app icon '$CAPTURE_LABEL' at $ix,$iy — pressing: DOWN, hold ${hold_s}s, then UP after the capture"
+    out="$(cap_adb shell input motionevent DOWN "$ix" "$iy" 2>&1)"
+    rc=$?
+    case "$out" in *[Uu]sage*|*[Ee]rror*|*[Uu]nknown*) rc=1 ;; esac
+    if [ "$rc" -eq 0 ]; then
+      pressed=1
+      sleep "$hold_s"
+    else
+      echo "capture: 'input motionevent' is not usable here ($(printf '%s' "$out" | head -n 1)) — swipe-hold for ${CAPTURE_PRESS_MS}ms instead"
+      cap_adb shell input swipe "$ix" "$iy" "$ix" "$iy" "$CAPTURE_PRESS_MS" >/dev/null 2>&1 || true
+      sleep 3
+    fi
   else
     echo "capture: no icon labelled '$CAPTURE_LABEL' was found — screenshotting whatever is on"
     echo "         screen anyway; ui-drawer.xml says what the launcher was showing."
   fi
 
-  # 5. The screenshot, taken even when the press never happened: a picture of
+  # 4. The screenshot, taken even when the press never happened: a picture of
   #    the wrong screen is how the next person fixes the gesture.
   if cap_adb shell screencap -p /sdcard/quickactions-longpress.png >/dev/null 2>&1 \
     && cap_adb pull /sdcard/quickactions-longpress.png "$dir/longpress.png" >/dev/null 2>&1; then
@@ -634,9 +689,10 @@ PY
     echo "capture: screencap or pull failed — no screenshot this run."
   fi
 
-  # 6. The half a machine can read: are the shortcut TITLES on screen? This is
+  # 5. The half a machine can read: are the shortcut TITLES on screen? This is
   #    the only line of the capture worth grepping for, and it is evidence
-  #    about the LAUNCHER — step 5 above already proved the icons resolved.
+  #    about the LAUNCHER — step 5 of the smoke already proved the icons
+  #    resolved.
   if [ -n "$xy" ] && cap_dump_ui "$dir/ui-longpress.xml"; then
     out="$(python3 "$py" labels "${titles[@]}" <"$dir/ui-longpress.xml")"
     rc=$?
@@ -649,6 +705,12 @@ PY
     printf '%s\n' "$out" | sed 's/^/  /'
   else
     echo "shortcut sheet visible: no (no hierarchy could be read after the press)"
+  fi
+
+  # 6. Let go. Only now: everything worth keeping was taken with the finger
+  #    still down.
+  if [ "$pressed" = 1 ]; then
+    cap_adb shell input motionevent UP "$ix" "$iy" >/dev/null 2>&1 || true
   fi
 
   rm -f "$py" || true

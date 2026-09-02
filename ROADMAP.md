@@ -20,10 +20,14 @@ ships it.
   is not found; on the API 35 Pixel launcher the icon IS found (in the
   predicted-apps dock) and pressed, but `input swipe x y x y 1500` produced no
   shortcut sheet — the hierarchy after the press is identical to the one
-  before. Next attempt: a real long press via `input motionevent DOWN x y` /
-  sleep / `input motionevent UP x y`, screencap a beat later, and on API 30
-  open the drawer through `am start` of the launcher's all-apps activity
-  instead of a gesture. The verdict never depends on it.
+  before. The second attempt is in the script and has not run yet: a real
+  long press (`input motionevent DOWN`, hold, screencap and hierarchy dump
+  while still down, then `UP`), and on a launcher that ignores the swipe an
+  escalation through `KEYCODE_ALL_APPS`, a tap on the launcher's own drawer
+  handle ("Apps list" on the API 30 Pixel launcher) and the `ALL_APPS`
+  intent. Read `longpress-<leg>` on the next run; if the sheet is still not
+  there, what remains is a launcher-specific gesture, and the entry stays.
+  The verdict never depends on it.
 - **Port the Android post-processor to `AndroidProjectFilesModifier` (Unity 6).**
   Unity's own notifications package moved to it "for better compatibility with
   incremental build"; the built-ins' distinct-name design was chosen so that

@@ -41,7 +41,12 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   the sheet belong to whatever launcher the system image ships, so the capture
   runs with `errexit` off, bounds every `adb` call with `timeout`, prints one
   grep-able `shortcut sheet visible: yes/no`, and leaves the verdict to the
-  eight steps above it.
+  eight steps above it. Its first run (both images ship the Pixel launcher)
+  found the API 30 swipe opening no drawer and the API 35 swipe-hold opening
+  no sheet, so the capture now escalates through `KEYCODE_ALL_APPS`, the
+  launcher's own "Apps list" handle and the `ALL_APPS` intent when the icon
+  is not found, and presses with `input motionevent` DOWN / hold / UP, taking
+  the screenshot and the hierarchy while the finger is still down.
 - **The settings page says what an `Icon` does on Android, next to the field.**
   A property drawer for `IconType` adds one line under the popup: "built-in
   drawable" for `Add` / `Compose` / `Favorite` / `Play`, or the exact
