@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Testbed art, NOT package output. The whole payload of the embedded UPM
+     package com.quickactions.testlib: if this name is in the APK resource
+     table, an .androidlib inside a package reached the Gradle build. Deliberately
+     NOT a catalog name (there is no IconType.FromPkg) — this file answers a
+     delivery question, and a name that also matched the runtime lookup would
+     blur the two.
+
+     Same file shape as Editor/Android/QuickActionsBuiltInIcons.cs writes and as
+     the .androidlib under Assets/: 48dp on a 96 viewport, white glyph on a
+     coloured disc. Amber (#F57C00) so all three testbed drawables — search,
+     decoy, frompkg — are told apart on sight. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="96"
+    android:viewportHeight="96">
+  <path
+      android:fillColor="#F57C00"
+      android:pathData="M2,48A46,46 0 1,1 94,48A46,46 0 1,1 2,48Z" />
+  <path
+      android:fillColor="#FFFFFF"
+      android:pathData="M24,32L72,32L72,40L24,40ZM24,44L72,44L72,52L24,52ZM24,56L56,56L56,64L24,64Z" />
+</vector>

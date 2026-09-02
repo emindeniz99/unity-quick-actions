@@ -36,7 +36,21 @@ public final class QuickActionsTrampolineActivity extends Activity {
         if (intent == null) return;
         // Dynamic shortcuts pass the id as an extra; static (res/xml) shortcuts
         // encode it in the action suffix.
-        String actionId = intent.getStringExtra(QuickActionsBridge.EXTRA_ACTION_ID);
+        //
+        // This is the one statement in the package that first touches data from
+        // an UNTRUSTED sender: the activity is exported (the launcher must be
+        // able to start it), so any app can start it with any extras, and
+        // getStringExtra unparcels the whole Bundle — a Parcelable whose class
+        // this app does not have throws (BadParcelableException) out of onCreate,
+        // i.e. a crash of the game's process from a hostile local app. Contained
+        // here like every other native entry point; a bad bundle is simply no tap.
+        String actionId;
+        try {
+            actionId = intent.getStringExtra(QuickActionsBridge.EXTRA_ACTION_ID);
+        } catch (RuntimeException e) {
+            android.util.Log.w("QuickActions", "Ignored a trampoline intent whose extras could not be read", e);
+            return;
+        }
         if (actionId == null) {
             String action = intent.getAction();
             if (action != null && action.startsWith(QuickActionsBridge.ACTION_PREFIX)) {
@@ -101,18 +115,17 @@ public final class QuickActionsTrampolineActivity extends Activity {
         // the existing app task to the front (or starts it on a cold launch).
         // We use it as-is: adding REORDER_TO_FRONT would be ignored alongside
         // NEW_TASK and only muddy the behaviour.
-        Intent launch = getPackageManager().getLaunchIntentForPackage(getPackageName());
-        if (launch != null) {
-            try {
-                startActivity(launch);
-            } catch (RuntimeException e) {
-                // This runs on EVERY shortcut tap, so an uncaught throw here is a
-                // process crash attributed to the game. ActivityNotFoundException
-                // (host disabled its launcher component) and SecurityException
-                // (OEM launch restrictions) are both reachable; every other native
-                // entry point in this package already contains its exceptions.
-                android.util.Log.w("QuickActions", "Could not launch the main activity", e);
-            }
+        try {
+            Intent launch = getPackageManager().getLaunchIntentForPackage(getPackageName());
+            if (launch != null) startActivity(launch);
+        } catch (RuntimeException e) {
+            // This runs on EVERY shortcut tap, so an uncaught throw here is a
+            // process crash attributed to the game. ActivityNotFoundException
+            // (host disabled its launcher component) and SecurityException
+            // (OEM launch restrictions) are both reachable, and the package-manager
+            // lookup itself can throw on a dying process; every other native entry
+            // point in this package already contains its exceptions.
+            android.util.Log.w("QuickActions", "Could not launch the main activity", e);
         }
     }
 }

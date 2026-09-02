@@ -38,6 +38,8 @@
          tools~/gen_builtin_icons.py), so the harness can hold what it wrote to
          the source of truth byte for byte. -->
     <Compile Include="../Editor/Android/QuickActionsBuiltInIcons.cs" />
+    <Compile Include="../Editor/QuickActionsBuiltInIconSet.cs" />
+    <Compile Include="../Editor/QuickActionsIconTypeDrawer.cs" />
     <!-- The ungated define-off stripper. Its Strip(path) sweep must remove the
          built-in icons and NOTHING a project owns; that is only testable here. -->
     <Compile Include="../Editor/NativeGate/QuickActionsTrampolineStripperAndroid.cs" />

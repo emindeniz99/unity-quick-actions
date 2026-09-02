@@ -3,48 +3,87 @@
 //   generator and re-run it. tools~/verify.sh fails when this file is stale.
 // </auto-generated>
 //
-// The built-in Android shortcut icons as VectorDrawable XML. On Android an
-// IconType is resolved BY NAME at runtime — QuickActionsBridge.java tries the
-// project's ic_quickaction_<name> first, then ic_quickaction_builtin_<name> —
-// so the drawable has to exist in the app, and the build post-processor writes
-// these into the generated Gradle project under the second prefix. Vectors,
-// so one density-independent file per icon; embedded rather than shipped as
-// assets so a Git/OpenUPM install and a .unitypackage one deliver the same
-// bytes with no package-path resolution, and so the headless harness can hold
-// the post-processor to this source of truth byte for byte.
+// The built-in Android shortcut icons as VectorDrawable / adaptive-icon XML. On
+// Android an IconType is resolved BY NAME at runtime — QuickActionsBridge.java
+// tries the project's ic_quickaction_<name> first, then
+// ic_quickaction_builtin_<name> — so the drawable has to exist in the app, and
+// the build post-processor writes these into the generated Gradle project under
+// the second prefix. XML, so one density-independent file per layer; embedded
+// rather than shipped as assets so a Git/OpenUPM install and a .unitypackage one
+// deliver the same bytes with no package-path resolution, and so the headless
+// harness can hold the post-processor to this source of truth byte for byte.
 //
-// 48dp on a 96 viewport, white glyph on a #3F51B5 disc.
+// Two variants under ONE resource name, chosen by the res/ qualifier and never
+// by anything at build time. The API 25 file: 48dp on a 96 viewport,
+// white glyph on a #3F51B5 disc. The -v26 one: an <adaptive-icon> over two layers of
+// its own — a full-bleed #3F51B5 background and the same glyph scaled into the
+// 66-of-108 safe zone — because API 26+ launchers otherwise wrap the legacy file
+// onto a white plate at 0.70 of the viewport: a disc inside a white ring,
+// smaller than the adaptive icons beside it.
 namespace EminDeniz99.QuickActions.Editor
 {
     internal static class QuickActionsBuiltInIcons
     {
+        /// <summary>What a given <see cref="Entry"/> is. The two variants of one icon
+        /// share a resource NAME (the qualifier picks between them); the two adaptive
+        /// layers are resources in their own right, referenced only by that
+        /// icon's <c>&lt;adaptive-icon&gt;</c>.</summary>
+        internal enum IconLayer
+        {
+            /// <summary>res/drawable — the plain vector, what API 25 draws.</summary>
+            Legacy,
+            /// <summary>res/drawable-anydpi-v26 — the &lt;adaptive-icon&gt;, same name.</summary>
+            Adaptive,
+            /// <summary>That icon's full-bleed background layer.</summary>
+            Background,
+            /// <summary>That icon's glyph layer, inside the safe zone.</summary>
+            Foreground,
+        }
+
         internal sealed class Entry
         {
-            /// <summary>The catalog value this drawable renders.</summary>
+            /// <summary>The catalog value this file belongs to (the adaptive layers
+            /// belong to the same one their icon does).</summary>
             public readonly IconType Icon;
-            /// <summary>The &lt;name&gt; in ic_quickaction_builtin_&lt;name&gt; — must equal
-            /// the Java ICON_NAMES entry for <see cref="Icon"/>'s value.</summary>
+            /// <summary>The &lt;name&gt; in ic_quickaction_builtin_&lt;name&gt;.xml. For
+            /// <see cref="IconLayer.Legacy"/> and <see cref="IconLayer.Adaptive"/> it must
+            /// equal the Java ICON_NAMES entry for <see cref="Icon"/>'s value; the layers
+            /// carry that name plus a suffix, which keeps them inside the keep glob and
+            /// the define-off sweep.</summary>
             public readonly string Name;
-            /// <summary>The VectorDrawable, verbatim.</summary>
+            /// <summary>The res/ subdirectory this file goes in — the qualifier that
+            /// makes one resource name resolve to two different files by API level.</summary>
+            public readonly string Directory;
+            /// <summary>Which of the four files of an icon this is.</summary>
+            public readonly IconLayer Layer;
+            /// <summary>The drawable XML, verbatim.</summary>
             public readonly string Xml;
 
-            public Entry(IconType icon, string name, string xml)
+            public Entry(IconType icon, string name, string directory, IconLayer layer, string xml)
             {
                 Icon = icon;
                 Name = name;
+                Directory = directory;
+                Layer = layer;
                 Xml = xml;
             }
         }
 
-        /// <summary>The res/ subdirectory the entries are written under: a vector is
-        /// density-independent, so the unqualified one.</summary>
-        internal const string ResourceDirectory = "drawable";
-        /// <summary>The viewport every entry draws on (width and height).</summary>
+        /// <summary>The viewport the API 25 vector draws on (width and height).</summary>
         internal const int Viewport = 96;
+        /// <summary>The viewport the -v26 layers draw on: Android's adaptive-icon
+        /// canvas.</summary>
+        internal const int AdaptiveViewport = 108;
+        /// <summary>The diameter, on that canvas, of the centred circle every launcher
+        /// mask is guaranteed to show. The foreground glyph stays inside it.</summary>
+        internal const int AdaptiveSafeZone = 66;
 
+        /// <summary>Every file the build post-processor writes, declared up front:
+        /// four per icon, each with the subdirectory it belongs in. Nothing is decided
+        /// from the exported tree.</summary>
         internal static readonly Entry[] Entries =
         {
-            new Entry(IconType.Add, "add",
+            new Entry(IconType.Add, "add", "drawable", IconLayer.Legacy,
                 "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
                 "<!-- Written by com.emindeniz99.quick-actions (tools~/gen_builtin_icons.py). A\n" +
                 "     project's own ic_quickaction_<name> takes precedence over this file. -->\n" +
@@ -60,7 +99,41 @@ namespace EminDeniz99.QuickActions.Editor
                 "      android:fillColor=\"#FFFFFF\"\n" +
                 "      android:pathData=\"M44,24L53,24L53,73L44,73ZM24,44L73,44L73,53L24,53Z\" />\n" +
                 "</vector>\n"),
-            new Entry(IconType.Compose, "compose",
+            new Entry(IconType.Add, "add", "drawable-anydpi-v26", IconLayer.Adaptive,
+                "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
+                "<!-- Written by com.emindeniz99.quick-actions (tools~/gen_builtin_icons.py). A\n" +
+                "     project's own ic_quickaction_<name> takes precedence over this file. -->\n" +
+                "<adaptive-icon xmlns:android=\"http://schemas.android.com/apk/res/android\">\n" +
+                "  <background android:drawable=\"@drawable/ic_quickaction_builtin_add_background\" />\n" +
+                "  <foreground android:drawable=\"@drawable/ic_quickaction_builtin_add_foreground\" />\n" +
+                "</adaptive-icon>\n"),
+            new Entry(IconType.Add, "add_background", "drawable", IconLayer.Background,
+                "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
+                "<!-- Written by com.emindeniz99.quick-actions (tools~/gen_builtin_icons.py). A\n" +
+                "     project's own ic_quickaction_<name> takes precedence over this file. -->\n" +
+                "<vector xmlns:android=\"http://schemas.android.com/apk/res/android\"\n" +
+                "    android:width=\"108dp\"\n" +
+                "    android:height=\"108dp\"\n" +
+                "    android:viewportWidth=\"108\"\n" +
+                "    android:viewportHeight=\"108\">\n" +
+                "  <path\n" +
+                "      android:fillColor=\"#3F51B5\"\n" +
+                "      android:pathData=\"M0,0L108,0L108,108L0,108Z\" />\n" +
+                "</vector>\n"),
+            new Entry(IconType.Add, "add_foreground", "drawable", IconLayer.Foreground,
+                "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
+                "<!-- Written by com.emindeniz99.quick-actions (tools~/gen_builtin_icons.py). A\n" +
+                "     project's own ic_quickaction_<name> takes precedence over this file. -->\n" +
+                "<vector xmlns:android=\"http://schemas.android.com/apk/res/android\"\n" +
+                "    android:width=\"108dp\"\n" +
+                "    android:height=\"108dp\"\n" +
+                "    android:viewportWidth=\"108\"\n" +
+                "    android:viewportHeight=\"108\">\n" +
+                "  <path\n" +
+                "      android:fillColor=\"#FFFFFF\"\n" +
+                "      android:pathData=\"M50.88,35.28L57.9,35.28L57.9,73.5L50.88,73.5ZM35.28,50.88L73.5,50.88L73.5,57.9L35.28,57.9Z\" />\n" +
+                "</vector>\n"),
+            new Entry(IconType.Compose, "compose", "drawable", IconLayer.Legacy,
                 "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
                 "<!-- Written by com.emindeniz99.quick-actions (tools~/gen_builtin_icons.py). A\n" +
                 "     project's own ic_quickaction_<name> takes precedence over this file. -->\n" +
@@ -76,7 +149,41 @@ namespace EminDeniz99.QuickActions.Editor
                 "      android:fillColor=\"#FFFFFF\"\n" +
                 "      android:pathData=\"M28,70L32,56L60,28L72,40L44,68Z\" />\n" +
                 "</vector>\n"),
-            new Entry(IconType.Favorite, "favorite",
+            new Entry(IconType.Compose, "compose", "drawable-anydpi-v26", IconLayer.Adaptive,
+                "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
+                "<!-- Written by com.emindeniz99.quick-actions (tools~/gen_builtin_icons.py). A\n" +
+                "     project's own ic_quickaction_<name> takes precedence over this file. -->\n" +
+                "<adaptive-icon xmlns:android=\"http://schemas.android.com/apk/res/android\">\n" +
+                "  <background android:drawable=\"@drawable/ic_quickaction_builtin_compose_background\" />\n" +
+                "  <foreground android:drawable=\"@drawable/ic_quickaction_builtin_compose_foreground\" />\n" +
+                "</adaptive-icon>\n"),
+            new Entry(IconType.Compose, "compose_background", "drawable", IconLayer.Background,
+                "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
+                "<!-- Written by com.emindeniz99.quick-actions (tools~/gen_builtin_icons.py). A\n" +
+                "     project's own ic_quickaction_<name> takes precedence over this file. -->\n" +
+                "<vector xmlns:android=\"http://schemas.android.com/apk/res/android\"\n" +
+                "    android:width=\"108dp\"\n" +
+                "    android:height=\"108dp\"\n" +
+                "    android:viewportWidth=\"108\"\n" +
+                "    android:viewportHeight=\"108\">\n" +
+                "  <path\n" +
+                "      android:fillColor=\"#3F51B5\"\n" +
+                "      android:pathData=\"M0,0L108,0L108,108L0,108Z\" />\n" +
+                "</vector>\n"),
+            new Entry(IconType.Compose, "compose_foreground", "drawable", IconLayer.Foreground,
+                "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
+                "<!-- Written by com.emindeniz99.quick-actions (tools~/gen_builtin_icons.py). A\n" +
+                "     project's own ic_quickaction_<name> takes precedence over this file. -->\n" +
+                "<vector xmlns:android=\"http://schemas.android.com/apk/res/android\"\n" +
+                "    android:width=\"108dp\"\n" +
+                "    android:height=\"108dp\"\n" +
+                "    android:viewportWidth=\"108\"\n" +
+                "    android:viewportHeight=\"108\">\n" +
+                "  <path\n" +
+                "      android:fillColor=\"#FFFFFF\"\n" +
+                "      android:pathData=\"M38.4,71.16L41.52,60.24L63.36,38.4L72.72,47.76L50.88,69.6Z\" />\n" +
+                "</vector>\n"),
+            new Entry(IconType.Favorite, "favorite", "drawable", IconLayer.Legacy,
                 "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
                 "<!-- Written by com.emindeniz99.quick-actions (tools~/gen_builtin_icons.py). A\n" +
                 "     project's own ic_quickaction_<name> takes precedence over this file. -->\n" +
@@ -92,7 +199,41 @@ namespace EminDeniz99.QuickActions.Editor
                 "      android:fillColor=\"#FFFFFF\"\n" +
                 "      android:pathData=\"M48,14L39.18,35.86L15.66,37.49L33.73,52.64L28.02,75.51L48,63L67.98,75.51L62.27,52.64L80.34,37.49L56.82,35.86Z\" />\n" +
                 "</vector>\n"),
-            new Entry(IconType.Play, "play",
+            new Entry(IconType.Favorite, "favorite", "drawable-anydpi-v26", IconLayer.Adaptive,
+                "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
+                "<!-- Written by com.emindeniz99.quick-actions (tools~/gen_builtin_icons.py). A\n" +
+                "     project's own ic_quickaction_<name> takes precedence over this file. -->\n" +
+                "<adaptive-icon xmlns:android=\"http://schemas.android.com/apk/res/android\">\n" +
+                "  <background android:drawable=\"@drawable/ic_quickaction_builtin_favorite_background\" />\n" +
+                "  <foreground android:drawable=\"@drawable/ic_quickaction_builtin_favorite_foreground\" />\n" +
+                "</adaptive-icon>\n"),
+            new Entry(IconType.Favorite, "favorite_background", "drawable", IconLayer.Background,
+                "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
+                "<!-- Written by com.emindeniz99.quick-actions (tools~/gen_builtin_icons.py). A\n" +
+                "     project's own ic_quickaction_<name> takes precedence over this file. -->\n" +
+                "<vector xmlns:android=\"http://schemas.android.com/apk/res/android\"\n" +
+                "    android:width=\"108dp\"\n" +
+                "    android:height=\"108dp\"\n" +
+                "    android:viewportWidth=\"108\"\n" +
+                "    android:viewportHeight=\"108\">\n" +
+                "  <path\n" +
+                "      android:fillColor=\"#3F51B5\"\n" +
+                "      android:pathData=\"M0,0L108,0L108,108L0,108Z\" />\n" +
+                "</vector>\n"),
+            new Entry(IconType.Favorite, "favorite_foreground", "drawable", IconLayer.Foreground,
+                "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
+                "<!-- Written by com.emindeniz99.quick-actions (tools~/gen_builtin_icons.py). A\n" +
+                "     project's own ic_quickaction_<name> takes precedence over this file. -->\n" +
+                "<vector xmlns:android=\"http://schemas.android.com/apk/res/android\"\n" +
+                "    android:width=\"108dp\"\n" +
+                "    android:height=\"108dp\"\n" +
+                "    android:viewportWidth=\"108\"\n" +
+                "    android:viewportHeight=\"108\">\n" +
+                "  <path\n" +
+                "      android:fillColor=\"#FFFFFF\"\n" +
+                "      android:pathData=\"M54,27.48L47.12,44.53L28.78,45.8L42.87,57.62L38.41,75.46L54,65.7L69.59,75.46L65.13,57.62L79.22,45.8L60.88,44.53Z\" />\n" +
+                "</vector>\n"),
+            new Entry(IconType.Play, "play", "drawable", IconLayer.Legacy,
                 "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
                 "<!-- Written by com.emindeniz99.quick-actions (tools~/gen_builtin_icons.py). A\n" +
                 "     project's own ic_quickaction_<name> takes precedence over this file. -->\n" +
@@ -107,6 +248,40 @@ namespace EminDeniz99.QuickActions.Editor
                 "  <path\n" +
                 "      android:fillColor=\"#FFFFFF\"\n" +
                 "      android:pathData=\"M34,26L34,70L72,48Z\" />\n" +
+                "</vector>\n"),
+            new Entry(IconType.Play, "play", "drawable-anydpi-v26", IconLayer.Adaptive,
+                "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
+                "<!-- Written by com.emindeniz99.quick-actions (tools~/gen_builtin_icons.py). A\n" +
+                "     project's own ic_quickaction_<name> takes precedence over this file. -->\n" +
+                "<adaptive-icon xmlns:android=\"http://schemas.android.com/apk/res/android\">\n" +
+                "  <background android:drawable=\"@drawable/ic_quickaction_builtin_play_background\" />\n" +
+                "  <foreground android:drawable=\"@drawable/ic_quickaction_builtin_play_foreground\" />\n" +
+                "</adaptive-icon>\n"),
+            new Entry(IconType.Play, "play_background", "drawable", IconLayer.Background,
+                "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
+                "<!-- Written by com.emindeniz99.quick-actions (tools~/gen_builtin_icons.py). A\n" +
+                "     project's own ic_quickaction_<name> takes precedence over this file. -->\n" +
+                "<vector xmlns:android=\"http://schemas.android.com/apk/res/android\"\n" +
+                "    android:width=\"108dp\"\n" +
+                "    android:height=\"108dp\"\n" +
+                "    android:viewportWidth=\"108\"\n" +
+                "    android:viewportHeight=\"108\">\n" +
+                "  <path\n" +
+                "      android:fillColor=\"#3F51B5\"\n" +
+                "      android:pathData=\"M0,0L108,0L108,108L0,108Z\" />\n" +
+                "</vector>\n"),
+            new Entry(IconType.Play, "play_foreground", "drawable", IconLayer.Foreground,
+                "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
+                "<!-- Written by com.emindeniz99.quick-actions (tools~/gen_builtin_icons.py). A\n" +
+                "     project's own ic_quickaction_<name> takes precedence over this file. -->\n" +
+                "<vector xmlns:android=\"http://schemas.android.com/apk/res/android\"\n" +
+                "    android:width=\"108dp\"\n" +
+                "    android:height=\"108dp\"\n" +
+                "    android:viewportWidth=\"108\"\n" +
+                "    android:viewportHeight=\"108\">\n" +
+                "  <path\n" +
+                "      android:fillColor=\"#FFFFFF\"\n" +
+                "      android:pathData=\"M43.08,36.84L43.08,71.16L72.72,54Z\" />\n" +
                 "</vector>\n"),
         };
     }

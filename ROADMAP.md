@@ -3,37 +3,6 @@
 Follow-ups discussed but not shipped. Delete an entry in the same commit that
 ships it.
 
-- **Verify the `.androidlib` icon recipe on a real build.** The README's
-  recipe for a consumer's own icons — an `.androidlib` under `Assets/` — rests
-  on Unity documentation and on reading Unity's first-party notifications
-  package, **not** on a build we ran. (The built-in icons take a different
-  path: the post-processor writes them straight into `unityLibrary/src/main/res/`,
-  which CI reads back out of a real APK on every push, so that path needs no
-  entry here.) The APK proof was attempted and could not run: the Unity
-  editors live on `/Volumes/T7Data`, which was unmounted. Confirm on 2022.3:
-  (a) a `.androidlib` under `Assets/` lands its `src/main/res/drawable-*/`
-  entries in the APK resource table (`aapt2 dump resources <apk> | grep -i
-  quickaction`); (b) `res/` at the `.androidlib` root is silently dropped, as
-  the docs imply; (d) a `.androidlib` shipped *inside a UPM package* is picked
-  up — Unity's own `com.unity.mobile.notifications` ships
-  `Runtime/Android/Plugins/mobilenotifications.androidlib/` with a committed
-  `.meta` and depends on exactly this, so the mechanism is established by
-  precedent even though no Unity manual page documents it; what remains is
-  only seeing it on a build of ours. (Confirmed on reading that package while
-  designing 0.5.0: Unity copies an `.androidlib` to
-  `unityLibrary/<Name>.androidlib/`, nested, not to the Gradle root.)
-
-  The old item (c) — does the resource shrinker honour the shipped
-  `res/raw/quickactions_keep.xml` — is **answered, and stays answered**: the
-  `android-shrink-verify` job in
-  [`unity-ci.yml`](./.github/workflows/unity-ci.yml) re-runs the experiment on
-  every code push. On 2026-08-29 it reported, on a real minified release
-  resource pipeline (AGP, `minifyEnabled` + `shrinkResources`, Unity 2022.3
-  export): the keep-globbed probe `ic_quickaction_probe` went in at 990 bytes
-  and came out at 990, while the unreferenced control `zz_shrink_control` went
-  from 990 to AGP's 67-byte dummy. The control proves the shrinker ran; the
-  probe proves the keep rule held. (a), (b) and (d) still need a hand-run editor.
-
 - **`.androidlib` does not survive `.unitypackage` export/import** (reported
   against 2022.3.15, re-confirmed 2024, unfixed). This is why the built-in icons
   must be written by the build post-processor rather than shipped as a
@@ -42,40 +11,32 @@ ships it.
   OpenUPM/Git and silently vanish for Asset Store users. Re-check whether Unity
   has fixed this before choosing any design that depends on it.
 
-- **Adaptive (`-v26`) variants of the built-in icons.** On API 26+ AOSP wraps a
-  legacy shortcut drawable onto a white plate at 0.70 of the viewport, so the
-  built-ins render as a disc inside a white ring, smaller than neighbouring
-  adaptive icons. A `res/drawable-anydpi-v26/ic_quickaction_builtin_<name>.xml`
-  `<adaptive-icon>` under the same name would escape that (the launcher takes
-  an `AdaptiveIconDrawable` as-is): full-bleed indigo background layer, glyph
-  foreground confined to the 66/72 safe zone (≤ ~61 % of the 108 dp canvas —
-  the current glyphs span ~71 % and would be clipped by a squircle mask if
-  reused as-is), child drawables prefix-named so the keep glob covers them, the
-  plain vector kept for API 25. Deliberately not in the first release of the
-  built-ins: nobody has seen even the legacy art on a launcher, and this
-  doubles the unseen surface.
-- **Emulator screenshot of the built-in icons.** The smoke leg proves the
-  shortcuts registered with an icon resource; a capture of the long-press sheet
-  (`adb shell input` long-press on the app icon, then `screencap`) attached as
-  a workflow artifact would be the first look anyone has had at the art. Flaky
-  to drive (the gesture is launcher-dependent); worth one attempt.
-- **Unity 6 incremental Android builds are unmeasured.** CI builds a clean
-  Gradle project on a fresh runner every time. A second player build over the
-  same project directory — where Unity may prune files it did not declare and
-  the `IPostGenerateGradleAndroidProject` path may not re-run — is unproven for
-  the icons, the keep rule and the shortcut resources alike. Build the Unity 6
-  leg twice and aapt2 the SECOND APK. Related: Unity's own notifications package
-  moved to `AndroidProjectFilesModifier` on Unity 6 "for better compatibility
-  with incremental build"; the built-ins' distinct-name design was chosen so
-  that port is mechanical (every output declared up front, nothing inspected in
-  the tree), but the port itself is not done.
-- **Mark which `IconType`s have Android art in the settings UI.** A consumer
-  choosing `IconType.Search` from the 29-entry dropdown learns only at build
-  time (a warning) that it renders blank on Android without a drawable of their
-  own; the settings page could say so next to the field.
+- **Emulator screenshot of the built-in icons — the gesture, not the capture,
+  is what is missing.** The smoke legs now end with a best-effort long-press
+  capture (`CAPTURE_LONGPRESS=1` in `tools~/device-smoke/android_device_smoke.sh`)
+  and upload `longpress-<leg>` (screenshot plus two `uiautomator` dumps) on
+  every push. The first run (2026-09-02) showed why it was flagged flaky: on
+  the API 30 default launcher the swipe never opens the app drawer, so the icon
+  is not found; on the API 35 Pixel launcher the icon IS found (in the
+  predicted-apps dock) and pressed, but `input swipe x y x y 1500` produced no
+  shortcut sheet — the hierarchy after the press is identical to the one
+  before. Next attempt: a real long press via `input motionevent DOWN x y` /
+  sleep / `input motionevent UP x y`, screencap a beat later, and on API 30
+  open the drawer through `am start` of the launcher's all-apps activity
+  instead of a gesture. The verdict never depends on it.
+- **Port the Android post-processor to `AndroidProjectFilesModifier` (Unity 6).**
+  Unity's own notifications package moved to it "for better compatibility with
+  incremental build"; the built-ins' distinct-name design was chosen so that
+  port is mechanical (every output declared up front, nothing inspected in the
+  tree), but the port itself is not done. CI's unity6 leg now builds the
+  Android player twice over one project directory and runs the same aapt2
+  assertions on the second APK (first measured 2026-09-02: 54,951,386 vs
+  54,951,670 bytes, every assertion green on both), so the current
+  `IPostGenerateGradleAndroidProject` path is measured rather than assumed on
+  every push — this is an API-alignment item, not a bug.
 - **Teaching sample for custom Android icons (small, optional).** A
   `Samples~/AndroidIcons/` containing a ready-made `QuickActionIcons.androidlib`
-  (correct `src/main/AndroidManifest.xml` + `src/main/res/drawable-xhdpi/`)
+  (correct root-level `AndroidManifest.xml` + `res/drawable-xhdpi/`)
   would let a user import a *working* example rather than follow a five-step
   written recipe. Imports to `Assets/Samples/<pkg>/<version>/…`, which is under
   `Assets/`, so it would be picked up with no further action. Caveats: nobody
@@ -177,10 +138,15 @@ The stub harness compiles the C#/Java but can't confirm Unity-only wiring:
   no `QuickActions` symbols. Android: `QuickActionsTrampolineInjectorAndroid`
   (gated) injects the trampoline `<activity>` only when the define is on, and
   `QuickActionsTrampolineStripperAndroid` (ungated) strips any stale entry when
-  it is off — the build-output half is CONFIRMED on 2021.3 and 6.3 (a player
-  built with the define removed contains no trace of the trampoline); on device,
-  verify the prod manifest has no `QuickActionsTrampolineActivity` (the `.java` dead
-  class remains; literally-zero needs the package excluded from the prod project).
+  it is off — the build-output half is now proven on every code push by the
+  `gate-off` CI job (define-off APK: no trampoline `<activity>`, no shortcuts
+  meta-data, no package resources, nothing of the package's assembly in the
+  IL2CPP metadata; define-off Xcode export: no macro, no marked plist items — each
+  with the define-on build as the positive control), and was hand-confirmed
+  earlier on 2021.3 and 6.3. What remains is the device: install that prod
+  build and confirm no shortcut menu appears and the app is untouched (the
+  `.java` dead class remains; literally-zero needs the package excluded from
+  the prod project).
   Both ungated cleanups gate on compile-time `#if QUICKACTIONS_ENABLED` (the
   same truth as the gated injectors), with a stale-assembly coherence check
   that FAILS the build if the define was removed without a script recompile.

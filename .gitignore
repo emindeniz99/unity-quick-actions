@@ -48,3 +48,6 @@ Thumbs.db
 Examples~/*/*.sln
 Examples~/*/*.slnx
 Examples~/*/*.csproj
+
+# Claude Code agent worktrees (created under the repo by the harness, never source)
+.claude/

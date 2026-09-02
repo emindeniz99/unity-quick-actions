@@ -50,6 +50,68 @@ hardware; iOS 13+ opens it with a plain long-press on every device.
   Unity's activity, so it works on both `UnityPlayerActivity` (2021/2022) and
   `UnityPlayerGameActivity` (6+).
 
+## 60-second quickstart
+
+1. **Install** — Package Manager ▸ *Add package from git URL…*:
+   `https://github.com/emindeniz99/unity-quick-actions.git#v0.5.0`
+2. **Turn it on** — **Window ▸ Quick Actions ▸ Enable Quick Actions** adds the
+   `QUICKACTIONS_ENABLED` define for Standalone, Android and iOS. The package is
+   inert without it, by design.
+3. **Wire it up** from a script in your first scene — guarded, so the project
+   still compiles when the define is off:
+
+   ```csharp
+   #if QUICKACTIONS_ENABLED
+   using EminDeniz99.QuickActions;
+   #endif
+   using UnityEngine;
+
+   public class ShortcutSetup : MonoBehaviour
+   {
+   #if QUICKACTIONS_ENABLED
+       // Subscribe early: the cold-launch tap arrives one frame after startup.
+       void Awake() => QuickActions.Performed += OnShortcut;
+       // Performed is static and process-wide: never leave a handler behind.
+       void OnDestroy() => QuickActions.Performed -= OnShortcut;
+       
+       // Fires on every tap, including the cold launch that started the app.
+       void OnShortcut(string id) => Debug.Log($"Tapped: {id}");
+
+       void Start()
+       {
+           QuickActions.Add(new QuickActionItem(
+               id: "new_game", title: "New Game",
+               subtitle: "Start fresh", icon: IconType.Add));
+       }
+   #endif
+   }
+   ```
+
+   If that script lives in its own assembly definition, add
+   `EminDeniz99.QuickActions` to the asmdef's references; `Assembly-CSharp`
+   sees the package with no setup. With the define off the package's
+   assemblies are not compiled at all and Unity drops the reference rather
+   than failing the build — the `gate-off` CI job builds a testbed assembly of
+   exactly this shape (`Examples~/Testbed2022/Assets/Integration/`) with the
+   define off — so the same `#if` guards keep your assembly compiling. To keep
+   the package out of your gameplay assembly altogether, put the glue in a
+   small asmdef with `"defineConstraints": ["QUICKACTIONS_ENABLED"]` and keep
+   `MonoBehaviour`s out of it, so no scene component goes missing when that
+   assembly is not compiled.
+4. **See it** — **Window ▸ Quick Actions ▸ Simulator** fires taps in the
+   Editor; build to a device (or the iOS Simulator) and long-press the app icon
+   for the real menu.
+
+Longer walk-through: [GETTING_STARTED](./GETTING_STARTED.md). Handing the
+integration to an AI coding agent: [AGENTS.md](./AGENTS.md).
+
+## Contents
+
+- [Status](#status) · [Install](#install) · [Dev-only — excluding it from production](#dev-only--excluding-it-completely-from-production-builds)
+- [Usage](#usage) · [API](#api) · [Android icons](#android-icons) · [Test in the Editor](#test-in-the-editor--no-device-needed) · [Static shortcuts](#static-shortcuts-baked-into-the-build) · [Build-time placeholders](#build-time-placeholders--app-info-on-long-press)
+- [How it works](#how-it-works) · [The OS shortcut cap](#known-limits--the-os-shortcut-cap) · [Host coexistence](#host-coexistence--the-package-touches-only-its-own-shortcuts) · [Localization](#known-limits--localization) · [Android build variants](#known-limits--android-build-variants-and-static-shortcuts) · [Android minification](#known-limits--android-minification-r8proguard--resource-shrinking)
+- [Security](#security-a-shortcut-tap-is-not-an-authenticated-action) · [Limitations / roadmap](#limitations--roadmap) · [Verification](#verification--running-the-checks-yourself) · [Notes / learnings](#notes--learnings)
+
 ## Status
 
 This is **0.5.0**, a pre-1.0 release. Here is exactly what has been proven and
@@ -91,10 +153,11 @@ covered by headless tests only — no device or Simulator run has happened since
 they landed, so what a resolved `v1.4.0 (37)` looks like on a real home screen
 is still unconfirmed.
 
-**Also true:** the suite is 98 headless tests (`dotnet test`) and 74 in Unity's
-Test Runner (it adds 5 `JsonUtility` serialization tests; 29 of the headless ones
-don't run there), plus an Android Java smoke of 108 checks, across 10 C# compile
-configurations with 0 warnings.
+**Also true:** the suite is 122 headless tests (`dotnet test`) and 77 in Unity's
+Test Runner (it adds 6 `JsonUtility` serialization tests; 51 of the headless ones
+don't run there), plus an Android Java smoke of 111 checks, across 10 C# compile
+configurations with 0 warnings. The last CI-measured Test Runner result was
+76/76 (run 38, 2026-09-01), taken before the sixth serialization test landed.
 The iOS `.mm` compiles cleanly against the current iOS SDK
 (ARC, arm64, deployment target iOS 13) with no deprecation or availability
 errors — a compile result, separate from the Simulator run above.
@@ -205,19 +268,31 @@ or:
 "com.emindeniz99.quick-actions": "file:../path/to/unity-quick-actions"
 ```
 
+### 5. Vendor the source (embedded package)
+
+Copy the repository — a release tag's tree, ideally — into your project as
+`Packages/com.emindeniz99.quick-actions/` (the folder name must be the package
+name; `package.json` sits at its root). Unity treats a folder under `Packages/`
+as an **embedded package**: no `manifest.json` entry, the source is editable
+and versioned with your game, and the `~`-suffixed folders (`tools~/`,
+`Examples~/`, `Samples~/`) are ignored by the importer exactly as in any other
+install. Upgrade by replacing the folder. Pick this if your team keeps every
+dependency in the repo or expects to patch the package — it is the same
+assemblies as methods 1–4, so the one-copy rule above still applies.
+
 ---
 
 After installing, import the **Demo** sample from the package page to try it on a
-device. More on packaging/export: [`tools~/export-unitypackage.md`](./tools~/export-unitypackage.md).
+device. More on packaging/export: [`tools~/export-unitypackage.md`](https://github.com/emindeniz99/unity-quick-actions/blob/main/tools~/export-unitypackage.md).
 
 ### Or skip the setup: open a ready-made project
 
 `Examples~/` holds one consuming Unity project per supported editor line —
-[`Testbed2021`](./Examples~/Testbed2021), [`Testbed2022`](./Examples~/Testbed2022)
-and [`Testbed6`](./Examples~/Testbed6) — each with the package linked, the
+[`Testbed2021`](https://github.com/emindeniz99/unity-quick-actions/tree/main/Examples~/Testbed2021), [`Testbed2022`](https://github.com/emindeniz99/unity-quick-actions/tree/main/Examples~/Testbed2022)
+and [`Testbed6`](https://github.com/emindeniz99/unity-quick-actions/tree/main/Examples~/Testbed6) — each with the package linked, the
 define set and three static shortcuts already configured. Clone the repo, open
 the one matching your editor, and compare it against your own integration. See
-[`Examples~/README.md`](./Examples~/README.md).
+[`Examples~/README.md`](https://github.com/emindeniz99/unity-quick-actions/blob/main/Examples~/README.md).
 
 ## Dev-only — excluding it completely from production builds
 
@@ -245,9 +320,11 @@ Constraints only work for managed code, **not** native plugins):
   nothing is injected, and an *ungated* post-processor
   (`Editor/NativeGate/QuickActionsTrampolineStripperAndroid`) additionally
   strips any pre-existing entry (defense in depth), so the trampoline can't be
-  launched (the package is **inert**). One caveat: the trampoline `.java` still
-  compiles into the APK as a small dead, unreachable class — Unity can't
-  conditionally exclude a loose native source. For a *literally*-zero Android
+  launched (the package is **inert**). One caveat: the two plugin `.java` files
+  (the trampoline and the bridge, ~20 KB of bytecode together) still compile
+  into the APK as dead, unreachable classes unless R8 minification removes
+  them — Unity can't conditionally exclude a loose native source. The `gate-off`
+  CI job's APK diff reports exactly what remains. For a *literally*-zero Android
   footprint, keep the package out of the prod project (see below). All these
   post-processors edit the **build output**, so they work for read-only UPM
   packages.
@@ -295,11 +372,17 @@ on import)? Remove the `defineConstraints` from the asmdefs, drop the
 mechanical steps if your project wants the opposite trade-off.
 
 > The native gating edits the generated Xcode/Gradle project and can't be
-> exercised by the stub harness — verify it once in a real build. Concretely, in a
-> **prod build (define off)**: the generated Xcode project should contain **no**
-> `QUICKACTIONS_ENABLED` (grep the `.pbxproj`) and the merged Android manifest
-> should contain **no** `QuickActionsTrampolineActivity` (never injected, and
-> stripped if stale). In a **dev build (define on)** both are present.
+> exercised by the stub harness. CI does the real-build check on every code
+> push: the `gate-off` job in [`unity-ci.yml`](https://github.com/emindeniz99/unity-quick-actions/blob/main/.github/workflows/unity-ci.yml)
+> builds the 2022.3 testbed with the define **off** — an IL2CPP APK and an iOS
+> Simulator export — and requires the `.pbxproj` to contain **no**
+> `QUICKACTIONS_ENABLED`, the merged Android manifest **no**
+> `QuickActionsTrampolineActivity` and no shortcuts meta-data, the resource
+> table nothing of the package's, and the IL2CPP metadata nothing of the
+> package's assembly (its image name, its namespaces) — each against the define-**on** build from the same
+> run as a positive control. It then diffs the two APKs entry by entry (plus the whole-file size): that
+> number, printed in the job summary, is the package's footprint (held under
+> 1 MiB). To repeat it by hand, do the same in your own project.
 
 > **Static-shortcuts caveat when toggling the define.** If you configured static
 > shortcuts (Project Settings ▸ Quick Actions), the `QuickActionsSettings.asset`
@@ -322,12 +405,15 @@ up later, or only in a scene loaded afterward, and you'll miss the cold-launch
 tap (warm taps still arrive).
 
 ```csharp
+#if QUICKACTIONS_ENABLED
 using System.Collections.Generic;
 using EminDeniz99.QuickActions;
+#endif
 using UnityEngine;
 
 public class ShortcutRouter : MonoBehaviour
 {
+#if QUICKACTIONS_ENABLED
     void Awake()
     {
         // Subscribe early so the cold-launch tap (delivered next frame) isn't missed.
@@ -349,8 +435,25 @@ public class ShortcutRouter : MonoBehaviour
 
     // Fires on every tap, including the cold launch that started the app.
     void OnShortcut(string id) => Route(id);
+#endif
 }
 ```
+
+The `#if` guards keep the game compiling in a build where the define is off —
+the recommended production setup (see [Dev-only](#dev-only--excluding-it-completely-from-production-builds)) —
+and they wrap only the package-specific parts: the `MonoBehaviour` itself stays
+compiled, so the component on your scene object is an inert router there, not a
+missing script.
+If the script lives in its own assembly definition, add
+`EminDeniz99.QuickActions` to that asmdef's references (and
+`EminDeniz99.QuickActions.Editor` to an Editor asmdef that uses the build-time
+hooks); scripts in `Assembly-CSharp` see the package with no setup. That
+reference resolves to nothing with the define off and Unity drops it rather
+than failing the build — CI compiles a testbed assembly of that shape both
+ways (see the [quickstart](#60-second-quickstart)); a gated glue asmdef
+(`"defineConstraints": ["QUICKACTIONS_ENABLED"]`, no `MonoBehaviour`s in it)
+is the alternative for a project that wants the package out of its gameplay
+assembly entirely.
 
 ### API
 
@@ -361,11 +464,11 @@ public class ShortcutRouter : MonoBehaviour
 | `event Action<string> Performed` | Tapped action id (main thread; includes cold launch). |
 | `string LastPerformed` | Id the app was last launched/resumed from, or null. |
 | `void ResetLastPerformed()` | Clear `LastPerformed`. |
-| `bool Add(QuickActionItem)` | Add one; false if invalid, id already added, or the OS set couldn't be read / the OS rejected the write (transient — retry later). |
-| `void AddList(IList<QuickActionItem>)` | Add several in one OS update (same transient no-op cases as `Add`). |
+| `bool Add(QuickActionItem)` | Add one; false if invalid, id already added, or the OS set couldn't be read / the OS rejected the write (transient — retry later). A `null` item throws `ArgumentNullException` — the only way any call here throws. |
+| `void AddList(IList<QuickActionItem>)` | Add several in one OS update (same transient no-op cases as `Add`; a `null` list throws). |
 | `List<QuickActionItem> GetAll()` | Snapshot of the currently installed dynamic actions (OS-reconciled). |
 | `QuickActionItem GetById(string)` | Lookup by id. |
-| `bool Update(QuickActionItem)` | Replace the added action with the same `Id` **in place** — list position (launcher rank) preserved, one OS update, Android user-pinned copies refresh too. False when not added (use `Add`), invalid, the OS set couldn't be read, or the OS refused the write (all leave the previous item in place) — or when the OS **dropped** the pushed item (budget shrank; the shortcut is then gone, re-`Add` when there's room). |
+| `bool Update(QuickActionItem)` | `null` throws `ArgumentNullException`. Replace the added action with the same `Id` **in place** — list position (launcher rank) preserved, one OS update, Android user-pinned copies refresh too. False when not added (use `Add`), invalid, the OS set couldn't be read, or the OS refused the write (all leave the previous item in place) — or when the OS **dropped** the pushed item (budget shrank; the shortcut is then gone, re-`Add` when there's room). |
 | `bool Remove(QuickActionItem)` / `RemoveById(string)` | Remove one. |
 | `void RemoveAll()` | Remove every action. |
 | `bool IsAdded(QuickActionItem)` / `IsAdded(string)` | Membership test. |
@@ -404,29 +507,44 @@ getIdentifier("ic_quickaction_builtin_add", "drawable", pkg)  // else the built-
 
 **Four catalog entries ship built in** — `Add`, `Compose`, `Favorite` and
 `Play`, the ones the demo uses. On every Android build with the define on, the
-package's post-processor writes `ic_quickaction_builtin_<name>.xml` for each
-into the generated Gradle project (`unityLibrary/src/main/res/drawable/`), next
-to the keep rule that carries them through resource shrinking. They are
-VectorDrawables — one density-independent file each, about 2 KB for all four —
-of a white glyph on a coloured disc, so the icon carries its own contrast
-(API 26+ launchers wrap a legacy shortcut icon onto a white plate, where a
-glyph alone would vanish). A **static** item with one of those four as its
-`Icon` and no `AndroidDrawable` bakes a reference to the built-in, so it
-renders on a cold install too. Every CI build reads all four back out of the
-APK with `aapt2`, the shrink experiment holds them unchanged through
-`shrinkResources`, and the emulator smoke requires the registered shortcuts to
-have resolved an icon resource; what nobody has done yet is look at them on a
-launcher — the screenshot at the top of this file predates them.
+package's post-processor writes them into the generated Gradle project
+(`unityLibrary/src/main/res/`), next to the keep rule that carries them through
+resource shrinking. Each is **one resource name in two variants**, and the
+resource qualifier — not anything at build time — picks between them:
+
+```
+res/drawable/ic_quickaction_builtin_add.xml              API 25: white glyph on an indigo disc
+res/drawable-anydpi-v26/ic_quickaction_builtin_add.xml   API 26+: <adaptive-icon>, two layers
+res/drawable/ic_quickaction_builtin_add_background.xml     full-bleed indigo
+res/drawable/ic_quickaction_builtin_add_foreground.xml     the glyph, inside the mask's safe zone
+```
+
+The API 25 file carries its own contrast because API 26+ launchers wrap a
+*legacy* shortcut drawable onto a white plate, where a glyph alone would vanish
+— but that same wrap also scales it to 0.70 of the plate, so from API 26 the
+`-v26` variant takes over and the launcher masks a full-bleed icon instead.
+All XML, density-independent, about 6 KB for all four icons and their layers.
+A **static** item with one of those four as its `Icon` and no `AndroidDrawable`
+bakes a reference to the built-in — the one name, so it gets the right variant
+per device — and renders on a cold install too. Every CI build reads all four
+(and their layers) back out of the APK with `aapt2`, the shrink experiment
+holds them unchanged through `shrinkResources`, and the emulator smoke requires
+the registered shortcuts to have resolved an icon resource; what nobody has
+done yet is look at either variant on a launcher — the screenshot at the top of
+this file predates them.
 
 **The other 25 entries stay blank until you add a drawable**, and so does any
-built-in one you would rather draw yourself. Create an **Android Library
+built-in one you would rather draw yourself. The settings page says which is
+which next to every `Icon` field — "built-in drawable" for the four, or the
+exact `ic_quickaction_<name>` a member needs — so you learn it while
+configuring, not from a build-log warning. Create an **Android Library
 plug-in** anywhere under `Assets/` (Unity's supported mechanism on 2021.3,
 2022.3 and 6.x alike — the import instructions are identical across all three):
 
 ```
 Assets/QuickActionIcons.androidlib/
-  src/main/AndroidManifest.xml     <manifest package="com.yourcompany.qaicons"/>
-  src/main/res/drawable-xhdpi/ic_quickaction_search.png
+  AndroidManifest.xml              <manifest package="com.yourcompany.qaicons"/>
+  res/drawable-xhdpi/ic_quickaction_search.png
 ```
 
 Then either name the drawable `ic_quickaction_<icontype>` so `Icon` finds it, or
@@ -451,8 +569,16 @@ ship your own. A define-off production build carries none of this either way.
 
 Three traps worth knowing:
 
-- The resources must sit under **`src/main/res/`**. A `res/` folder at the
-  `.androidlib` root is silently ignored — green build, no warning, no icon.
+- Manifest and resources sit at the **root** of a bare `.androidlib` — one
+  with no `build.gradle` of its own — because that is the module layout Unity
+  generates for it. The Gradle-module layout, `src/main/res/`, is **silently
+  ignored** there: green build, no warning, no icon. It works only when the
+  `.androidlib` ships its own `build.gradle`, which is how Unity's
+  `com.unity.mobile.notifications` gets away with it. The first version of
+  this recipe said the opposite; the `android-build` job's 2022.3 leg measured
+  it — a drawable under `src/main/res/` never reached the APK, one under `res/`
+  did — and now plants a decoy under `src/main/res/` that must stay absent on
+  every push.
 - **Do not** use `Assets/Plugins/Android/res/`. Unity **removed** that path in
   2021.2, below this package's floor, and it now fails the build outright
   rather than being ignored.
@@ -484,7 +610,11 @@ where the long-press menu works — only to verify the OS menu itself.
 
 For shortcuts that must exist on the **first** launch (before any runtime
 `Add`), open **Project Settings ▸ Quick Actions**, click *Create settings
-asset*, and add entries. At build time:
+asset*, and add entries. The asset is created at
+`Assets/Settings/QuickActionsSettings.asset` — commit it with the project. It
+is found by type, not path, so it can live anywhere under `Assets/` (the
+testbeds keep theirs under `Assets/QuickActions/`); deliberately not the
+`.unitypackage` install folder, so a re-import never deletes it. At build time:
 
 <img src="https://raw.githubusercontent.com/emindeniz99/unity-quick-actions/main/store~/device-android-dynamic.jpg" alt="Four shortcuts on Android after the demo added two at runtime" width="240" align="right">
 
@@ -774,7 +904,7 @@ retain it. Either:
   covers it; or
 - ship your own keep rule inside your `.androidlib` (see
   [Android icons](#android-icons)) —
-  `src/main/res/raw/myapp_keep.xml`:
+  `res/raw/myapp_keep.xml` (at the `.androidlib` root, next to its manifest):
 
   ```xml
   <?xml version="1.0" encoding="utf-8"?>
@@ -837,20 +967,20 @@ The package is type-checked and compiled without Unity via a stub-based harness:
 
 ```bash
 tools~/setup.sh     # install dotnet + JDK (once)
-tools~/verify.sh    # .meta + C# compile (10 configs) + unit tests + Android plugin + frozen strings + release coherence
+tools~/verify.sh    # .meta + C# compile (11 configs) + unit tests + Android plugin + frozen strings + release coherence
 ```
 
-`verify.sh` compiles the C# in **10 configurations** (0 warnings), runs the **98**
+`verify.sh` compiles the C# in **11 configurations** (0 warnings), runs the **122**
 headless unit tests via `dotnet test`, and compiles and smoke-tests the Android
-Java plugin (**108** checks). Those tests (bar 29 headless-only ones) plus 5
+Java plugin (**111** checks). Those tests (bar 51 headless-only ones) plus 6
 `JsonUtility` serialization tests run in Unity's **Test Runner** from
-`Tests/Editor/` — **74** there. See [`.verify/README.md`](./.verify/README.md)
+`Tests/Editor/` — **77** there. See [`.verify/README.md`](https://github.com/emindeniz99/unity-quick-actions/blob/main/.verify/README.md)
 for how the stubs work.
 
-Beyond the stubs, [`unity-ci.yml`](./.github/workflows/unity-ci.yml) runs the
+Beyond the stubs, [`unity-ci.yml`](https://github.com/emindeniz99/unity-quick-actions/blob/main/.github/workflows/unity-ci.yml) runs the
 **real editors** via [GameCI](https://game.ci). Every leg runs on every code
 push and PR that touches code (docs-only changes trigger nothing): the
-EditMode suite on all three [`Examples~`](./Examples~) testbeds, plus a
+EditMode suite on all three [`Examples~`](https://github.com/emindeniz99/unity-quick-actions/tree/main/Examples~) testbeds, plus a
 `unity6-latest` canary leg that resolves the newest Unity 6 editor with a
 GameCI image at run time and upgrade-opens Testbed6 with it — so "the latest
 editor broke the package" surfaces here before it surfaces in a user's
@@ -868,9 +998,12 @@ measured one (the 2026-08-31 cron, shrink leg included), against 13
 unchained — and nothing else. Each Android APK is also read back with
 `aapt2`, which must
 find the baked static shortcuts, the resource-shrinker keep file and the
-trampoline `<activity>` inside it, and a further 2022.3-only job
+trampoline `<activity>` inside it, a further 2022.3-only job
 (`android-shrink-verify`) exports the Gradle project and runs the AGP resource
-shrinker over it to test whether that keep file is honoured — the `aapt2`
+shrinker over it to test whether that keep file is honoured, and a last one
+(`gate-off`) rebuilds the same testbed with `QUICKACTIONS_ENABLED` off, requires
+nothing of the package in the APK or the Xcode export, and diffs the two APKs
+to measure the package's footprint — the `aapt2`
 read-back has been green on all three lines in every heavy run that carried it,
 and the shrink job returned its first verdict on 2026-08-29: keep rule held,
 control shrunk (below).

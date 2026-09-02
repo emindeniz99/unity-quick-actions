@@ -702,11 +702,13 @@ static char *QABuildShortcutsJson(void) {
             @"AndroidDrawable": @"",
         }];
     }
-    NSString *json = @"{\"items\":[]}";
+    // A serializer failure is a FAILED read (NULL — the C# side maps it to the
+    // bridge's null), never an empty set: an empty set is authoritative and the
+    // facade prunes against it, which would remove the user's real shortcuts.
     NSData *data = [NSJSONSerialization dataWithJSONObject:@{@"items": out} options:0 error:nil];
-    if (data != nil)
-        json = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
-    return QACopyCString(json);
+    if (data == nil) return NULL;
+    NSString *json = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
+    return json != nil ? QACopyCString(json) : NULL;
 }
 
 // Reads the dynamic shortcuts, marshalling onto the main thread (UIApplication is

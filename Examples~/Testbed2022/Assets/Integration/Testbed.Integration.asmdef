@@ -1,0 +1,16 @@
+{
+    "name": "Testbed.Integration",
+    "rootNamespace": "",
+    "references": [
+        "EminDeniz99.QuickActions"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

@@ -11,7 +11,7 @@ rules below are non-negotiable.
 tools~/verify.sh        # must end with: VERIFY: PASS
 ```
 
-It checks `.meta` completeness, compiles the C# in 10 configs against Unity
+It checks `.meta` completeness, compiles the C# in 11 configs against Unity
 stubs, runs the NUnit suite, compiles + smoke-tests the Android Java plugin, and
 runs three more checks: the frozen device strings
 (`tools~/check_frozen_strings.py`), `package.json` / top `CHANGELOG.md` heading /
@@ -94,7 +94,12 @@ ask "merge or squash?" — the answer is merge.
 ## Docs
 
 Prefer relative links between files in this repo (`./GETTING_STARTED.md`) so
-they resolve on GitHub *and* in the Unity Package Manager. Install URL is
+they resolve on GitHub *and* in the Unity Package Manager — but only between
+files that ship together (the `files` list in `package.json`). A link from a
+shipped doc to something that does not ship (`~` folders, `.verify/`,
+`.github/`, the maintainer docs) is an absolute
+`https://github.com/emindeniz99/unity-quick-actions/blob/main/…` URL, so no
+package install ever carries a dangling link. Install URL is
 `https://github.com/emindeniz99/unity-quick-actions.git` — `package.json` is at
 the repo root, so the URL carries no subfolder query suffix. Pin a version with
 `#v0.5.0`. Tags are plain semver; `v0.4.0` was the first one.

@@ -62,8 +62,9 @@ unity test . --mode EditMode --output test-results.xml
 
 Uses [Unity's CLI](https://docs.unity.com/en-us/unity-cli/unity-cli-reference)
 (experimental, and its published docs lag the binary — `unity --help` is the
-authoritative command list). The full suite is 74 tests, and it has been run
-green on all three lines.
+authoritative command list). The full suite is 77 tests in the Test Runner; the
+last CI-measured run was 76/76 (run 38, 2026-09-01), and the 74-test suite of
+its day was run green by hand on all three lines.
 
 ## Build from the command line
 
@@ -78,8 +79,12 @@ around 2023 — Mono has no ARM64 backend on Android, so reaching arm64 means
 IL2CPP. Use `TestbedBuilder.BuildAndroidPhone` for a sideload build that carries
 both ABIs in one APK and installs on any phone from 7.1 up.
 
-`TestbedBuilder` also carries `DisableDefine` / `EnableDefine`. Those exist
-because the package **refuses** to build if the define is flipped inside the
+`TestbedBuilder` also carries `DisableDefine` / `EnableDefine` (both mobile
+targets at once) and the define-off builds CI's `gate-off` job runs after
+flipping — `BuildAndroidPhoneNoDefine` (IL2CPP, both ABIs, so the APK differs
+from `BuildAndroidPhone`'s in nothing but the define) and
+`BuildiOSSimulatorNoDefine`. The flip is separate because the package
+**refuses** to build if the define is flipped inside the
 same editor invocation as the build — the editor assemblies would still be
 compiled with it, so the resulting player would quietly still contain the
 dev-only pieces. Flip the define in one invocation, build in the next. (This is

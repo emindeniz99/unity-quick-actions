@@ -35,7 +35,8 @@ rationale):
    the release is cut from those two, so a disagreement is caught here rather
    than on main;
 7. the built-in Android icons embedded in
-   `Editor/Android/QuickActionsBuiltInIcons.cs` (VectorDrawable XML) still
+   `Editor/Android/QuickActionsBuiltInIcons.cs` (VectorDrawable and
+   `<adaptive-icon>` XML) still
    match their generator, `tools~/gen_builtin_icons.py` — that file is
    generated, never hand-edited.
 

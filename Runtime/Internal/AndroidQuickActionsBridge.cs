@@ -27,15 +27,43 @@ namespace EminDeniz99.QuickActions.Internal
                 return player.GetStatic<AndroidJavaObject>("currentActivity");
         }
 
-        // ShortcutManager is API 25 (Android 7.1)+.
-        public bool IsPlatformSupported
+        // ShortcutManager is API 25 (Android 7.1)+. SDK_INT never changes for a
+        // process, so it is read once and cached; a FAILED read is neither cached
+        // nor reported as "unsupported". The distinction matters: below API 25 an
+        // empty shortcut set is a real, authoritative answer (the facade prunes
+        // against it), whereas a JNI read that threw says nothing about the device —
+        // treating it as API<25 would let one bad read wipe the user's real
+        // shortcuts on the next write. So the read/write members below ask
+        // TrySdkInt and take their failed-read path (null) when it fails, and the
+        // query members answer "not supported" for that call only.
+        private static int _sdkInt = -1; // -1: not read yet, or the last read failed
+
+        private static bool TrySdkInt(out int sdkInt)
         {
-            get
+            if (_sdkInt >= 0)
+            {
+                sdkInt = _sdkInt;
+                return true;
+            }
+            try
             {
                 using (var version = new AndroidJavaClass("android.os.Build$VERSION"))
-                    return version.GetStatic<int>("SDK_INT") >= 25;
+                    _sdkInt = version.GetStatic<int>("SDK_INT");
+                sdkInt = _sdkInt;
+                return _sdkInt >= 0;
+            }
+            catch (AndroidJavaException e)
+            {
+                // Guarded like every other JNI path here: this is evaluated AHEAD of
+                // the try blocks in the members below, so a throw from it would be the
+                // one JNI exception that could escape into the caller's Add()/GetAll().
+                Debug.LogWarning("[QuickActions] Could not read Build.VERSION.SDK_INT: " + e.Message);
+                sdkInt = -1;
+                return false;
             }
         }
+
+        public bool IsPlatformSupported => TrySdkInt(out var sdkInt) && sdkInt >= 25;
 
         public int MaxShortcutCount
         {
@@ -111,8 +139,11 @@ namespace EminDeniz99.QuickActions.Internal
             // Below API 25 ShortcutManager doesn't exist, so nothing is installed. Report
             // an empty accepted set (not accept-all) so the facade prunes its list and
             // GetAll()/IsAdded() don't claim shortcuts the OS never received — matching
-            // IsPlatformSupported=false and the documented no-op behaviour.
-            if (!IsPlatformSupported) return new List<QuickActionItem>();
+            // IsPlatformSupported=false and the documented no-op behaviour. A read
+            // that FAILED is a failed write instead (null): the facade re-syncs and
+            // retries, and nothing is pruned on the strength of an unknown SDK level.
+            if (!TrySdkInt(out var sdkInt)) return null;
+            if (sdkInt < 25) return new List<QuickActionItem>();
             var json = JsonUtility.ToJson(new QuickActionList(items));
             string applied;
             try
@@ -139,8 +170,12 @@ namespace EminDeniz99.QuickActions.Internal
             // just-added item by misreading a stale device state).
             if (string.IsNullOrEmpty(applied)) return null;
 
+            // A payload the parser cannot read is a failed write report, not an
+            // empty one — return null for the same re-sync as a failed call.
+            var appliedItems = QuickActionList.Parse(applied);
+            if (appliedItems == null) return null;
             var appliedIds = new HashSet<string>();
-            foreach (var s in QuickActionList.Parse(applied))
+            foreach (var s in appliedItems)
                 if (s != null) appliedIds.Add(s.Id);
 
             // Return the subset of the *input* (caller's own objects, icons intact), in
@@ -154,7 +189,8 @@ namespace EminDeniz99.QuickActions.Internal
 
         public bool RemoveAll()
         {
-            if (!IsPlatformSupported) return true; // no dynamic shortcuts exist below API 25
+            if (!TrySdkInt(out var sdkInt)) return false; // unknown SDK level: report failure, not success
+            if (sdkInt < 25) return true; // no dynamic shortcuts exist below API 25
             try
             {
                 using (var bridge = new AndroidJavaClass(BridgeClass))
@@ -188,8 +224,12 @@ namespace EminDeniz99.QuickActions.Internal
         public IList<QuickActionItem> GetShortcuts()
         {
             // Below API 25 there are genuinely no dynamic shortcuts — a real (empty)
-            // read, not a failure.
-            if (!IsPlatformSupported)
+            // read, not a failure. An SDK level we could not read is a failed read
+            // (null): the facade leaves its cache alone and retries, rather than
+            // adopting an empty set it would later prune against.
+            if (!TrySdkInt(out var sdkInt))
+                return null;
+            if (sdkInt < 25)
                 return new List<QuickActionItem>();
             try
             {

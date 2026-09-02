@@ -100,7 +100,8 @@ unobserved.
 It does **not** prove:
 
 * that a **launcher** renders those shortcuts, their icons, or their order —
-  that needs human eyes on a home screen;
+  that needs human eyes on a home screen, which is what the opt-in capture
+  below *photographs* without asserting anything about it;
 * that a real **launcher tap** on a quit app behaves like the `am start` the
   script sends — the intent is the same one the launcher builds, but only
   SpringBoard-style UI automation could tap the icon itself;
@@ -108,6 +109,41 @@ It does **not** prove:
   of the spoof gate — covered headlessly by the Java smoke test in
   `.verify/JavaSmoke`);
 * pinning, static/manifest shortcuts, or host-app coexistence on a real device.
+
+### The long-press capture — `CAPTURE_LONGPRESS=1`
+
+Everything above is an assertion. This is not: with `CAPTURE_LONGPRESS=1` in the
+environment, the script's last act — *after* the `PASS:` line — is to drive the
+launcher and photograph the long-press sheet. Home, swipe up to open the app
+drawer, find the app's icon by its label in a `uiautomator dump`, long-press it
+(a `input swipe` that never moves), `screencap`, and dump the hierarchy again to
+see whether the shortcut titles are on screen. Into `CAPTURE_DIR`:
+`longpress.png`, `ui-drawer.xml`, `ui-longpress.xml`. The log carries the
+launcher it resolved, the coordinates it pressed, and one grep-able verdict —
+`shortcut sheet visible: yes` / `partial` / `no`.
+
+What it can prove: **what the icons actually look like on a launcher.** That is
+the whole point — `dumpsys shortcut` (step 5) proves each icon resolved to a
+resource id, and no automated check anywhere has ever seen the art. What it
+cannot prove: anything at all, by itself. `shortcut sheet visible: no` means the
+gesture missed, or that launcher lays its sheet out differently, or that the
+label was truncated past recognition — never that the package is broken. Read
+the picture, not the line.
+
+So it **never fails the job**. The gesture belongs to whatever launcher the
+system image ships (AOSP `default` images run Launcher3; a `google_apis` image
+may run something else entirely), the drawer swipe is a guess derived from
+`wm size`, and UI automation on a software-rendered emulator is flaky by
+nature. Accordingly: the verdict is printed before any of it runs, the whole
+block runs in a subshell with `errexit`/`pipefail` off, every `adb` call is
+bounded by `timeout`, and the script's exit status is 0 regardless. A red smoke
+exits earlier and captures nothing. Knobs: `CAPTURE_DIR`, `CAPTURE_LABEL` (the
+launcher label to search for — `QuickActionsDemo`, the testbeds' `productName`;
+`aapt2 dump badging <apk>` prints it for any other APK), `CAPTURE_TITLES`
+(`|`-separated), `CAPTURE_TIMEOUT` (60s per adb call), `CAPTURE_PRESS_MS`.
+
+CI turns it on for all three `android-smoke` legs and uploads
+`longpress-<leg>` as a workflow artifact (`continue-on-error`, `if: always()`).
 
 ### Local run
 
@@ -118,6 +154,9 @@ adb devices
 tools~/device-smoke/android_device_smoke.sh ~/builds/demo.apk com.example.game
 # ...or against a specific device:
 tools~/device-smoke/android_device_smoke.sh ~/builds/demo.apk com.example.game emulator-5554
+# ...or with the long-press capture, which leaves the screenshot in CAPTURE_DIR:
+CAPTURE_LONGPRESS=1 CAPTURE_DIR=/tmp/longpress \
+  tools~/device-smoke/android_device_smoke.sh ~/builds/demo.apk com.example.game
 ```
 
 ### CI

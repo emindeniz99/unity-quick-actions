@@ -1,0 +1,7 @@
+{
+  "name": "com.quickactions.testlib",
+  "version": "1.0.0",
+  "displayName": "Quick Actions Testbed Android Library",
+  "description": "Testbed fixture, not a shipped package. An embedded UPM package whose only content is Runtime/Android/Plugins/TestLib.androidlib — the layout Unity's own com.unity.mobile.notifications uses. CI's android-build job requires its drawable ic_quickaction_frompkg in the 2022.3 APK, which is the ROADMAP's sub-item (d): does an .androidlib shipped inside a package reach the build the same way one under Assets/ does?",
+  "unity": "2022.3"
+}

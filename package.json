@@ -52,6 +52,12 @@
     "ROADMAP.md.meta",
     "GETTING_STARTED.md",
     "GETTING_STARTED.md.meta",
+    "PRODUCTION_READINESS.md",
+    "PRODUCTION_READINESS.md.meta",
+    "SECURITY.md",
+    "SECURITY.md.meta",
+    "AGENTS.md",
+    "AGENTS.md.meta",
     "package.json.meta"
   ]
 }

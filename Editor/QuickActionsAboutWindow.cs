@@ -16,11 +16,13 @@ namespace EminDeniz99.QuickActions.Editor
         private const string Snippet =
 @"using EminDeniz99.QuickActions;
 
-void Awake()
-{
-    // Fires on every tap, including the cold launch that started the app.
-    QuickActions.Performed += id => Debug.Log($""Tapped: {id}"");
-}
+// Subscribe early: the cold-launch tap arrives one frame after startup.
+void Awake() => QuickActions.Performed += OnShortcut;
+// Performed is static and process-wide: never leave a handler behind.
+void OnDestroy() => QuickActions.Performed -= OnShortcut;
+
+// Fires on every tap, including the cold launch that started the app.
+void OnShortcut(string id) => Debug.Log($""Tapped: {id}"");
 
 void Start()
 {

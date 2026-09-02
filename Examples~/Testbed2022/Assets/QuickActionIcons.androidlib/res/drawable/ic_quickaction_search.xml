@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Testbed art, NOT package output. IconType.Search is one of the 25 catalog
+     entries the package ships no built-in for, so this is exactly the drawable
+     README.md tells a consumer to add: named ic_quickaction_<icontype>, so the
+     Java bridge's getIdentifier() lookup finds it, and reached through an
+     .androidlib because Assets/Plugins/Android/res/ has been removed since
+     2021.2. Teal (#00796B), not the built-ins' indigo (#3F51B5), so a screenshot
+     tells consumer art from package art at a glance.
+
+     Same file shape as Editor/Android/QuickActionsBuiltInIcons.cs writes:
+     48dp on a 96 viewport, a white glyph on a coloured disc, because API 26+
+     launchers wrap a legacy shortcut drawable onto a white plate where a bare
+     glyph would vanish. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="96"
+    android:viewportHeight="96">
+  <path
+      android:fillColor="#00796B"
+      android:pathData="M2,48A46,46 0 1,1 94,48A46,46 0 1,1 2,48Z" />
+  <path
+      android:fillColor="#FFFFFF"
+      android:pathData="M22,42A20,20 0 1,1 62,42A20,20 0 1,1 22,42ZM29,42A13,13 0 1,0 55,42A13,13 0 1,0 29,42ZM54,60L60,54L76,70L70,76Z" />
+</vector>

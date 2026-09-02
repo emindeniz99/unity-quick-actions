@@ -65,7 +65,7 @@ adds nothing to a build unless you turn it on in step A3.)
 **Shortcut:** the repo ships a ready-made project for each supported editor line
 under `Examples~/` (`Testbed2021`, `Testbed2022`, `Testbed6`). Clone the repo,
 open the one matching your editor in Unity Hub, and steps A2 and A3 are already
-done for you — jump to A4. See [`Examples~/README.md`](./Examples~/README.md).
+done for you — jump to A4. See [`Examples~/README.md`](https://github.com/emindeniz99/unity-quick-actions/blob/main/Examples~/README.md).
 
 ### A2. Install the package
 **Window ▸ Package Manager ▸ + ▸ Add package from git URL…** and paste:
@@ -198,6 +198,7 @@ Make a **production** build with the define **removed**:
 |---|---|
 | `QuickActions` type not found in your scripts / sample inert | `QUICKACTIONS_ENABLED` define missing (step A3) — add it for that platform |
 | Imported it and nothing happens | Same thing: the package is opt-in by design. Add the define (step A3). |
+| Define is on, but `QuickActions` is still not found | Your script sits in an assembly definition that doesn't reference `EminDeniz99.QuickActions` — add it under the asmdef's *Assembly Definition References* (`Assembly-CSharp` needs nothing). With the define off that reference points at an assembly Unity is not compiling and is dropped, so keep the `#if` guards; see the README quickstart. |
 | Nothing happens in the Editor Play mode | Expected — the OS menu only exists on a device, or on the iOS Simulator (Part B). Use the Quick Actions Simulator window (step A5) to test tap handling in-Editor |
 | Long-press shows no shortcuts | Did you press "Add 3 shortcuts" first? Android < 7.1 (API 25) isn't supported |
 | The package's tests don't show in the Test Runner | Add `"testables": ["com.emindeniz99.quick-actions"]` to your `Packages/manifest.json` |
@@ -205,6 +206,6 @@ Make a **production** build with the define **removed**:
 
 Other docs: [`README.md`](./README.md) (API + install) ·
 [`PRODUCTION_READINESS.md`](./PRODUCTION_READINESS.md) (what's tested, and what
-isn't) · [`CONTRIBUTING.md`](./CONTRIBUTING.md) (building the package from
-source) · [`MAINTAINING.md`](./MAINTAINING.md) (maintainer-only: releasing and
+isn't) · [`CONTRIBUTING.md`](https://github.com/emindeniz99/unity-quick-actions/blob/main/CONTRIBUTING.md) (building the package from
+source) · [`MAINTAINING.md`](https://github.com/emindeniz99/unity-quick-actions/blob/main/MAINTAINING.md) (maintainer-only: releasing and
 distribution).

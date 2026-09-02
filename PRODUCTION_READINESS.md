@@ -11,8 +11,8 @@ physical-device work is done — is the **Status** section of the
 the two must not disagree.
 
 **Legend — Verified by:**
-`unit` = headless NUnit (`dotnet test`, 112 tests) · `unity-test` = Unity Test
-Runner only (JsonUtility) · `static` = compiles in the stub harness (10 configs) ·
+`unit` = headless NUnit (`dotnet test`, 122 tests) · `unity-test` = Unity Test
+Runner only (JsonUtility) · `static` = compiles in the stub harness (11 configs) ·
 `review` = code review, several adversarial rounds (see git log) ·
 `device` = **requires a real physical device** — Android partially done
 (2026-08-07, Moto G Play 2024: static + dynamic shortcuts render, tap delivery
@@ -57,7 +57,7 @@ says "6.3" for work dated later than 2026-07-17, the Editor was `6000.3.21f1`.
 |---|---|---|---|
 | `QuickActionItem` ctor / `IsValid` / equality-by-id | unit + review | `Constructor_SetsFields`, `IsValid_RequiresIdAndTitle`, `Equality_IsByIdOnly` | ✅ |
 | `IconType` pinned 0..29 (native contract) | unit + review | `IconType_EveryValueIsPinned`, `IconType_NoneIsZero…` | ✅ |
-| JSON contract `{"items":[{"Id"…}]}` (exact keys, Icon as int) | unity-test + review + **editor-2022.3 + editor-6.x** | `SerializationTests` (5 tests) — **executed for real on 2022.3, 6.0 and 6.3** (the whole suite was 35/35 at the time; see Sign-off for today's counts) | ✅ |
+| JSON contract `{"items":[{"Id"…}]}` (exact keys, Icon as int) | unity-test + review + **editor-2022.3 + editor-6.x** | `SerializationTests` (6 tests) — **executed for real on 2022.3, 6.0 and 6.3** (the whole suite was 35/35 at the time; see Sign-off for today's counts) | ✅ |
 
 ## 3. Bridges / native (compiled; behavior is device-only, except the iOS path now proven on the Simulator)
 
@@ -76,8 +76,10 @@ says "6.3" for work dated later than 2026-07-17, the Editor was `6000.3.21f1`.
 | Static shortcuts → iOS `Info.plist` (`PBXProject`/`PlistDocument`) | static + review + **editor-6.x iOS Simulator run** | ✅ run for real on 6.3: the baker wrote the static shortcuts into the generated Xcode project's `Info.plist`, and they appear on the Simulator home screen with their SF Symbol icons (alongside one added at runtime through the C# API) |
 | Static-shortcut `{placeholder}` interpolation + build-code hooks (`QuickActionsStaticBuild`: `Customize`, `RegisterPlaceholder`) | unit + static | 17 headless tests pin the engine — escaping, case-insensitivity, unknown-token verbatim, override/custom precedence, per-locale rows, throwing resolvers, the customizer contract, copy-not-mutate on subscriber items — and both bakers consume the prepared list. The resolved strings ride the two bake paths proven above/below; no device build has been run **since** this feature landed. |
 | Static shortcuts → Android `res/xml` + strings + meta-data (escaping, real `applicationId`) | static + review + **editor-2022.3 REAL APK** | ✅ **build-proven 2026-07-17**: 4 static shortcuts (with hostile escaping inputs — embedded `"`, `'`, `&`, `<>`, leading `@`/`?`, `\`, edge whitespace) baked into a real dev APK. `aapt dump`: `res/xml/quickactions_shortcuts.xml` present, each `<shortcut>` intent targets `QuickActionsTrampolineActivity` with action `…PERFORM.<id>` and `targetPackage` = the real `applicationId` from the launcher `build.gradle`; launcher activity has the `android.app.shortcuts` meta-data; every string round-tripped exactly and aapt2 accepted them (a wrong `EscapeResValue` would fail the resource compile). |
-| Built-in Android icons → drawable/ic_quickaction_builtin_{add,compose,favorite,play}.xml | unit + static + CI (aapt2 + shrinker + emulator) | ⏳ **device** — 12 harness tests pin the verbatim write, well-formed vectors, the dynamic-only and no-launcher cases, idempotence, that a project's own `ic_quickaction_*` is never touched wherever it lives, the static `@drawable` reference for the four (and its absence for the rest), `AndroidDrawable` precedence, the opt-out and the define-off sweep's exact reach; the Java smoke pins the lookup order (project's name first, then the built-in); every CI APK is read back with aapt2 for all four on all three lines, with the demo's `new_game` referencing one; the shrink job requires them unchanged through `shrinkResources`; the emulator smoke requires `dumpsys shortcut` to show an icon resource on the registered items. Never seen on a launcher: the README screenshot predates them. |
+| Built-in Android icons → drawable/ + drawable-anydpi-v26/ic_quickaction_builtin_{add,compose,favorite,play}.xml (+ the two adaptive layers each) | unit + static + CI (aapt2 + shrinker + emulator) | ⏳ **device** — 16 harness tests pin the verbatim write of every file into its own res/ bucket, well-formed vectors, the dynamic-only and no-launcher cases, idempotence, that a project's own `ic_quickaction_*` is never touched wherever it lives, the static `@drawable` reference for the four (and its absence for the rest), `AndroidDrawable` precedence, the opt-out and the define-off sweep's exact reach; and, for the API 26+ variant, the qualifier each file lands under, the exact names its `<adaptive-icon>` references (both written), a full-bleed background, and every foreground coordinate inside the 66-of-108 safe zone. The Java smoke pins the lookup order (project's name first, then the built-in); every CI APK is read back with aapt2 for all four names and their eight layers on all three lines, with the demo's `new_game` referencing one; the shrink job requires the export to carry a `-v26` bucket and holds every shipped name unchanged through `shrinkResources`; the emulator smoke requires `dumpsys shortcut` to show an icon resource on the registered items. Never seen on a launcher — neither variant: the README screenshot predates them, and the masked/adaptive rendering is exactly what no automated check here can see. |
 | Icon keep rule → res/raw/quickactions_keep.xml (resource shrinker) | unit + static + CI shrinker run | ✅ **CI** — 8 headless tests pin that it is written on every enabled Android build (zero static shortcuts included), its parsed tools:keep value, idempotence, and that the static-shortcut cleanup leaves it alone; and `android-shrink-verify` runs the real AGP shrinker per push. First verdict 2026-08-29 (run 33): probe `ic_quickaction_probe` 990 → 990 bytes, control `zz_shrink_control` 990 → 67 (AGP's dummy). Control shrunk, probe intact. |
+| Unity 6 incremental Android build keeps every baked output | **CI (unity6 leg builds twice)** | ✅ **CI** — the unity6 `android-build` leg runs the player build a second time over the same project directory and runs the identical aapt2/manifest/dex assertions on the second APK; first measured 2026-09-02 (PR #16): 54,951,386 vs 54,951,670 bytes, all assertions green on both. |
+| Consumer `.androidlib` icons reach the APK (Assets/ and inside a UPM package) | **CI (2022.3 leg)** | ✅ **CI** — Testbed2022 ships a bare `.androidlib` under `Assets/` and one inside an embedded package; `ic_quickaction_search` and `ic_quickaction_frompkg` must be in the resource table and a decoy under `src/main/res/` must not. The first run (2026-09-02) inverted the README recipe — a bare `.androidlib` takes manifest and `res/` at its root — and the docs were corrected from the measurement. |
 | Trampoline `<activity>` injector (`QuickActionsTrampolineInjectorAndroid`, gated) | static + review + **editor-2022.3 REAL APK** + **editor-6.x REAL BUILD** | ✅ **build-proven 2026-07-17**: real Gradle dev build (define ON) → `aapt dump xmltree` shows the trampoline `<activity>` with exported/translucent/taskAffinity=""/excludeFromRecents/noHistory. Since re-proven on the `UnityPlayerActivity` path (2021.3.45f2, 2022.3.62f3) **and** on the Unity 6 `UnityPlayerGameActivity` path (6000.3.21f1). (The injector exists because a real build proved Unity does **not** merge a loose `AndroidManifest.xml` from inside a UPM package — the pre-fix dev APK had no trampoline at all.) |
 | Project Settings ▸ Quick Actions UI (+ asset create, dup-id warning) | static + review | ⏳ **Unity** — Editor GUI |
 | Editor Simulator (warm tap + Play-Mode cold-launch seed, play-session state reset) | unit + static + review + **editor-2022.3 + editor-6.x** (both `Window ▸ Quick Actions ▸ Simulator/About` menus execute on 2022.3, 6.0 and 6.3) | ⏳ interactive Play-Mode flow still manual |
@@ -87,36 +89,40 @@ says "6.3" for work dated later than 2026-07-17, the Editor was `6000.3.21f1`.
 | Aspect | Verified by | Status / gate |
 |---|---|---|
 | Managed: gated asmdefs, define-OFF compiles to nothing | static + review + **editor-2022.3 + editor-6.x REAL BUILDS** | ✅ **build-proven 2026-07-17 on 2022.3, 6.0 and 6.3**: define ON → `EminDeniz99.QuickActions.dll` in the built Standalone player; define OFF → zero package trace in the entire build output (`grep -ri quickactions` = 0 hits) |
-| iOS: `.mm` `#if`-wrapped + macro injector (gated) + ungated cleanup (macro + plist strip when OFF) | static + review | ⏳ **device** — diff a prod Xcode project for `QUICKACTIONS_ENABLED` (expect none, incl. after an Append build via `QuickActionsGateCleanupiOS`) |
-| Android: trampoline `<activity>` absent when OFF (never injected + stripper defense-in-depth) | review + **editor-2022.3 REAL APK** + **2021.3 / 6.3 define-off builds** | ✅ **build-proven 2026-07-17**: real prod Gradle build (define OFF) → `aapt dump xmltree` shows **no** trampoline `<activity>`, **no** `EminDeniz99.QuickActions.dll`, **zero** `quickactions` files in the APK. Re-proven on 2021.3.45f2 and 6000.3.21f1: the same build with the define removed carries no trace of the trampoline. Only the dead trampoline `.java` remains as ~4 unreachable strings in `classes.dex` (documented; needs package exclusion for literally-zero). |
+| iOS: `.mm` `#if`-wrapped + macro injector (gated) + ungated cleanup (macro + plist strip when OFF) | static + review + **CI define-off export** | ✅ **CI** — the `gate-off` job in `unity-ci.yml` exports the 2022.3 testbed for the iOS Simulator with the define OFF on every code push and requires the `.pbxproj` to carry no `QUICKACTIONS_ENABLED` and Info.plist no marked `UIApplicationShortcutItems`, with the define-ON export from the same run as the positive control (the check fails itself if the control does not fire). Not covered: an *Append* build over a stale project (the cleanup path) — hand-run only. |
+| Android: trampoline `<activity>` absent when OFF (never injected + stripper defense-in-depth) | review + **CI define-off APK** + earlier hand-run builds | ✅ **CI** — the same `gate-off` job builds a define-OFF IL2CPP APK in `android-build`'s exact configuration and requires: no trampoline `<activity>` and no `android.app.shortcuts` in the manifest, no `quickactions_*` / `qa_*` / `ic_quickaction_builtin_*` resources, nothing of the package's assembly (image name, namespaces) in the IL2CPP metadata (the define-ON APK is the positive control) — then diffs the two APKs entry by entry (plus the whole-file size), which is the package's **measured footprint**, printed in the job summary and capped at 1 MiB — 144,061 bytes (140.7 KiB) compressed on run 52's APK pair (2022.3, IL2CPP arm64+armv7): two IL2CPP libraries, 31 KiB of metadata, 47 KiB of `libunity.so`, ~10 KB of resources. Hand-proven before CI: real prod Gradle build (define OFF) on 2022.3, re-proven on 2021.3.45f2 and 6000.3.21f1 (2026-07-17). The two plugin `.java` classes (trampoline + bridge, ~20 KB of bytecode) remain in `classes.dex` as dead code unless R8 minifies them — the job counts the dex references on both APKs and the footprint diff reports the bytes (documented, not gated). |
+| Release-configuration player: Managed Stripping Level **High** + R8 `minifyEnabled` | — | ⏳ **not run.** Every CI player build uses the testbed's default stripping level and no R8. The package ships no `link.xml`: its only reflection-reached types are the `[Serializable]` JSON DTOs (`QuickActionList` / `QuickActionItem`), which `JsonUtility` reads without reflection-based stripping risk, and the Java bridge is reached through explicit `AndroidJavaObject` calls, not a proxy — so nothing *should* need preserving. That is reasoning, not a build; a stripping-High + R8 APK that still registers and receives a shortcut is the missing proof. |
 
 ## Sign-off
 
 - **Headless gate (closable without a Unity Editor): GREEN.** `tools~/verify.sh` → **VERIFY: PASS** —
-  10 C# configs compile with **0 warnings**, **98 unit tests pass** (`dotnet test`),
-  the Android plugin compiles and its Java smoke test passes **108 checks, 0
+  11 C# configs compile with **0 warnings**, **122 unit tests pass** (`dotnet test`),
+  the Android plugin compiles and its Java smoke test passes **111 checks, 0
   failed**, and every asset has a stable `.meta`. Every managed feature has a
   dedicated, intent-encoding test. Reviewed feature by feature across repeated
   adversarial rounds; every confirmed finding was fixed or explicitly
   documented, and **no ship-blocker remains open**.
-- **Test inventory (where each number comes from).** 103 distinct C# tests:
-  - **69 shared** — `Tests/Editor/QuickActionsApiTests.cs` (63) and
+- **Test inventory (where each number comes from).** 128 distinct C# tests:
+  - **71 shared** — `Tests/Editor/QuickActionsApiTests.cs` (65) and
     `QuickActionItemTests.cs` (6). Run by BOTH `dotnet test` and the Unity Test
     Runner.
-  - **5 Unity-only** — `Tests/Editor/SerializationTests.cs`. Needs real
+  - **6 Unity-only** — `Tests/Editor/SerializationTests.cs`. Needs real
     `JsonUtility`, so the headless harness excludes it (see the `Compile Include`
     list in `.verify/QuickActions.Tests.csproj`).
-  - **29 headless-only** — `.verify/EditorTests/AndroidStaticLocalizationTests.cs`
-    (4), `AndroidKeepRulesTests.cs` (8) and `StaticBuildPlaceholdersTests.cs`
-    (17). Live in the harness because
+  - **51 headless-only** — `.verify/EditorTests/AndroidStaticLocalizationTests.cs`
+    (4), `AndroidKeepRulesTests.cs` (8), `AndroidBuiltInIconsTests.cs` (16),
+    `BuiltInIconSetTests.cs` (6) and `StaticBuildPlaceholdersTests.cs` (17).
+    Live in the harness because
     the code under test sits in Editor assemblies a Unity test assembly cannot
     reference (the Android post-processor's asmdef is `defineConstraints`-gated
     to `UNITY_ANDROID`; the runtime-referencing test asmdef can't see the Editor
     assembly the placeholder pipeline lives in).
 
-  So `dotnet test` reports **98** (69 + 29) and a Unity Test Runner run reports
-  **74** (69 + 5) — and **74/74 is the measured result** on 2021.3.45f2,
-  2022.3.62f3 and 6000.3.21f1. The `35/35` real-editor runs cited below predate
+  So `dotnet test` reports **122** (71 + 51) and a Unity Test Runner run reports
+  **77** (71 + 6). The measured Test Runner results: **74/74** on 2021.3.45f2,
+  2022.3.62f3 and 6000.3.21f1 at the suite size of that day, and **76/76** on
+  the 2026-09-01 CI run (run 38), taken before the sixth serialization test
+  landed — 77 is not yet a measured number. The `35/35` real-editor runs cited below predate
   every test added from 2026-07-17 onward (cap-reconcile, failed-read/failed-write
   contracts, empty-accepted, and the later waves), so wherever `35/35` appears it
   is a historical measurement, not the current count. The only line not re-run
@@ -148,7 +154,7 @@ says "6.3" for work dated later than 2026-07-17, the Editor was `6000.3.21f1`.
   proven in **real Standalone builds** (define ON → `EminDeniz99.QuickActions.dll`
   present; OFF → zero `quickactions` trace in the whole build tree). This
   confirms no Unity-6 API deprecation breaks the package. (**35/35** is the
-  historical suite size at that date; the suite is 74 in the Test Runner now.)
+  historical suite size at that date; the suite is 77 in the Test Runner now.)
   The 6.x **Android** Gradle pass (GameActivity era) **has since been run**, on
   `6000.3.21f1`: the player builds with the trampoline `<activity>` injected on
   the `UnityPlayerGameActivity` path, and the define-off build carries no trace
@@ -242,7 +248,7 @@ What is left is physical hardware.
    result this check exists to prevent.
 3. On a physical device: cold + warm taps, static + dynamic shortcuts, both
    OSes. The Android half is scripted in
-   [`tools~/device-smoke/`](./tools~/device-smoke/README.md); iOS is manual (no
+   [`tools~/device-smoke/`](https://github.com/emindeniz99/unity-quick-actions/blob/main/tools~/device-smoke/README.md); iOS is manual (no
    adb analog).
 
    **Android, partially closed 2026-08-07** — Moto G Play 2024 (Android 14,

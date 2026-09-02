@@ -133,7 +133,10 @@ Tags are plain semver, one per release; `v0.4.0`, cut 2026-08-07, was the first.
       missing, build it with `tools~/release.sh` and upload it by hand) —
       docs point downloaders at
       <https://github.com/emindeniz99/unity-quick-actions/releases>.
-- [ ] OpenUPM one-time submission: [`docs~/publishing-to-openupm.md`](./docs~/publishing-to-openupm.md).
+- [x] OpenUPM one-time submission — **done**: `com.emindeniz99.quick-actions`
+      0.4.0 through 0.4.9 are listed on OpenUPM (checked 2026-09-01) and every
+      later tag is picked up automatically. Procedure, should it ever need
+      redoing: [`docs~/publishing-to-openupm.md`](./docs~/publishing-to-openupm.md).
 
 ## If something breaks
 

@@ -51,7 +51,12 @@ INCLUDE_DIRS = [
 # ./LICENSE.md link for every customer. Dual distribution is the copyright
 # holder's right; the honest fix is to DISCLOSE it in the store listing
 # rather than hide the file and leave the claim dangling.
-INCLUDE_FILES = ["README.md", "CHANGELOG.md", "LICENSE.md", "ROADMAP.md"]
+INCLUDE_FILES = [
+    "README.md", "CHANGELOG.md", "LICENSE.md", "ROADMAP.md",
+    # The README links to these; without them the classic install had
+    # dangling links (the UPM install carries every root file anyway).
+    "GETTING_STARTED.md", "SECURITY.md", "PRODUCTION_READINESS.md", "AGENTS.md",
+]
 
 
 def guid_of_meta(meta_path):

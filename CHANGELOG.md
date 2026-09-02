@@ -11,6 +11,187 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 > as its own section because each is a distinct, self-contained set of API
 > additions; read them as the package's development log.
 
+## [Unreleased]
+
+### Added
+
+- **The built-in Android icons now ship an API 26+ adaptive variant.** On API 26+
+  AOSP does not draw a legacy shortcut drawable as authored — it wraps it onto a
+  white plate at 0.70 of the viewport, so the built-ins rendered as a small
+  indigo disc inside a white ring, out of place beside their neighbours. Every
+  Android build now also writes
+  `res/drawable-anydpi-v26/ic_quickaction_builtin_<name>.xml`, an
+  `<adaptive-icon>` under the **same resource name**, over two layers of its own
+  (`ic_quickaction_builtin_<name>_background`, full-bleed indigo, and
+  `…_foreground`, the same glyph scaled into the 66-of-108 safe zone so no
+  launcher mask clips it). The plain vector stays for API 25 and the resource
+  qualifier picks between them, so nothing that names an icon changes: the Java
+  lookup, the static `android:icon="@drawable/ic_quickaction_builtin_<name>"`
+  bake, the `ic_quickaction_*` keep rule, the settings opt-out and the define-off
+  sweep all cover the new files unchanged. About 6 KB of XML for all four icons.
+  Not yet seen on a launcher — neither variant.
+- **The `android-smoke` legs now photograph the launcher's long-press sheet.**
+  `dumpsys shortcut` proves each shortcut registered *with* an icon resource;
+  nothing has ever seen that art drawn by a launcher. With `CAPTURE_LONGPRESS=1`,
+  `tools~/device-smoke/android_device_smoke.sh` ends — after its `PASS:`
+  verdict — by going home, opening the app drawer, locating the app's icon by
+  its launcher label in a `uiautomator dump`, long-pressing it, and keeping
+  `longpress.png` plus both hierarchy dumps; CI uploads them per leg as
+  `longpress-<leg>`. It asserts nothing and can fail nothing: the gesture and
+  the sheet belong to whatever launcher the system image ships, so the capture
+  runs with `errexit` off, bounds every `adb` call with `timeout`, prints one
+  grep-able `shortcut sheet visible: yes/no`, and leaves the verdict to the
+  eight steps above it.
+- **The settings page says what an `Icon` does on Android, next to the field.**
+  A property drawer for `IconType` adds one line under the popup: "built-in
+  drawable" for `Add` / `Compose` / `Favorite` / `Play`, or the exact
+  `ic_quickaction_<name>` the project must ship for the other 25 — which used
+  to surface first as a build-log warning. The four names come from a second
+  generated file, `Editor/QuickActionsBuiltInIconSet.cs`, written by the same
+  generator from the same list (the Android assembly holding the art is
+  `UNITY_ANDROID`-only, so the always-present Editor assembly needed its own
+  copy), held to the art by `--check` and by harness tests that also pin the
+  drawer's name derivation to the Java `ICON_NAMES` table member by member,
+  that the note stops promising a drawable when **Write built-in Android
+  icons** is off, and that in the static list it says what the baker needs:
+  a static shortcut bakes no icon for a non-built-in choice unless
+  `AndroidDrawable` names one. The note wraps at narrow inspector widths.
+- **`AGENTS.md`** — the shortest correct integration path for an AI coding
+  agent (or a hurried human): install, define, asmdef reference, the guarded
+  snippet, the checks that prove it worked, and the don'ts. The README gains a
+  60-second quickstart with the same guarded snippet, a contents list, and an
+  embedded-package (vendoring) install option.
+
+### Changed
+
+- **The Unity 6000.6 canary retries an editor that died before the suite
+  ran.** `tests (unity6-latest)` has twice (main run 41, PR #16 run 53) ended
+  with exit 137 at "Begin MonoManager ReloadAssembly" — the editor killed
+  during its own start-up, no test executed — and started fine on the runs
+  between. The job now starts the editor once more when, and only when, the
+  first attempt left no `editmode-results.xml`; an attempt that produced
+  results is final, so a real test failure is never retried, and a verdict
+  step turns the job red unless the last attempt passed.
+- **The custom-asmdef integration shape is compiled by CI in both
+  configurations.** README tells a project whose scripts live in their own
+  assembly definition to reference `EminDeniz99.QuickActions`; with the define
+  off that assembly is not compiled, so whether the referencing assembly still
+  builds was an assertion about Unity, not a measurement. Testbed2022 now
+  carries `Assets/Integration/Testbed.Integration.asmdef`, which references the
+  package and holds the guarded quickstart component; the define-on legs and
+  the define-off `gate-off` build compile it on every push, and the README
+  also describes the gated-glue-asmdef alternative.
+- **The `.androidlib` icon recipe is measured on a real APK — and the
+  measurement corrected it.** README's recipe for a consumer's own Android
+  shortcut icons rested on Unity's documentation and on reading Unity's
+  `com.unity.mobile.notifications`, never on a build. Testbed2022 now carries
+  an `.androidlib` under `Assets/` and one inside an embedded UPM package
+  (`Packages/com.quickactions.testlib/`), and the 2022.3 leg of
+  `android-build` requires their drawables in the APK resource table on every
+  push. The first run proved the documented layout wrong: a bare `.androidlib`
+  (no `build.gradle` of its own) takes `AndroidManifest.xml` and `res/` at its
+  root — the `src/main/` layout the README prescribed, Unity's own package's
+  layout only because that package ships a `build.gradle`, was silently
+  ignored. The recipe, its first "trap" and the keep-file example now say so,
+  and a decoy planted under `src/main/res/` must stay absent from the APK on
+  every push, so the trap is asserted rather than assumed.
+- **The Unity 6 Android leg now builds twice and asserts the second APK.** CI
+  had only ever built a clean Gradle project on a fresh runner, so nothing knew
+  whether the icons, `res/raw/quickactions_keep.xml`, the baked shortcut
+  resources and the trampoline `<activity>` survive an INCREMENTAL build, where
+  Unity reuses the project it staged under `Library/`. The leg runs
+  `unity-builder` a second time over the same project directory
+  (`TestbedBuilder.BuildAndroidPhoneSecond`, same configuration to
+  `Builds/QuickActionsDemo-phone-2.apk`), uploads that APK as
+  `quickactions-demo-apk-unity6-incremental`, and runs the *same* aapt2
+  assertions against it — one function over the leg's APKs rather than a copy
+  per APK. The job summary names which of the two was the incremental one.
+- **The `.unitypackage` carries the docs the README links to.** The classic
+  install now includes `GETTING_STARTED.md`, `SECURITY.md`,
+  `PRODUCTION_READINESS.md` and `AGENTS.md` next to the four root docs it
+  already shipped, so a reader of the packed README no longer hits dangling
+  links. The README's usage example is `#if QUICKACTIONS_ENABLED`-guarded,
+  says where the settings asset lives, and the API table states that a `null`
+  item throws — the one way any call throws.
+- **CI proves the gate and measures the footprint on every push.** A new
+  `gate-off` job builds the 2022.3 testbed with `QUICKACTIONS_ENABLED` off —
+  an IL2CPP APK in `android-build`'s exact configuration and an iOS Simulator
+  export — and asserts the package left nothing behind: no trampoline
+  `<activity>` or shortcuts meta-data in the manifest, no `quickactions_*` /
+  `qa_*` / `ic_quickaction_builtin_*` resources, nothing of the package's
+  assembly in the IL2CPP metadata, no `QUICKACTIONS_ENABLED` macro in the `.pbxproj`, no
+  marked `UIApplicationShortcutItems`. Every negative is paired with a positive
+  control — the define-on artifacts from the same run must trip the same
+  probes, or the check declares itself blind instead of green. The two APKs
+  are then diffed entry by entry, plus the whole-file size: that difference is the package's footprint,
+  printed in the job summary and held under 1 MiB, so an asset or code path
+  that starts shipping turns the job red. `PRODUCTION_READINESS.md`'s two gate
+  rows move from "build-proven once, 2026-07-17" to CI. `TestbedBuilder` gains
+  `BuildAndroidPhoneNoDefine` / `BuildiOSSimulatorNoDefine`, and its
+  `DisableDefine` / `EnableDefine` now flip both mobile targets.
+
+  The first measurement (run 51) read 1,077,821 bytes and failed the ceiling —
+  and the entry-by-entry diff said why: `libunity.so` alone accounted for
+  1.4 MiB uncompressed, because the define-off build had dropped the IMGUI,
+  TextRendering, InputLegacy and both TextCore engine modules. Nothing in the
+  package uses them (its runtime reaches AndroidJNI and JSONSerialize, present
+  in both APKs); the **Demo sample** does, and the Demo wrapped its whole file
+  in `#if QUICKACTIONS_ENABLED`, so with the define off its `MonoBehaviour`
+  vanished from `Assembly-CSharp`, engine-code stripping removed the modules
+  only it used, and their weight was billed to the package. The Demo now keeps
+  its component and IMGUI shell compiled in both configurations and guards
+  only the package calls — the README's own guidance, and what the
+  `Testbed.Integration` component already did — so the same engine modules
+  stay on both sides of the diff. A new harness config, `SampleOff`, compiles
+  that `#else` branch the way a define-off device build does (no define, no
+  Runtime), which no config did before. The Demo's own namespace,
+  `EminDeniz99.QuickActions.DemoSample`, therefore stays in a define-off
+  build's IL2CPP metadata — as any consumer namespace would — and run 52
+  flagged exactly that as a leak, because the metadata probe grepped for the
+  namespace prefix. It now names what only the assembly leaves behind: the
+  image name `EminDeniz99.QuickActions.dll`, the `Internal` namespace and the
+  root namespace's `namespace|Type` strings — 12 lines on the define-on APK,
+  none on the define-off one — and a leak report prints every metadata line
+  mentioning the namespace, probe-matching or not. With the Demo on both
+  sides, run 52's APK pair diffed through the job's own script measures
+  **144,061 bytes (140.7 KiB)** compressed: `libil2cpp.so` +149.7 KiB (arm64)
+  and +122.0 KiB (armv7) uncompressed, `global-metadata.dat` +31.4 KiB,
+  `libunity.so` +27.0 / +19.9 KiB, and about 10 KB of resources — the
+  eighteen files the package writes.
+- **The Demo sample survives a define-off build as a real component.** With
+  `QUICKACTIONS_ENABLED` off, `Samples~/Demo/QuickActionsDemo.cs` used to
+  compile to nothing, so a define-off build of its scene carried a "missing
+  script". The component and its on-screen shell now compile either way; with
+  the define off the buttons report that the package is not compiled instead
+  of calling it. Define-on behaviour is unchanged — the same catalog, log lines
+  and autotest hook the device smoke drives.
+
+### Fixed
+
+- **A hostile local app can no longer crash the game through the trampoline.**
+  `QuickActionsTrampolineActivity` is exported (the launcher has to start it),
+  so any app can start it with arbitrary extras — and reading the action id
+  unparcels the whole bundle, so a `Parcelable` this app cannot load threw
+  `BadParcelableException` out of `onCreate`: a process crash attributed to the
+  game. The read is now contained — a bundle that cannot be read is logged and
+  treated as no tap — and the launch-intent lookup sits inside the existing
+  catch too. A new Java smoke scenario drives the hostile bundle (111 checks).
+- **A failed native read is never mistaken for an empty shortcut set.**
+  `QuickActionList.Parse` returns `null` for a payload the real `JsonUtility`
+  rejects; it used to return an empty list, which the facade treats as
+  authoritative and prunes against, so a serializer failure would have removed
+  the user's real shortcuts on the next write. The Android bridge's
+  `SetShortcuts` propagates that null as a failed write, and the iOS
+  `QABuildShortcutsJson` returns `NULL` instead of `{"items":[]}` when
+  `NSJSONSerialization` fails. A Unity-only test pins the `Parse` contract
+  (the Test Runner suite is 77).
+- **The Android SDK-level read can neither throw out of the facade nor pose
+  as "API < 25".** The `Build.VERSION` JNI read is guarded like every other
+  JNI path in the bridge, read once and cached; a read that fails is kept
+  distinct from an unsupported device — the bridge's read and write members
+  return their failed-read signal (null) for it, so the facade retries instead
+  of adopting an empty set and pruning the user's real shortcuts against it.
+
 ## [0.5.0] - 2026-09-01
 
 ### Added

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The whole manifest an Android Library plug-in needs when it ships resources
+  and no code. Shape taken from Unity's own first-party androidlib
+  (com.unity.mobile.notifications 2.3.2,
+  Runtime/Android/Plugins/mobilenotifications.androidlib/src/main/AndroidManifest.xml),
+  which declares its package exactly this way. That package keeps it under
+  src/main/ because it ships a build.gradle; a BARE androidlib like this one
+  has no build.gradle, and Unity generates the module with the manifest and
+  res/ at the ROOT — the first CI run of this fixture measured exactly that.
+
+  `package` rather than a `namespace` in a build.gradle of our own: Unity
+  2022.3 exports AGP 7.1.2, where the manifest attribute is still the supported
+  way for a library module to name itself. AGP 7.3 deprecates it (a warning)
+  and AGP 8.0 removes it, so this androidlib is deliberately confined to the
+  2022.3 testbed — Testbed6 exports AGP 8.x and would reject it. Unity's own
+  package makes the same split: it keeps package= for the AGP 4.0.1 of 2021.3
+  and sets `namespace` from build.gradle when the running AGP has it.
+
+  No build.gradle here on purpose. README.md's recipe is manifest + res and
+  nothing else, and this androidlib exists to hold that recipe to a real APK;
+  adding a build.gradle would prove a different, easier claim.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.quickactions.testbed.icons" />
