@@ -375,7 +375,8 @@ printf '\nPASS: %s on API %s — %s registered with ShortcutManager; a WARM tap 
 #
 # Everything above is an assertion. This is not one. `dumpsys shortcut` proves
 # each icon resolved to a RESOURCE ID; it says nothing about what a launcher
-# draws, and nobody has ever seen the package's built-in art on a home screen.
+# draws, and until PR #18 run 61 (API 30, 2026-09-02) nothing had ever seen the
+# package's built-in art drawn by a launcher.
 # So, once the verdict is printed, optionally drive the launcher — home, open
 # the app drawer, long-press the app's icon, screencap — and keep the picture.
 #
@@ -404,11 +405,18 @@ printf '\nPASS: %s on API %s — %s registered with ShortcutManager; a WARM tap 
 # all three Examples~ testbeds. For any other APK, read it out of
 # `aapt2 dump badging <apk>` (application-label) and pass it in.
 CAPTURE_LABEL="${CAPTURE_LABEL:-QuickActionsDemo}"
-# The TITLES (not ids) the sheet should list, '|'-separated because they contain
-# spaces. These are the three the smoke's AUTOTEST=add3 publishes, from the demo
-# Catalog in Samples~/Demo/QuickActionsDemo.cs — the same three titles the
-# testbeds' QuickActionsSettings.asset bakes statically.
-CAPTURE_TITLES="${CAPTURE_TITLES:-New Game|Continue|Daily Reward}"
+# The labels the sheet should list, as '|'-separated TITLE=SUBTITLE pairs (not
+# ids; '|' because they contain spaces). Either half counts: Launcher3 draws the
+# LONG label — the package's Subtitle — when it fits the popup and the short one
+# otherwise, and the first sheet ever photographed here (API 30, run 61) read
+# "Start a fresh run", not "New Game". These are the three the testbeds'
+# QuickActionsSettings.asset bakes statically; the smoke's AUTOTEST=add3 re-adds
+# new_game and continue under the same ids (dropped as duplicates) and a dynamic
+# `daily`, which the sheet lists as a fourth row.
+# (The default lives in its own variable: an apostrophe inside "${…:-…}" is a
+# quote to bash's parser and swallows the rest of the file.)
+default_titles="New Game=Start a fresh run|Continue=Resume your save|Daily Reward=Claim today's gift"
+CAPTURE_TITLES="${CAPTURE_TITLES:-$default_titles}"
 CAPTURE_TIMEOUT="${CAPTURE_TIMEOUT:-60}"
 CAPTURE_PRESS_MS="${CAPTURE_PRESS_MS:-1500}"
 
@@ -494,7 +502,9 @@ needs, so the shell never has to parse XML. Three modes:
   icon <label>       -> "<centre-x> <centre-y>" of the smallest node whose
                         text/content-desc is that app label; exit 5 when the
                         only match is a launcher prediction of the app
-  labels <title>...  -> one "<title>: yes|no" line each; exit 0 if all were
+  labels <title[=subtitle]>...
+                     -> one "<title>: yes|no" line each, either form counting
+                        (the launcher draws whichever fits); exit 0 if all were
                         found, 4 if some, 3 if none
 """
 import re
@@ -595,12 +605,26 @@ def main(argv):
         return 0
 
     if mode == "labels":
+        # Each entry is "Title=Subtitle" (more '='-separated forms are fine).
+        # Launcher3 draws the LONG label — the package's Subtitle — when it
+        # fits the popup and the short one otherwise: the first sheet ever
+        # photographed here (API 30, run 61) read "Start a fresh run", not
+        # "New Game", and this mode called it a miss. Either form counts.
         wanted = argv[2:]
         seen = [t for node in read_nodes(data) for t in labels_of(node)]
-        found = [w for w in wanted if any(w == t or w in t for t in seen)]
-        for title in wanted:
-            print("%s: %s" % (title, "yes" if title in found else "no"))
-        if len(found) == len(wanted):
+        found = 0
+        for entry in wanted:
+            forms = [f for f in entry.split("=") if f] or [entry]
+            shown = next((f for f in forms
+                          if any(f == t or f in t for t in seen)), None)
+            if shown is None:
+                print("%s: no" % forms[0])
+            elif shown == forms[0]:
+                print("%s: yes" % forms[0])
+            else:
+                print('%s: yes (shown as "%s")' % (forms[0], shown))
+            found += shown is not None
+        if found == len(wanted):
             return 0
         return 4 if found else 3
 
@@ -720,11 +744,13 @@ PY
     echo "capture: screencap or pull failed — no screenshot this run."
   fi
 
-  # 5. The half a machine can read: are the shortcut TITLES on screen? This is
-  #    the only line of the capture worth grepping for, and it is evidence
-  #    about the LAUNCHER — step 5 of the smoke already proved the icons
-  #    resolved.
-  if [ -n "$xy" ] && cap_dump_ui "$dir/ui-longpress.xml"; then
+  # 5. The half a machine can read: are the shortcut LABELS on screen — title
+  #    or subtitle, whichever the launcher drew? This is the only line of the
+  #    capture worth grepping for, and it is evidence about the LAUNCHER —
+  #    step 5 of the smoke already proved the icons resolved.
+  if [ -z "$xy" ]; then
+    echo "shortcut sheet visible: no (nothing was pressed — no icon was found)"
+  elif cap_dump_ui "$dir/ui-longpress.xml"; then
     out="$(python3 "$py" labels "${titles[@]}" <"$dir/ui-longpress.xml")"
     rc=$?
     case "$rc" in
