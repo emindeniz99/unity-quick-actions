@@ -1716,17 +1716,27 @@ jobs:
           scan() {
             local apk="$1" hits=""
             local res manifest meta
-            res="$("$AAPT2" dump resources "$apk")" || { echo "aapt2 could not read $apk"; exit 1; }
+            # Diagnostics go to stderr: stdout is the hit list the caller captures.
+            res="$("$AAPT2" dump resources "$apk")" || { echo "aapt2 could not read $apk" >&2; exit 1; }
             for name in quickactions_shortcuts quickactions_keep quickactions_strings qa_short_ qa_long_ ic_quickaction_builtin_; do
               case "$res" in *"$name"*) hits="$hits res:$name" ;; esac
             done
-            manifest="$("$AAPT2" dump xmltree --file AndroidManifest.xml "$apk" 2>&1)" || { echo "aapt2 could not dump the manifest of $apk"; exit 1; }
+            manifest="$("$AAPT2" dump xmltree --file AndroidManifest.xml "$apk" 2>&1)" || { echo "aapt2 could not dump the manifest of $apk" >&2; exit 1; }
             for name in QuickActionsTrampolineActivity android.app.shortcuts; do
               case "$manifest" in *"$name"*) hits="$hits manifest:$name" ;; esac
             done
             # IL2CPP keeps assembly and type names in global-metadata.dat; the
             # gated runtime assembly is not compiled at all with the define off.
-            meta="$(unzip -p "$apk" assets/bin/Data/Managed/Metadata/global-metadata.dat 2>/dev/null | strings -a | grep -c 'EminDeniz99.QuickActions' || true)"
+            # Extract first and fail LOUDLY if the file is not there: an APK
+            # without it is an APK this probe cannot see into, and "0 hits"
+            # would read as a clean gate. Only grep's no-match is ignorable.
+            local metadata
+            metadata="$(mktemp)"
+            unzip -p "$apk" assets/bin/Data/Managed/Metadata/global-metadata.dat >"$metadata" \
+              || { echo "could not extract global-metadata.dat from $apk — no IL2CPP metadata, the probe cannot run" >&2; exit 1; }
+            [ -s "$metadata" ] || { echo "global-metadata.dat came out empty from $apk" >&2; exit 1; }
+            meta="$(strings -a "$metadata" | grep -c 'EminDeniz99.QuickActions' || true)"
+            rm -f "$metadata"
             [ "${meta:-0}" -gt 0 ] && hits="$hits metadata:EminDeniz99.QuickActions(x$meta)"
             printf '%s' "$hits"
           }
