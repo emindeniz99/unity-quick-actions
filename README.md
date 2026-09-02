@@ -543,8 +543,8 @@ plug-in** anywhere under `Assets/` (Unity's supported mechanism on 2021.3,
 
 ```
 Assets/QuickActionIcons.androidlib/
-  src/main/AndroidManifest.xml     <manifest package="com.yourcompany.qaicons"/>
-  src/main/res/drawable-xhdpi/ic_quickaction_search.png
+  AndroidManifest.xml              <manifest package="com.yourcompany.qaicons"/>
+  res/drawable-xhdpi/ic_quickaction_search.png
 ```
 
 Then either name the drawable `ic_quickaction_<icontype>` so `Icon` finds it, or
@@ -569,8 +569,16 @@ ship your own. A define-off production build carries none of this either way.
 
 Three traps worth knowing:
 
-- The resources must sit under **`src/main/res/`**. A `res/` folder at the
-  `.androidlib` root is silently ignored — green build, no warning, no icon.
+- Manifest and resources sit at the **root** of a bare `.androidlib` — one
+  with no `build.gradle` of its own — because that is the module layout Unity
+  generates for it. The Gradle-module layout, `src/main/res/`, is **silently
+  ignored** there: green build, no warning, no icon. It works only when the
+  `.androidlib` ships its own `build.gradle`, which is how Unity's
+  `com.unity.mobile.notifications` gets away with it. The first version of
+  this recipe said the opposite; the `android-build` job's 2022.3 leg measured
+  it — a drawable under `src/main/res/` never reached the APK, one under `res/`
+  did — and now plants a decoy under `src/main/res/` that must stay absent on
+  every push.
 - **Do not** use `Assets/Plugins/Android/res/`. Unity **removed** that path in
   2021.2, below this package's floor, and it now fails the build outright
   rather than being ignored.
@@ -896,7 +904,7 @@ retain it. Either:
   covers it; or
 - ship your own keep rule inside your `.androidlib` (see
   [Android icons](#android-icons)) —
-  `src/main/res/raw/myapp_keep.xml`:
+  `res/raw/myapp_keep.xml` (at the `.androidlib` root, next to its manifest):
 
   ```xml
   <?xml version="1.0" encoding="utf-8"?>

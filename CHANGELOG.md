@@ -73,21 +73,20 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   package and holds the guarded quickstart component; the define-on legs and
   the define-off `gate-off` build compile it on every push, and the README
   also describes the gated-glue-asmdef alternative.
-- **The `.androidlib` icon recipe is proven on a real APK, not just documented.**
-  README's recipe for a consumer's own Android shortcut icons rested on Unity's
-  documentation and on reading Unity's `com.unity.mobile.notifications`, never on
-  a build. Testbed2022 now carries both shapes: an `.androidlib` under `Assets/`
-  and one inside an embedded UPM package (`Packages/com.quickactions.testlib/`,
-  laid out and `.meta`-ed exactly as Unity's own package lays its out). The
-  2022.3 leg of `android-build` now requires `ic_quickaction_search` and
-  `ic_quickaction_frompkg` in the APK resource table on every push — so both
-  delivery paths, `Assets/` and a package, are asserted rather than assumed.
-- **And the trap under it is asserted too.** A decoy drawable sits at
-  `res/drawable/` at the `.androidlib` *root*, the layout README documents as
-  silently dropped, and the same step requires `ic_quickaction_decoy` to be
-  ABSENT. Without that assertion a green run would describe equally well a
-  README trap that was never real. The four built-in icons the step already
-  reads are its positive control, and fail first.
+- **The `.androidlib` icon recipe is measured on a real APK — and the
+  measurement corrected it.** README's recipe for a consumer's own Android
+  shortcut icons rested on Unity's documentation and on reading Unity's
+  `com.unity.mobile.notifications`, never on a build. Testbed2022 now carries
+  an `.androidlib` under `Assets/` and one inside an embedded UPM package
+  (`Packages/com.quickactions.testlib/`), and the 2022.3 leg of
+  `android-build` requires their drawables in the APK resource table on every
+  push. The first run proved the documented layout wrong: a bare `.androidlib`
+  (no `build.gradle` of its own) takes `AndroidManifest.xml` and `res/` at its
+  root — the `src/main/` layout the README prescribed, Unity's own package's
+  layout only because that package ships a `build.gradle`, was silently
+  ignored. The recipe, its first "trap" and the keep-file example now say so,
+  and a decoy planted under `src/main/res/` must stay absent from the APK on
+  every push, so the trap is asserted rather than assumed.
 - **The Unity 6 Android leg now builds twice and asserts the second APK.** CI
   had only ever built a clean Gradle project on a fresh runner, so nothing knew
   whether the icons, `res/raw/quickactions_keep.xml`, the baked shortcut

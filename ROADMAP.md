@@ -3,37 +3,6 @@
 Follow-ups discussed but not shipped. Delete an entry in the same commit that
 ships it.
 
-- **Verify the `.androidlib` icon recipe on a real build.** The README's
-  recipe for a consumer's own icons — an `.androidlib` under `Assets/` — rests
-  on Unity documentation and on reading Unity's first-party notifications
-  package, **not** on a build we ran. (The built-in icons take a different
-  path: the post-processor writes them straight into `unityLibrary/src/main/res/`,
-  which CI reads back out of a real APK on every push, so that path needs no
-  entry here.) The APK proof was attempted and could not run: the Unity
-  editors live on `/Volumes/T7Data`, which was unmounted. Confirm on 2022.3:
-  (a) a `.androidlib` under `Assets/` lands its `src/main/res/drawable-*/`
-  entries in the APK resource table (`aapt2 dump resources <apk> | grep -i
-  quickaction`); (b) `res/` at the `.androidlib` root is silently dropped, as
-  the docs imply; (d) a `.androidlib` shipped *inside a UPM package* is picked
-  up — Unity's own `com.unity.mobile.notifications` ships
-  `Runtime/Android/Plugins/mobilenotifications.androidlib/` with a committed
-  `.meta` and depends on exactly this, so the mechanism is established by
-  precedent even though no Unity manual page documents it; what remains is
-  only seeing it on a build of ours. (Confirmed on reading that package while
-  designing 0.5.0: Unity copies an `.androidlib` to
-  `unityLibrary/<Name>.androidlib/`, nested, not to the Gradle root.)
-
-  The old item (c) — does the resource shrinker honour the shipped
-  `res/raw/quickactions_keep.xml` — is **answered, and stays answered**: the
-  `android-shrink-verify` job in
-  [`unity-ci.yml`](https://github.com/emindeniz99/unity-quick-actions/blob/main/.github/workflows/unity-ci.yml) re-runs the experiment on
-  every code push. On 2026-08-29 it reported, on a real minified release
-  resource pipeline (AGP, `minifyEnabled` + `shrinkResources`, Unity 2022.3
-  export): the keep-globbed probe `ic_quickaction_probe` went in at 990 bytes
-  and came out at 990, while the unreferenced control `zz_shrink_control` went
-  from 990 to AGP's 67-byte dummy. The control proves the shrinker ran; the
-  probe proves the keep rule held. (a), (b) and (d) still need a hand-run editor.
-
 - **`.androidlib` does not survive `.unitypackage` export/import** (reported
   against 2022.3.15, re-confirmed 2024, unfixed). This is why the built-in icons
   must be written by the build post-processor rather than shipped as a
@@ -59,7 +28,7 @@ ships it.
   the tree), but the port itself is not done.
 - **Teaching sample for custom Android icons (small, optional).** A
   `Samples~/AndroidIcons/` containing a ready-made `QuickActionIcons.androidlib`
-  (correct `src/main/AndroidManifest.xml` + `src/main/res/drawable-xhdpi/`)
+  (correct root-level `AndroidManifest.xml` + `res/drawable-xhdpi/`)
   would let a user import a *working* example rather than follow a five-step
   written recipe. Imports to `Assets/Samples/<pkg>/<version>/…`, which is under
   `Assets/`, so it would be picked up with no further action. Caveats: nobody
