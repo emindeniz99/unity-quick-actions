@@ -11,35 +11,32 @@ ships it.
   OpenUPM/Git and silently vanish for Asset Store users. Re-check whether Unity
   has fixed this before choosing any design that depends on it.
 
-- **Emulator screenshot of the built-in icons — the gesture, not the capture,
-  is what is missing.** The smoke legs now end with a best-effort long-press
-  capture (`CAPTURE_LONGPRESS=1` in `tools~/device-smoke/android_device_smoke.sh`)
-  and upload `longpress-<leg>` (screenshot plus two `uiautomator` dumps) on
-  every push. The first run (2026-09-02) showed why it was flagged flaky: on
-  the API 30 default launcher the swipe never opens the app drawer, so the icon
-  is not found; on the API 35 Pixel launcher the icon IS found (in the
-  predicted-apps dock) and pressed, but `input swipe x y x y 1500` produced no
-  shortcut sheet — the hierarchy after the press is identical to the one
-  before. The second attempt (2026-09-02, run 56) pressed for real — `input
-  motionevent DOWN`, hold, screencap and hierarchy dump while still down,
-  then `UP` — and escalated through `KEYCODE_ALL_APPS`, a tap on the
-  launcher's own "Apps list" handle and the `ALL_APPS` intent when the swipe
-  surfaced nothing. On API 30 none of the three opened the drawer (the
-  hierarchy stayed the home screen every time). On API 35 the press landed
-  on the icon it had found — but that icon was the hotseat's *prediction*
-  of the app (`Predicted app: QuickActionsDemo`), and the Pixel launcher
-  answers a long press there with its "App suggestions added to empty
-  space / Settings" sheet, never the app's shortcut popup: the screenshot
-  shows exactly that sheet. Third attempt, in the script: a match that is
-  only a launcher prediction counts as a miss, so the drawer escalation
-  runs and tries to find, and then press, a real icon. Its first run
-  (2026-09-02, PR #18 run 60) recognised the prediction and escalated — and
-  none of the three openers moved the API 35 launcher off its home screen
-  either, so on both images the open question is the same: how to open this
-  Pixel launcher's drawer from `adb` at all. Not yet tried: a swipe that
-  starts above the gesture-navigation band, `KEYCODE_APP_SWITCH`, or the
-  launcher's all-apps activity by component name. The verdict never depends
-  on it.
+- **Emulator screenshot of the built-in icons — photographed once, on API 30;
+  the API 35 drawer is still the gap.** The smoke legs end with a best-effort
+  long-press capture (`CAPTURE_LONGPRESS=1` in
+  `tools~/device-smoke/android_device_smoke.sh`) and upload `longpress-<leg>`
+  (screenshot plus two `uiautomator` dumps) on every push. Three attempts on
+  2026-09-02 got the gesture right a piece at a time: a real press (`input
+  motionevent` DOWN, hold, capture, UP) instead of a swipe that never moves;
+  escalation through `KEYCODE_ALL_APPS`, the launcher's "Apps list" handle and
+  the `ALL_APPS` intent when the swipe surfaces nothing; and counting the
+  hotseat's *prediction* of the app (`Predicted app: …`, whose long press
+  opens the launcher's "App suggestions" sheet) as a miss. On the run after
+  that (PR #18 run 61) the API 30 swipe opened the drawer — the same swipe had
+  left the launcher on its home screen on every earlier run — the press
+  landed on the real icon, and `longpress-2022.3` holds the first photograph
+  of the app's popup: the three static entries and the runtime-added `daily`,
+  drawn with their long labels, with the built-in `add` and `favorite` art on
+  two of the rows (white glyph on the blue background, masked round by the
+  launcher — the `-v26` adaptive variant, which is what API 30 resolves). The
+  script's own `shortcut sheet visible` line said `no` on that run because it
+  matched the titles while the launcher drew the subtitles; it now accepts
+  either. Still open: the API 35 Pixel launcher has never left its home screen
+  for any opener (not yet tried: a swipe that starts above the
+  gesture-navigation band, `KEYCODE_APP_SWITCH`, the launcher's all-apps
+  activity by component name), and on API 30 the swipe has opened the drawer
+  once in four runs, so the capture is a photograph when it lands, never a
+  check. The verdict does not depend on it.
 - **Port the Android post-processor to `AndroidProjectFilesModifier` (Unity 6).**
   Unity's own notifications package moved to it "for better compatibility with
   incremental build"; the built-ins' distinct-name design was chosen so that

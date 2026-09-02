@@ -53,8 +53,17 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   the launcher off the home screen. A predicted-app match now counts as a
   miss, so the drawer escalation runs and tries to find, and then press, a
   real icon. Its first run recognised the prediction and escalated, and no
-  opener moved the API 35 launcher off its home screen either; the ROADMAP
-  entry records what to try next.
+  opener moved the API 35 launcher off its home screen either. On the run
+  after that (61) the API 30 swipe opened the drawer for the first time, the
+  press landed on the real icon, and `longpress-2022.3` holds the first
+  photograph of the popup: the three static entries and the runtime-added
+  `daily`, with the built-in `add` and `favorite` art drawn on two of the rows.
+  The verdict line said `no` on that run — it matched the titles while
+  Launcher3 draws the long label (the `Subtitle`) when it fits — so
+  `CAPTURE_TITLES` entries are now `Title=Subtitle` pairs, either form counts,
+  and when nothing was pressed the line says so instead of blaming the
+  hierarchy. The API 35 drawer stays open; the ROADMAP entry records what to
+  try next.
 - **The settings page says what an `Icon` does on Android, next to the field.**
   A property drawer for `IconType` adds one line under the popup: "built-in
   drawable" for `Add` / `Compose` / `Favorite` / `Play`, or the exact
