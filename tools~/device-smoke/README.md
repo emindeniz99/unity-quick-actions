@@ -115,9 +115,16 @@ It does **not** prove:
 Everything above is an assertion. This is not: with `CAPTURE_LONGPRESS=1` in the
 environment, the script's last act — *after* the `PASS:` line — is to drive the
 launcher and photograph the long-press sheet. Home, swipe up to open the app
-drawer, find the app's icon by its label in a `uiautomator dump`, long-press it
-(a `input swipe` that never moves), `screencap`, and dump the hierarchy again to
-see whether the shortcut titles are on screen. Into `CAPTURE_DIR`:
+drawer, find the app's icon by its label in a `uiautomator dump` — and when the
+swipe surfaces nothing (the Pixel launcher on the API 30 image ignores it),
+escalate: the `KEYCODE_ALL_APPS` key, a tap on the launcher's own drawer handle
+if the hierarchy shows one ("Apps list" there), then the `ALL_APPS` intent, each
+followed by a fresh search. Then a real long press — `input motionevent DOWN`,
+hold, and `UP` only after the capture (the swipe-that-never-moves the first run
+used reached the API 35 Pixel launcher as a gesture and opened nothing); where
+`motionevent` is rejected the swipe form is the fallback and the log says so.
+`screencap` and the second hierarchy dump happen with the finger still down, so
+a sheet that dismisses on release is captured all the same. Into `CAPTURE_DIR`:
 `longpress.png`, `ui-drawer.xml`, `ui-longpress.xml`. The log carries the
 launcher it resolved, the coordinates it pressed, and one grep-able verdict —
 `shortcut sheet visible: yes` / `partial` / `no`.

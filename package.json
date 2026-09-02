@@ -30,6 +30,11 @@
       "displayName": "Demo",
       "description": "On-screen IMGUI demo: add/remove shortcuts at runtime and watch the performed-action log.",
       "path": "Samples~/Demo"
+    },
+    {
+      "displayName": "Android icons",
+      "description": "A ready-made QuickActionIcons.androidlib — the custom-Android-icon recipe as a working plug-in you can build. UPM installs only; .androidlib does not survive a .unitypackage.",
+      "path": "Samples~/AndroidIcons"
     }
   ],
   "files": [

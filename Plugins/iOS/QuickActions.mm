@@ -11,15 +11,18 @@
 // A host app that adopts the UIScene lifecycle gets both taps routed to its SCENE
 // delegate instead (cold in scene:willConnectToSession:options:, warm in
 // windowScene:performActionForShortcutItem:completionHandler:), so we learn that
-// delegate class at runtime — from the UISceneConfiguration the host hands back —
-// and install the same two hooks there. Only an app that declares a scene manifest
-// can adopt that lifecycle, and we add the configuration hook only in one — a default
-// Unity project keeps the exact app-delegate launch path it had without this package.
+// delegate class at runtime — from the UISceneConfiguration for the CONNECTING
+// SESSION, which is the manifest entry UIKit resolves or whatever configuration a host
+// implementation of the selector returns — and install the same two hooks there. Only
+// an app that declares a scene manifest can adopt that lifecycle, and we add the
+// configuration hook only in one — a default Unity project keeps the exact app-delegate
+// launch path it had without this package.
 // A host UnityAppController SUBCLASS that owns the configuration selector shadows that
 // hook, so a UISceneWillConnectNotification observer installs the same hooks from the
-// live scene's delegate as a fallback — covering warm taps and every later connection,
-// but NOT necessarily the first cold tap of such an install (see
-// QAInstallSceneHooksFromScene for why, and for the one-line host-side fix).
+// connecting scene's own configuration as a fallback — covering warm taps and every
+// later connection, but NOT necessarily the first cold tap of such an install, and only
+// for a scene we can tell is Unity's (see QAInstallSceneHooksFromScene for why, for the
+// scenes it deliberately ignores, and for the one-line host-side fix).
 // Both paths enqueue; C# drains the queue on first frame and on focus gain.
 // performActionForShortcutItem runs before applicationDidBecomeActive, so the
 // focus poll reliably catches a warm tap. No UnitySendMessage needed. A cold tap
@@ -29,6 +32,7 @@
 
 #import <UIKit/UIKit.h>
 #import <objc/runtime.h>
+#import <stdio.h>
 #import <string.h>
 
 // Unity compiles plugin .mm with ARC. The static NSString assignments below rely
@@ -245,6 +249,18 @@ static BOOL QADidFinishLaunching(id self, SEL _cmd, UIApplication *application, 
         QAStorePerformedCold(launchItem.type);
     }
 
+    // _cmd is forwarded VERBATIM here and at every other chain site in this file, on
+    // purpose. We install with class_replaceMethod / class_addMethod — a direct
+    // override, never method_exchangeImplementations — so under ordinary dispatch _cmd
+    // IS the selector the captured IMP was installed for, which is exactly what the
+    // callee expects. When an exchange-based swizzler upstream enters us under a
+    // renamed selector (OneSignal's oneSignalApplication:didFinishLaunchingWithOptions:,
+    // Firebase C++'s randomized selector), neither value is authoritative: the canonical
+    // selector no longer resolves to the IMP we hold, so hardcoding it would name an
+    // implementation that is not the one being entered, while _cmd at least names the
+    // message actually sent. None of the captured originals — Unity's own
+    // didFinishLaunching, the scene callbacks — branches on _cmd. Do not "simplify"
+    // this to a hardcoded @selector without re-reading that.
     BOOL result = YES;
     if (gQAOrigDidFinishLaunching != NULL) {
         result = gQAOrigDidFinishLaunching(self, _cmd, application, launchOptions);
@@ -305,6 +321,16 @@ static void QAPerformActionForShortcutItem(id self, SEL _cmd, UIApplication *app
     // existing warm-tap handler still runs — mirrors the didFinish path. Complete
     // ourselves only when we are the terminal handler (no prior implementation AND
     // nobody wrapped us) — anything else risks a double completionHandler call.
+    // The rule this states, deliberately, is "AT MOST once, never twice". In the one
+    // state where we are wrapped AND had no original below us, nobody here calls the
+    // handler: a wrapper for a handler-bearing selector may pass ours down and let the
+    // chain complete, or substitute its own and complete from that (GoogleUtilities'
+    // GULAppDelegateSwizzler ships both shapes in one file), and from in here we cannot
+    // tell which. An unreported success BOOL is inert — Apple documents no watchdog on
+    // this handler, and the tap is already queued above — while a double-invoked UIKit
+    // block is undefined behaviour. WHAT A WRAPPER MUST DO: chain to the IMP it
+    // captured, then either complete exactly once itself or leave completion to the
+    // chain — never both.
     if (gQAOrigPerformAction != NULL) {
         gQAOrigPerformAction(self, _cmd, application, shortcutItem, completionHandler);
     } else if (terminal && completionHandler != nil) {
@@ -323,6 +349,13 @@ static void QAPerformActionForShortcutItem(id self, SEL _cmd, UIApplication *app
 static void (*gQAOrigSceneWillConnect)(id, SEL, id, id, id) = NULL;
 static void (*gQAOrigScenePerformAction)(id, SEL, id, id, void (^)(BOOL)) = NULL;
 static id (*gQAOrigSceneConfiguration)(id, SEL, id, id, id) = NULL;
+// YES when the scene hooks were installed from the UISceneWillConnectNotification
+// fallback onto a class we could NOT confirm is Unity's own scene delegate — i.e. no
+// UnityScene class exists in this process, so the scene manifest was authored by a host
+// rather than by Unity's trampoline. There we are demonstrably not the app's only
+// quick-action consumer, so the unmarked best-effort adoption below stays off. Written
+// once, on the main thread, before any hook it gates can fire.
+static BOOL gQASceneOwnerUnconfirmed = NO;
 
 // COLD tap under the scene lifecycle: the item rides in the connection options
 // instead of launchOptions.
@@ -362,23 +395,34 @@ static void QAScenePerformActionForShortcutItem(id self, SEL _cmd, UIWindowScene
         terminal = current != NULL &&
                    method_getImplementation(current) == (IMP)QAScenePerformActionForShortcutItem;
     }
+    BOOL adopted = NO;
     if (QAIsOurShortcut(shortcutItem)) {
         // Ours, wrapped or terminal: record it — deduped against a cold tap of the same
         // id that the connecting scene already queued this launch.
         QAStorePerformedWarm(shortcutItem.type);
-    } else if (terminal) {
+        adopted = YES;
+    } else if (terminal && !gQASceneOwnerUnconfirmed) {
         // Unmarked item and we are the ONLY handler — same rule as the app-delegate
         // hook: dropping it while completing YES below would black-hole the tap, so
         // deliver it best-effort through our channel as the only consumer.
+        // NOT when gQASceneOwnerUnconfirmed: there we added this selector to a scene
+        // delegate class we could not confirm is Unity's own (see
+        // QAInstallSceneHooksFromScene), so "the only consumer" is precisely what we are
+        // not — that scene belongs to a host and its unmarked items are the host's.
         QAStorePerformedWarm(shortcutItem.type);
+        adopted = YES;
     }
     // Chain when the class already handled this selector and let that implementation
     // own the completion handler; complete ourselves only when we are terminal, so the
-    // handler is called exactly once on every path we own.
+    // handler is called at most once on every path we own (the app-delegate twin above
+    // spells out why "at most", and what a wrapper owes us). Report `adopted` rather
+    // than a flat YES: NO for an unmarked item on an unconfirmed host scene is the
+    // honest "we did not perform this action", and it is what UIKit would have seen had
+    // we never added the selector to that class.
     if (gQAOrigScenePerformAction != NULL) {
         gQAOrigScenePerformAction(self, _cmd, windowScene, shortcutItem, completionHandler);
     } else if (terminal && completionHandler != nil) {
-        completionHandler(YES);
+        completionHandler(adopted);
     }
 }
 
@@ -391,10 +435,12 @@ static void QAScenePerformActionForShortcutItem(id self, SEL _cmd, UIWindowScene
 // scene-delegate classes gets scene coverage for that one. Main thread only (UIKit
 // asks for the configuration there, and UISceneWillConnectNotification is posted
 // there), which is what makes the static flag enough.
+// Returns YES only for the call that actually installed, so the notification fallback
+// can record HOW the class was learned. `via` names that path for the log line.
 API_AVAILABLE(ios(13.0))
-static void QAInstallSceneHooks(Class delegateClass) {
+static BOOL QAInstallSceneHooks(Class delegateClass, const char *via) {
     static BOOL installed = NO;
-    if (installed || delegateClass == Nil) return;
+    if (installed || delegateClass == Nil) return NO;
     installed = YES;
 
     // Cold: scene:willConnectToSession:options: (the Apple scene template implements
@@ -424,7 +470,18 @@ static void QAInstallSceneHooks(Class delegateClass) {
         class_addMethod(delegateClass, performSel, (IMP)QAScenePerformActionForShortcutItem,
                         "v@:@@@?");
     }
+
+    // Always on, one line per process launch: which class we bound to, and by which of
+    // the two routes. Under the scene lifecycle this is the difference between a working
+    // install and a silently inert one, and an adopter integrating the package into an
+    // existing native stack has no other way to see it. See +load for the companion line.
+    NSLog(@"[QuickActions] iOS scene hooks installed on %@ via %s",
+          NSStringFromClass(delegateClass), via);
+    return YES;
 }
+
+API_AVAILABLE(ios(13.0))
+static void QAInstallSceneHooksScoped(Class declared, const char *via);
 
 // Wrapped purely to LEARN the scene-delegate class; the configuration is returned
 // untouched, so the host's scene is built exactly as it would have been.
@@ -438,17 +495,70 @@ static UISceneConfiguration *QAConfigurationForConnectingSceneSession(
             gQAOrigSceneConfiguration(self, _cmd, application, connectingSceneSession, options);
     } else {
         // Nobody implemented the selector and we added it (only ever in an app that
-        // declares a scene manifest — see +load), so reproduce UIKit's own default
-        // instead of inventing a configuration: a nil name resolves to the first scene
-        // configuration in that manifest for this role, which is exactly what UIKit
-        // would have used had this method stayed absent.
+        // declares a scene manifest — see +load), so let UIKit resolve that manifest for
+        // us instead of hand-building a configuration. The initializer performs the
+        // lookup itself; UIKit's own SDK header documents it, with wording unchanged
+        // from iPhoneOS13.0.sdk through iPhoneOS26.0.sdk
+        // (UIKit.framework/Headers/UISceneConfiguration.h):
+        //   "Creates a UISceneConfiguration instance from your Info.plist using the name
+        //    and session role provided. If nil is provided for the name, the first
+        //    matching instance of the provided session role is used. If no matching name
+        //    is found, or no descriptions of the provided session role exist in your
+        //    Info.plist, then an instance with a nil sceneSubclass, delegateClass, and
+        //    storyboard is returned."
+        // The manifest this branch requires is exactly what that lookup reads, so
+        // delegateClass comes back populated from the entry for this role — for Unity's
+        // own manifest, UnityScene.
         configuration = [[UISceneConfiguration alloc] initWithName:nil
                                                       sessionRole:connectingSceneSession.role];
     }
     // A nil configuration (or one that names no delegate class) messages to Nil here and
-    // is refused by the installer's guard — we stay inert rather than hook a guess.
-    QAInstallSceneHooks(configuration.delegateClass);
+    // is refused — we stay inert rather than hook a guess. And the class it does name is
+    // held to the same ownership rule as the notification fallback: a manifest may
+    // declare more than one role, and the first session UIKit brings up is not
+    // necessarily Unity's window (see QAInstallSceneHooksScoped).
+    QAInstallSceneHooksScoped(configuration.delegateClass, "configuration");
     return configuration;
+}
+
+// Class-descent test done with the runtime rather than by messaging: a scene delegate
+// is not required to descend from NSObject, so -isSubclassOfClass: is not guaranteed to
+// be there to ask.
+static BOOL QAClassDescendsFrom(Class cls, Class ancestor) {
+    if (ancestor == Nil) return NO;
+    for (Class c = cls; c != Nil; c = class_getSuperclass(c)) {
+        if (c == ancestor) return YES;
+    }
+    return NO;
+}
+
+// The ownership rule BOTH discovery routes apply before binding — the configuration
+// wrapper and the notification fallback alike, because either can be handed a scene
+// that is not Unity's: a manifest may declare more than one role (CarPlay, an
+// external display), and whichever session UIKit brings up first is not necessarily
+// Unity's window. Binding to it would burn the one-shot on a host class, so Unity's
+// real scene never gets hooked, and ADD the warm selector to a class that lacked it,
+// making us "terminal" for the host's own quick actions. So: when this process has
+// Unity's own scene delegate, bind to it and nothing else — without consuming the
+// one-shot on anyone else's class, so Unity's scene is still hooked whenever it
+// connects; when it has none (a host-authored manifest on a trampoline that predates
+// UnityScene) bind to the first declared class, as before, but record the owner as
+// unconfirmed, which turns OFF the unmarked best-effort adoption in
+// QAScenePerformActionForShortcutItem.
+API_AVAILABLE(ios(13.0))
+static void QAInstallSceneHooksScoped(Class declared, const char *via) {
+    if (declared == Nil) return;
+    Class unityScene = NSClassFromString(@"UnityScene");
+    if (unityScene != Nil) {
+        if (!QAClassDescendsFrom(declared, unityScene)) {
+            NSLog(@"[QuickActions] iOS scene hooks: %@ (via %s) is not Unity's scene delegate "
+                  @"— left alone", NSStringFromClass(declared), via);
+            return;
+        }
+        QAInstallSceneHooks(declared, via);
+        return;
+    }
+    if (QAInstallSceneHooks(declared, via)) gQASceneOwnerUnconfirmed = YES;
 }
 
 // FALLBACK for the shape the configuration hook above cannot see: a host
@@ -476,11 +586,36 @@ static UISceneConfiguration *QAConfigurationForConnectingSceneSession(
 // hooks are in place by then. The reliable fix for the first cold tap is for such a
 // host to call [super application:configurationForConnectingSceneSession:options:],
 // which routes through the wrapper above and installs before willConnect runs.
+//
+// SCOPE — the notification fires for EVERY connecting scene, and most of them are none
+// of our business: a Unity-as-a-Library host's own scene, a SwiftUI @main host, a second
+// iPad / Stage Manager window with a different delegate class, an external-display or
+// CarPlay scene. Binding to the first one to connect would burn the one-shot on a host
+// class (so Unity's real scene never gets hooked) and — worse — ADD
+// windowScene:performActionForShortcutItem:completionHandler: to a class that did not
+// have it, making us "terminal" for the HOST's own quick actions and swallowing them
+// into a queue nothing on their side drains. So we bind only to Unity's own scene when
+// this process has one, and stay conservative when it does not.
+
 API_AVAILABLE(ios(13.0))
 static void QAInstallSceneHooksFromScene(UIScene *scene) {
-    id delegate = scene.delegate;
-    if (delegate == nil) return; // nothing named yet — a later connection may still name one
-    QAInstallSceneHooks(object_getClass(delegate));
+    // Prefer the DECLARED class from the session's configuration over the live delegate
+    // object: it is the class UIKit resolved for this scene (from UISceneDelegateClassName,
+    // or from a host implementation of the configuration selector), it is set even if
+    // UIKit has not instantiated the delegate yet, and it is never a per-instance
+    // isa-swizzled proxy (Firebase's GUL_<Class>-<UUID>, NSKVONotifying_<Class>) — hooking
+    // one of those would burn the one-shot on a class only that one delegate will ever have.
+    Class declared = scene.session.configuration.delegateClass;
+    if (declared == Nil) {
+        id delegate = scene.delegate;
+        if (delegate == nil) return; // nothing named yet — a later connection may still name one
+        declared = object_getClass(delegate);
+    }
+
+    // Unity's trampoline ships its own scene delegate (2022.3.72f1+ / 6000.0.68f1+ /
+    // 6000.3.8f1+); the shared rule binds only to it when it exists, and to the first
+    // declared class with the owner recorded as unconfirmed when it does not.
+    QAInstallSceneHooksScoped(declared, "notification");
 }
 
 @interface QuickActionsAppControllerHook : NSObject
@@ -498,6 +633,11 @@ static void QAInstallSceneHooksFromScene(UIScene *scene) {
     Class cls = NSClassFromString(@"UnityAppController");
     if (cls == Nil) return;
 
+    // Which branch each install took, for the one diagnostic line at the end.
+    const char *didFinishBranch = "added";
+    const char *performBranch = "added";
+    const char *sceneConfigBranch = "absent";
+
     // Swizzle application:didFinishLaunchingWithOptions: (Unity implements it).
     SEL didFinishSel = @selector(application:didFinishLaunchingWithOptions:);
     Method didFinish = class_getInstanceMethod(cls, didFinishSel);
@@ -505,10 +645,17 @@ static void QAInstallSceneHooksFromScene(UIScene *scene) {
         gQAOrigDidFinishLaunching =
             (BOOL (*)(id, SEL, UIApplication *, NSDictionary *))method_getImplementation(didFinish);
         class_replaceMethod(cls, didFinishSel, (IMP)QADidFinishLaunching, method_getTypeEncoding(didFinish));
+        didFinishBranch = "wrapped";
     } else {
-        // Defensive fallback (Unity always implements the selector). BOOL is
-        // 'c' (signed char) in the ObjC ABI.
-        class_addMethod(cls, didFinishSel, (IMP)QADidFinishLaunching, "c@:@@");
+        // Defensive fallback (Unity always implements the selector). Build the return
+        // encoding from @encode(BOOL) instead of hardcoding a character: on every
+        // 64-bit iOS slice objc.h takes the OBJC_BOOL_IS_BOOL branch, so BOOL is C99
+        // _Bool and the encoding is "B"; the legacy 'c' (signed char) belongs to the
+        // retired armv7/i386 ABI. Static so the buffer outlives +load whatever the
+        // runtime chooses to do with the pointer.
+        static char didFinishTypes[16];
+        snprintf(didFinishTypes, sizeof(didFinishTypes), "%s@:@@", @encode(BOOL));
+        class_addMethod(cls, didFinishSel, (IMP)QADidFinishLaunching, didFinishTypes);
     }
 
     // Install application:performActionForShortcutItem:completionHandler:
@@ -523,6 +670,7 @@ static void QAInstallSceneHooksFromScene(UIScene *scene) {
         gQAOrigPerformAction =
             (void (*)(id, SEL, UIApplication *, UIApplicationShortcutItem *, void (^)(BOOL)))method_getImplementation(perform);
         class_replaceMethod(cls, performSel, (IMP)QAPerformActionForShortcutItem, method_getTypeEncoding(perform));
+        performBranch = "wrapped";
     } else {
         class_addMethod(cls, performSel, (IMP)QAPerformActionForShortcutItem, performTypes);
     }
@@ -546,9 +694,11 @@ static void QAInstallSceneHooksFromScene(UIScene *scene) {
                 (id (*)(id, SEL, id, id, id))method_getImplementation(sceneConfig);
             class_replaceMethod(cls, sceneConfigSel, (IMP)QAConfigurationForConnectingSceneSession,
                                 method_getTypeEncoding(sceneConfig));
+            sceneConfigBranch = "wrapped";
         } else if (hasSceneManifest) {
             class_addMethod(cls, sceneConfigSel, (IMP)QAConfigurationForConnectingSceneSession,
                             "@@:@@@");
+            sceneConfigBranch = "added";
         }
     }
 
@@ -598,6 +748,17 @@ static void QAInstallSceneHooksFromScene(UIScene *scene) {
             }];
         }
     }
+
+    // ONE line per process launch, always on. Every failure mode this file has is
+    // otherwise silent: an adopter integrating the package into an existing native
+    // stack cannot tell a working install from an inert one, and "quick actions do
+    // nothing on iOS" has half a dozen indistinguishable causes. One console line at
+    // launch is cheap, and it is exactly what a coexistence bug report needs — which is
+    // also why CI's coexistence leg asserts on it. The scene-hook companion line is
+    // emitted from QAInstallSceneHooks when (and only when) that binding happens.
+    NSLog(@"[QuickActions] iOS hooks: didFinishLaunching=%s performAction=%s "
+          @"sceneConfig=%s manifest=%s",
+          didFinishBranch, performBranch, sceneConfigBranch, hasSceneManifest ? "yes" : "no");
 }
 
 @end

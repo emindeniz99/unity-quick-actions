@@ -20,10 +20,14 @@ ships it.
   is not found; on the API 35 Pixel launcher the icon IS found (in the
   predicted-apps dock) and pressed, but `input swipe x y x y 1500` produced no
   shortcut sheet — the hierarchy after the press is identical to the one
-  before. Next attempt: a real long press via `input motionevent DOWN x y` /
-  sleep / `input motionevent UP x y`, screencap a beat later, and on API 30
-  open the drawer through `am start` of the launcher's all-apps activity
-  instead of a gesture. The verdict never depends on it.
+  before. The second attempt is in the script and has not run yet: a real
+  long press (`input motionevent DOWN`, hold, screencap and hierarchy dump
+  while still down, then `UP`), and on a launcher that ignores the swipe an
+  escalation through `KEYCODE_ALL_APPS`, a tap on the launcher's own drawer
+  handle ("Apps list" on the API 30 Pixel launcher) and the `ALL_APPS`
+  intent. Read `longpress-<leg>` on the next run; if the sheet is still not
+  there, what remains is a launcher-specific gesture, and the entry stays.
+  The verdict never depends on it.
 - **Port the Android post-processor to `AndroidProjectFilesModifier` (Unity 6).**
   Unity's own notifications package moved to it "for better compatibility with
   incremental build"; the built-ins' distinct-name design was chosen so that
@@ -34,18 +38,6 @@ ships it.
   54,951,670 bytes, every assertion green on both), so the current
   `IPostGenerateGradleAndroidProject` path is measured rather than assumed on
   every push — this is an API-alignment item, not a bug.
-- **Teaching sample for custom Android icons (small, optional).** A
-  `Samples~/AndroidIcons/` containing a ready-made `QuickActionIcons.androidlib`
-  (correct root-level `AndroidManifest.xml` + `res/drawable-xhdpi/`)
-  would let a user import a *working* example rather than follow a five-step
-  written recipe. Imports to `Assets/Samples/<pkg>/<version>/…`, which is under
-  `Assets/`, so it would be picked up with no further action. Caveats: nobody
-  ships this combination today (untested), `Samples~` content ships without
-  `.meta` so the Android-only `PluginImporter` setting falls back to defaults,
-  and it inherits the `.unitypackage` limitation above. The four built-in icons
-  now ship through the post-processor; this sample would be
-  documentation-by-example for the 25 catalog entries that still need the
-  consumer's own art, and for replacing a built-in one.
 
 - **Automated device CI, remaining scope** — 0.4.6 closed the licence half:
   `.github/workflows/unity-ci.yml` (GameCI) builds the dev APK in CI and feeds
@@ -158,28 +150,34 @@ The stub harness compiles the C#/Java but can't confirm Unity-only wiring:
   `QUICKACTIONS_ENABLED` off shows it as "missing script". Harmless and reversible
   (re-enable the define), documented in README. A future cleanup could move the SO
   *type* into an always-compiled editor assembly so the asset never orphans.
-- **iOS scene lifecycle + cold dedup (SHIPPED in v0.4.0 — device-validate):** the
-  package now learns the scene-delegate class from the host's
-  `UISceneConfiguration` and installs cold
+- **iOS scene lifecycle + cold dedup (SHIPPED in v0.4.0 — Simulator-measured
+  since 2026-09-02, device still open):** the package learns the scene-delegate
+  class from the connecting session's `UISceneConfiguration` and installs cold
   (`scene:willConnectToSession:options:`) + warm
   (`windowScene:performActionForShortcutItem:completionHandler:`) hooks, with a
   consume-once cold-dedup marker that also swallows the host-subclass
-  double-delivery on the app-delegate path. NO ObjC compile harness exists; the
-  first real validation was an Xcode build, and it has now happened — the
-  generated project compiles against the real iOS device SDK on 2021.3 and 6.3
-  with zero warnings from `QuickActions.mm`, and a 6.3 / iOS 26.5 Simulator run
-  confirms a cold tap reaching `Performed`. On device, verify: a scene-manifest
-  app delivers cold + warm taps exactly once each; a default (no-manifest) app
-  behaves byte-identically to v0.3.0; a host UnityAppController subclass that
-  discards our `NO` no longer double-delivers; multi-scene-delegate-class hosts
-  get coverage only for the first class learned (documented in-code). Also
-  verify the SUBCLASS-SHADOWED shape specifically: a host that overrides
-  `application:configurationForConnectingSceneSession:options:` without calling
-  super shadows our hook, and the `UISceneWillConnectNotification` fallback
-  installs from the live scene's delegate instead. Confirm warm taps arrive in
-  that shape, and measure whether the FIRST cold tap does — the notification may
-  be posted after the delegate's own `willConnect`, in which case that one tap
-  is lost by design (a `[super ...]` call on the host side closes it).
+  double-delivery on the app-delegate path. CI's `ios-simulator-coex` leg now
+  measures, on Testbed6 (6000.3.21f1) under a mock host: the app STARTS with the
+  package's `configurationForConnectingSceneSession` in place (the connected
+  scene's delegate is a `UnityScene`, `session.configuration.delegateClass` is
+  `UnityScene`); the cold launch item is queued exactly once and a warm tap
+  through the scene selector exactly once; a host subclass that discards our
+  `NO` does not double-deliver; and the SUBCLASS-SHADOWED shape (the host
+  overrides the configuration selector without calling super) is recovered by
+  the `UISceneWillConnectNotification` fallback, warm taps included. All of it
+  through synthetic sends. Still open: a cold tap arriving through
+  `connectionOptions` (only UIKit fills that — a real SpringBoard tap, which
+  needs an XCUITest target); whether the FIRST cold tap survives the shadowed
+  shape (the notification may be posted after the delegate's own `willConnect`,
+  in which case that one tap is lost by design — a `[super ...]` call on the
+  host side closes it); multi-scene-delegate-class hosts (coverage only for the
+  first class learned, documented in-code); and any physical device. Also
+  measured, as a shape to avoid: an app delegate that implements
+  `application:configurationForConnectingSceneSession:options:` opts the app
+  into the scene lifecycle even WITHOUT `UIApplicationSceneManifest` (UIKit
+  called the mock host's override on the manifest-less 2022.3 export) — the
+  package gates every scene hook on the manifest, so such a host gets none;
+  declare the manifest or do not implement the selector.
 - **Localization (SHIPPED in v0.4.0 — device-validate):** dynamic per-locale
   titles resolve/refresh across cold starts (verify a device-language change
   re-renders on next launch, and the refresh push tolerates rate limiting);

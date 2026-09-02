@@ -21,14 +21,23 @@ icons (`tools~/gen_builtin_icons.py --check` — regenerate, never hand-edit
 `tools~/setup.sh` installs the toolchain once. Never report a change as done on a
 red or unrun verify; say what failed.
 
+**Never push to a PR branch while its `unity` workflow run is still pending.**
+The `pull_request` `paths` filter is matched against the PR's *whole* diff, not
+the pushed commits, so even a docs-only push cancels the in-flight run
+(concurrency group per ref) and restarts every Unity job from scratch. Wait for
+the run to finish — read its result — then push.
+
 ## Unity discipline
 
 - **Every asset needs a committed `.meta`.** After adding/renaming/moving files,
   run `python3 tools~/gen_meta.py` and `git add` the `.meta` next to the asset.
   `verify.sh` fails if it had to generate one.
 - **`Samples~/`, `store~/`, `dist~/`** — folders ending in `~` are invisible to
-  Unity; the folders themselves get no `.meta`. Files inside `Samples~/Demo/` do
-  have `.meta`s (gen_meta handles that folder explicitly) — leave them.
+  Unity; the folders themselves get no `.meta`. Everything under `Samples~/`
+  (`Demo/`, `AndroidIcons/`) does have `.meta`s, because a sample is copied into
+  `Assets/` on import — gen_meta walks that one `~` folder explicitly, and gives
+  a `*.androidlib` a single `PluginImporter` `.meta` for the folder and none for
+  the files inside it — leave them.
 - **Never commit a `.unitypackage`.** It is a build output; `dist~/` is
   gitignored, `tools~/pack_unitypackage.py` produces it, CI attaches it to the
   GitHub Release (first one: `v0.4.0`).
@@ -39,7 +48,17 @@ red or unrun verify; say what failed.
 - Quick actions cannot be observed in the Editor, but they **do** work on the
   iOS Simulator — verified on Unity 6.3 / iOS 26.5, where static and
   runtime-added shortcuts appeared on the Simulator home screen and a tap
-  cold-launched the app and delivered the id to `Performed`. (Android has no
+  cold-launched the app and delivered the id to `Performed`. That run's editor
+  patch was never recorded and its exported `Info.plist` was never inspected, so
+  it is NOT established which iOS path delivered the tap. The **UIScene** path
+  (Unity 2022.3.72f1+ / 6000.0.68f1+ / 6000.3.8f1+, where `Info.plist` names
+  `UnityScene` as the scene delegate and Apple stops calling the app-delegate
+  quick-action selector) is exercised on the iOS Simulator by CI's
+  `ios-simulator-coex` leg on Testbed6 (6000.3.21f1): scene hooks installed on
+  `UnityScene` via the configuration wrapper and, shadowed, via the notification
+  fallback, the cold launch item and a warm tap each queued once — through
+  synthetic sends, never a SpringBoard tap, and never on a device. Say exactly
+  that; do not describe device behaviour as verified. (Android has no
   simulator equivalent; the 2021.3 line cannot do a Simulator run at all —
   Unity ships an x86_64-only simulator runtime there.) **Physical hardware is
   partly covered**: one Android run (Moto G Play 2024 / Android 14) confirmed
