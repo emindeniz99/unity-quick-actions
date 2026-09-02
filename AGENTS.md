@@ -59,12 +59,13 @@ repository root, so the repository **is** the package.
    public class ShortcutSetup : MonoBehaviour
    {
    #if QUICKACTIONS_ENABLED
-       void Awake()
-       {
-           // Subscribe in Awake/OnEnable of the FIRST scene: the cold-launch tap
-           // is delivered one frame after startup and a later subscriber misses it.
-           QuickActions.Performed += id => Debug.Log($"Tapped: {id}");
-       }
+       // Subscribe early: the cold-launch tap arrives one frame after startup.
+       void Awake() => QuickActions.Performed += OnShortcut;
+       // Performed is static and process-wide: never leave a handler behind.
+       void OnDestroy() => QuickActions.Performed -= OnShortcut;
+       
+       // Fires on every tap, including the cold launch that started the app.
+       void OnShortcut(string id) => Debug.Log($"Tapped: {id}");
 
        void Start()
        {
