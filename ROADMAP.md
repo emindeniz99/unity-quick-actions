@@ -42,18 +42,6 @@ ships it.
   OpenUPM/Git and silently vanish for Asset Store users. Re-check whether Unity
   has fixed this before choosing any design that depends on it.
 
-- **Adaptive (`-v26`) variants of the built-in icons.** On API 26+ AOSP wraps a
-  legacy shortcut drawable onto a white plate at 0.70 of the viewport, so the
-  built-ins render as a disc inside a white ring, smaller than neighbouring
-  adaptive icons. A `res/drawable-anydpi-v26/ic_quickaction_builtin_<name>.xml`
-  `<adaptive-icon>` under the same name would escape that (the launcher takes
-  an `AdaptiveIconDrawable` as-is): full-bleed indigo background layer, glyph
-  foreground confined to the 66/72 safe zone (≤ ~61 % of the 108 dp canvas —
-  the current glyphs span ~71 % and would be clipped by a squircle mask if
-  reused as-is), child drawables prefix-named so the keep glob covers them, the
-  plain vector kept for API 25. Deliberately not in the first release of the
-  built-ins: nobody has seen even the legacy art on a launcher, and this
-  doubles the unseen surface.
 - **Emulator screenshot of the built-in icons.** The smoke leg proves the
   shortcuts registered with an icon resource; a capture of the long-press sheet
   (`adb shell input` long-press on the app icon, then `screencap`) attached as

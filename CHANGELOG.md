@@ -15,6 +15,21 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **The built-in Android icons now ship an API 26+ adaptive variant.** On API 26+
+  AOSP does not draw a legacy shortcut drawable as authored — it wraps it onto a
+  white plate at 0.70 of the viewport, so the built-ins rendered as a small
+  indigo disc inside a white ring, out of place beside their neighbours. Every
+  Android build now also writes
+  `res/drawable-anydpi-v26/ic_quickaction_builtin_<name>.xml`, an
+  `<adaptive-icon>` under the **same resource name**, over two layers of its own
+  (`ic_quickaction_builtin_<name>_background`, full-bleed indigo, and
+  `…_foreground`, the same glyph scaled into the 66-of-108 safe zone so no
+  launcher mask clips it). The plain vector stays for API 25 and the resource
+  qualifier picks between them, so nothing that names an icon changes: the Java
+  lookup, the static `android:icon="@drawable/ic_quickaction_builtin_<name>"`
+  bake, the `ic_quickaction_*` keep rule, the settings opt-out and the define-off
+  sweep all cover the new files unchanged. About 6 KB of XML for all four icons.
+  Not yet seen on a launcher — neither variant.
 - **The `android-smoke` legs now photograph the launcher's long-press sheet.**
   `dumpsys shortcut` proves each shortcut registered *with* an icon resource;
   nothing has ever seen that art drawn by a launcher. With `CAPTURE_LONGPRESS=1`,
@@ -47,6 +62,32 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **The `.androidlib` icon recipe is proven on a real APK, not just documented.**
+  README's recipe for a consumer's own Android shortcut icons rested on Unity's
+  documentation and on reading Unity's `com.unity.mobile.notifications`, never on
+  a build. Testbed2022 now carries both shapes: an `.androidlib` under `Assets/`
+  and one inside an embedded UPM package (`Packages/com.quickactions.testlib/`,
+  laid out and `.meta`-ed exactly as Unity's own package lays its out). The
+  2022.3 leg of `android-build` now requires `ic_quickaction_search` and
+  `ic_quickaction_frompkg` in the APK resource table on every push — so both
+  delivery paths, `Assets/` and a package, are asserted rather than assumed.
+- **And the trap under it is asserted too.** A decoy drawable sits at
+  `res/drawable/` at the `.androidlib` *root*, the layout README documents as
+  silently dropped, and the same step requires `ic_quickaction_decoy` to be
+  ABSENT. Without that assertion a green run would describe equally well a
+  README trap that was never real. The four built-in icons the step already
+  reads are its positive control, and fail first.
+- **The Unity 6 Android leg now builds twice and asserts the second APK.** CI
+  had only ever built a clean Gradle project on a fresh runner, so nothing knew
+  whether the icons, `res/raw/quickactions_keep.xml`, the baked shortcut
+  resources and the trampoline `<activity>` survive an INCREMENTAL build, where
+  Unity reuses the project it staged under `Library/`. The leg runs
+  `unity-builder` a second time over the same project directory
+  (`TestbedBuilder.BuildAndroidPhoneSecond`, same configuration to
+  `Builds/QuickActionsDemo-phone-2.apk`), uploads that APK as
+  `quickactions-demo-apk-unity6-incremental`, and runs the *same* aapt2
+  assertions against it — one function over the leg's APKs rather than a copy
+  per APK. The job summary names which of the two was the incremental one.
 - **The `.unitypackage` carries the docs the README links to.** The classic
   install now includes `GETTING_STARTED.md`, `SECURITY.md`,
   `PRODUCTION_READINESS.md` and `AGENTS.md` next to the four root docs it
