@@ -2589,7 +2589,21 @@ jobs:
           # and kill it instead. Poll capture-then-case, never `| grep -q`: under
           # pipefail an early grep exit SIGPIPEs the writer (same rule as the adb
           # smoke and the plain simulator leg).
+          # A launch that produced NO console at all — not even Unity's own start-up
+          # lines — is an app that never came up (seen once, PR #18 run 60: 0 lines in
+          # 120 s right after boot, green on the same code before and after). That says
+          # nothing about the hooks, so it gets one more launch; a launch that printed
+          # anything is final, and the assertions below judge it.
           run_launch() {
+            launch_once "$1" "$2"
+            if [ "$(wc -l < "$2")" -eq 0 ]; then
+              echo "launch (mode=${1:-default}) produced no console at all — the app never came up; launching once more"
+              sleep 5
+              launch_once "$1" "$2"
+            fi
+          }
+
+          launch_once() {
             mode="$1"; out="$2"
             : > "$out"
             if [ -n "$mode" ]; then
