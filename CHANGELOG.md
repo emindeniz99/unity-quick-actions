@@ -121,7 +121,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   delivery paths carried that tap is unknown — 6000.3.8f1 is where Unity
   starts emitting `UIApplicationSceneManifest` and Apple stops calling the
   app-delegate selector. README Status, `PRODUCTION_READINESS.md` (the one
-  iOS row becomes two: app-delegate ✅, UIScene ⏳ unexercised), `CLAUDE.md`
+  iOS row becomes two, both ⏳: the app-delegate row because that run cannot
+  be credited to it, the UIScene row because nothing has exercised it), `CLAUDE.md`
   and `ROADMAP.md` now say so, and the ROADMAP's scene items start with
   "confirm the app still starts": the package adds
   `application:configurationForConnectingSceneSession:options:` where Unity
