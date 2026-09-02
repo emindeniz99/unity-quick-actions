@@ -556,6 +556,13 @@ Assets/QuickActionIcons.androidlib/
   res/drawable-xhdpi/ic_quickaction_search.png
 ```
 
+That exact plug-in ships ready to build as the **Android icons** sample
+(*Package Manager ▸ Samples ▸ Import*) — import it instead of typing the recipe
+out, and read
+[its README](https://github.com/emindeniz99/unity-quick-actions/blob/main/Samples~/AndroidIcons/README.md)
+for the AGP 8 / Unity 6 variant; it is a UPM-install feature, since an
+`.androidlib` does not survive a `.unitypackage`.
+
 Then either name the drawable `ic_quickaction_<icontype>` so `Icon` finds it, or
 point at any resource explicitly with `AndroidDrawable = "my_icon"`. Draw it
 with its own background — a white glyph on transparent is invisible on the

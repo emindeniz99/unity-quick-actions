@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The second drawable, so the sample shows the plural case: one .androidlib
+     holds as many ic_quickaction_<icontype> files as you need, and nothing
+     about the module changes when you add another. IconType.Home is another of
+     the 25 entries with no built-in.
+
+     Structure and reasoning are the same as ic_quickaction_search.xml: 48dp on
+     a 96 viewport, white glyph on a full-bleed indigo disc. Here the door is
+     cut by painting it back in the disc's colour rather than by winding, which
+     is the simpler of the two ways and just as valid. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="96"
+    android:viewportHeight="96">
+  <path
+      android:fillColor="#3F51B5"
+      android:pathData="M2,48A46,46 0 1,1 94,48A46,46 0 1,1 2,48Z" />
+  <path
+      android:fillColor="#FFFFFF"
+      android:pathData="M48,20L82,52L70,52L70,76L26,76L26,52L14,52Z" />
+  <path
+      android:fillColor="#3F51B5"
+      android:pathData="M40,58L56,58L56,76L40,76Z" />
+</vector>

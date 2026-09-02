@@ -8,6 +8,8 @@ path via MD5, so re-running this is idempotent and never churns existing files.
 
 Routing:
   * directories                       -> DefaultImporter (folderAsset)
+  * *.androidlib directories          -> PluginImporter (Android only), and
+                                         their CONTENTS get no .meta at all
   * .cs                               -> MonoImporter
   * .asmdef                           -> AssemblyDefinitionImporter
   * Plugins/iOS/*.{mm,m,h,a}          -> PluginImporter (iOS only)
@@ -151,13 +153,111 @@ def plugin_meta(guid: str, platform: str) -> str:
     )
 
 
+# An .androidlib is a whole Gradle library MODULE that Unity imports as one
+# plug-in: the folder carries the PluginImporter and the files inside it are
+# never imported individually, so they get no .meta (Unity's own
+# com.unity.mobile.notifications ships its androidlib the same way). This is the
+# shape a real Unity writes for one and the shape the CI fixture at
+# Examples~/Testbed2022/Assets/QuickActionIcons.androidlib.meta carries — the
+# only .androidlib in this repo whose build has actually been measured, so it is
+# copied rather than invented. It differs from plugin_meta() above (isOverridable,
+# the Standalone rows, "Exclude iOS" where a file plug-in says "Exclude iPhone")
+# because Unity itself writes a different row set for a folder plug-in.
+def androidlib_meta(guid: str) -> str:
+    return (
+        "fileFormatVersion: 2\n"
+        f"guid: {guid}\n"
+        "PluginImporter:\n"
+        "  externalObjects: {}\n"
+        "  serializedVersion: 2\n"
+        "  iconMap: {}\n"
+        "  executionOrder: {}\n"
+        "  defineConstraints: []\n"
+        "  isPreloaded: 0\n"
+        "  isOverridable: 1\n"
+        "  isExplicitlyReferenced: 0\n"
+        "  validateReferences: 1\n"
+        "  platformData:\n"
+        "  - first:\n"
+        "      '': Any\n"
+        "    second:\n"
+        "      enabled: 0\n"
+        "      settings:\n"
+        "        Exclude Android: 0\n"
+        "        Exclude Editor: 1\n"
+        "        Exclude Linux64: 1\n"
+        "        Exclude OSXUniversal: 1\n"
+        "        Exclude Win: 1\n"
+        "        Exclude Win64: 1\n"
+        "        Exclude iOS: 1\n"
+        "  - first:\n"
+        "      Android: Android\n"
+        "    second:\n"
+        "      enabled: 1\n"
+        "      settings:\n"
+        "        CPU: ARMv7\n"
+        "  - first:\n"
+        "      Any: \n"
+        "    second:\n"
+        "      enabled: 0\n"
+        "      settings: {}\n"
+        "  - first:\n"
+        "      Editor: Editor\n"
+        "    second:\n"
+        "      enabled: 0\n"
+        "      settings:\n"
+        "        CPU: AnyCPU\n"
+        "        DefaultValueInitialized: true\n"
+        "        OS: AnyOS\n"
+        "  - first:\n"
+        "      Standalone: Linux64\n"
+        "    second:\n"
+        "      enabled: 0\n"
+        "      settings:\n"
+        "        CPU: None\n"
+        "  - first:\n"
+        "      Standalone: OSXUniversal\n"
+        "    second:\n"
+        "      enabled: 0\n"
+        "      settings:\n"
+        "        CPU: None\n"
+        "  - first:\n"
+        "      Standalone: Win\n"
+        "    second:\n"
+        "      enabled: 0\n"
+        "      settings:\n"
+        "        CPU: None\n"
+        "  - first:\n"
+        "      Standalone: Win64\n"
+        "    second:\n"
+        "      enabled: 0\n"
+        "      settings:\n"
+        "        CPU: None\n"
+        "  - first:\n"
+        "      iPhone: iOS\n"
+        "    second:\n"
+        "      enabled: 0\n"
+        "      settings:\n"
+        "        AddToEmbeddedBinaries: false\n"
+        "        CPU: AnyCPU\n"
+        "        CompileFlags: \n"
+        "        FrameworkDependencies: \n"
+        "  userData: \n"
+        "  assetBundleName: \n"
+        "  assetBundleVariant: \n"
+    )
+
+
 IOS_EXT = {".mm", ".m", ".h", ".a"}
 ANDROID_EXT = {".java", ".xml", ".aar"}
+ANDROIDLIB_SUFFIX = ".androidlib"
 
 
 def meta_for(rel_path: str, is_dir: bool) -> str:
     guid = guid_for(rel_path)
     if is_dir:
+        if rel_path.endswith(ANDROIDLIB_SUFFIX):
+            return androidlib_meta(guid)
         return folder_meta(guid)
     ext = os.path.splitext(rel_path)[1].lower()
     if ext == ".cs":
@@ -187,6 +287,9 @@ def iter_assets():
         for d in dirs:
             abs_dir = os.path.join(root, d)
             yield abs_dir, os.path.relpath(abs_dir, PKG).replace(os.sep, "/"), True
+        # Yielded the .androidlib itself (it is the plug-in), now stop: nothing
+        # inside a folder plug-in is imported as an asset in its own right.
+        dirs[:] = [d for d in dirs if not d.endswith(ANDROIDLIB_SUFFIX)]
         for name in files:
             if name.endswith(".meta"):
                 continue
@@ -205,6 +308,7 @@ def iter_assets():
             for d in dirs:
                 abs_dir = os.path.join(root, d)
                 yield abs_dir, os.path.relpath(abs_dir, PKG).replace(os.sep, "/"), True
+            dirs[:] = [d for d in dirs if not d.endswith(ANDROIDLIB_SUFFIX)]
             for name in files:
                 if name.endswith(".meta"):
                     continue
@@ -259,9 +363,17 @@ def check() -> int:
             meta = os.path.abspath(os.path.join(root, name))
             if meta in expected_metas:
                 continue
+            rel = os.path.relpath(meta, PKG).replace(os.sep, "/")
+            # A .meta INSIDE a folder plug-in is never read by Unity but ships
+            # with the package, so catch it here rather than let it look like an
+            # asset that simply has no meta.
+            if ANDROIDLIB_SUFFIX + "/" in rel:
+                problems.append(
+                    f"{rel}: inside an .androidlib — the folder is the plug-in, "
+                    "its contents are not assets; delete this .meta")
+                continue
             asset = meta[: -len(".meta")]
             if not os.path.exists(asset):
-                rel = os.path.relpath(meta, PKG).replace(os.sep, "/")
                 problems.append(f"{rel}: orphan — no asset at {os.path.basename(asset)}")
 
     if problems:
@@ -276,62 +388,16 @@ def check() -> int:
 def main() -> int:
     if "--check" in sys.argv:
         return check()
+    # iter_assets() is the single source of truth for what counts as an asset;
+    # walking it here (rather than repeating its skip rules) is what keeps the
+    # generate pass and --check from ever disagreeing about one.
     created = 0
-    for root, dirs, files in os.walk(PKG):
-        # Skip hidden/ignored dirs (Unity ignores names ending with ~ or starting .)
-        # (the store~/dist~ collateral dirs are covered by the ~ rule).
-        dirs[:] = [d for d in dirs
-                   if not d.endswith("~") and not d.startswith(".")
-                   and d != "__pycache__"  # python bytecode cache; gitignored, never an asset
-                   ]
-
-        for d in dirs:
-            abs_dir = os.path.join(root, d)
-            rel = os.path.relpath(abs_dir, PKG).replace(os.sep, "/")
-            meta = abs_dir + ".meta"
-            if not os.path.exists(meta):
-                with open(meta, "w") as f:
-                    f.write(meta_for(rel, True))
-                created += 1
-
-        for name in files:
-            if name.endswith(".meta"):
-                continue
-            # Unity's importer ignores the same names it ignores for dirs, so a
-            # .meta for one (e.g. .gitignore.meta) would be an orphan.
-            if name.startswith(".") or name.endswith("~"):
-                continue
-            abs_file = os.path.join(root, name)
-            rel = os.path.relpath(abs_file, PKG).replace(os.sep, "/")
-            meta = abs_file + ".meta"
-            if not os.path.exists(meta):
-                with open(meta, "w") as f:
-                    f.write(meta_for(rel, False))
-                created += 1
-
-    # Samples~ contents need .meta too (they are copied into Assets on import),
-    # but os.walk skipped the ~ dir above. Handle it explicitly.
-    samples = os.path.join(PKG, "Samples~")
-    if os.path.isdir(samples):
-        for root, dirs, files in os.walk(samples):
-            for d in dirs:
-                abs_dir = os.path.join(root, d)
-                rel = os.path.relpath(abs_dir, PKG).replace(os.sep, "/")
-                meta = abs_dir + ".meta"
-                if not os.path.exists(meta):
-                    with open(meta, "w") as f:
-                        f.write(meta_for(rel, True))
-                    created += 1
-            for name in files:
-                if name.endswith(".meta"):
-                    continue
-                abs_file = os.path.join(root, name)
-                rel = os.path.relpath(abs_file, PKG).replace(os.sep, "/")
-                meta = abs_file + ".meta"
-                if not os.path.exists(meta):
-                    with open(meta, "w") as f:
-                        f.write(meta_for(rel, False))
-                    created += 1
+    for path, rel, is_dir in iter_assets():
+        meta = path + ".meta"
+        if not os.path.exists(meta):
+            with open(meta, "w") as f:
+                f.write(meta_for(rel, is_dir))
+            created += 1
 
     print(f"gen_meta: created {created} .meta file(s)")
     return 0

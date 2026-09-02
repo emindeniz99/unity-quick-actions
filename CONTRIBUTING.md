@@ -106,8 +106,11 @@ git add <asset> <asset>.meta
 **Folders ending in `~` are invisible to Unity's importer.** `Samples~/`,
 `store~/`, `dist~/` are skipped by Unity and by the asset walk in
 `gen_meta.py`; the folders themselves get no `.meta`. (The files *inside*
-`Samples~/Demo/` do carry `.meta`s — they are copied into `Assets/` on sample
-import — and `gen_meta.py` handles that folder explicitly. Don't delete them.)
+`Samples~/` do carry `.meta`s — they are copied into `Assets/` on sample
+import — and `gen_meta.py` walks that folder explicitly. Don't delete them.
+One exception, also `gen_meta.py`'s: a `*.androidlib` is a folder plug-in, so
+the folder gets an Android-only `PluginImporter` meta and nothing inside it
+gets a `.meta` at all — Unity imports the module, not its files.)
 
 **The `.unitypackage` is a build output and is never committed.** `dist~/` is
 gitignored. Produce one locally with `python3 tools~/pack_unitypackage.py` (or
