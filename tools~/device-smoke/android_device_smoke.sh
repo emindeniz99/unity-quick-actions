@@ -162,9 +162,18 @@ performed_logged() {
 # The precondition of the cold step, and the only thing separating it from the
 # warm one. `am force-stop` can be accepted by AMS and still leave the process
 # briefly alive (or, on a refusal, indefinitely alive), and its exit status
-# says nothing either way — only an empty pidof does.
+# says nothing either way — only pidof finding nothing does. And only pidof
+# itself: an adb hiccup also yields empty output, which is not evidence that
+# the process is gone, so the device-side exit status of pidof is read back
+# as a marker (1 = ran and found nothing) and anything else — found, or no
+# marker because the query never ran — keeps the poll going.
 app_stopped() {
-  [ -z "$(adb_ shell pidof "$APP_ID" 2>/dev/null | tr -d '\r\n')" ]
+  local out
+  out="$(adb_ shell "pidof $APP_ID >/dev/null 2>&1; echo pidof-rc=\$?" 2>/dev/null | tr -d '\r\n')"
+  case "$out" in
+    *pidof-rc=1) return 0 ;;
+    *) return 1 ;;
+  esac
 }
 
 command -v adb >/dev/null 2>&1 || fail "adb is not on PATH (install Android platform-tools)."
@@ -270,8 +279,20 @@ if ! poll "$half" shortcuts_registered; then
     echo "warning: after $((half * POLL_INTERVAL))s the Unity player has logged nothing at all — it never came up" >&2
     echo "         (a known API 30 emulator failure mode); force-stopping and launching once more." >&2
     adb_ shell am force-stop "$APP_ID" >/dev/null 2>&1 || true
-    sleep 2
-    launch_with_autotest
+    # force-stop's status proves nothing and the kill is asynchronous (step 8
+    # says why): launch only once the process is really gone, or the second
+    # `am start` just hands its intent to the same stalled activity.
+    if poll "$LOG_ATTEMPTS" app_stopped; then
+      # A dead process is not yet a settled emulator: step 8 explains why the
+      # cold start waits after the pid is gone (gfxstream is still tearing the
+      # dead process's Vulkan objects down, and a player booted into that sat
+      # engine-silent). This relaunch exists to recover from exactly that
+      # shape, so it waits the same way.
+      sleep "${COLD_SETTLE:-5}"
+      launch_with_autotest
+    else
+      echo "warning: the stalled process did not stop within $((LOG_ATTEMPTS * POLL_INTERVAL))s — no relaunch; waiting out the budget." >&2
+    fi
   fi
 fi
 if ! shortcuts_registered && ! poll "$((SHORTCUT_ATTEMPTS - half))" shortcuts_registered; then
