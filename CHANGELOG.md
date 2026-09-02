@@ -23,8 +23,10 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   generated file, `Editor/QuickActionsBuiltInIconSet.cs`, written by the same
   generator from the same list (the Android assembly holding the art is
   `UNITY_ANDROID`-only, so the always-present Editor assembly needed its own
-  copy), held to the art by `--check` and by a harness test that also pins the
-  drawer's name derivation to the Java `ICON_NAMES` table member by member.
+  copy), held to the art by `--check` and by harness tests that also pin the
+  drawer's name derivation to the Java `ICON_NAMES` table member by member,
+  and that the note stops promising a drawable when **Write built-in Android
+  icons** is off.
 - **`AGENTS.md`** — the shortest correct integration path for an AI coding
   agent (or a hurried human): install, define, asmdef reference, the guarded
   snippet, the checks that prove it worked, and the don'ts. The README gains a
@@ -76,10 +78,12 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `QABuildShortcutsJson` returns `NULL` instead of `{"items":[]}` when
   `NSJSONSerialization` fails. A Unity-only test pins the `Parse` contract
   (the Test Runner suite is 77).
-- **`IsPlatformSupported` no longer throws out of the facade on Android.** The
-  `Build.VERSION` JNI read is guarded like every other JNI path in the bridge;
-  a failed read answers "unsupported", so `Add()` / `GetAll()` take their
-  documented no-op instead of surfacing an `AndroidJavaException`.
+- **The Android SDK-level read can neither throw out of the facade nor pose
+  as "API < 25".** The `Build.VERSION` JNI read is guarded like every other
+  JNI path in the bridge, read once and cached; a read that fails is kept
+  distinct from an unsupported device — the bridge's read and write members
+  return their failed-read signal (null) for it, so the facade retries instead
+  of adopting an empty set and pruning the user's real shortcuts against it.
 
 ## [0.5.0] - 2026-09-01
 

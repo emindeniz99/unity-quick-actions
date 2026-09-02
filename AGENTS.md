@@ -130,6 +130,10 @@ repository root, so the repository **is** the package.
 
 ## Working on the package itself
 
-Rules for agents changing this repository are in [`CLAUDE.md`](./CLAUDE.md);
-the human-facing detail is in [`CONTRIBUTING.md`](./CONTRIBUTING.md).
-`tools~/verify.sh` must end with `VERIFY: PASS` before any push.
+Rules for agents changing this repository are in
+[`CLAUDE.md`](https://github.com/emindeniz99/unity-quick-actions/blob/main/CLAUDE.md);
+the human-facing detail is in
+[`CONTRIBUTING.md`](https://github.com/emindeniz99/unity-quick-actions/blob/main/CONTRIBUTING.md).
+Both live in the repository only — a `.unitypackage` install does not carry
+them, which is why these two links are absolute. `tools~/verify.sh` must end
+with `VERIFY: PASS` before any push.

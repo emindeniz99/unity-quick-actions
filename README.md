@@ -143,8 +143,8 @@ covered by headless tests only — no device or Simulator run has happened since
 they landed, so what a resolved `v1.4.0 (37)` looks like on a real home screen
 is still unconfirmed.
 
-**Also true:** the suite is 112 headless tests (`dotnet test`) and 77 in Unity's
-Test Runner (it adds 6 `JsonUtility` serialization tests; 41 of the headless ones
+**Also true:** the suite is 117 headless tests (`dotnet test`) and 77 in Unity's
+Test Runner (it adds 6 `JsonUtility` serialization tests; 46 of the headless ones
 don't run there), plus an Android Java smoke of 111 checks, across 10 C# compile
 configurations with 0 warnings. The last CI-measured Test Runner result was
 76/76 (run 38, 2026-09-01), taken before the sixth serialization test landed.
@@ -398,10 +398,12 @@ tap (warm taps still arrive).
 #if QUICKACTIONS_ENABLED
 using System.Collections.Generic;
 using EminDeniz99.QuickActions;
+#endif
 using UnityEngine;
 
 public class ShortcutRouter : MonoBehaviour
 {
+#if QUICKACTIONS_ENABLED
     void Awake()
     {
         // Subscribe early so the cold-launch tap (delivered next frame) isn't missed.
@@ -423,12 +425,15 @@ public class ShortcutRouter : MonoBehaviour
 
     // Fires on every tap, including the cold launch that started the app.
     void OnShortcut(string id) => Route(id);
-}
 #endif
+}
 ```
 
-The `#if` keeps the game compiling in a build where the define is off — the
-recommended production setup (see [Dev-only](#dev-only--excluding-it-completely-from-production-builds)).
+The `#if` guards keep the game compiling in a build where the define is off —
+the recommended production setup (see [Dev-only](#dev-only--excluding-it-completely-from-production-builds)) —
+and they wrap only the package-specific parts: the `MonoBehaviour` itself stays
+compiled, so the component on your scene object is an inert router there, not a
+missing script.
 If the script lives in its own assembly definition, add
 `EminDeniz99.QuickActions` to that asmdef's references (and
 `EminDeniz99.QuickActions.Editor` to an Editor asmdef that uses the build-time
@@ -929,9 +934,9 @@ tools~/setup.sh     # install dotnet + JDK (once)
 tools~/verify.sh    # .meta + C# compile (10 configs) + unit tests + Android plugin + frozen strings + release coherence
 ```
 
-`verify.sh` compiles the C# in **10 configurations** (0 warnings), runs the **112**
+`verify.sh` compiles the C# in **10 configurations** (0 warnings), runs the **117**
 headless unit tests via `dotnet test`, and compiles and smoke-tests the Android
-Java plugin (**111** checks). Those tests (bar 41 headless-only ones) plus 6
+Java plugin (**111** checks). Those tests (bar 46 headless-only ones) plus 6
 `JsonUtility` serialization tests run in Unity's **Test Runner** from
 `Tests/Editor/` — **77** there. See [`.verify/README.md`](./.verify/README.md)
 for how the stubs work.
