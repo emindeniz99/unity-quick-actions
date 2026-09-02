@@ -369,3 +369,301 @@ fi
 
 printf '\nPASS: %s on API %s — %s registered with ShortcutManager; a WARM tap on '\''%s'\'' and a COLD (force-stopped) tap on '\''%s'\'' both came back as Performed.\n' \
   "$APP_ID" "$API_LEVEL" "$SHORTCUT_IDS" "$TAP_ID" "$COLD_TAP_ID"
+
+# ---------------------------------------------------------------------------
+# Opt-in tail (CAPTURE_LONGPRESS=1): photograph the launcher's long-press sheet.
+#
+# Everything above is an assertion. This is not one. `dumpsys shortcut` proves
+# each icon resolved to a RESOURCE ID; it says nothing about what a launcher
+# draws, and nobody has ever seen the package's built-in art on a home screen.
+# So, once the verdict is printed, optionally drive the launcher — home, open
+# the app drawer, long-press the app's icon, screencap — and keep the picture.
+#
+# It is best-effort by construction and can never change the verdict:
+#   * the PASS line above is printed BEFORE any of this runs;
+#   * the whole block runs in a subshell with errexit and pipefail OFF, its
+#     status discarded, so the script's own status stays 0 (see the tail);
+#   * every adb call is bounded by `timeout` where coreutils has it — a hung
+#     `uiautomator dump` would otherwise eat the job's whole timeout, which is
+#     the one way a decoration like this could turn a green smoke red.
+# The drawer gesture and the sheet belong to whatever launcher the system image
+# ships (Launcher3 on an AOSP `default` image; something else on a google_apis
+# or OEM one — the capture logs which HOME activity it resolved, because that
+# is the first thing you need when it misses). A run that finds nothing is an
+# expected outcome: it prints what it saw instead of failing.
+#
+# Written into CAPTURE_DIR (default: a temp dir):
+#   longpress.png     the screen after the long press — the artifact for eyes
+#   ui-drawer.xml     the hierarchy the app icon was located in
+#   ui-longpress.xml  the hierarchy after the press, i.e. the machine-readable
+#                     half: "shortcut sheet visible: yes/no" comes from it
+# ---------------------------------------------------------------------------
+
+# The app's launcher label, which is what the drawer shows and what the icon is
+# found by: Unity writes android:label from productName, `QuickActionsDemo` in
+# all three Examples~ testbeds. For any other APK, read it out of
+# `aapt2 dump badging <apk>` (application-label) and pass it in.
+CAPTURE_LABEL="${CAPTURE_LABEL:-QuickActionsDemo}"
+# The TITLES (not ids) the sheet should list, '|'-separated because they contain
+# spaces. These are the three the smoke's AUTOTEST=add3 publishes, from the demo
+# Catalog in Samples~/Demo/QuickActionsDemo.cs — the same three titles the
+# testbeds' QuickActionsSettings.asset bakes statically.
+CAPTURE_TITLES="${CAPTURE_TITLES:-New Game|Continue|Daily Reward}"
+CAPTURE_TIMEOUT="${CAPTURE_TIMEOUT:-60}"
+CAPTURE_PRESS_MS="${CAPTURE_PRESS_MS:-1500}"
+
+# adb, bounded. `adb_` cannot be reused here: `timeout` runs a program, not a
+# shell function, so the serial has to be spelled out again.
+cap_adb() {
+  if command -v timeout >/dev/null 2>&1; then
+    if [ -n "$SERIAL" ]; then
+      timeout "$CAPTURE_TIMEOUT" adb -s "$SERIAL" "$@"
+    else
+      timeout "$CAPTURE_TIMEOUT" adb "$@"
+    fi
+  else
+    adb_ "$@"
+  fi
+}
+
+# uiautomator writes on the device, so a dump is a dump plus a pull. It also
+# refuses while the screen animates ("Could not get idle state"), which is why
+# the sequence below goes HOME first and waits: a Unity player redrawing every
+# frame is never idle.
+cap_dump_ui() {
+  local dest="$1"
+  cap_adb shell uiautomator dump /sdcard/quickactions-ui.xml >/dev/null 2>&1 || return 1
+  cap_adb pull /sdcard/quickactions-ui.xml "$dest" >/dev/null 2>&1 || return 1
+  [ -s "$dest" ]
+}
+
+capture_longpress() {
+  local dir tmp py wh w h x y_from y_to xy ix iy out rc attempt
+  local titles=()
+
+  printf '\n== capture (best effort, NOT part of the verdict): the long-press sheet ==\n'
+  command -v python3 >/dev/null 2>&1 || {
+    echo "capture: python3 is not on PATH — nothing to parse the UI dumps with; skipped."
+    return 0
+  }
+  dir="${CAPTURE_DIR:-${TMPDIR:-/tmp}/quickactions-longpress}"
+  mkdir -p "$dir" || {
+    echo "capture: could not create '$dir'; skipped."
+    return 0
+  }
+  # Scaffolding, so NOT in CAPTURE_DIR: that directory is uploaded whole as a
+  # CI artifact and a helper script is not evidence of anything.
+  tmp="$(mktemp -d 2>/dev/null)" || tmp="$dir"
+  py="$tmp/parse_ui.py"
+  # Heredoc body and terminator sit at column 0 — `<<` (not `<<-`) strips
+  # nothing, so indenting them would indent the Python with them.
+cat >"$py" <<'PY'
+"""Read `wm size` output or a uiautomator dump on stdin; print what the capture
+needs, so the shell never has to parse XML. Three modes:
+
+  size               -> "<width> <height>"
+  icon <label>       -> "<centre-x> <centre-y>" of the smallest node whose
+                        text/content-desc is that app label
+  labels <title>...  -> one "<title>: yes|no" line each; exit 0 if all were
+                        found, 4 if some, 3 if none
+"""
+import re
+import sys
+import xml.etree.ElementTree as ET
+
+BOUNDS = re.compile(r"\[(-?\d+),(-?\d+)\]\[(-?\d+),(-?\d+)\]")
+CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f]")
+
+
+def read_nodes(data):
+    """Every <node> of a uiautomator dump, as attribute dicts."""
+    try:
+        root = ET.fromstring(data)
+    except ET.ParseError:
+        # An app may put control characters in a label; uiautomator serializes
+        # them and ElementTree then rejects the whole dump. Strip them, retry.
+        root = ET.fromstring(CONTROL.sub("", data))
+    return [element.attrib for element in root.iter("node")]
+
+
+def labels_of(node):
+    """Both places a launcher can carry a visible name."""
+    return [t for t in (node.get("text", ""), node.get("content-desc", "")) if t]
+
+
+def centre(node):
+    """(x, y, area) of bounds="[x1,y1][x2,y2]", or None if it has no extent."""
+    match = BOUNDS.match(node.get("bounds", ""))
+    if not match:
+        return None
+    x1, y1, x2, y2 = (int(v) for v in match.groups())
+    if x2 <= x1 or y2 <= y1:
+        return None
+    return (x1 + x2) // 2, (y1 + y2) // 2, (x2 - x1) * (y2 - y1)
+
+
+def is_label(text, label):
+    if text == label:
+        return True
+    # Launchers truncate a long label ("QuickActionsD…"), so accept a prefix —
+    # but a substantial one, or "Q" would match half the drawer.
+    trimmed = text.rstrip(". …")
+    return len(trimmed) >= 6 and label.startswith(trimmed)
+
+
+def main(argv):
+    mode = argv[1] if len(argv) > 1 else ""
+    data = sys.stdin.read()
+
+    if mode == "size":
+        # `wm size` prints "Physical size: WxH", plus an "Override size:" line
+        # when the display is scaled — input coordinates follow the override.
+        match = (re.search(r"Override size:\s*(\d+)x(\d+)", data)
+                 or re.search(r"Physical size:\s*(\d+)x(\d+)", data))
+        if not match:
+            print("parse_ui: no WxH in the `wm size` output", file=sys.stderr)
+            return 1
+        print(match.group(1), match.group(2))
+        return 0
+
+    if mode == "icon":
+        label = argv[2]
+        seen, best = [], None
+        for node in read_nodes(data):
+            texts = labels_of(node)
+            seen.extend(texts)
+            if not any(is_label(t, label) for t in texts):
+                continue
+            point = centre(node)
+            # Smallest match wins: the icon itself, never a container that
+            # happens to describe itself with the same name.
+            if point and (best is None or point[2] < best[2]):
+                best = point
+        if best is None:
+            print("parse_ui: nothing labelled %r among %d visible labels; saw: %s"
+                  % (label, len(seen), ", ".join(sorted(set(seen))[:15])),
+                  file=sys.stderr)
+            return 3
+        print(best[0], best[1])
+        return 0
+
+    if mode == "labels":
+        wanted = argv[2:]
+        seen = [t for node in read_nodes(data) for t in labels_of(node)]
+        found = [w for w in wanted if any(w == t or w in t for t in seen)]
+        for title in wanted:
+            print("%s: %s" % (title, "yes" if title in found else "no"))
+        if len(found) == len(wanted):
+            return 0
+        return 4 if found else 3
+
+    print("parse_ui: unknown mode %r" % mode, file=sys.stderr)
+    return 1
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main(sys.argv))
+    except Exception as exc:  # best-effort: a traceback here helps nobody
+        print("parse_ui: %s" % exc, file=sys.stderr)
+        sys.exit(1)
+PY
+
+  IFS='|' read -r -a titles <<<"$CAPTURE_TITLES"
+
+  # 1. Home. The launcher has to be in front for uiautomator to reach an idle
+  #    state at all, and step 8 left the app itself in the foreground. Name the
+  #    launcher while we are here: everything below is ITS behaviour, and which
+  #    one a given system image ships is exactly what a failed gesture leaves
+  #    you guessing about.
+  echo "capture: home activity: $(cap_adb shell cmd package resolve-activity --brief \
+    -a android.intent.action.MAIN -c android.intent.category.HOME 2>/dev/null \
+    | tr -d '\r' | tail -n 1)"
+  cap_adb shell input keyevent KEYCODE_HOME >/dev/null 2>&1 || true
+  sleep 2
+
+  # 2. Open the all-apps drawer: a swipe up from NEAR the bottom, not from the
+  #    very edge — on a gesture-navigation device that band belongs to the
+  #    system and the swipe would only go home again.
+  if ! wh="$(cap_adb shell wm size 2>/dev/null | tr -d '\r' | python3 "$py" size)"; then
+    echo "capture: could not read the display size from 'wm size'; skipped."
+    return 0
+  fi
+  w="${wh%% *}"
+  h="${wh##* }"
+  x=$((w / 2))
+  y_from=$((h * 9 / 10))
+  y_to=$((h / 5))
+  echo "capture: display ${w}x${h} — swiping up at x=$x, y $y_from -> $y_to to open the app drawer"
+  cap_adb shell input swipe "$x" "$y_from" "$x" "$y_to" 300 >/dev/null 2>&1 || true
+  sleep 3
+
+  # 3. Find the app's icon by its launcher label. Retried, not because the
+  #    launcher is slow to answer but because a dump taken mid-animation comes
+  #    back as the previous screen.
+  xy=""
+  for attempt in 1 2 3; do
+    if cap_dump_ui "$dir/ui-drawer.xml" \
+      && xy="$(python3 "$py" icon "$CAPTURE_LABEL" <"$dir/ui-drawer.xml")"; then
+      break
+    fi
+    xy=""
+    echo "capture: attempt $attempt — no '$CAPTURE_LABEL' icon in the hierarchy yet"
+    sleep 3
+  done
+
+  # 4. Long-press it. A long press IS a swipe that never moves: the same point
+  #    twice, held for CAPTURE_PRESS_MS.
+  if [ -n "$xy" ]; then
+    ix="${xy%% *}"
+    iy="${xy##* }"
+    echo "capture: app icon '$CAPTURE_LABEL' at $ix,$iy — long-pressing for ${CAPTURE_PRESS_MS}ms"
+    cap_adb shell input swipe "$ix" "$iy" "$ix" "$iy" "$CAPTURE_PRESS_MS" >/dev/null 2>&1 || true
+    sleep 3
+  else
+    echo "capture: no icon labelled '$CAPTURE_LABEL' was found — screenshotting whatever is on"
+    echo "         screen anyway; ui-drawer.xml says what the launcher was showing."
+  fi
+
+  # 5. The screenshot, taken even when the press never happened: a picture of
+  #    the wrong screen is how the next person fixes the gesture.
+  if cap_adb shell screencap -p /sdcard/quickactions-longpress.png >/dev/null 2>&1 \
+    && cap_adb pull /sdcard/quickactions-longpress.png "$dir/longpress.png" >/dev/null 2>&1; then
+    echo "capture: screenshot -> $dir/longpress.png"
+  else
+    echo "capture: screencap or pull failed — no screenshot this run."
+  fi
+
+  # 6. The half a machine can read: are the shortcut TITLES on screen? This is
+  #    the only line of the capture worth grepping for, and it is evidence
+  #    about the LAUNCHER — step 5 above already proved the icons resolved.
+  if [ -n "$xy" ] && cap_dump_ui "$dir/ui-longpress.xml"; then
+    out="$(python3 "$py" labels "${titles[@]}" <"$dir/ui-longpress.xml")"
+    rc=$?
+    case "$rc" in
+      0) echo "shortcut sheet visible: yes" ;;
+      4) echo "shortcut sheet visible: partial" ;;
+      3) echo "shortcut sheet visible: no" ;;
+      *) echo "shortcut sheet visible: unknown (the hierarchy could not be parsed)" ;;
+    esac
+    printf '%s\n' "$out" | sed 's/^/  /'
+  else
+    echo "shortcut sheet visible: no (no hierarchy could be read after the press)"
+  fi
+
+  rm -f "$py" || true
+  echo "capture: artifacts in $dir"
+}
+
+# The last thing this script does, and its exit status either way is 0 — the
+# `|| true` discards the subshell's, and an `if` whose condition is false is
+# itself a success. That is what makes the capture unable to speak for the run.
+# (A closing `exit 0` would say the same thing louder, but it cuts shellcheck's
+# reachability graph: every function above that only `poll` ever calls then
+# reads as dead code, thirteen false SC2317s deep.)
+if [ "${CAPTURE_LONGPRESS:-0}" = "1" ]; then
+  (
+    set +e +o pipefail
+    capture_longpress
+  ) || true
+fi

@@ -15,6 +15,18 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **The `android-smoke` legs now photograph the launcher's long-press sheet.**
+  `dumpsys shortcut` proves each shortcut registered *with* an icon resource;
+  nothing has ever seen that art drawn by a launcher. With `CAPTURE_LONGPRESS=1`,
+  `tools~/device-smoke/android_device_smoke.sh` ends — after its `PASS:`
+  verdict — by going home, opening the app drawer, locating the app's icon by
+  its launcher label in a `uiautomator dump`, long-pressing it, and keeping
+  `longpress.png` plus both hierarchy dumps; CI uploads them per leg as
+  `longpress-<leg>`. It asserts nothing and can fail nothing: the gesture and
+  the sheet belong to whatever launcher the system image ships, so the capture
+  runs with `errexit` off, bounds every `adb` call with `timeout`, prints one
+  grep-able `shortcut sheet visible: yes/no`, and leaves the verdict to the
+  eight steps above it.
 - **The settings page says what an `Icon` does on Android, next to the field.**
   A property drawer for `IconType` adds one line under the popup: "built-in
   drawable" for `Add` / `Compose` / `Favorite` / `Play`, or the exact

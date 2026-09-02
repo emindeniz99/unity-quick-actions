@@ -658,11 +658,46 @@ jobs:
         env:
           SHORTCUT_ATTEMPTS: "240"
           COLD_LOG_ATTEMPTS: "180"
+          # The smoke's opt-in tail (see capture_longpress in the script): once
+          # the verdict is printed, drive the launcher — home, app drawer,
+          # long-press the icon — and keep a screenshot plus the two UI dumps.
+          # `dumpsys shortcut` above proves the icons resolved to a RESOURCE;
+          # nobody has ever seen the built-in art drawn by a launcher, and this
+          # is the cheapest place to look.
+          #
+          # It lives INSIDE this step because the emulator only exists for the
+          # duration of this action: a later step has no device to talk to.
+          # It cannot turn the step red — the script prints PASS first, runs
+          # the capture in a subshell with errexit off, bounds every adb call
+          # with `timeout`, and returns 0 whatever the launcher did.
+          CAPTURE_LONGPRESS: "1"
+          CAPTURE_DIR: ${{ runner.temp }}/longpress
         with:
           api-level: ${{ matrix.testbed.api }}
           arch: x86_64
           target: google_apis
           script: tools~/device-smoke/android_device_smoke.sh "$RUNNER_TEMP/apk/QuickActionsDemo-phone.apk" com.quickactions.testbed
+      # The point of the whole exercise: a picture of the long-press sheet, one
+      # per leg. Best-effort in both directions — the drawer gesture and the
+      # sheet are the LAUNCHER's, and which launcher a google_apis image ships
+      # is not something anything here has checked (the capture logs the HOME
+      # activity it resolved, so the first run answers that). A leg can come
+      # back with nothing but a screenshot of the app drawer; upload it anyway.
+      # The two hierarchy dumps next to it are how the next person fixes the
+      # gesture, and the step log already said "shortcut sheet visible: yes/no".
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        if: always()
+        # Belt and braces: the capture cannot fail the smoke step, and a failed
+        # upload of a decoration must not fail the job either.
+        continue-on-error: true
+        with:
+          name: longpress-${{ matrix.testbed.name }}
+          path: ${{ runner.temp }}/longpress
+          # On a RED smoke the script exits before the capture, so this
+          # directory does not exist — and that must not annotate a run whose
+          # log already says what actually failed.
+          if-no-files-found: ignore
+          retention-days: 14
 
   # ROADMAP verification item (c), automated: does AGP's resource shrinker
   # actually HONOUR the keep rule the package ships? 0.4.7 made every enabled
