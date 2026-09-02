@@ -482,7 +482,8 @@ needs, so the shell never has to parse XML. Three modes:
 
   size               -> "<width> <height>"
   icon <label>       -> "<centre-x> <centre-y>" of the smallest node whose
-                        text/content-desc is that app label
+                        text/content-desc is that app label; exit 5 when the
+                        only match is a launcher prediction of the app
   labels <title>...  -> one "<title>: yes|no" line each; exit 0 if all were
                         found, 4 if some, 3 if none
 """
@@ -547,17 +548,34 @@ def main(argv):
 
     if mode == "icon":
         label = argv[2]
-        seen, best = [], None
+        seen, best, predicted = [], None, None
         for node in read_nodes(data):
             texts = labels_of(node)
             seen.extend(texts)
             if not any(is_label(t, label) for t in texts):
                 continue
             point = centre(node)
+            if not point:
+                continue
+            # A launcher PREDICTION of the app (the Pixel launcher's hotseat
+            # suggestions carry content-desc "Predicted app: <label>") is not
+            # the icon we want: a long press there opens the launcher's
+            # "App suggestions" sheet, never the app's shortcut popup — the
+            # second capture attempt photographed exactly that. Remember it,
+            # but only as a last resort the caller can recognise.
+            if any(t.startswith("Predicted app:") for t in texts):
+                if predicted is None or point[2] < predicted[2]:
+                    predicted = point
+                continue
             # Smallest match wins: the icon itself, never a container that
             # happens to describe itself with the same name.
-            if point and (best is None or point[2] < best[2]):
+            if best is None or point[2] < best[2]:
                 best = point
+        if best is None and predicted is not None:
+            print("parse_ui: %r is on screen only as a launcher prediction at %d,%d — "
+                  "not a real icon; open the drawer" % (label, predicted[0], predicted[1]),
+                  file=sys.stderr)
+            return 5
         if best is None:
             print("parse_ui: nothing labelled %r among %d visible labels; saw: %s"
                   % (label, len(seen), ", ".join(sorted(set(seen))[:15])),
@@ -610,8 +628,11 @@ PY
   #    for the drawer, each followed by a fresh search: the ALL_APPS key
   #    (API 28+), a tap on the launcher's own drawer handle if the hierarchy
   #    shows one ("Apps list" on that image), and finally the ALL_APPS intent.
-  #    On the API 35 image the icon sat in the predicted-apps row of the home
-  #    screen, which the first search already finds.
+  #    On the API 35 image the icon sits in the predicted-apps row of the home
+  #    screen; the second attempt found and pressed it there, and the launcher
+  #    answered with its "App suggestions added to empty space" sheet — a
+  #    prediction is not a real icon, so parse_ui now reports such a match as
+  #    exit 5 and the search goes on to the drawer like any other miss.
   if ! wh="$(cap_adb shell wm size 2>/dev/null | tr -d '\r' | python3 "$py" size)"; then
     echo "capture: could not read the display size from 'wm size'; skipped."
     return 0

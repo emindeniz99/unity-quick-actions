@@ -20,14 +20,22 @@ ships it.
   is not found; on the API 35 Pixel launcher the icon IS found (in the
   predicted-apps dock) and pressed, but `input swipe x y x y 1500` produced no
   shortcut sheet — the hierarchy after the press is identical to the one
-  before. The second attempt is in the script and has not run yet: a real
-  long press (`input motionevent DOWN`, hold, screencap and hierarchy dump
-  while still down, then `UP`), and on a launcher that ignores the swipe an
-  escalation through `KEYCODE_ALL_APPS`, a tap on the launcher's own drawer
-  handle ("Apps list" on the API 30 Pixel launcher) and the `ALL_APPS`
-  intent. Read `longpress-<leg>` on the next run; if the sheet is still not
-  there, what remains is a launcher-specific gesture, and the entry stays.
-  The verdict never depends on it.
+  before. The second attempt (2026-09-02, run 56) pressed for real — `input
+  motionevent DOWN`, hold, screencap and hierarchy dump while still down,
+  then `UP` — and escalated through `KEYCODE_ALL_APPS`, a tap on the
+  launcher's own "Apps list" handle and the `ALL_APPS` intent when the swipe
+  surfaced nothing. On API 30 none of the three opened the drawer (the
+  hierarchy stayed the home screen every time). On API 35 the press landed
+  on the icon it had found — but that icon was the hotseat's *prediction*
+  of the app (`Predicted app: QuickActionsDemo`), and the Pixel launcher
+  answers a long press there with its "App suggestions added to empty
+  space / Settings" sheet, never the app's shortcut popup: the screenshot
+  shows exactly that sheet. Third attempt, in the script: a match that is
+  only a launcher prediction counts as a miss, so the drawer escalation
+  runs and the real icon gets the press. If `longpress-unity6` still shows
+  no sheet after that, the remaining unknown is whether the API 35 image's
+  launcher opens its drawer for `KEYCODE_ALL_APPS` at all. The verdict never
+  depends on it.
 - **Port the Android post-processor to `AndroidProjectFilesModifier` (Unity 6).**
   Unity's own notifications package moved to it "for better compatibility with
   incremental build"; the built-ins' distinct-name design was chosen so that

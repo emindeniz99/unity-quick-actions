@@ -46,7 +46,12 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   no sheet, so the capture now escalates through `KEYCODE_ALL_APPS`, the
   launcher's own "Apps list" handle and the `ALL_APPS` intent when the icon
   is not found, and presses with `input motionevent` DOWN / hold / UP, taking
-  the screenshot and the hierarchy while the finger is still down.
+  the screenshot and the hierarchy while the finger is still down. That
+  second attempt (run 56) photographed the Pixel launcher's "App suggestions"
+  sheet on API 35: the icon it pressed was the hotseat's *prediction* of the
+  app, which never opens the shortcut popup, and on API 30 no opener moved
+  the launcher off the home screen. A predicted-app match now counts as a
+  miss, so the drawer escalation runs and a real icon gets the press.
 - **The settings page says what an `Icon` does on Android, next to the field.**
   A property drawer for `IconType` adds one line under the popup: "built-in
   drawable" for `Add` / `Compose` / `Favorite` / `Play`, or the exact

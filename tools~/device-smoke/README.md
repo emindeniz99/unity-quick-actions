@@ -124,7 +124,10 @@ hold, and `UP` only after the capture (the swipe-that-never-moves the first run
 used reached the API 35 Pixel launcher as a gesture and opened nothing); where
 `motionevent` is rejected the swipe form is the fallback and the log says so.
 `screencap` and the second hierarchy dump happen with the finger still down, so
-a sheet that dismisses on release is captured all the same. Into `CAPTURE_DIR`:
+a sheet that dismisses on release is captured all the same. An icon the launcher
+shows only as a *prediction* (`Predicted app: …` in the hotseat) is not pressed —
+a long press there opens the launcher's suggestions sheet, not the app's popup —
+so such a match counts as a miss and the drawer escalation runs. Into `CAPTURE_DIR`:
 `longpress.png`, `ui-drawer.xml`, `ui-longpress.xml`. The log carries the
 launcher it resolved, the coordinates it pressed, and one grep-able verdict —
 `shortcut sheet visible: yes` / `partial` / `no`.
