@@ -52,8 +52,10 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `UNITY_ANDROID`-only, so the always-present Editor assembly needed its own
   copy), held to the art by `--check` and by harness tests that also pin the
   drawer's name derivation to the Java `ICON_NAMES` table member by member,
-  and that the note stops promising a drawable when **Write built-in Android
-  icons** is off.
+  that the note stops promising a drawable when **Write built-in Android
+  icons** is off, and that in the static list it says what the baker needs:
+  a static shortcut bakes no icon for a non-built-in choice unless
+  `AndroidDrawable` names one. The note wraps at narrow inspector widths.
 - **`AGENTS.md`** — the shortest correct integration path for an AI coding
   agent (or a hurried human): install, define, asmdef reference, the guarded
   snippet, the checks that prove it worked, and the don'ts. The README gains a
@@ -62,6 +64,15 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **The custom-asmdef integration shape is compiled by CI in both
+  configurations.** README tells a project whose scripts live in their own
+  assembly definition to reference `EminDeniz99.QuickActions`; with the define
+  off that assembly is not compiled, so whether the referencing assembly still
+  builds was an assertion about Unity, not a measurement. Testbed2022 now
+  carries `Assets/Integration/Testbed.Integration.asmdef`, which references the
+  package and holds the guarded quickstart component; the define-on legs and
+  the define-off `gate-off` build compile it on every push, and the README
+  also describes the gated-glue-asmdef alternative.
 - **The `.androidlib` icon recipe is proven on a real APK, not just documented.**
   README's recipe for a consumer's own Android shortcut icons rested on Unity's
   documentation and on reading Unity's `com.unity.mobile.notifications`, never on

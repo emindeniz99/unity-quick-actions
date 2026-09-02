@@ -39,7 +39,14 @@ repository root, so the repository **is** the package.
 3. **Reference the assembly** if the calling script lives in an assembly
    definition: add `EminDeniz99.QuickActions` to that asmdef's `references`
    (and `EminDeniz99.QuickActions.Editor` to an Editor asmdef that uses the
-   build-time hooks). Scripts in `Assembly-CSharp` need nothing.
+   build-time hooks). Scripts in `Assembly-CSharp` need nothing. With the
+   define off the package's assemblies are not compiled and Unity drops the
+   reference rather than failing the build (CI compiles
+   `Examples~/Testbed2022/Assets/Integration/Testbed.Integration.asmdef` both
+   ways), so the `#if` guards below are all that is needed; a project that
+   wants the package out of its gameplay assembly entirely puts the glue in a
+   small asmdef with `"defineConstraints": ["QUICKACTIONS_ENABLED"]` and keeps
+   `MonoBehaviour`s out of it.
 4. **Subscribe in the first scene, then add** — guarded so the project still
    compiles with the define off:
 

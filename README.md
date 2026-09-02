@@ -87,7 +87,15 @@ hardware; iOS 13+ opens it with a plain long-press on every device.
 
    If that script lives in its own assembly definition, add
    `EminDeniz99.QuickActions` to the asmdef's references; `Assembly-CSharp`
-   sees the package with no setup.
+   sees the package with no setup. With the define off the package's
+   assemblies are not compiled at all and Unity drops the reference rather
+   than failing the build — the `gate-off` CI job builds a testbed assembly of
+   exactly this shape (`Examples~/Testbed2022/Assets/Integration/`) with the
+   define off — so the same `#if` guards keep your assembly compiling. To keep
+   the package out of your gameplay assembly altogether, put the glue in a
+   small asmdef with `"defineConstraints": ["QUICKACTIONS_ENABLED"]` and keep
+   `MonoBehaviour`s out of it, so no scene component goes missing when that
+   assembly is not compiled.
 4. **See it** — **Window ▸ Quick Actions ▸ Simulator** fires taps in the
    Editor; build to a device (or the iOS Simulator) and long-press the app icon
    for the real menu.
@@ -143,8 +151,8 @@ covered by headless tests only — no device or Simulator run has happened since
 they landed, so what a resolved `v1.4.0 (37)` looks like on a real home screen
 is still unconfirmed.
 
-**Also true:** the suite is 121 headless tests (`dotnet test`) and 77 in Unity's
-Test Runner (it adds 6 `JsonUtility` serialization tests; 50 of the headless ones
+**Also true:** the suite is 122 headless tests (`dotnet test`) and 77 in Unity's
+Test Runner (it adds 6 `JsonUtility` serialization tests; 51 of the headless ones
 don't run there), plus an Android Java smoke of 111 checks, across 10 C# compile
 configurations with 0 warnings. The last CI-measured Test Runner result was
 76/76 (run 38, 2026-09-01), taken before the sixth serialization test landed.
@@ -437,7 +445,13 @@ missing script.
 If the script lives in its own assembly definition, add
 `EminDeniz99.QuickActions` to that asmdef's references (and
 `EminDeniz99.QuickActions.Editor` to an Editor asmdef that uses the build-time
-hooks); scripts in `Assembly-CSharp` see the package with no setup.
+hooks); scripts in `Assembly-CSharp` see the package with no setup. That
+reference resolves to nothing with the define off and Unity drops it rather
+than failing the build — CI compiles a testbed assembly of that shape both
+ways (see the [quickstart](#60-second-quickstart)); a gated glue asmdef
+(`"defineConstraints": ["QUICKACTIONS_ENABLED"]`, no `MonoBehaviour`s in it)
+is the alternative for a project that wants the package out of its gameplay
+assembly entirely.
 
 ### API
 
@@ -946,9 +960,9 @@ tools~/setup.sh     # install dotnet + JDK (once)
 tools~/verify.sh    # .meta + C# compile (10 configs) + unit tests + Android plugin + frozen strings + release coherence
 ```
 
-`verify.sh` compiles the C# in **10 configurations** (0 warnings), runs the **121**
+`verify.sh` compiles the C# in **10 configurations** (0 warnings), runs the **122**
 headless unit tests via `dotnet test`, and compiles and smoke-tests the Android
-Java plugin (**111** checks). Those tests (bar 50 headless-only ones) plus 6
+Java plugin (**111** checks). Those tests (bar 51 headless-only ones) plus 6
 `JsonUtility` serialization tests run in Unity's **Test Runner** from
 `Tests/Editor/` — **77** there. See [`.verify/README.md`](./.verify/README.md)
 for how the stubs work.

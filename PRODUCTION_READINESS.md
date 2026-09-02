@@ -11,7 +11,7 @@ physical-device work is done — is the **Status** section of the
 the two must not disagree.
 
 **Legend — Verified by:**
-`unit` = headless NUnit (`dotnet test`, 121 tests) · `unity-test` = Unity Test
+`unit` = headless NUnit (`dotnet test`, 122 tests) · `unity-test` = Unity Test
 Runner only (JsonUtility) · `static` = compiles in the stub harness (10 configs) ·
 `review` = code review, several adversarial rounds (see git log) ·
 `device` = **requires a real physical device** — Android partially done
@@ -94,29 +94,29 @@ says "6.3" for work dated later than 2026-07-17, the Editor was `6000.3.21f1`.
 ## Sign-off
 
 - **Headless gate (closable without a Unity Editor): GREEN.** `tools~/verify.sh` → **VERIFY: PASS** —
-  10 C# configs compile with **0 warnings**, **121 unit tests pass** (`dotnet test`),
+  10 C# configs compile with **0 warnings**, **122 unit tests pass** (`dotnet test`),
   the Android plugin compiles and its Java smoke test passes **111 checks, 0
   failed**, and every asset has a stable `.meta`. Every managed feature has a
   dedicated, intent-encoding test. Reviewed feature by feature across repeated
   adversarial rounds; every confirmed finding was fixed or explicitly
   documented, and **no ship-blocker remains open**.
-- **Test inventory (where each number comes from).** 127 distinct C# tests:
+- **Test inventory (where each number comes from).** 128 distinct C# tests:
   - **71 shared** — `Tests/Editor/QuickActionsApiTests.cs` (65) and
     `QuickActionItemTests.cs` (6). Run by BOTH `dotnet test` and the Unity Test
     Runner.
   - **6 Unity-only** — `Tests/Editor/SerializationTests.cs`. Needs real
     `JsonUtility`, so the headless harness excludes it (see the `Compile Include`
     list in `.verify/QuickActions.Tests.csproj`).
-  - **50 headless-only** — `.verify/EditorTests/AndroidStaticLocalizationTests.cs`
+  - **51 headless-only** — `.verify/EditorTests/AndroidStaticLocalizationTests.cs`
     (4), `AndroidKeepRulesTests.cs` (8), `AndroidBuiltInIconsTests.cs` (16),
-    `BuiltInIconSetTests.cs` (5) and `StaticBuildPlaceholdersTests.cs` (17).
+    `BuiltInIconSetTests.cs` (6) and `StaticBuildPlaceholdersTests.cs` (17).
     Live in the harness because
     the code under test sits in Editor assemblies a Unity test assembly cannot
     reference (the Android post-processor's asmdef is `defineConstraints`-gated
     to `UNITY_ANDROID`; the runtime-referencing test asmdef can't see the Editor
     assembly the placeholder pipeline lives in).
 
-  So `dotnet test` reports **121** (71 + 50) and a Unity Test Runner run reports
+  So `dotnet test` reports **122** (71 + 51) and a Unity Test Runner run reports
   **77** (71 + 6). The measured Test Runner results: **74/74** on 2021.3.45f2,
   2022.3.62f3 and 6000.3.21f1 at the suite size of that day, and **76/76** on
   the 2026-09-01 CI run (run 38), taken before the sixth serialization test
