@@ -4,7 +4,10 @@
   and no code. Shape taken from Unity's own first-party androidlib
   (com.unity.mobile.notifications 2.3.2,
   Runtime/Android/Plugins/mobilenotifications.androidlib/src/main/AndroidManifest.xml),
-  which declares its package exactly this way.
+  which declares its package exactly this way. That package keeps it under
+  src/main/ because it ships a build.gradle; a BARE androidlib like this one
+  has no build.gradle, and Unity generates the module with the manifest and
+  res/ at the ROOT — the first CI run of this fixture measured exactly that.
 
   `package` rather than a `namespace` in a build.gradle of our own: Unity
   2022.3 exports AGP 7.1.2, where the manifest attribute is still the supported

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- THE DECOY. Deliberately under src/main/res/ — the Gradle-module layout —
+     which a BARE .androidlib (no build.gradle of its own) silently ignores:
+     Unity generates the module with AndroidManifest.xml and res/ at the root.
+     The first CI run of this fixture proved that the hard way: the drawable
+     that then sat here never reached the APK while a decoy at res/ did. The
+     android-build job's 2022.3 leg now requires THIS file to be absent from
+     the APK resource table, so the README's trap stays a measured fact. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="96"
+    android:viewportHeight="96">
+  <path
+      android:fillColor="#B71C1C"
+      android:pathData="M2,48A46,46 0 1,1 94,48A46,46 0 1,1 2,48Z" />
+  <path
+      android:fillColor="#FFFFFF"
+      android:pathData="M28,34L34,28L68,62L62,68ZM62,28L68,34L34,68L28,62Z" />
+</vector>

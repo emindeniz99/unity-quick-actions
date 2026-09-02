@@ -655,24 +655,27 @@ jobs:
               exit 1
             fi
             # 2022.3 only: the recipe README.md gives a consumer for their OWN
-            # icons — an .androidlib — which until now rested on Unity's
-            # documentation and on reading Unity's first-party
-            # com.unity.mobile.notifications, never on a build. ROADMAP
-            # sub-items (a), (b) and (d), in order:
-            #   (a) Assets/QuickActionIcons.androidlib/src/main/res/drawable/
-            #       must reach the APK          -> ic_quickaction_search PRESENT
-            #   (d) the same folder shape inside an embedded UPM package,
+            # icons — a bare .androidlib (no build.gradle of its own) — which
+            # until this leg rested on Unity's documentation and on reading
+            # Unity's first-party com.unity.mobile.notifications, never on a
+            # build. The first run proved the documented layout WRONG: Unity
+            # generates the Gradle module for a bare androidlib with the manifest
+            # and res/ at the ROOT, and the src/main/ layout (which Unity's own
+            # package can use only because it ships a build.gradle) is silently
+            # ignored. ROADMAP sub-items (a), (b) and (d), as measured:
+            #   (a) Assets/QuickActionIcons.androidlib/res/drawable/ must reach
+            #       the APK                     -> ic_quickaction_search PRESENT
+            #   (d) the same root layout inside an embedded UPM package,
             #       Packages/com.quickactions.testlib/Runtime/Android/Plugins/
             #                                   -> ic_quickaction_frompkg PRESENT
-            #   (b) res/ at the .androidlib ROOT is silently dropped, which is
-            #       the first of README's "three traps"
+            #   (b) src/main/res/ in a bare .androidlib is silently dropped —
+            #       README's first trap, inverted from what it first said
             #                                   -> ic_quickaction_decoy ABSENT
-            # The four built-in drawables just asserted above are the positive
+            # The built-in drawables just asserted above are the positive
             # control: they prove this dump is being read correctly, so a miss
             # below is about the .androidlib and not about aapt2. And (b) is
             # ASSERTED, not assumed — without it a green run would equally
-            # describe a build that had been picking the root res/ up all along,
-            # i.e. a README trap that is simply wrong.
+            # describe a build that picks src/main/res/ up after all.
             if [ "${ANDROIDLIB:-}" = "true" ]; then
               local consumer_missing=""
               for want in drawable/ic_quickaction_search drawable/ic_quickaction_frompkg; do
@@ -684,7 +687,7 @@ jobs:
               if [ -n "$consumer_missing" ]; then
                 echo "MISSING from the APK resource table:$consumer_missing"
                 echo "The .androidlib recipe README.md documents did not reach this APK."
-                echo "ic_quickaction_search comes from Assets/QuickActionIcons.androidlib/;"
+                echo "ic_quickaction_search comes from Assets/QuickActionIcons.androidlib/res/;"
                 echo "ic_quickaction_frompkg from the embedded package com.quickactions.testlib."
                 echo "--- every ic_quickaction_ line aapt2 did report ---"
                 printf '%s\n' "$res" | grep -i 'ic_quickaction' || echo "(none at all)"
@@ -693,14 +696,14 @@ jobs:
               case "$res" in
                 *ic_quickaction_decoy*)
                   echo "UNEXPECTED: ic_quickaction_decoy IS in the APK resource table."
-                  echo "That file sits at res/drawable/ at the .androidlib ROOT, which"
+                  echo "That file sits under src/main/res/ in a bare .androidlib, which"
                   echo "README.md documents as silently ignored — green build, no warning,"
-                  echo "no icon. Either Unity changed or the trap was never real: fix"
+                  echo "no icon. Either Unity changed or the trap is not real: fix"
                   echo "README.md's 'Three traps worth knowing' rather than this check."
                   printf '%s\n' "$res" | grep -i 'ic_quickaction' || true
                   exit 1
                   ;;
-                *) echo "ok: ic_quickaction_decoy is ABSENT — res/ at the .androidlib root is dropped" ;;
+                *) echo "ok: ic_quickaction_decoy is ABSENT — src/main/res/ in a bare .androidlib is dropped" ;;
               esac
             fi
             manifest="$("$AAPT2" dump xmltree --file AndroidManifest.xml "$apk" 2>&1)" \
