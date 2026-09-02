@@ -24,6 +24,39 @@ namespace UnityEditor
         public static GUIStyle textArea => new GUIStyle();
         public static GUIStyle textField => new GUIStyle();
         public static GUIStyle miniButton => new GUIStyle();
+        public static GUIStyle miniLabel => new GUIStyle();
+    }
+
+    // The PropertyDrawer surface the IconType drawer uses: compile-only, never drawn.
+    public class SerializedProperty
+    {
+        public int intValue;
+        public bool hasMultipleDifferentValues;
+    }
+
+    public abstract class PropertyDrawer
+    {
+        public virtual void OnGUI(Rect position, SerializedProperty property, GUIContent label) { }
+        public virtual float GetPropertyHeight(SerializedProperty property, GUIContent label) => 0f;
+    }
+
+    [AttributeUsage(AttributeTargets.Class, AllowMultiple = true)]
+    public sealed class CustomPropertyDrawer : Attribute
+    {
+        public CustomPropertyDrawer(Type type) { }
+        public CustomPropertyDrawer(Type type, bool useForChildren) { }
+    }
+
+    public static class EditorGUI
+    {
+        public static bool PropertyField(Rect position, SerializedProperty property, GUIContent label) => false;
+        public static void LabelField(Rect position, string label, GUIStyle style) { }
+    }
+
+    public static class EditorGUIUtility
+    {
+        public static float singleLineHeight => 18f;
+        public static float standardVerticalSpacing => 2f;
     }
 
     public static class EditorGUILayout

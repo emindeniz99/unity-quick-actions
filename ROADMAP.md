@@ -69,10 +69,6 @@ ships it.
   with incremental build"; the built-ins' distinct-name design was chosen so
   that port is mechanical (every output declared up front, nothing inspected in
   the tree), but the port itself is not done.
-- **Mark which `IconType`s have Android art in the settings UI.** A consumer
-  choosing `IconType.Search` from the 29-entry dropdown learns only at build
-  time (a warning) that it renders blank on Android without a drawable of their
-  own; the settings page could say so next to the field.
 - **Teaching sample for custom Android icons (small, optional).** A
   `Samples~/AndroidIcons/` containing a ready-made `QuickActionIcons.androidlib`
   (correct `src/main/AndroidManifest.xml` + `src/main/res/drawable-xhdpi/`)

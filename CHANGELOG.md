@@ -15,6 +15,16 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **The settings page says what an `Icon` does on Android, next to the field.**
+  A property drawer for `IconType` adds one line under the popup: "built-in
+  drawable" for `Add` / `Compose` / `Favorite` / `Play`, or the exact
+  `ic_quickaction_<name>` the project must ship for the other 25 — which used
+  to surface first as a build-log warning. The four names come from a second
+  generated file, `Editor/QuickActionsBuiltInIconSet.cs`, written by the same
+  generator from the same list (the Android assembly holding the art is
+  `UNITY_ANDROID`-only, so the always-present Editor assembly needed its own
+  copy), held to the art by `--check` and by a harness test that also pins the
+  drawer's name derivation to the Java `ICON_NAMES` table member by member.
 - **`AGENTS.md`** — the shortest correct integration path for an AI coding
   agent (or a hurried human): install, define, asmdef reference, the guarded
   snippet, the checks that prove it worked, and the don'ts. The README gains a

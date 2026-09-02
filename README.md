@@ -501,7 +501,10 @@ have resolved an icon resource; what nobody has done yet is look at them on a
 launcher — the screenshot at the top of this file predates them.
 
 **The other 25 entries stay blank until you add a drawable**, and so does any
-built-in one you would rather draw yourself. Create an **Android Library
+built-in one you would rather draw yourself. The settings page says which is
+which next to every `Icon` field — "built-in drawable" for the four, or the
+exact `ic_quickaction_<name>` a member needs — so you learn it while
+configuring, not from a build-log warning. Create an **Android Library
 plug-in** anywhere under `Assets/` (Unity's supported mechanism on 2021.3,
 2022.3 and 6.x alike — the import instructions are identical across all three):
 
