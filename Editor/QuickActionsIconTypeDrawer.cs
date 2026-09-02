@@ -45,7 +45,18 @@ namespace EminDeniz99.QuickActions.Editor
         public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
         {
             var field = new Rect(position.x, position.y, position.width, EditorGUIUtility.singleLineHeight);
-            EditorGUI.PropertyField(field, property, label);
+            // Never EditorGUI.PropertyField for THIS property here: that call dispatches
+            // to the registered drawer for its type — this one — and recurses until the
+            // Editor overflows its stack the first time any IconType field is shown.
+            // Draw the popup directly and write the value back ourselves.
+            label = EditorGUI.BeginProperty(field, label, property);
+            EditorGUI.BeginChangeCheck();
+            EditorGUI.showMixedValue = property.hasMultipleDifferentValues;
+            var chosen = (IconType)EditorGUI.EnumPopup(field, label, (IconType)property.intValue);
+            EditorGUI.showMixedValue = false;
+            if (EditorGUI.EndChangeCheck())
+                property.intValue = (int)chosen;
+            EditorGUI.EndProperty();
 
             var note = Note(property);
             if (note == null)

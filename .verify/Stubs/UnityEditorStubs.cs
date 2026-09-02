@@ -55,6 +55,12 @@ namespace UnityEditor
 
     public static class EditorGUI
     {
+        public static bool showMixedValue;
+        public static GUIContent BeginProperty(Rect totalPosition, GUIContent label, SerializedProperty property) => label;
+        public static void EndProperty() { }
+        public static void BeginChangeCheck() { }
+        public static bool EndChangeCheck() => false;
+        public static Enum EnumPopup(Rect position, GUIContent label, Enum selected) => selected;
         public static bool PropertyField(Rect position, SerializedProperty property, GUIContent label) => false;
         public static void LabelField(Rect position, string label, GUIStyle style) { }
         public static void LabelField(Rect position, GUIContent label, GUIStyle style) { }
