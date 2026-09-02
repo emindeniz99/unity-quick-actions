@@ -116,7 +116,8 @@ Everything above is an assertion. This is not: with `CAPTURE_LONGPRESS=1` in the
 environment, the script's last act — *after* the `PASS:` line — is to drive the
 launcher and photograph the long-press sheet. Home, swipe up to open the app
 drawer, find the app's icon by its label in a `uiautomator dump` — and when the
-swipe surfaces nothing (the Pixel launcher on the API 30 image ignores it),
+swipe surfaces nothing (the Pixel launcher on the API 30 image ignored it on
+three runs and opened on the fourth; the API 35 one has ignored it every time),
 escalate: the `KEYCODE_ALL_APPS` key, a tap on the launcher's own drawer handle
 if the hierarchy shows one ("Apps list" there), then the `ALL_APPS` intent, each
 followed by a fresh search. Then a real long press — `input motionevent DOWN`,
@@ -124,15 +125,22 @@ hold, and `UP` only after the capture (the swipe-that-never-moves the first run
 used reached the API 35 Pixel launcher as a gesture and opened nothing); where
 `motionevent` is rejected the swipe form is the fallback and the log says so.
 `screencap` and the second hierarchy dump happen with the finger still down, so
-a sheet that dismisses on release is captured all the same. Into `CAPTURE_DIR`:
+a sheet that dismisses on release is captured all the same. An icon the launcher
+shows only as a *prediction* (`Predicted app: …` in the hotseat) is not pressed —
+a long press there opens the launcher's suggestions sheet, not the app's popup —
+so such a match counts as a miss and the drawer escalation runs. Into `CAPTURE_DIR`:
 `longpress.png`, `ui-drawer.xml`, `ui-longpress.xml`. The log carries the
 launcher it resolved, the coordinates it pressed, and one grep-able verdict —
-`shortcut sheet visible: yes` / `partial` / `no`.
+`shortcut sheet visible: yes` / `partial` / `no`. Each `CAPTURE_TITLES` entry is
+a `Title=Subtitle` pair and either half counts — Launcher3 draws the long label
+(the `Subtitle`) when it fits the popup and the short one otherwise — and the
+per-entry line says which form it saw.
 
 What it can prove: **what the icons actually look like on a launcher.** That is
 the whole point — `dumpsys shortcut` (step 5) proves each icon resolved to a
-resource id, and no automated check anywhere has ever seen the art. What it
-cannot prove: anything at all, by itself. `shortcut sheet visible: no` means the
+resource id, and until PR #18 run 61 (API 30, 2026-09-02: `longpress-2022.3`,
+the popup with `add` and `favorite` drawn on two of its four rows) no automated
+check anywhere had seen the art. What it cannot prove: anything at all, by itself. `shortcut sheet visible: no` means the
 gesture missed, or that launcher lays its sheet out differently, or that the
 label was truncated past recognition — never that the package is broken. Read
 the picture, not the line.
@@ -147,7 +155,8 @@ bounded by `timeout`, and the script's exit status is 0 regardless. A red smoke
 exits earlier and captures nothing. Knobs: `CAPTURE_DIR`, `CAPTURE_LABEL` (the
 launcher label to search for — `QuickActionsDemo`, the testbeds' `productName`;
 `aapt2 dump badging <apk>` prints it for any other APK), `CAPTURE_TITLES`
-(`|`-separated), `CAPTURE_TIMEOUT` (60s per adb call), `CAPTURE_PRESS_MS`.
+(`|`-separated `Title=Subtitle` pairs), `CAPTURE_TIMEOUT` (60s per adb call),
+`CAPTURE_PRESS_MS`.
 
 CI turns it on for all three `android-smoke` legs and uploads
 `longpress-<leg>` as a workflow artifact (`continue-on-error`, `if: always()`).

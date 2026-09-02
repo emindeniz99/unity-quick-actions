@@ -11,23 +11,32 @@ ships it.
   OpenUPM/Git and silently vanish for Asset Store users. Re-check whether Unity
   has fixed this before choosing any design that depends on it.
 
-- **Emulator screenshot of the built-in icons — the gesture, not the capture,
-  is what is missing.** The smoke legs now end with a best-effort long-press
-  capture (`CAPTURE_LONGPRESS=1` in `tools~/device-smoke/android_device_smoke.sh`)
-  and upload `longpress-<leg>` (screenshot plus two `uiautomator` dumps) on
-  every push. The first run (2026-09-02) showed why it was flagged flaky: on
-  the API 30 default launcher the swipe never opens the app drawer, so the icon
-  is not found; on the API 35 Pixel launcher the icon IS found (in the
-  predicted-apps dock) and pressed, but `input swipe x y x y 1500` produced no
-  shortcut sheet — the hierarchy after the press is identical to the one
-  before. The second attempt is in the script and has not run yet: a real
-  long press (`input motionevent DOWN`, hold, screencap and hierarchy dump
-  while still down, then `UP`), and on a launcher that ignores the swipe an
-  escalation through `KEYCODE_ALL_APPS`, a tap on the launcher's own drawer
-  handle ("Apps list" on the API 30 Pixel launcher) and the `ALL_APPS`
-  intent. Read `longpress-<leg>` on the next run; if the sheet is still not
-  there, what remains is a launcher-specific gesture, and the entry stays.
-  The verdict never depends on it.
+- **Emulator screenshot of the built-in icons — photographed once, on API 30;
+  the API 35 drawer is still the gap.** The smoke legs end with a best-effort
+  long-press capture (`CAPTURE_LONGPRESS=1` in
+  `tools~/device-smoke/android_device_smoke.sh`) and upload `longpress-<leg>`
+  (screenshot plus two `uiautomator` dumps) on every push. Three attempts on
+  2026-09-02 got the gesture right a piece at a time: a real press (`input
+  motionevent` DOWN, hold, capture, UP) instead of a swipe that never moves;
+  escalation through `KEYCODE_ALL_APPS`, the launcher's "Apps list" handle and
+  the `ALL_APPS` intent when the swipe surfaces nothing; and counting the
+  hotseat's *prediction* of the app (`Predicted app: …`, whose long press
+  opens the launcher's "App suggestions" sheet) as a miss. On the run after
+  that (PR #18 run 61) the API 30 swipe opened the drawer — the same swipe had
+  left the launcher on its home screen on every earlier run — the press
+  landed on the real icon, and `longpress-2022.3` holds the first photograph
+  of the app's popup: the three static entries and the runtime-added `daily`,
+  drawn with their long labels, with the built-in `add` and `favorite` art on
+  two of the rows (white glyph on the blue background, masked round by the
+  launcher — the `-v26` adaptive variant, which is what API 30 resolves). The
+  script's own `shortcut sheet visible` line said `no` on that run because it
+  matched the titles while the launcher drew the subtitles; it now accepts
+  either. Still open: the API 35 Pixel launcher has never left its home screen
+  for any opener (not yet tried: a swipe that starts above the
+  gesture-navigation band, `KEYCODE_APP_SWITCH`, the launcher's all-apps
+  activity by component name), and on API 30 the swipe has opened the drawer
+  once in four runs, so the capture is a photograph when it lands, never a
+  check. The verdict does not depend on it.
 - **Port the Android post-processor to `AndroidProjectFilesModifier` (Unity 6).**
   Unity's own notifications package moved to it "for better compatibility with
   incremental build"; the built-ins' distinct-name design was chosen so that
