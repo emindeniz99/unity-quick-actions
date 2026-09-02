@@ -75,16 +75,29 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   GoogleUtilities-style isa proxy — the three shapes a project's own
   `UnityAppController` subclass, AppsFlyer / OneSignal-style categories and
   Firebase take. The Simulator launch must print every `QA-COEX: PASS` line by
-  name plus the package's own install line; the category `+load` requires
-  `performActionForShortcutItem` to already exist on `UnityAppController`,
-  the executable proof that a class `+load` runs before a category `+load`.
-  On the scene testbed a second launch shadows
+  name plus the package's own install line; the category `+load` records
+  whether it ran before or after the package's class `+load` and composes
+  either way, because the first run showed both — category first on the
+  2022.3.62f3 export, class first on 6000.3.21f1, every file in
+  `UnityFramework` both times — where the README had asserted a class
+  `+load` always runs first. On the scene testbed a second launch shadows
   `application:configurationForConnectingSceneSession:options:` without
   calling super and requires the install line to flip from "via
   configuration" to "via notification". Until now the `ios-simulator` leg
   only required the process to still exist, which an app with no hooks
   installed satisfies too. The lifecycle each leg exercises is asserted, not
-  described.
+  described. **First run (2026-09-02):** on Testbed6 (6000.3.21f1, scene
+  manifest, iOS 26 Simulator) every check passed on both launches — the
+  UIScene path's first exercise anywhere: hooks on `UnityScene` via the
+  configuration wrapper, via the notification fallback when the host shadows
+  the selector, the cold launch item queued once with `NO` returned, the
+  warm tap once with one completion, the host's discarded `NO` not
+  double-delivering. On Testbed2022 the mock host itself was wrong twice: its
+  category `+load` demanded an order objc4 does not promise, and its
+  scene-configuration override opted the manifest-less app into the scene
+  lifecycle — UIKit calls that selector on any delegate that implements it,
+  manifest or not, and the app then never became active. Both corrected: the
+  order is recorded, and the override exists only under a manifest.
 - **One `NSLog` per launch names the branch each iOS hook took.**
   `[QuickActions] iOS hooks: didFinishLaunching=… performAction=…
   sceneConfig=… manifest=…` at the end of `+load`, and
@@ -121,8 +134,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   delivery paths carried that tap is unknown — 6000.3.8f1 is where Unity
   starts emitting `UIApplicationSceneManifest` and Apple stops calling the
   app-delegate selector. README Status, `PRODUCTION_READINESS.md` (the one
-  iOS row becomes two, both ⏳: the app-delegate row because that run cannot
-  be credited to it, the UIScene row because nothing has exercised it), `CLAUDE.md`
+  iOS row becomes two, and the older Simulator run is credited to neither —
+  what each row claims now comes from the coexistence leg), `CLAUDE.md`
   and `ROADMAP.md` now say so, and the ROADMAP's scene items start with
   "confirm the app still starts": the package adds
   `application:configurationForConnectingSceneSession:options:` where Unity

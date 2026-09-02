@@ -775,10 +775,12 @@ their tokens show raw there.
 ## How it works
 
 - **iOS** — `Plugins/iOS/QuickActions.mm` installs its hooks on
-  `UnityAppController` from a **class `+load`**, so every
-  `IMPL_APP_CONTROLLER_SUBCLASS` subclass inherits them and later plugin
-  swizzlers chain *through* them (an Objective-C class `+load` runs before every
-  category `+load` in the same image). Cold launches arrive in
+  `UnityAppController` — the root class — from a **class `+load`**, so every
+  `IMPL_APP_CONTROLLER_SUBCLASS` subclass inherits them; it wraps whatever
+  implementation it finds and tolerates being wrapped, so a plugin swizzler
+  installed before or after it chains *through* it either way (CI's coexistence
+  leg measured both orders: a vendor-style category `+load` ran before ours on
+  the 2022.3 export and after it on Unity 6). Cold launches arrive in
   `didFinishLaunchingWithOptions:` and warm taps on an injected
   `application:performActionForShortcutItem:completionHandler:`; both enqueue the
   id. **From Unity 2022.3.72f1 / 6000.0.68f1 / 6000.3.8f1 the generated project
@@ -883,16 +885,22 @@ points: a `UnityAppController` subclass via
 (which is itself a *category* `+load` that assigns the `AppControllerClassName`
 global), the `AppDelegateListener` notifications above, and plain swizzling.
 This package hooks `NSClassFromString("UnityAppController")` — the root class,
-never `AppControllerClassName` — from a **class** `+load`, because
-[objc4](https://github.com/apple-oss-distributions/objc4) runs every pending
-class `+load` before any category `+load` in the same image. Three consequences:
-every app-controller subclass *inherits* our implementations; a vendor category
-swizzler installs *on top of* ours and captures our IMP as its "original"; and a
-vendor that reads `AppControllerClassName` at class-`+load` time still sees the
-default, while we do not care. The guarantee is scoped to one image — a vendor
-shipping a dynamic `.xcframework` that loads before `UnityFramework` can still
-run a class `+load` first — but no surveyed SDK touches these selectors, so the
-ordering only has to hold for the ones that swizzle *around* us.
+never `AppControllerClassName` — from a **class** `+load`, and treats the
+`+load` **order as unknown**. What
+[objc4](https://github.com/apple-oss-distributions/objc4) orders is a class's
+own `+load` before its categories' and superclasses before subclasses; between a
+class `+load` and a category `+load` on *different* classes it promises nothing,
+and CI's coexistence leg saw both orders on its first run — the mock vendor
+category ran **before** the package on the 2022.3.62f3 export and **after** it
+on 6000.3.21f1, every file in `UnityFramework` both times. So the design rests
+on what holds in either order: every app-controller subclass *inherits* our
+implementations (root class); a vendor category that installs after us captures
+our IMP as its "original" and chains; one that installs before us is captured
+by *us* and chained to — `didFinishLaunching` is wrapped and
+`performActionForShortcutItem` is wrapped or added, whichever we find. The one
+thing the class `+load` buys for certain is running before the categories on
+its *own* class, which is why we never read `AppControllerClassName`: Unity's
+`IMPL_APP_CONTROLLER_SUBCLASS` assigns it from a category `+load`.
 
 **What the surveyed SDKs do** (source read, not inferred, except where noted):
 
@@ -947,7 +955,12 @@ the duplicate delivery — but returning it is the contract); and if you impleme
 `application:configurationForConnectingSceneSession:options:`, call
 `[super …]` there too, or your subclass shadows our hook and the *first* cold tap
 after install can be missed while the `UISceneWillConnectNotification` fallback
-catches up.
+catches up. And implement that selector **only in an app that declares
+`UIApplicationSceneManifest`**: UIKit treats a delegate that responds to it as
+having adopted the scene lifecycle even without a manifest (measured — UIKit
+called the CI mock host's override on the manifest-less 2022.3 export), while
+this package gates every scene hook on the manifest, so such an app gets the
+scene lifecycle and no scene hooks, and quick actions do nothing.
 
 **Two shapes are unsupported.** In **Unity as a Library** the host owns the
 `UIApplicationDelegate` and `UnityAppController` is reachable only through
@@ -1223,16 +1236,18 @@ behaviour, which cannot run in the Editor.
   handler" (check the installed IMP at call time before owning the
   completionHandler). Returning `NO` from `didFinishLaunchingWithOptions` is
   what dedupes a cold shortcut tap.
-- **Install from a class `+load`, never a category `+load`** — objc4 runs every
-  pending *class* `+load` before any *category* `+load` in the same image, and
-  Unity's `IMPL_APP_CONTROLLER_SUBCLASS` **is** a category `+load`. That one
-  choice is why vendor swizzlers (AppsFlyer, Firebase C++, OneSignal) capture our
-  IMP and chain to it instead of racing us, and why every app-controller subclass
-  inherits our hooks. Corollary: hook `NSClassFromString("UnityAppController")`,
-  never Unity's `AppControllerClassName` global — that global is assigned from a
-  category `+load`, so a class `+load` reading it still sees the default. The
-  guarantee is scoped to one image: a vendor whose dynamic framework loads before
-  `UnityFramework` can still run a class `+load` first.
+- **Install on the root class, and never rely on `+load` order** — hook
+  `NSClassFromString("UnityAppController")` so every app-controller subclass
+  inherits the hooks, wrap whatever is already there and tolerate being wrapped,
+  and assume nothing about whether a vendor's category `+load` runs before or
+  after ours: the coexistence leg's first run measured *both* orders (category
+  first on the 2022.3.62f3 export, class first on 6000.3.21f1) with every file in
+  `UnityFramework`. The claim this README made until then — "a class `+load`
+  runs before every category `+load` in the same image" — was an assumption the
+  first measurement contradicted. Corollary: never read Unity's
+  `AppControllerClassName` global — `IMPL_APP_CONTROLLER_SUBCLASS` assigns it from
+  a category `+load` on the subclass, and only that class's own `+load` is
+  guaranteed to precede it.
 - **Compile-only stubs miss contract bugs.** The classes of defect that
   slipped past `javac` + the NUnit suite (in-place pinned updates, null-vs-empty
   reads, rate-limit windows) were caught only by *running* the plugin against

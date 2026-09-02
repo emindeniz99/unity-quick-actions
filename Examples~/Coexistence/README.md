@@ -21,11 +21,15 @@ them anyway compiles them to nothing.
 
 ## What it proves
 
-* **Install ordering, executably.** The category `+load` requires
-  `application:performActionForShortcutItem:completionHandler:` — a selector Unity
-  never implements — to already exist on `UnityAppController`. It can only be there if
-  the package's *class* `+load` ran first, which is the ordering the whole design
-  rests on.
+* **Install ordering, measured — not required.** The category `+load` records
+  whether `application:performActionForShortcutItem:completionHandler:` — a selector
+  Unity never implements — already existed on `UnityAppController` when it ran
+  (`category-load-ran order=class-first|category-first`), and behaves like a real
+  vendor swizzle either way: it wraps and chains what it finds, or adds its own
+  handler for the package to wrap later. The first run saw both orders — category
+  first on the 2022.3.62f3 export, class first on 6000.3.21f1 — with every file in
+  `UnityFramework`, which is why the design rests on composing in either order, not
+  on winning the race.
 * **Chain integrity** through a subclass, a category swizzle and an isa proxy at the
   same time: the cold call reaches the package and its `NO` comes back up through both
   wrappers; a warm tap through the proxied delegate still lands in the package's queue.

@@ -150,36 +150,34 @@ The stub harness compiles the C#/Java but can't confirm Unity-only wiring:
   `QUICKACTIONS_ENABLED` off shows it as "missing script". Harmless and reversible
   (re-enable the define), documented in README. A future cleanup could move the SO
   *type* into an always-compiled editor assembly so the asset never orphans.
-- **iOS scene lifecycle + cold dedup (SHIPPED in v0.4.0 — device-validate):** the
-  package now learns the scene-delegate class from the connecting session's
-  `UISceneConfiguration` and installs cold
+- **iOS scene lifecycle + cold dedup (SHIPPED in v0.4.0 — Simulator-measured
+  since 2026-09-02, device still open):** the package learns the scene-delegate
+  class from the connecting session's `UISceneConfiguration` and installs cold
   (`scene:willConnectToSession:options:`) + warm
   (`windowScene:performActionForShortcutItem:completionHandler:`) hooks, with a
   consume-once cold-dedup marker that also swallows the host-subclass
-  double-delivery on the app-delegate path. NO ObjC compile harness exists; the
-  first real validation was an Xcode build, and it has now happened — the
-  generated project compiles against the real iOS device SDK on 2021.3 and 6.3
-  with zero warnings from `QuickActions.mm`, and a 6.3 / iOS 26.5 Simulator run
-  confirms a cold tap reaching `Performed` (that run's editor patch was never
-  recorded, so which lifecycle it exercised is unknown). FIRST verify the app
-  still STARTS: on a scene-manifest project, confirm the connected scene's
-  delegate is a `UnityScene` instance and that
-  `session.configuration.delegateClass == UnityScene`. The package adds
-  `application:configurationForConnectingSceneSession:options:` where Unity has
-  none, which moves UIKit off the Info.plist path and onto our return value — if
-  that value were wrong the engine would never initialise, and no tap assertion
-  above it would mean anything. Then verify: a scene-manifest
-  app delivers cold + warm taps exactly once each; a default (no-manifest) app
-  behaves byte-identically to v0.3.0; a host UnityAppController subclass that
-  discards our `NO` no longer double-delivers; multi-scene-delegate-class hosts
-  get coverage only for the first class learned (documented in-code). Also
-  verify the SUBCLASS-SHADOWED shape specifically: a host that overrides
-  `application:configurationForConnectingSceneSession:options:` without calling
-  super shadows our hook, and the `UISceneWillConnectNotification` fallback
-  installs from the live scene's delegate instead. Confirm warm taps arrive in
-  that shape, and measure whether the FIRST cold tap does — the notification may
-  be posted after the delegate's own `willConnect`, in which case that one tap
-  is lost by design (a `[super ...]` call on the host side closes it).
+  double-delivery on the app-delegate path. CI's `ios-simulator-coex` leg now
+  measures, on Testbed6 (6000.3.21f1) under a mock host: the app STARTS with the
+  package's `configurationForConnectingSceneSession` in place (the connected
+  scene's delegate is a `UnityScene`, `session.configuration.delegateClass` is
+  `UnityScene`); the cold launch item is queued exactly once and a warm tap
+  through the scene selector exactly once; a host subclass that discards our
+  `NO` does not double-deliver; and the SUBCLASS-SHADOWED shape (the host
+  overrides the configuration selector without calling super) is recovered by
+  the `UISceneWillConnectNotification` fallback, warm taps included. All of it
+  through synthetic sends. Still open: a cold tap arriving through
+  `connectionOptions` (only UIKit fills that — a real SpringBoard tap, which
+  needs an XCUITest target); whether the FIRST cold tap survives the shadowed
+  shape (the notification may be posted after the delegate's own `willConnect`,
+  in which case that one tap is lost by design — a `[super ...]` call on the
+  host side closes it); multi-scene-delegate-class hosts (coverage only for the
+  first class learned, documented in-code); and any physical device. Also
+  measured, as a shape to avoid: an app delegate that implements
+  `application:configurationForConnectingSceneSession:options:` opts the app
+  into the scene lifecycle even WITHOUT `UIApplicationSceneManifest` (UIKit
+  called the mock host's override on the manifest-less 2022.3 export) — the
+  package gates every scene hook on the manifest, so such a host gets none;
+  declare the manifest or do not implement the selector.
 - **Localization (SHIPPED in v0.4.0 — device-validate):** dynamic per-locale
   titles resolve/refresh across cold starts (verify a device-language change
   re-renders on next launch, and the refresh push tolerates rate limiting);
