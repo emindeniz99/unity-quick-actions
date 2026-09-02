@@ -53,7 +53,7 @@ hardware; iOS 13+ opens it with a plain long-press on every device.
 ## 60-second quickstart
 
 1. **Install** — Package Manager ▸ *Add package from git URL…*:
-   `https://github.com/emindeniz99/unity-quick-actions.git#v0.5.0`
+   `https://github.com/emindeniz99/unity-quick-actions.git#v0.6.0`
 2. **Turn it on** — **Window ▸ Quick Actions ▸ Enable Quick Actions** adds the
    `QUICKACTIONS_ENABLED` define for Standalone, Android and iOS. The package is
    inert without it, by design.
@@ -114,7 +114,7 @@ integration to an AI coding agent: [AGENTS.md](./AGENTS.md).
 
 ## Status
 
-This is **0.5.0**, a pre-1.0 release. Here is exactly what has been proven and
+This is **0.6.0**, a pre-1.0 release. Here is exactly what has been proven and
 what has not — one place, no hedging. (Per-feature detail:
 [PRODUCTION_READINESS.md](./PRODUCTION_READINESS.md).)
 
@@ -164,12 +164,18 @@ is still unconfirmed.
 
 **Also true:** the suite is 122 headless tests (`dotnet test`) and 77 in Unity's
 Test Runner (it adds 6 `JsonUtility` serialization tests; 51 of the headless ones
-don't run there), plus an Android Java smoke of 111 checks, across 10 C# compile
+don't run there), plus an Android Java smoke of 111 checks, across 11 C# compile
 configurations with 0 warnings. The last CI-measured Test Runner result was
 76/76 (run 38, 2026-09-01), taken before the sixth serialization test landed.
 The iOS `.mm` compiles cleanly against the current iOS SDK
 (ARC, arm64, deployment target iOS 13) with no deprecation or availability
-errors — a compile result, separate from the Simulator run above.
+errors — a compile result, separate from the Simulator run above. A
+**release-configuration Android build** — non-development, Managed Stripping
+Level High, R8 with the keep rule documented under
+[Android minification](#known-limits--android-minification-r8proguard--resource-shrinking)
+— registers shortcuts and receives a warm and a cold tap on the API 30 emulator
+in CI (first measured 2026-09-02); every other CI player build is a
+development build.
 
 ## Install
 
@@ -210,7 +216,7 @@ https://github.com/emindeniz99/unity-quick-actions.git
 Pin a version by appending a tag, e.g.:
 
 ```
-https://github.com/emindeniz99/unity-quick-actions.git#v0.5.0
+https://github.com/emindeniz99/unity-quick-actions.git#v0.6.0
 ```
 
 (Without a tag you track the default branch. `v0.4.0` is the first tag, so
@@ -244,7 +250,7 @@ package under `dependencies`:
     }
   ],
   "dependencies": {
-    "com.emindeniz99.quick-actions": "0.5.0"
+    "com.emindeniz99.quick-actions": "0.6.0"
   }
 }
 ```
