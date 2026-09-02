@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- THE DECOY. Deliberately at the androidlib ROOT (res/, not src/main/res/),
+     which README.md's "Three traps worth knowing" says is silently ignored —
+     green build, no warning, no icon. Nothing in this repo had ever watched a
+     build make that true; the android-build job's 2022.3 leg now requires
+     ic_quickaction_decoy to be ABSENT from the APK resource table while its
+     sibling under src/main/res/ is present.
+
+     Everything but the location is identical to ic_quickaction_search.xml —
+     same prefix (so the package's res/raw/quickactions_keep.xml glob would
+     cover it), same shape, same viewport — so a leg that finds this in the APK
+     has isolated one variable: where inside the androidlib the file sat.
+     If this assertion ever goes red, the README trap is wrong and the recipe
+     has a second working layout. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="96"
+    android:viewportHeight="96">
+  <path
+      android:fillColor="#B71C1C"
+      android:pathData="M2,48A46,46 0 1,1 94,48A46,46 0 1,1 2,48Z" />
+  <path
+      android:fillColor="#FFFFFF"
+      android:pathData="M28,34L34,28L68,62L62,68ZM62,28L68,34L34,68L28,62Z" />
+</vector>

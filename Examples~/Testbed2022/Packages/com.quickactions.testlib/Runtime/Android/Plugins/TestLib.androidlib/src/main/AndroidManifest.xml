@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Same shape as the testbed's Assets/QuickActionIcons.androidlib manifest, and
+  same reasoning: `package` rather than a `namespace` in a build.gradle,
+  because Unity 2022.3 exports AGP 7.1.2 where the manifest attribute is still
+  the supported way for a library module to name itself (deprecated in AGP 7.3,
+  removed in 8.0 — hence 2022.3 only). A DIFFERENT package name from the one
+  under Assets/, because two library modules in one Gradle build may not share
+  one; a collision would fail the build rather than silently merge.
+
+  Keeping this file identical in every other respect to the Assets/ one is the
+  point: the only variable between the two halves of the experiment is where
+  the .androidlib lives.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.quickactions.testbed.testlib" />
