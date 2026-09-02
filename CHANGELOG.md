@@ -64,6 +64,14 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **The Unity 6000.6 canary retries an editor that died before the suite
+  ran.** `tests (unity6-latest)` has twice (main run 41, PR #16 run 53) ended
+  with exit 137 at "Begin MonoManager ReloadAssembly" — the editor killed
+  during its own start-up, no test executed — and started fine on the runs
+  between. The job now starts the editor once more when, and only when, the
+  first attempt left no `editmode-results.xml`; an attempt that produced
+  results is final, so a real test failure is never retried, and a verdict
+  step turns the job red unless the last attempt passed.
 - **The custom-asmdef integration shape is compiled by CI in both
   configurations.** README tells a project whose scripts live in their own
   assembly definition to reference `EminDeniz99.QuickActions`; with the define

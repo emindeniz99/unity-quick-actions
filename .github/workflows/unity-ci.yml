@@ -392,7 +392,18 @@ jobs:
           key: Library-unity6latest-${{ steps.resolve.outputs.version }}-tests-${{ hashFiles('Examples~/Testbed6/Packages/**', 'Examples~/Testbed6/ProjectSettings/**') }}
           restore-keys: |
             Library-unity6latest-${{ steps.resolve.outputs.version }}-tests-
+      # The 6000.6 editor has died with exit 137 (SIGKILL) during its OWN
+      # start-up — at "Begin MonoManager ReloadAssembly", before the runner
+      # executed a single test — on main run 41 and PR #16 run 53, and started
+      # fine on the runs between. A start that never reached the suite says
+      # nothing about the package, so it gets ONE more attempt. The gate is the
+      # results file being absent, never the exit code: an attempt that wrote
+      # editmode-results.xml (a real test failure, or the editor dying with
+      # results on disk) is final. The verdict step below turns the job red when
+      # the last attempt did not pass; continue-on-error only keeps the first
+      # attempt from ending the job before that step can run.
       - id: tests
+        continue-on-error: true
         uses: game-ci/unity-test-runner@0ff419b913a3630032cbe0de48a0099b5a9f0ed9 # v4.3.1
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
@@ -405,11 +416,38 @@ jobs:
           testMode: EditMode
           checkName: unity tests (unity6-latest, ${{ steps.resolve.outputs.version }})
           githubToken: ${{ secrets.GITHUB_TOKEN }}
+      - id: tests-retry
+        name: Start the editor once more if it died before producing any results
+        if: ${{ steps.tests.outcome == 'failure' && hashFiles('artifacts/editmode-results.xml') == '' }}
+        uses: game-ci/unity-test-runner@0ff419b913a3630032cbe0de48a0099b5a9f0ed9 # v4.3.1
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+        with:
+          projectPath: Examples~/Testbed6
+          unityVersion: ${{ steps.resolve.outputs.version }}
+          testMode: EditMode
+          checkName: unity tests (unity6-latest, ${{ steps.resolve.outputs.version }}, retry)
+          githubToken: ${{ secrets.GITHUB_TOKEN }}
+      - name: Verdict (the last attempt must have passed)
+        if: ${{ steps.tests.outcome == 'failure' }}
+        env:
+          FIRST: ${{ steps.tests.outcome }}
+          RETRY: ${{ steps.tests-retry.outcome }}
+        run: |
+          echo "unity6-latest: first attempt $FIRST, retry $RETRY"
+          case "$RETRY" in
+            success) echo "the retried start passed; the first death was the editor's, not the suite's" ;;
+            skipped) echo "not retried: the first attempt produced results, so its failure is the suite's"; exit 1 ;;
+            *) echo "the retry did not pass either"; exit 1 ;;
+          esac
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         if: always()
         with:
           name: test-results-unity6-latest
-          path: ${{ steps.tests.outputs.artifactsPath }}
+          path: ${{ steps.tests-retry.outputs.artifactsPath || steps.tests.outputs.artifactsPath }}
           retention-days: 14
 
   # Development APK per testbed via the testbed's own CLI entry point
