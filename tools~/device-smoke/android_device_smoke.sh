@@ -228,21 +228,53 @@ case "$COMPONENT" in
   *) fail "could not resolve a launcher activity for '$APP_ID' (got '${COMPONENT:-<empty>}'). Is that the APK's application id?" ;;
 esac
 adb_ logcat -c >/dev/null 2>&1 || fail "could not clear logcat before the launch."
-if ! out="$(adb_ shell am start -W -n "$COMPONENT" \
-    -a android.intent.action.MAIN -c android.intent.category.LAUNCHER \
-    --es "$AUTOTEST_EXTRA" add3 2>&1 | tr -d '\r')"; then
-  fail "adb could not start $COMPONENT:
+# The launch itself, as a function: step 5 may need it a second time.
+launch_with_autotest() {
+  local out
+  if ! out="$(adb_ shell am start -W -n "$COMPONENT" \
+      -a android.intent.action.MAIN -c android.intent.category.LAUNCHER \
+      --es "$AUTOTEST_EXTRA" add3 2>&1 | tr -d '\r')"; then
+    fail "adb could not start $COMPONENT:
 $out"
-fi
-# `am start` reports "Error: ..." on stdout and still exits 0 — check the text.
-case "$out" in
-  *Error*|*Exception*) fail "am start reported an error for $COMPONENT:
+  fi
+  # `am start` reports "Error: ..." on stdout and still exits 0 — check the text.
+  case "$out" in
+    *Error*|*Exception*) fail "am start reported an error for $COMPONENT:
 $out" ;;
-esac
-echo "launched $COMPONENT with $AUTOTEST_EXTRA=add3"
+  esac
+  echo "launched $COMPONENT with $AUTOTEST_EXTRA=add3"
+}
+launch_with_autotest
+
+# Has the Unity player said anything at all since the launch? Its runtime logs
+# under the `Unity` tag from its first frames on; the two header lines logcat
+# prints for its buffers are not it.
+player_has_logged() {
+  [ -n "$(adb_ shell logcat -d -s Unity:V 2>/dev/null | tr -d '\r' | grep -v '^-' | head -n 1)" ]
+}
 
 step "5/8 wait for the demo's shortcuts to reach ShortcutManager"
-if ! poll "$SHORTCUT_ATTEMPTS" shortcuts_registered; then
+# A known failure mode of the API 30 emulator, seen twice on identical APKs
+# that passed on the next run (2026-09-02, runs 52 and 65): the activity reaches
+# the foreground, and then the Unity player never initialises — no VkInstance,
+# not one line under logcat's `Unity` tag — so nothing this script waits for
+# can ever happen. That is the emulator's ARM translation, not the package. So:
+# half the budget, and if NOTHING has been published and the player has not
+# spoken at all, force-stop and launch once more, loudly, then wait out the
+# other half. A player that did come up and still published nothing gets no
+# second chance — that would be the package's failure, and a relaunch would
+# only hide it.
+half=$((SHORTCUT_ATTEMPTS / 2))
+if ! poll "$half" shortcuts_registered; then
+  if ! player_has_logged; then
+    echo "warning: after $((half * POLL_INTERVAL))s the Unity player has logged nothing at all — it never came up" >&2
+    echo "         (a known API 30 emulator failure mode); force-stopping and launching once more." >&2
+    adb_ shell am force-stop "$APP_ID" >/dev/null 2>&1 || true
+    sleep 2
+    launch_with_autotest
+  fi
+fi
+if ! shortcuts_registered && ! poll "$((SHORTCUT_ATTEMPTS - half))" shortcuts_registered; then
   fail "after $((SHORTCUT_ATTEMPTS * POLL_INTERVAL))s, 'dumpsys shortcut' does not list all of: $SHORTCUT_IDS
 This means the app did not publish them — the autotest hook did not run (not a
 QUICKACTIONS_ENABLED dev build of the Demo sample?), the write was rejected, or
@@ -674,20 +706,32 @@ PY
   w="${wh%% *}"
   h="${wh##* }"
   x=$((w / 2))
-  # Start on the WORKSPACE, not the bottom edge. The first four attempts began
-  # at 90% of the height, and the dumps of both images put that point on a
-  # search box: the Pixel launcher's hotseat search bar on API 35 (y 535–598 of
-  # 640) and the collapsed all-apps search box on API 30 (574–630). A drag that
-  # begins on a search widget is the widget's to keep, and API 30 opened its
-  # drawer on one run in five while API 35 never moved. 65% is above the
+  # Start on the WORKSPACE first, not the bottom edge. The first four attempts
+  # began at 90% of the height, and the dumps of both images put that point on
+  # a search box: the Pixel launcher's hotseat search bar on API 35 (y 535–598
+  # of 640) and the collapsed all-apps search box on API 30 (574–630). A drag
+  # that begins on a search widget is the widget's to keep, and API 30 opened
+  # its drawer on one run in five while API 35 never moved. 65% is above the
   # hotseat and the page indicator on both dumps (API 35: 441–465 / 465+;
   # API 30: 475–499 / 499+) and below the smartspace card at the top.
+  # The 65% start opened the API 35 drawer on its first run (PR #19 run 64) and
+  # the API 30 one not at all, while the 90% start had opened API 30's once —
+  # the drag that starts on the collapsed all-apps box is the one that image
+  # answers. So both, in that order: the workspace first, the bottom edge
+  # second, each followed by a fresh search.
   y_from=$((h * 13 / 20))
   y_to=$((h / 5))
   echo "capture: display ${w}x${h} — swiping up at x=$x, y $y_from -> $y_to to open the app drawer"
   cap_adb shell input swipe "$x" "$y_from" "$x" "$y_to" 300 >/dev/null 2>&1 || true
   sleep 3
   cap_find_icon 3 || true
+  if [ -z "$xy" ]; then
+    y_from=$((h * 9 / 10))
+    echo "capture: the workspace swipe surfaced no icon — swiping again from the bottom edge, y $y_from -> $y_to"
+    cap_adb shell input swipe "$x" "$y_from" "$x" "$y_to" 300 >/dev/null 2>&1 || true
+    sleep 3
+    cap_find_icon 2 || true
+  fi
   if [ -z "$xy" ]; then
     echo "capture: the swipe surfaced no icon — sending KEYCODE_ALL_APPS"
     cap_adb shell input keyevent KEYCODE_ALL_APPS >/dev/null 2>&1 || true

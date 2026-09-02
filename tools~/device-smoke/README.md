@@ -76,6 +76,15 @@ default 5 — an emulator's GPU process tears the dead app's Vulkan objects
 down asynchronously, and launching the new process into that teardown left a
 restarted player engine-silent in CI).
 
+One wait has a second chance built in. Step 5 spends half of
+`SHORTCUT_ATTEMPTS`, and if by then nothing has been published *and* the Unity
+player has not logged a single line under logcat's `Unity` tag, it force-stops
+the app and launches it once more (loudly, on stderr) before spending the other
+half. That is the API 30 emulator's known failure mode — the activity comes to
+the foreground and the player never initialises, seen twice on APKs that passed
+unchanged on the next run — not the package's. A player that did come up and
+still published nothing is not relaunched: that would be a real failure.
+
 ### What it asserts — and what it does not
 
 It asserts that a `QUICKACTIONS_ENABLED` build publishes dynamic shortcuts the
@@ -116,9 +125,10 @@ Everything above is an assertion. This is not: with `CAPTURE_LONGPRESS=1` in the
 environment, the script's last act — *after* the `PASS:` line — is to drive the
 launcher and photograph the long-press sheet. Home, swipe up to open the app
 drawer, find the app's icon by its label in a `uiautomator dump` — and when the
-swipe surfaces nothing (the Pixel launcher on the API 30 image ignored it on
-three runs and opened on the fourth; the API 35 one has ignored it every time),
-escalate: the `KEYCODE_ALL_APPS` key, a tap on the launcher's own drawer handle
+swipe surfaces nothing, swipe again from the bottom edge — the 65% start is
+what opened the API 35 drawer (2026-09-02, run 64), the bottom-edge start is
+the one the API 30 image had answered once (run 61); the old single start at
+90% landed on a search widget on both images — and only then escalate: the `KEYCODE_ALL_APPS` key, a tap on the launcher's own drawer handle
 if the hierarchy shows one ("Apps list" there), then the `ALL_APPS` intent, each
 followed by a fresh search. Then a real long press — `input motionevent DOWN`,
 hold, and `UP` only after the capture (the swipe-that-never-moves the first run
@@ -138,9 +148,10 @@ per-entry line says which form it saw.
 
 What it can prove: **what the icons actually look like on a launcher.** That is
 the whole point — `dumpsys shortcut` (step 5) proves each icon resolved to a
-resource id, and until PR #18 run 61 (API 30, 2026-09-02: `longpress-2022.3`,
-the popup with `add` and `favorite` drawn on two of its four rows) no automated
-check anywhere had seen the art. What it cannot prove: anything at all, by itself. `shortcut sheet visible: no` means the
+resource id, and until 2026-09-02 no automated check anywhere had seen the
+art; `longpress-2022.3` of PR #18 run 61 (API 30) and `longpress-unity6` of
+PR #19 run 64 (API 35) now show the popup with `add` and `favorite` drawn on
+two of its four rows. What it cannot prove: anything at all, by itself. `shortcut sheet visible: no` means the
 gesture missed, or that launcher lays its sheet out differently, or that the
 label was truncated past recognition — never that the package is broken. Read
 the picture, not the line.

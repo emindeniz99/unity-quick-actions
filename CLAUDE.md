@@ -121,7 +121,7 @@ shipped doc to something that does not ship (`~` folders, `.verify/`,
 package install ever carries a dangling link. Install URL is
 `https://github.com/emindeniz99/unity-quick-actions.git` — `package.json` is at
 the repo root, so the URL carries no subfolder query suffix. Pin a version with
-`#v0.5.0`. Tags are plain semver; `v0.4.0` was the first one.
+`#v0.6.0`. Tags are plain semver; `v0.4.0` was the first one.
 
 Don't invent status claims. If a doc asserts something you cannot verify, leave
 it as it is rather than "improving" it.

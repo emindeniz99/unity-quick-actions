@@ -21,7 +21,7 @@ repository root, so the repository **is** the package.
    *Add package from git URL…*:
 
    ```json
-   "com.emindeniz99.quick-actions": "https://github.com/emindeniz99/unity-quick-actions.git#v0.5.0"
+   "com.emindeniz99.quick-actions": "https://github.com/emindeniz99/unity-quick-actions.git#v0.6.0"
    ```
 
    Alternatives: `openupm add com.emindeniz99.quick-actions`; or vendor the
