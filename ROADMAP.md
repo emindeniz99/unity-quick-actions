@@ -3,8 +3,14 @@
 Follow-ups discussed but not shipped. Delete an entry in the same commit that
 ships it.
 
-- **`.androidlib` does not survive `.unitypackage` export/import** (reported
-  against 2022.3.15, re-confirmed 2024, unfixed). This is why the built-in icons
+- **`.androidlib` does not survive `.unitypackage` export/import** — reported
+  by other users, not by this project: a Unity Discussions thread opened
+  against 2022.3.15
+  (<https://discussions.unity.com/t/export-and-import-androidlib-file/935469>)
+  and a Unity Issue Tracker entry on bundled plugins not exporting into a
+  package
+  (<https://issuetracker.unity3d.com/issues/console-error-error-while-exporting-package-no-assets-to-export-only-folders-did-you-mean-to-use-exportpackageoptions-dot-recurse-when-trying-to-export-a-bundle-file-as-a-package>);
+  no fix version is recorded here. This is why the built-in icons
   must be written by the build post-processor rather than shipped as a
   `.androidlib` inside the package: the Asset Store channel delivers a
   `.unitypackage`, so anything relying on a shipped `.androidlib` would work on
