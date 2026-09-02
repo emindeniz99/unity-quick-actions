@@ -442,12 +442,22 @@ cap_dump_ui() {
 # answer but because a dump taken mid-animation comes back as the previous
 # screen. Reads the caller's `dir` and `py`.
 cap_find_icon() {
-  local tries="$1" attempt
+  local tries="$1" attempt rc
   xy=""
   for attempt in $(seq 1 "$tries"); do
-    if cap_dump_ui "$dir/ui-drawer.xml" \
-      && xy="$(python3 "$py" icon "$CAPTURE_LABEL" <"$dir/ui-drawer.xml")"; then
-      return 0
+    if cap_dump_ui "$dir/ui-drawer.xml"; then
+      xy="$(python3 "$py" icon "$CAPTURE_LABEL" <"$dir/ui-drawer.xml")"
+      rc=$?
+      [ "$rc" -eq 0 ] && return 0
+      xy=""
+      # Exit 5: the label is on screen only as the launcher's PREDICTION of the
+      # app. That screen will not change by waiting, and pressing there opens the
+      # launcher's suggestions sheet, not the app's popup — so no retry: the
+      # caller escalates to the drawer at once.
+      if [ "$rc" -eq 5 ]; then
+        echo "capture: '$CAPTURE_LABEL' is on screen only as a launcher prediction — escalating to the drawer"
+        return 1
+      fi
     fi
     xy=""
     echo "capture: attempt $attempt — no '$CAPTURE_LABEL' icon in the hierarchy yet"
