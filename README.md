@@ -491,19 +491,31 @@ getIdentifier("ic_quickaction_builtin_add", "drawable", pkg)  // else the built-
 
 **Four catalog entries ship built in** — `Add`, `Compose`, `Favorite` and
 `Play`, the ones the demo uses. On every Android build with the define on, the
-package's post-processor writes `ic_quickaction_builtin_<name>.xml` for each
-into the generated Gradle project (`unityLibrary/src/main/res/drawable/`), next
-to the keep rule that carries them through resource shrinking. They are
-VectorDrawables — one density-independent file each, about 2 KB for all four —
-of a white glyph on a coloured disc, so the icon carries its own contrast
-(API 26+ launchers wrap a legacy shortcut icon onto a white plate, where a
-glyph alone would vanish). A **static** item with one of those four as its
-`Icon` and no `AndroidDrawable` bakes a reference to the built-in, so it
-renders on a cold install too. Every CI build reads all four back out of the
-APK with `aapt2`, the shrink experiment holds them unchanged through
-`shrinkResources`, and the emulator smoke requires the registered shortcuts to
-have resolved an icon resource; what nobody has done yet is look at them on a
-launcher — the screenshot at the top of this file predates them.
+package's post-processor writes them into the generated Gradle project
+(`unityLibrary/src/main/res/`), next to the keep rule that carries them through
+resource shrinking. Each is **one resource name in two variants**, and the
+resource qualifier — not anything at build time — picks between them:
+
+```
+res/drawable/ic_quickaction_builtin_add.xml              API 25: white glyph on an indigo disc
+res/drawable-anydpi-v26/ic_quickaction_builtin_add.xml   API 26+: <adaptive-icon>, two layers
+res/drawable/ic_quickaction_builtin_add_background.xml     full-bleed indigo
+res/drawable/ic_quickaction_builtin_add_foreground.xml     the glyph, inside the mask's safe zone
+```
+
+The API 25 file carries its own contrast because API 26+ launchers wrap a
+*legacy* shortcut drawable onto a white plate, where a glyph alone would vanish
+— but that same wrap also scales it to 0.70 of the plate, so from API 26 the
+`-v26` variant takes over and the launcher masks a full-bleed icon instead.
+All XML, density-independent, about 6 KB for all four icons and their layers.
+A **static** item with one of those four as its `Icon` and no `AndroidDrawable`
+bakes a reference to the built-in — the one name, so it gets the right variant
+per device — and renders on a cold install too. Every CI build reads all four
+(and their layers) back out of the APK with `aapt2`, the shrink experiment
+holds them unchanged through `shrinkResources`, and the emulator smoke requires
+the registered shortcuts to have resolved an icon resource; what nobody has
+done yet is look at either variant on a launcher — the screenshot at the top of
+this file predates them.
 
 **The other 25 entries stay blank until you add a drawable**, and so does any
 built-in one you would rather draw yourself. The settings page says which is

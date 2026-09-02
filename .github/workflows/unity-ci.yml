@@ -543,9 +543,20 @@ jobs:
           # built-in icons, written unconditionally by the same post-processor —
           # the Demo uses exactly these four IconTypes, so a missing one here is
           # a blank square on the emulator's launcher.
-          for want in xml/quickactions_shortcuts raw/quickactions_keep string/qa_short_0 \
-                      drawable/ic_quickaction_builtin_add drawable/ic_quickaction_builtin_compose \
-                      drawable/ic_quickaction_builtin_favorite drawable/ic_quickaction_builtin_play; do
+          wants="xml/quickactions_shortcuts raw/quickactions_keep string/qa_short_0"
+          for icon in add compose favorite play; do
+            # Each icon is ONE resource name carrying two config-qualified files
+            # (drawable/ for API 25, drawable-anydpi-v26/ for the <adaptive-icon>),
+            # so the name below says nothing about which variants linked. The two
+            # LAYERS do: they exist only because the -v26 file references them, and
+            # an unresolved @drawable is a hard aapt2 link error — so all three
+            # names present is the resource table's account of the adaptive variant
+            # having shipped.
+            for res in "$icon" "${icon}_background" "${icon}_foreground"; do
+              wants="$wants drawable/ic_quickaction_builtin_$res"
+            done
+          done
+          for want in $wants; do
             case "$RES" in
               *"$want"*) echo "ok: resource table carries $want" ;;
               *) missing="$missing $want" ;;
@@ -920,10 +931,26 @@ jobs:
               raise SystemExit("no built-in ic_quickaction_builtin_*.xml under %s/drawable*/ — the "
                                "package's post-processor did not write the 0.5.0 icons into "
                                "this export" % res_dir.parent)
+          # The -v26 <adaptive-icon> variant: a second FILE under a resource name the
+          # plain vector already covers, so nothing else in this job would notice it
+          # missing — hence its own check here.
+          if not any(icon.parent.name.endswith("-v26") for icon in shipped):
+              raise SystemExit("no built-in icon under a drawable*-v26 bucket of %s — the "
+                               "post-processor wrote the API 25 vectors but not the adaptive "
+                               "variant. Buckets found: %s"
+                               % (res_dir.parent, sorted({i.parent.name for i in shipped})))
+          seen = set()
           for icon in shipped:
               size = icon.stat().st_size
-              lines.append("%s %d" % (icon.stem, size))
               print("shipped %s (%d bytes)" % (icon, size))
+              # ONE row per resource NAME. An icon now has two config-qualified files
+              # under one name (drawable/ and drawable-anydpi-v26/), and the assertion
+              # this feeds compares a resource between two archives — a second row for
+              # the same name would just overwrite the first with a size that is
+              # informational anyway.
+              if icon.stem not in seen:
+                  seen.add(icon.stem)
+                  lines.append("%s %d" % (icon.stem, size))
 
           pathlib.Path(os.environ["SIZES_FILE"]).write_text("\n".join(lines) + "\n")
           PY
@@ -1537,6 +1564,12 @@ jobs:
           # tile if the answer is no. "Unchanged" is judged between the linked and
           # the stripped archive: the shrinker rewrites in place, so a kept entry
           # keeps its size and a dropped one becomes a tiny dummy.
+          # Since 0.5.0's adaptive variant the list also carries the two LAYERS of
+          # each icon (…_background, …_foreground). They match the same keep glob
+          # AND are referenced by their -v26 parent, so either route should save
+          # them — which is what makes a layer that came out dummy-replaced beside
+          # a kept parent worth failing on: on API 26+ that is a blank or ringed
+          # tile, and on nothing else at all.
           if not SHIPPED:
               failures.append(
                   "the plant step recorded no shipped ic_quickaction_builtin_* icons, so "

@@ -12,8 +12,12 @@ namespace EminDeniz99.QuickActions
     /// <c>ic_quickaction_play</c> (the exact names in the Java <c>ICON_NAMES</c>
     /// table). Four members ship a built-in drawable — <see cref="Add"/>,
     /// <see cref="Compose"/>, <see cref="Favorite"/> and <see cref="Play"/>, written
-    /// into every Android build as <c>ic_quickaction_builtin_&lt;name&gt;</c>; a
-    /// project's own <c>ic_quickaction_&lt;name&gt;</c> takes precedence. For the
+    /// into every Android build as <c>ic_quickaction_builtin_&lt;name&gt;</c> in two
+    /// variants of that one name: a plain vector for API 25 and an
+    /// <c>&lt;adaptive-icon&gt;</c> under <c>drawable-anydpi-v26</c> for API 26+, so
+    /// the launcher masks a full-bleed icon instead of plating the legacy one (not
+    /// yet seen on a launcher by anyone). A project's own
+    /// <c>ic_quickaction_&lt;name&gt;</c> takes precedence. For the
     /// others, with no drawable in the app the shortcut renders <b>without an
     /// icon</b> — a blank tile on every launcher observed so far. See
     /// <see cref="QuickActionItem.AndroidDrawable"/> to name a drawable explicitly.

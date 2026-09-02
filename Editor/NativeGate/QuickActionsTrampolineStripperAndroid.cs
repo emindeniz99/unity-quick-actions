@@ -134,11 +134,17 @@ namespace EminDeniz99.QuickActions.Editor.NativeGate
                     foreach (var localeDir in Directory.GetDirectories(resDir, "values-*"))
                         SafeDelete(Path.Combine(localeDir, StringsResource + ".xml"));
                     // ...and the built-in shortcut icons the gated post-processor writes
-                    // (drawable/ic_quickaction_builtin_<name>.xml). Only in the module it
-                    // writes to (unityLibrary — the `path` this callback is handed), by
-                    // its own prefix, in any extension: no project writes
+                    // (drawable*/ic_quickaction_builtin_<name>*.xml). Only in the module
+                    // it writes to (unityLibrary — the `path` this callback is handed),
+                    // by its own prefix, in any extension: no project writes
                     // ic_quickaction_builtin_, and a project's ic_quickaction_<name> —
                     // wherever it lives, this module's res included — never matches.
+                    // The drawable* glob is why the API 26+ variant under
+                    // drawable-anydpi-v26/ goes with the plain one, and the prefix why
+                    // that variant's two layers (the catalog name plus
+                    // _background/_foreground) go with them: a production build must
+                    // come out carrying no piece of the package's art, not three
+                    // quarters of it.
                     if (module == path)
                         foreach (var drawableDir in Directory.GetDirectories(resDir, "drawable*"))
                             foreach (var icon in Directory.GetFiles(drawableDir, BuiltInIconPrefix + "*"))

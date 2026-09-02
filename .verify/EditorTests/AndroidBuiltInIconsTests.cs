@@ -16,7 +16,21 @@
 // build that leaves the files behind ships package art in a production APK — so
 // all three ends are held here, plus the rule that made the design safe: the
 // package never touches a file it did not write.
+//
+// The same release ships a SECOND variant of each icon, under one name — an
+// <adaptive-icon> in res/drawable-anydpi-v26/, over two layers of its own — so
+// API 26+ launchers stop wrapping the legacy file onto a white plate. That whole
+// mechanism is invisible to every check that came before it: the resource name
+// does not change, the static bake does not change, and a variant written to the
+// wrong directory, referencing a layer that was never written, or drawing a glyph
+// outside the mask's safe zone all build green and are only visible on a
+// launcher nobody here can see. So the pins below are geometric and textual: the
+// qualifier each file lands under, the two layers named by the exact strings the
+// <adaptive-icon> references, and the foreground's coordinates against the
+// documented safe zone.
 using System;
+using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -64,9 +78,58 @@ namespace EminDeniz99.QuickActions.Tests
 
         private string ResDir => Path.Combine(UnityLibrary, "src", "main", "res");
 
-        private string DrawableDir => Path.Combine(ResDir, QuickActionsBuiltInIcons.ResourceDirectory);
+        // The two qualifiers, spelled out rather than read back from the generated
+        // entries: which directory a file lands in IS the contract with aapt2 (the
+        // -v26 suffix is what makes API 26+ take the adaptive variant and API 25 the
+        // plain one), so a test that took them from the same source as the writer
+        // would agree with any typo.
+        private const string LegacyDir = "drawable";
+        private const string AdaptiveDir = "drawable-anydpi-v26";
+
+        private string DrawableDir => Path.Combine(ResDir, LegacyDir);
 
         private string OurIcon(string name) => Path.Combine(DrawableDir, BuiltInPrefix + name + ".xml");
+
+        // Where the writer must have put one generated entry.
+        private string FileFor(QuickActionsBuiltInIcons.Entry entry) =>
+            Path.Combine(ResDir, entry.Directory, BuiltInPrefix + entry.Name + ".xml");
+
+        // Every res/drawable* bucket in unityLibrary, i.e. everywhere our files and
+        // the sweeps that undo them can reach.
+        private string[] DrawableDirs() =>
+            Directory.Exists(ResDir) ? Directory.GetDirectories(ResDir, "drawable*") : new string[0];
+
+        private List<string> AllDrawableFiles() =>
+            DrawableDirs().SelectMany(Directory.GetFiles).OrderBy(f => f).ToList();
+
+        private static IEnumerable<QuickActionsBuiltInIcons.Entry> EntriesOfLayer(
+            QuickActionsBuiltInIcons.IconLayer layer) =>
+            QuickActionsBuiltInIcons.Entries.Where(e => e.Layer == layer);
+
+        // The one entry of a layer for a catalog value — every icon ships all four.
+        private static QuickActionsBuiltInIcons.Entry EntryFor(
+            IconType icon, QuickActionsBuiltInIcons.IconLayer layer)
+        {
+            var matches = QuickActionsBuiltInIcons.Entries.Where(e => e.Icon == icon && e.Layer == layer).ToList();
+            Assert.AreEqual(1, matches.Count, "expected exactly one " + layer + " entry for IconType." + icon);
+            return matches[0];
+        }
+
+        // Every (x,y) in a VectorDrawable pathData built by tools~/gen_builtin_icons.py:
+        // it emits absolute M/L polygons, so the coordinate pairs are the geometry.
+        private static List<(double X, double Y)> PathPoints(string xml)
+        {
+            var doc = new XmlDocument();
+            doc.LoadXml(xml);
+            var points = new List<(double, double)>();
+            foreach (XmlElement path in doc.DocumentElement.GetElementsByTagName("path"))
+                foreach (Match m in Regex.Matches(path.GetAttribute("pathData", AndroidNs),
+                             @"(-?[0-9]+(?:\.[0-9]+)?),(-?[0-9]+(?:\.[0-9]+)?)"))
+                    points.Add((double.Parse(m.Groups[1].Value, CultureInfo.InvariantCulture),
+                        double.Parse(m.Groups[2].Value, CultureInfo.InvariantCulture)));
+            Assert.IsNotEmpty(points, "no coordinate pairs in the pathData — the parser or the art changed shape");
+            return points;
+        }
 
         private string ShortcutsFile => Path.Combine(ResDir, "xml", "quickactions_shortcuts.xml");
 
@@ -143,12 +206,51 @@ namespace EminDeniz99.QuickActions.Tests
 
             foreach (var entry in QuickActionsBuiltInIcons.Entries)
             {
-                Assert.IsTrue(File.Exists(OurIcon(entry.Name)), "missing " + OurIcon(entry.Name));
-                Assert.AreEqual(entry.Xml, File.ReadAllText(OurIcon(entry.Name)),
-                    BuiltInPrefix + entry.Name + " must be the embedded vector, unchanged");
+                Assert.IsTrue(File.Exists(FileFor(entry)), "missing " + FileFor(entry));
+                Assert.AreEqual(entry.Xml, File.ReadAllText(FileFor(entry)),
+                    entry.Directory + "/" + BuiltInPrefix + entry.Name +
+                    " must be the embedded drawable, unchanged");
             }
-            Assert.AreEqual(QuickActionsBuiltInIcons.Entries.Length,
-                Directory.GetFiles(DrawableDir).Length, "nothing else may be written there");
+            Assert.AreEqual(QuickActionsBuiltInIcons.Entries.Length, AllDrawableFiles().Count,
+                "nothing else may be written under res/drawable*");
+        }
+
+        [Test]
+        public void EveryIcon_ShipsFourFiles_UnderTheQualifiersThatMakeTheVariantWork()
+        {
+            // The -v26 mechanism IS the directory names: one resource name, two files,
+            // and the platform picks by API level. Written into the wrong bucket the
+            // build still succeeds — the adaptive file would either replace the legacy
+            // one on every API level (drawable/) or be ignored (any other qualifier),
+            // and only a launcher would show it. The two layers are separate resources
+            // and must carry the built-in prefix, or the keep glob and the define-off
+            // sweep both stop covering them.
+            foreach (var legacy in EntriesOfLayer(QuickActionsBuiltInIcons.IconLayer.Legacy).ToList())
+            {
+                var name = legacy.Name;
+                Assert.AreEqual(LegacyDir, legacy.Directory, name + ": the API 25 vector is unqualified");
+
+                var adaptive = EntryFor(legacy.Icon, QuickActionsBuiltInIcons.IconLayer.Adaptive);
+                Assert.AreEqual(AdaptiveDir, adaptive.Directory,
+                    name + ": the adaptive variant must be qualified -v26, and anydpi so it beats " +
+                    "every density bucket");
+                Assert.AreEqual(name, adaptive.Name,
+                    name + ": the variant only works under the SAME resource name");
+
+                var background = EntryFor(legacy.Icon, QuickActionsBuiltInIcons.IconLayer.Background);
+                var foreground = EntryFor(legacy.Icon, QuickActionsBuiltInIcons.IconLayer.Foreground);
+                Assert.AreEqual(name + "_background", background.Name);
+                Assert.AreEqual(name + "_foreground", foreground.Name);
+                Assert.AreEqual(LegacyDir, background.Directory, name + ": layers are unqualified drawables");
+                Assert.AreEqual(LegacyDir, foreground.Directory, name + ": layers are unqualified drawables");
+            }
+            // No two entries may claim the same file, and every one of them sits under
+            // the package's own prefix (what makes the sweeps safe and complete).
+            var paths = QuickActionsBuiltInIcons.Entries
+                .Select(e => e.Directory + "/" + BuiltInPrefix + e.Name + ".xml").ToList();
+            CollectionAssert.AllItemsAreUnique(paths);
+            Assert.AreEqual(4 * EntriesOfLayer(QuickActionsBuiltInIcons.IconLayer.Legacy).Count(),
+                QuickActionsBuiltInIcons.Entries.Length, "four files per icon, no more and no fewer");
         }
 
         [Test]
@@ -159,31 +261,44 @@ namespace EminDeniz99.QuickActions.Tests
             // which is what this pin is for.
             CollectionAssert.AreEquivalent(
                 new[] { IconType.Add, IconType.Compose, IconType.Favorite, IconType.Play },
-                QuickActionsBuiltInIcons.Entries.Select(e => e.Icon).ToArray());
+                QuickActionsBuiltInIcons.Entries.Select(e => e.Icon).Distinct().ToArray());
         }
 
         [Test]
-        public void EveryEntry_IsAWellFormedVectorDrawable()
+        public void EveryEntry_IsAWellFormedDrawable()
         {
             // The XML is generated and embedded as a string; a bad regeneration would
             // not fail to compile, and aapt2 would only reject it on the consumer's
-            // build. Pin the shape a VectorDrawable needs: a <vector> root with the
-            // android namespace, a 48dp size on the declared viewport, and at least
-            // two filled paths (the disc that carries the contrast, and the glyph).
+            // build. Pin the shape each kind needs: the API 25 file is a <vector> at
+            // 48dp on the 96 viewport with at least two filled paths (the disc that
+            // carries the contrast, and the glyph); the two adaptive layers are
+            // <vector>s on Android's 108 canvas; the -v26 file is an <adaptive-icon>,
+            // checked in full by the test below.
             foreach (var entry in QuickActionsBuiltInIcons.Entries)
             {
                 var doc = new XmlDocument();
                 doc.LoadXml(entry.Xml);
                 var root = doc.DocumentElement;
+                if (entry.Layer == QuickActionsBuiltInIcons.IconLayer.Adaptive)
+                {
+                    Assert.AreEqual("adaptive-icon", root.Name, entry.Name + ": root element");
+                    continue;
+                }
+                var legacy = entry.Layer == QuickActionsBuiltInIcons.IconLayer.Legacy;
+                var dp = legacy ? "48dp" : QuickActionsBuiltInIcons.AdaptiveViewport + "dp";
+                var viewport = (legacy
+                    ? QuickActionsBuiltInIcons.Viewport
+                    : QuickActionsBuiltInIcons.AdaptiveViewport).ToString();
                 Assert.AreEqual("vector", root.Name, entry.Name + ": root element");
-                Assert.AreEqual("48dp", root.GetAttribute("width", AndroidNs), entry.Name + ": width");
-                Assert.AreEqual("48dp", root.GetAttribute("height", AndroidNs), entry.Name + ": height");
-                Assert.AreEqual(QuickActionsBuiltInIcons.Viewport.ToString(),
-                    root.GetAttribute("viewportWidth", AndroidNs), entry.Name + ": viewportWidth");
-                Assert.AreEqual(QuickActionsBuiltInIcons.Viewport.ToString(),
-                    root.GetAttribute("viewportHeight", AndroidNs), entry.Name + ": viewportHeight");
+                Assert.AreEqual(dp, root.GetAttribute("width", AndroidNs), entry.Name + ": width");
+                Assert.AreEqual(dp, root.GetAttribute("height", AndroidNs), entry.Name + ": height");
+                Assert.AreEqual(viewport, root.GetAttribute("viewportWidth", AndroidNs),
+                    entry.Name + ": viewportWidth");
+                Assert.AreEqual(viewport, root.GetAttribute("viewportHeight", AndroidNs),
+                    entry.Name + ": viewportHeight");
                 var paths = root.ChildNodes.OfType<XmlElement>().Where(e => e.Name == "path").ToList();
-                Assert.GreaterOrEqual(paths.Count, 2, entry.Name + ": a disc and a glyph, at least");
+                Assert.GreaterOrEqual(paths.Count, legacy ? 2 : 1,
+                    entry.Name + (legacy ? ": a disc and a glyph, at least" : ": one filled layer"));
                 foreach (var path in paths)
                 {
                     StringAssert.IsMatch("^#[0-9A-F]{6}$", path.GetAttribute("fillColor", AndroidNs),
@@ -191,6 +306,91 @@ namespace EminDeniz99.QuickActions.Tests
                     StringAssert.IsMatch("^M.*Z$", path.GetAttribute("pathData", AndroidNs),
                         entry.Name + ": every path is a closed shape");
                 }
+            }
+        }
+
+        [Test]
+        public void TheAdaptiveVariant_ReferencesItsTwoLayers_AndBothAreWritten()
+        {
+            // <adaptive-icon> takes drawable REFERENCES, so the variant is only as good
+            // as two names resolving. A typo in either is not a C# error, not a test
+            // failure anywhere else, and not even a build failure until aapt2 links the
+            // consumer's app — where it is a hard link error. Pin the exact strings,
+            // then prove the post-processor really put those files in the export.
+            WriteManifest(launcher: true);
+            RunPostProcessor();
+
+            foreach (var adaptive in EntriesOfLayer(QuickActionsBuiltInIcons.IconLayer.Adaptive).ToList())
+            {
+                var doc = new XmlDocument();
+                doc.LoadXml(adaptive.Xml);
+                Assert.AreEqual("adaptive-icon", doc.DocumentElement.Name, adaptive.Name + ": root element");
+
+                foreach (var layer in new[]
+                         {
+                             QuickActionsBuiltInIcons.IconLayer.Background,
+                             QuickActionsBuiltInIcons.IconLayer.Foreground,
+                         })
+                {
+                    var child = doc.DocumentElement.ChildNodes.OfType<XmlElement>()
+                        .SingleOrDefault(e => e.Name == layer.ToString().ToLowerInvariant());
+                    Assert.IsNotNull(child, adaptive.Name + ": no <" + layer.ToString().ToLowerInvariant() + ">");
+                    var entry = EntryFor(adaptive.Icon, layer);
+                    Assert.AreEqual("@drawable/" + BuiltInPrefix + entry.Name,
+                        child.GetAttribute("drawable", AndroidNs),
+                        adaptive.Name + ": the " + layer + " layer must be referenced by its exact name");
+                    Assert.IsTrue(File.Exists(FileFor(entry)),
+                        "referenced but not written: " + FileFor(entry));
+                }
+            }
+        }
+
+        [Test]
+        public void TheAdaptiveForeground_StaysInsideTheSafeZone()
+        {
+            // The reason the glyph could not simply be reused. A launcher masks the 108
+            // canvas down to a shape of its choosing and animates it; only the centred
+            // 66-unit circle is guaranteed to survive, and the legacy glyph spans ~71 %
+            // of its viewport — a squircle would clip the star's points. Read the
+            // geometry back out of the pathData and hold every coordinate to that
+            // circle (stricter than the box, and the actual guarantee).
+            var centre = QuickActionsBuiltInIcons.AdaptiveViewport / 2.0;
+            var radius = QuickActionsBuiltInIcons.AdaptiveSafeZone / 2.0;
+            foreach (var entry in EntriesOfLayer(QuickActionsBuiltInIcons.IconLayer.Foreground).ToList())
+            {
+                var points = PathPoints(entry.Xml);
+                foreach (var p in points)
+                {
+                    var distance = Math.Sqrt((p.X - centre) * (p.X - centre) + (p.Y - centre) * (p.Y - centre));
+                    Assert.LessOrEqual(distance, radius,
+                        $"{entry.Name}: ({p.X},{p.Y}) is {distance:F2} from the centre of the " +
+                        $"{QuickActionsBuiltInIcons.AdaptiveViewport} canvas, outside the " +
+                        $"{QuickActionsBuiltInIcons.AdaptiveSafeZone}-unit safe zone (radius {radius}) — " +
+                        "a launcher mask may clip it");
+                }
+                // ...and it is still the glyph, not a dot: something that scaled the art
+                // to nothing would pass the check above with room to spare.
+                var width = points.Max(p => p.X) - points.Min(p => p.X);
+                var height = points.Max(p => p.Y) - points.Min(p => p.Y);
+                Assert.GreaterOrEqual(Math.Max(width, height), radius,
+                    entry.Name + ": the glyph must still fill a good part of the safe zone");
+            }
+        }
+
+        [Test]
+        public void TheAdaptiveBackground_IsFullBleed()
+        {
+            // The whole point of the -v26 variant: an inset background would give the
+            // mask something to cut around and bring back the white ring AOSP's legacy
+            // wrapper draws — the exact defect this variant exists to remove.
+            var size = (double)QuickActionsBuiltInIcons.AdaptiveViewport;
+            foreach (var entry in EntriesOfLayer(QuickActionsBuiltInIcons.IconLayer.Background).ToList())
+            {
+                var points = PathPoints(entry.Xml);
+                Assert.AreEqual(0.0, points.Min(p => p.X), entry.Name + ": must reach the left edge");
+                Assert.AreEqual(0.0, points.Min(p => p.Y), entry.Name + ": must reach the top edge");
+                Assert.AreEqual(size, points.Max(p => p.X), entry.Name + ": must reach the right edge");
+                Assert.AreEqual(size, points.Max(p => p.Y), entry.Name + ": must reach the bottom edge");
             }
         }
 
@@ -205,9 +405,13 @@ namespace EminDeniz99.QuickActions.Tests
             Assert.IsTrue(File.Exists(OurIcon("play")), "a non-launcher manifest must not skip the icons");
 
             File.Delete(ManifestPath);
-            Directory.Delete(DrawableDir, true);
+            foreach (var dir in DrawableDirs())
+                Directory.Delete(dir, true);
             RunPostProcessor();
             Assert.IsTrue(File.Exists(OurIcon("play")), "a module with no manifest must not skip the icons");
+            foreach (var entry in QuickActionsBuiltInIcons.Entries)
+                Assert.IsTrue(File.Exists(FileFor(entry)),
+                    "every file, in a directory the writer had to create: " + FileFor(entry));
         }
 
         [Test]
@@ -218,11 +422,9 @@ namespace EminDeniz99.QuickActions.Tests
             WriteManifest(launcher: true);
 
             RunPostProcessor();
-            var first = Directory.GetFiles(DrawableDir).OrderBy(f => f)
-                .ToDictionary(f => f, File.ReadAllText);
+            var first = AllDrawableFiles().ToDictionary(f => f, File.ReadAllText);
             RunPostProcessor();
-            var second = Directory.GetFiles(DrawableDir).OrderBy(f => f)
-                .ToDictionary(f => f, File.ReadAllText);
+            var second = AllDrawableFiles().ToDictionary(f => f, File.ReadAllText);
 
             CollectionAssert.AreEqual(first.Keys, second.Keys);
             foreach (var pair in first)
@@ -253,9 +455,12 @@ namespace EminDeniz99.QuickActions.Tests
             foreach (var theirs in new[] { inOurModule, nested, inLauncher })
                 CollectionAssert.AreEqual(UserBytes, File.ReadAllBytes(theirs), "must be untouched: " + theirs);
             foreach (var entry in QuickActionsBuiltInIcons.Entries)
-                Assert.IsTrue(File.Exists(OurIcon(entry.Name)),
-                    "the built-in is still written under its own name: " + entry.Name);
-            Assert.IsEmpty(Directory.GetFiles(DrawableDir, "ic_quickaction_*")
+                Assert.IsTrue(File.Exists(FileFor(entry)),
+                    "the built-in is still written under its own name: " + FileFor(entry));
+            // In the two buckets the writer creates — including the -v26 one, where a
+            // project's own adaptive icon of the same name would sit.
+            Assert.IsEmpty(new[] { DrawableDir, Path.Combine(ResDir, AdaptiveDir) }
+                    .SelectMany(d => Directory.GetFiles(d, "ic_quickaction_*"))
                     .Where(f => !Path.GetFileName(f).StartsWith(BuiltInPrefix)),
                 "the package never writes a file under the project's prefix");
         }
@@ -267,16 +472,20 @@ namespace EminDeniz99.QuickActions.Tests
             // only reference a drawable by name. Before 0.5.0 an Icon without an
             // AndroidDrawable baked NO icon (and warned); now the four built-ins are
             // referenced, under the name the writer above just guaranteed exists.
+            // One item per ICON, not per entry: the four files of an icon share a
+            // single resource name, and that name — the one the qualifier resolves to
+            // the right variant per API level — is what a static item may reference.
+            var icons = EntriesOfLayer(QuickActionsBuiltInIcons.IconLayer.Legacy).ToList();
             WriteManifest(launcher: true);
             QuickActionsStaticBuild.Customize += ctx =>
             {
-                foreach (var entry in QuickActionsBuiltInIcons.Entries)
+                foreach (var entry in icons)
                     ctx.Shortcuts.Add(new QuickActionItem("s_" + entry.Name, "S") { Icon = entry.Icon });
             };
 
             RunPostProcessor();
 
-            foreach (var entry in QuickActionsBuiltInIcons.Entries)
+            foreach (var entry in icons)
                 Assert.AreEqual("@drawable/" + BuiltInPrefix + entry.Name, BakedIcon("s_" + entry.Name),
                     "IconType." + entry.Icon + " must bake a reference to its built-in drawable");
         }
@@ -324,8 +533,14 @@ namespace EminDeniz99.QuickActions.Tests
             WriteManifest(launcher: true);
             QuickActionsBuildPostProcessorAndroid.WriteBuiltInIconsOverrideForTests = false;
             var stale = Path.Combine(ResDir, "drawable-xhdpi", BuiltInPrefix + "add.png");
+            // The two shapes the -v26 variant added: the qualified file (a bucket the
+            // sweep only reaches through its drawable* glob) and a layer (a name the
+            // sweep only reaches because it carries the same prefix).
+            var staleAdaptive = Path.Combine(ResDir, AdaptiveDir, BuiltInPrefix + "add.xml");
+            var staleLayer = Path.Combine(DrawableDir, BuiltInPrefix + "add_foreground.xml");
             var theirs = Path.Combine(ResDir, "drawable-xhdpi", "ic_quickaction_add.png");
-            WriteFile(stale, new byte[] { 9 });
+            foreach (var ours in new[] { stale, staleAdaptive, staleLayer })
+                WriteFile(ours, new byte[] { 9 });
             WriteFile(theirs, UserBytes);
             QuickActionsStaticBuild.Customize += ctx =>
                 ctx.Shortcuts.Add(new QuickActionItem("s_add", "S") { Icon = IconType.Add });
@@ -333,14 +548,18 @@ namespace EminDeniz99.QuickActions.Tests
             RunPostProcessor();
 
             foreach (var entry in QuickActionsBuiltInIcons.Entries)
-                Assert.IsFalse(File.Exists(OurIcon(entry.Name)), "nothing may be written when off: " + entry.Name);
+                Assert.IsFalse(File.Exists(FileFor(entry)),
+                    "nothing may be written when off, in any bucket: " + FileFor(entry));
             Assert.IsFalse(File.Exists(stale), "a built-in left by an earlier build must be removed");
+            Assert.IsFalse(File.Exists(staleAdaptive), "...including one in the -v26 bucket");
+            Assert.IsFalse(File.Exists(staleLayer), "...and an adaptive layer of one");
             CollectionAssert.AreEqual(UserBytes, File.ReadAllBytes(theirs), "the project's file is untouched");
             Assert.IsNull(BakedIcon("s_add"), "with the built-ins off, a static item must not reference one");
 
             QuickActionsBuildPostProcessorAndroid.WriteBuiltInIconsOverrideForTests = true;
             RunPostProcessor();
-            Assert.IsTrue(File.Exists(OurIcon("add")), "back on: written again");
+            foreach (var entry in QuickActionsBuiltInIcons.Entries)
+                Assert.IsTrue(File.Exists(FileFor(entry)), "back on: written again — " + FileFor(entry));
             Assert.AreEqual("@drawable/" + BuiltInPrefix + "add", BakedIcon("s_add"), "back on: referenced again");
         }
 
@@ -365,7 +584,18 @@ namespace EminDeniz99.QuickActions.Tests
                 "the Java fallback must concatenate the built-in prefix with the same table");
             foreach (var entry in QuickActionsBuiltInIcons.Entries)
             {
-                Assert.AreEqual(SnakeCase(entry.Icon.ToString()), entry.Name,
+                // Only the two entries the LOOKUP can reach carry the catalog name; the
+                // adaptive layers are referenced by the <adaptive-icon> alone and carry
+                // that name plus a suffix, which is checked with the variant itself.
+                var expected = SnakeCase(entry.Icon.ToString());
+                if (entry.Layer != QuickActionsBuiltInIcons.IconLayer.Legacy &&
+                    entry.Layer != QuickActionsBuiltInIcons.IconLayer.Adaptive)
+                {
+                    StringAssert.StartsWith(expected + "_", entry.Name,
+                        "a layer's name must extend its icon's, so one prefix sweep still takes both");
+                    continue;
+                }
+                Assert.AreEqual(expected, entry.Name,
                     "the generated name must follow IconType's documented snake_case rule");
                 Assert.AreEqual(javaNames[(int)entry.Icon], entry.Name,
                     $"ICON_NAMES[{(int)entry.Icon}] in QuickActionsBridge.java disagrees with the generated name");
@@ -416,23 +646,33 @@ namespace EminDeniz99.QuickActions.Tests
             var staleWebp = Path.Combine(ResDir, "drawable-xxhdpi", BuiltInPrefix + "play.webp");
             var inLauncherOurPrefix = LauncherDrawable("drawable", BuiltInPrefix + "play.xml");
             var theirsInOurModule = Path.Combine(ResDir, "drawable-xhdpi", "ic_quickaction_add.png");
+            // Their own adaptive icon, in the very bucket the -v26 variant made ours
+            // write into: the sweep is scoped by PREFIX, not by directory.
+            var theirsInTheAdaptiveBucket = Path.Combine(ResDir, AdaptiveDir, "ic_quickaction_add.xml");
             var theirsNested = ProjectDrawable("MyIcons.androidlib", "drawable-xhdpi", "ic_quickaction_play.png");
             var theirsInLauncher = LauncherDrawable("drawable", "ic_quickaction_search.png");
             var hostFile = Path.Combine(DrawableDir, "host_logo.png");
+            var projectFiles = new[]
+            {
+                inLauncherOurPrefix, theirsInOurModule, theirsInTheAdaptiveBucket, theirsNested,
+                theirsInLauncher, hostFile,
+            };
             foreach (var ours in new[] { stalePng, staleWebp })
                 WriteFile(ours, new byte[] { 9 });
-            foreach (var theirs in new[] { inLauncherOurPrefix, theirsInOurModule, theirsNested, theirsInLauncher, hostFile })
+            foreach (var theirs in projectFiles)
                 WriteFile(theirs, UserBytes);
             foreach (var entry in QuickActionsBuiltInIcons.Entries)
-                Assume.That(File.Exists(OurIcon(entry.Name)), "precondition: the post-processor wrote " + entry.Name);
+                Assume.That(File.Exists(FileFor(entry)), "precondition: the post-processor wrote " + FileFor(entry));
 
             QuickActionsTrampolineStripperAndroid.Strip(UnityLibrary);
 
             foreach (var entry in QuickActionsBuiltInIcons.Entries)
-                Assert.IsFalse(File.Exists(OurIcon(entry.Name)), "the built-in icon must be stripped: " + entry.Name);
+                Assert.IsFalse(File.Exists(FileFor(entry)),
+                    "every file of the built-in must be stripped — the -v26 variant and its two " +
+                    "layers as much as the plain vector: " + FileFor(entry));
             Assert.IsFalse(File.Exists(stalePng), "a stale built-in in another bucket and format is ours too");
             Assert.IsFalse(File.Exists(staleWebp), "…whatever the extension");
-            foreach (var theirs in new[] { inLauncherOurPrefix, theirsInOurModule, theirsNested, theirsInLauncher, hostFile })
+            foreach (var theirs in projectFiles)
                 CollectionAssert.AreEqual(UserBytes, File.ReadAllBytes(theirs), "must survive the sweep: " + theirs);
         }
     }

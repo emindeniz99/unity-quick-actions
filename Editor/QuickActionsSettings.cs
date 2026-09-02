@@ -30,7 +30,8 @@ namespace EminDeniz99.QuickActions.Editor
         internal void AddStaticShortcut(QuickActionItem item) => staticShortcuts.Add(item);
 
         [Tooltip("Write the package's four built-in Android shortcut drawables " +
-                 "(ic_quickaction_builtin_{add,compose,favorite,play}, ~2 KB of vector XML) " +
+                 "(ic_quickaction_builtin_{add,compose,favorite,play}, ~6 KB of XML: a vector " +
+                 "for API 25 and an adaptive icon plus its two layers for API 26+) " +
                  "into every Android build, so IconType.Add/Compose/Favorite/Play render with " +
                  "nothing added to the project. Your own ic_quickaction_<name> takes precedence " +
                  "either way. Off: no package art reaches the APK, and those four render blank " +

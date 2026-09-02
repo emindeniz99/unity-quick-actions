@@ -23,8 +23,12 @@ namespace EminDeniz99.QuickActions.Tests
             // WHY: two generated files from one ICONS list — the generator's --check
             // pins each to the generator, this pins them to each other at the C# level,
             // so a hand edit of either would fail here even if --check were skipped.
+            // Entries has four files per icon since the adaptive variant; the set
+            // names icons, so compare against the legacy (API 25) row of each.
             CollectionAssert.AreEquivalent(
-                QuickActionsBuiltInIcons.Entries.Select(e => e.Icon).ToArray(),
+                QuickActionsBuiltInIcons.Entries
+                    .Where(e => e.Layer == QuickActionsBuiltInIcons.IconLayer.Legacy)
+                    .Select(e => e.Icon).ToArray(),
                 QuickActionsBuiltInIconSet.Icons);
             Assert.AreEqual(QuickActionsBuiltInIconSet.Icons.Length,
                 QuickActionsBuiltInIconSet.Icons.Distinct().Count(), "duplicate member in the set");
