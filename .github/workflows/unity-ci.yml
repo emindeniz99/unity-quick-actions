@@ -1978,7 +1978,9 @@ jobs:
             local res manifest meta
             # Diagnostics go to stderr: stdout is the hit list the caller captures.
             res="$("$AAPT2" dump resources "$apk")" || { echo "aapt2 could not read $apk" >&2; exit 1; }
-            for name in quickactions_shortcuts quickactions_keep quickactions_strings qa_short_ qa_long_ ic_quickaction_builtin_; do
+            # (quickactions_strings is a values file: aapt2 lists its ENTRIES —
+            # qa_short_N / qa_long_N — never the file name, so it is not probed.)
+            for name in quickactions_shortcuts quickactions_keep qa_short_ qa_long_ ic_quickaction_builtin_; do
               case "$res" in *"$name"*) hits="$hits res:$name" ;; esac
             done
             manifest="$("$AAPT2" dump xmltree --file AndroidManifest.xml "$apk" 2>&1)" || { echo "aapt2 could not dump the manifest of $apk" >&2; exit 1; }
@@ -2000,12 +2002,27 @@ jobs:
             [ "${meta:-0}" -gt 0 ] && hits="$hits metadata:EminDeniz99.QuickActions(x$meta)"
             printf '%s' "$hits"
           }
+          # The two plugin .java classes are compiled into EVERY build (Unity cannot
+          # gate a loose native source), so the dex is not part of the gate — but it
+          # is counted, so the "dead classes remain" line in the docs is a number
+          # from this run rather than a belief. Diagnostics to stderr, count to stdout.
+          dex_refs() {
+            local apk="$1" dex
+            dex="$(unzip -p "$apk" 'classes*.dex' 2>/dev/null | strings -a || true)"
+            [ -n "$dex" ] || { echo "no readable classes*.dex in $apk" >&2; exit 1; }
+            printf '%s\n' "$dex" | grep -c 'com/emindeniz99/quickactions/' || true
+          }
           on_hits="$(scan "$ON_APK")"
           off_hits="$(scan "$OFF_APK")"
+          on_dex="$(dex_refs "$ON_APK")"
+          off_dex="$(dex_refs "$OFF_APK")"
           echo "define ON  ($ON_APK):$on_hits"
           echo "define OFF ($OFF_APK):${off_hits:-<nothing of the package>}"
-          # Control first: every probe must fire on the define-on APK.
-          for want in res:quickactions_shortcuts res:quickactions_keep res:ic_quickaction_builtin_ \
+          echo "dex references to com/emindeniz99/quickactions/: define ON $on_dex, define OFF $off_dex (the two plugin classes ship either way — documented, counted, not gated)"
+          [ "$on_dex" -gt 0 ] || { echo "CONTROL FAILED: the define-on dex carries no package class reference, so the dex count cannot be trusted."; exit 1; }
+          # Control first: EVERY probe scan() knows must fire on the define-on APK,
+          # or the check is blind to that probe and says so instead of passing.
+          for want in res:quickactions_shortcuts res:quickactions_keep res:qa_short_ res:qa_long_ res:ic_quickaction_builtin_ \
                       manifest:QuickActionsTrampolineActivity manifest:android.app.shortcuts metadata:EminDeniz99.QuickActions; do
             case "$on_hits" in
               *"$want"*) ;;
@@ -2021,7 +2038,7 @@ jobs:
             "$AAPT2" dump resources "$OFF_APK" | grep -iE 'quickactions|qa_short|qa_long|ic_quickaction' || echo "(none)"
             exit 1
           fi
-          echo "PASS: nothing of the package in the define-off APK (manifest, resources, IL2CPP metadata)"
+          echo "PASS: nothing of the package in the define-off APK (manifest, resources, IL2CPP metadata); the dex keeps the two plugin classes ($off_dex references), as documented"
       - name: Measure the package's footprint (define-on APK minus define-off APK)
         env:
           OFF_APK: Examples~/Testbed2022/Builds/NoDefine-phone.apk
