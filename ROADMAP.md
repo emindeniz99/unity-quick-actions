@@ -38,11 +38,17 @@ ships it.
   script's own `shortcut sheet visible` line said `no` on that run because it
   matched the titles while the launcher drew the subtitles; it now accepts
   either. Still open: the API 35 Pixel launcher has never left its home screen
-  for any opener (not yet tried: a swipe that starts above the
-  gesture-navigation band, `KEYCODE_APP_SWITCH`, the launcher's all-apps
-  activity by component name), and on API 30 the swipe has opened the drawer
-  once in four runs, so the capture is a photograph when it lands, never a
-  check. The verdict does not depend on it.
+  for any opener, and on API 30 the swipe has opened the drawer once in five
+  runs, so the capture is a photograph when it lands, never a check. The dumps
+  say why the swipe is unreliable: it began at 90% of the display height, and
+  on both images that point is a search box — the hotseat's Google search bar
+  on API 35 (y 535–598 of 640), the collapsed all-apps search box on API 30
+  (574–630) — so the drag belonged to the widget, not the workspace. The
+  fourth attempt starts the swipe at 65%, on the empty workspace above the
+  hotseat and page indicator of both dumps; whether either drawer opens for it
+  is what its runs will show. Not yet tried: `KEYCODE_APP_SWITCH` and the
+  launcher's all-apps activity by component name. The verdict does not depend
+  on any of it.
 - **Port the Android post-processor to `AndroidProjectFilesModifier` (Unity 6).**
   Unity's own notifications package moved to it "for better compatibility with
   incremental build"; the built-ins' distinct-name design was chosen so that

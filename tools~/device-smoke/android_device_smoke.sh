@@ -674,7 +674,15 @@ PY
   w="${wh%% *}"
   h="${wh##* }"
   x=$((w / 2))
-  y_from=$((h * 9 / 10))
+  # Start on the WORKSPACE, not the bottom edge. The first four attempts began
+  # at 90% of the height, and the dumps of both images put that point on a
+  # search box: the Pixel launcher's hotseat search bar on API 35 (y 535–598 of
+  # 640) and the collapsed all-apps search box on API 30 (574–630). A drag that
+  # begins on a search widget is the widget's to keep, and API 30 opened its
+  # drawer on one run in five while API 35 never moved. 65% is above the
+  # hotseat and the page indicator on both dumps (API 35: 441–465 / 465+;
+  # API 30: 475–499 / 499+) and below the smartspace card at the top.
+  y_from=$((h * 13 / 20))
   y_to=$((h / 5))
   echo "capture: display ${w}x${h} — swiping up at x=$x, y $y_from -> $y_to to open the app drawer"
   cap_adb shell input swipe "$x" "$y_from" "$x" "$y_to" 300 >/dev/null 2>&1 || true
