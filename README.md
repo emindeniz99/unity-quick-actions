@@ -1032,9 +1032,10 @@ minification, so this only matters if yours does.)
 CI's `android smoke (2022.3-release)` leg builds the 2022.3 testbed as a release
 player — Managed Stripping Level **High**, `minifyRelease` (R8) on, with that
 exact `proguard-user.txt` and nothing else — and then runs the emulator smoke on
-that APK, so registering a shortcut and receiving a tap have to survive the
-recipe as written above; that is what the leg *does*, and it is new enough that
-no result from it is claimed here yet.
+that APK. Its first run (2026-09-02) was green: R8 had renamed classes all
+around while `QuickActionsBridge` kept its name, and registering a shortcut and
+receiving a warm and a cold tap both worked — so the recipe as written above is
+what CI holds on every push, and stripping High needed no `link.xml`.
 
 **Resources (`shrinkResources`) — icons.** Icon drawables are reached *only*
 through `getIdentifier(name, "drawable", …)`, so with `minifyEnabled` +

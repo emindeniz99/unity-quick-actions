@@ -34,8 +34,13 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   every other leg (its dex class names are exactly what R8 could have renamed)
   and then the same API 30 emulator smoke, where a shortcut must register and a
   warm and a cold tap must each arrive as `Performed`. Nothing in the package
-  itself changed. The leg has not run yet: this is a check that now exists, not
-  a result.
+  itself changed. Its first run (2026-09-02, PR #19 run 64) was green:
+  UnityLinker ran the High rule set (`global-metadata.dat` 1.70 → 1.18 MB), R8
+  collapsed four dex files into one and left one-and-two-letter class names
+  around the three package classes it had been told to keep, the APK came out
+  at 14.2 MB against the development build's 23.7 MB, and the smoke registered
+  three shortcuts and got a warm and a cold tap back as `Performed` — the
+  documented recipe holds, and stripping High needed no `link.xml`.
 - **The built-in Android icons now ship an API 26+ adaptive variant.** On API 26+
   AOSP does not draw a legacy shortcut drawable as authored — it wraps it onto a
   white plate at 0.70 of the viewport, so the built-ins rendered as a small
