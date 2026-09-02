@@ -110,8 +110,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   an IL2CPP APK in `android-build`'s exact configuration and an iOS Simulator
   export — and asserts the package left nothing behind: no trampoline
   `<activity>` or shortcuts meta-data in the manifest, no `quickactions_*` /
-  `qa_*` / `ic_quickaction_builtin_*` resources, no `EminDeniz99.QuickActions`
-  in the IL2CPP metadata, no `QUICKACTIONS_ENABLED` macro in the `.pbxproj`, no
+  `qa_*` / `ic_quickaction_builtin_*` resources, nothing of the package's
+  assembly in the IL2CPP metadata, no `QUICKACTIONS_ENABLED` macro in the `.pbxproj`, no
   marked `UIApplicationShortcutItems`. Every negative is paired with a positive
   control — the define-on artifacts from the same run must trip the same
   probes, or the check declares itself blind instead of green. The two APKs
@@ -136,7 +136,20 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `Testbed.Integration` component already did — so the same engine modules
   stay on both sides of the diff. A new harness config, `SampleOff`, compiles
   that `#else` branch the way a define-off device build does (no define, no
-  Runtime), which no config did before.
+  Runtime), which no config did before. The Demo's own namespace,
+  `EminDeniz99.QuickActions.DemoSample`, therefore stays in a define-off
+  build's IL2CPP metadata — as any consumer namespace would — and run 52
+  flagged exactly that as a leak, because the metadata probe grepped for the
+  namespace prefix. It now names what only the assembly leaves behind: the
+  image name `EminDeniz99.QuickActions.dll`, the `Internal` namespace and the
+  root namespace's `namespace|Type` strings — 12 lines on the define-on APK,
+  none on the define-off one — and a leak report prints every metadata line
+  mentioning the namespace, probe-matching or not. With the Demo on both
+  sides, run 52's APK pair diffed through the job's own script measures
+  **144,061 bytes (140.7 KiB)** compressed: `libil2cpp.so` +149.7 KiB (arm64)
+  and +122.0 KiB (armv7) uncompressed, `global-metadata.dat` +31.4 KiB,
+  `libunity.so` +27.0 / +19.9 KiB, and about 10 KB of resources — the
+  eighteen files the package writes.
 - **The Demo sample survives a define-off build as a real component.** With
   `QUICKACTIONS_ENABLED` off, `Samples~/Demo/QuickActionsDemo.cs` used to
   compile to nothing, so a define-off build of its scene carried a "missing

@@ -1828,7 +1828,7 @@ jobs:
   # configuration, and an iOS Simulator Xcode export — and asserted NEGATIVELY:
   # no trampoline <activity> and no android.app.shortcuts in the manifest, no
   # quickactions_* / qa_* / ic_quickaction_builtin_* resources, no
-  # EminDeniz99.QuickActions in the IL2CPP metadata; no QUICKACTIONS_ENABLED
+  # trace of the package's assembly in the IL2CPP metadata; no QUICKACTIONS_ENABLED
   # macro in the .pbxproj, no marked UIApplicationShortcutItems. Each negative
   # has its positive control: the define-ON artifacts android-build and
   # ios-export produced from the same commit must carry every one of those, or
@@ -1995,12 +1995,18 @@ jobs:
             # Extract first and fail LOUDLY if the file is not there: an APK
             # without it is an APK this probe cannot see into, and "0 hits"
             # would read as a clean gate. Only grep's no-match is ignorable.
+            # The pattern names what only the ASSEMBLY leaves behind — its image
+            # name, its Internal namespace, and the "namespace|Type" strings of
+            # its root namespace — not the bare namespace prefix: consumer code
+            # may live under it (the Demo sample's EminDeniz99.QuickActions.
+            # DemoSample does, and it compiles with the define off since run 52
+            # caught exactly that as a false leak).
             local metadata
             metadata="$(mktemp)"
             unzip -p "$apk" assets/bin/Data/Managed/Metadata/global-metadata.dat >"$metadata" \
               || { echo "could not extract global-metadata.dat from $apk — no IL2CPP metadata, the probe cannot run" >&2; exit 1; }
             [ -s "$metadata" ] || { echo "global-metadata.dat came out empty from $apk" >&2; exit 1; }
-            meta="$(strings -a "$metadata" | grep -c 'EminDeniz99.QuickActions' || true)"
+            meta="$(strings -a "$metadata" | grep -cE 'EminDeniz99\.QuickActions(\.dll|\.Internal|\|)' || true)"
             rm -f "$metadata"
             [ "${meta:-0}" -gt 0 ] && hits="$hits metadata:EminDeniz99.QuickActions(x$meta)"
             printf '%s' "$hits"
@@ -2039,6 +2045,8 @@ jobs:
             "$AAPT2" dump xmltree --file AndroidManifest.xml "$OFF_APK" 2>&1 | head -120
             echo "--- define-off resources mentioning quickactions/qa_ ---"
             "$AAPT2" dump resources "$OFF_APK" | grep -iE 'quickactions|qa_short|qa_long|ic_quickaction' || echo "(none)"
+            echo "--- define-off IL2CPP metadata strings mentioning EminDeniz99.QuickActions (all of them, probe-matching or not) ---"
+            unzip -p "$OFF_APK" assets/bin/Data/Managed/Metadata/global-metadata.dat | strings -a | grep 'EminDeniz99.QuickActions' || echo "(none)"
             exit 1
           fi
           echo "PASS: nothing of the package in the define-off APK (manifest, resources, IL2CPP metadata); the dex keeps the two plugin classes ($off_dex references), as documented"

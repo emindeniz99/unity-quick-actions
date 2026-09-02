@@ -378,8 +378,8 @@ mechanical steps if your project wants the opposite trade-off.
 > Simulator export — and requires the `.pbxproj` to contain **no**
 > `QUICKACTIONS_ENABLED`, the merged Android manifest **no**
 > `QuickActionsTrampolineActivity` and no shortcuts meta-data, the resource
-> table nothing of the package's, and the IL2CPP metadata no
-> `EminDeniz99.QuickActions` — each against the define-**on** build from the same
+> table nothing of the package's, and the IL2CPP metadata nothing of the
+> package's assembly (its image name, its namespaces) — each against the define-**on** build from the same
 > run as a positive control. It then diffs the two APKs entry by entry (plus the whole-file size): that
 > number, printed in the job summary, is the package's footprint (held under
 > 1 MiB). To repeat it by hand, do the same in your own project.

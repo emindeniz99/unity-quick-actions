@@ -140,8 +140,8 @@ The stub harness compiles the C#/Java but can't confirm Unity-only wiring:
   `QuickActionsTrampolineStripperAndroid` (ungated) strips any stale entry when
   it is off — the build-output half is now proven on every code push by the
   `gate-off` CI job (define-off APK: no trampoline `<activity>`, no shortcuts
-  meta-data, no package resources, no `EminDeniz99.QuickActions` in the IL2CPP
-  metadata; define-off Xcode export: no macro, no marked plist items — each
+  meta-data, no package resources, nothing of the package's assembly in the
+  IL2CPP metadata; define-off Xcode export: no macro, no marked plist items — each
   with the define-on build as the positive control), and was hand-confirmed
   earlier on 2021.3 and 6.3. What remains is the device: install that prod
   build and confirm no shortcut menu appears and the app is untouched (the
