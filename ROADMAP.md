@@ -17,38 +17,6 @@ ships it.
   OpenUPM/Git and silently vanish for Asset Store users. Re-check whether Unity
   has fixed this before choosing any design that depends on it.
 
-- **Emulator screenshot of the built-in icons — photographed once, on API 30;
-  the API 35 drawer is still the gap.** The smoke legs end with a best-effort
-  long-press capture (`CAPTURE_LONGPRESS=1` in
-  `tools~/device-smoke/android_device_smoke.sh`) and upload `longpress-<leg>`
-  (screenshot plus two `uiautomator` dumps) on every push. Three attempts on
-  2026-09-02 got the gesture right a piece at a time: a real press (`input
-  motionevent` DOWN, hold, capture, UP) instead of a swipe that never moves;
-  escalation through `KEYCODE_ALL_APPS`, the launcher's "Apps list" handle and
-  the `ALL_APPS` intent when the swipe surfaces nothing; and counting the
-  hotseat's *prediction* of the app (`Predicted app: …`, whose long press
-  opens the launcher's "App suggestions" sheet) as a miss. On the run after
-  that (PR #18 run 61) the API 30 swipe opened the drawer — the same swipe had
-  left the launcher on its home screen on every earlier run — the press
-  landed on the real icon, and `longpress-2022.3` holds the first photograph
-  of the app's popup: the three static entries and the runtime-added `daily`,
-  drawn with their long labels, with the built-in `add` and `favorite` art on
-  two of the rows (white glyph on the blue background, masked round by the
-  launcher — the `-v26` adaptive variant, which is what API 30 resolves). The
-  script's own `shortcut sheet visible` line said `no` on that run because it
-  matched the titles while the launcher drew the subtitles; it now accepts
-  either. Still open: the API 35 Pixel launcher has never left its home screen
-  for any opener, and on API 30 the swipe has opened the drawer once in five
-  runs, so the capture is a photograph when it lands, never a check. The dumps
-  say why the swipe is unreliable: it began at 90% of the display height, and
-  on both images that point is a search box — the hotseat's Google search bar
-  on API 35 (y 535–598 of 640), the collapsed all-apps search box on API 30
-  (574–630) — so the drag belonged to the widget, not the workspace. The
-  fourth attempt starts the swipe at 65%, on the empty workspace above the
-  hotseat and page indicator of both dumps; whether either drawer opens for it
-  is what its runs will show. Not yet tried: `KEYCODE_APP_SWITCH` and the
-  launcher's all-apps activity by component name. The verdict does not depend
-  on any of it.
 - **Port the Android post-processor to `AndroidProjectFilesModifier` (Unity 6).**
   Unity's own notifications package moved to it "for better compatibility with
   incremental build"; the built-ins' distinct-name design was chosen so that

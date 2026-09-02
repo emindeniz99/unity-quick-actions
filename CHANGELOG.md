@@ -88,8 +88,14 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Launcher3 draws the long label (the `Subtitle`) when it fits — so
   `CAPTURE_TITLES` entries are now `Title=Subtitle` pairs, either form counts,
   and when nothing was pressed the line says so instead of blaming the
-  hierarchy. The API 35 drawer stays open; the ROADMAP entry records what to
-  try next.
+  hierarchy. The API 35 drawer opened once the swipe stopped starting on the
+  hotseat's search bar: the dumps of both images put the old 90% start on a
+  search widget, so the capture now swipes from 65% of the height first — the
+  API 35 drawer opened on the first run of that (PR #19 run 64), the press
+  landed on the real icon and the verdict line read `yes` with all three long
+  labels — and from the bottom edge second, the start API 30 had answered
+  once. Both images' sheets are on file; the capture stays best-effort and is
+  never a check.
 - **The settings page says what an `Icon` does on Android, next to the field.**
   A property drawer for `IconType` adds one line under the popup: "built-in
   drawable" for `Add` / `Compose` / `Favorite` / `Play`, or the exact
