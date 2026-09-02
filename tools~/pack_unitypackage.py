@@ -53,7 +53,7 @@ INCLUDE_DIRS = [
 # rather than hide the file and leave the claim dangling.
 INCLUDE_FILES = [
     "README.md", "CHANGELOG.md", "LICENSE.md", "ROADMAP.md",
-    # The README links to these three; without them the classic install had
+    # The README links to these; without them the classic install had
     # dangling links (the UPM install carries every root file anyway).
     "GETTING_STARTED.md", "SECURITY.md", "PRODUCTION_READINESS.md", "AGENTS.md",
 ]

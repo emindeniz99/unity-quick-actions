@@ -116,7 +116,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   marked `UIApplicationShortcutItems`. Every negative is paired with a positive
   control — the define-on artifacts from the same run must trip the same
   probes, or the check declares itself blind instead of green. The two APKs
-  are then diffed byte for byte: that difference is the package's footprint,
+  are then diffed entry by entry, plus the whole-file size: that difference is the package's footprint,
   printed in the job summary and held under 1 MiB, so an asset or code path
   that starts shipping turns the job red. `PRODUCTION_READINESS.md`'s two gate
   rows move from "build-proven once, 2026-07-17" to CI. `TestbedBuilder` gains

@@ -378,7 +378,7 @@ mechanical steps if your project wants the opposite trade-off.
 > `QuickActionsTrampolineActivity` and no shortcuts meta-data, the resource
 > table nothing of the package's, and the IL2CPP metadata no
 > `EminDeniz99.QuickActions` — each against the define-**on** build from the same
-> run as a positive control. It then diffs the two APKs byte for byte: that
+> run as a positive control. It then diffs the two APKs entry by entry (plus the whole-file size): that
 > number, printed in the job summary, is the package's footprint (held under
 > 1 MiB). To repeat it by hand, do the same in your own project.
 
