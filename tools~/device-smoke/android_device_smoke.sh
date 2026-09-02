@@ -674,20 +674,32 @@ PY
   w="${wh%% *}"
   h="${wh##* }"
   x=$((w / 2))
-  # Start on the WORKSPACE, not the bottom edge. The first four attempts began
-  # at 90% of the height, and the dumps of both images put that point on a
-  # search box: the Pixel launcher's hotseat search bar on API 35 (y 535–598 of
-  # 640) and the collapsed all-apps search box on API 30 (574–630). A drag that
-  # begins on a search widget is the widget's to keep, and API 30 opened its
-  # drawer on one run in five while API 35 never moved. 65% is above the
+  # Start on the WORKSPACE first, not the bottom edge. The first four attempts
+  # began at 90% of the height, and the dumps of both images put that point on
+  # a search box: the Pixel launcher's hotseat search bar on API 35 (y 535–598
+  # of 640) and the collapsed all-apps search box on API 30 (574–630). A drag
+  # that begins on a search widget is the widget's to keep, and API 30 opened
+  # its drawer on one run in five while API 35 never moved. 65% is above the
   # hotseat and the page indicator on both dumps (API 35: 441–465 / 465+;
   # API 30: 475–499 / 499+) and below the smartspace card at the top.
+  # The 65% start opened the API 35 drawer on its first run (PR #19 run 64) and
+  # the API 30 one not at all, while the 90% start had opened API 30's once —
+  # the drag that starts on the collapsed all-apps box is the one that image
+  # answers. So both, in that order: the workspace first, the bottom edge
+  # second, each followed by a fresh search.
   y_from=$((h * 13 / 20))
   y_to=$((h / 5))
   echo "capture: display ${w}x${h} — swiping up at x=$x, y $y_from -> $y_to to open the app drawer"
   cap_adb shell input swipe "$x" "$y_from" "$x" "$y_to" 300 >/dev/null 2>&1 || true
   sleep 3
   cap_find_icon 3 || true
+  if [ -z "$xy" ]; then
+    y_from=$((h * 9 / 10))
+    echo "capture: the workspace swipe surfaced no icon — swiping again from the bottom edge, y $y_from -> $y_to"
+    cap_adb shell input swipe "$x" "$y_from" "$x" "$y_to" 300 >/dev/null 2>&1 || true
+    sleep 3
+    cap_find_icon 2 || true
+  fi
   if [ -z "$xy" ]; then
     echo "capture: the swipe surfaced no icon — sending KEYCODE_ALL_APPS"
     cap_adb shell input keyevent KEYCODE_ALL_APPS >/dev/null 2>&1 || true
