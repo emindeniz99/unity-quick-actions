@@ -52,7 +52,7 @@ hardware; iOS 13+ opens it with a plain long-press on every device.
 
 ## Status
 
-This is **0.4.9**, a pre-1.0 release. Here is exactly what has been proven and
+This is **0.5.0**, a pre-1.0 release. Here is exactly what has been proven and
 what has not — one place, no hedging. (Per-feature detail:
 [PRODUCTION_READINESS.md](./PRODUCTION_READINESS.md).)
 
@@ -138,7 +138,7 @@ https://github.com/emindeniz99/unity-quick-actions.git
 Pin a version by appending a tag, e.g.:
 
 ```
-https://github.com/emindeniz99/unity-quick-actions.git#v0.4.9
+https://github.com/emindeniz99/unity-quick-actions.git#v0.5.0
 ```
 
 (Without a tag you track the default branch. `v0.4.0` is the first tag, so
@@ -172,7 +172,7 @@ package under `dependencies`:
     }
   ],
   "dependencies": {
-    "com.emindeniz99.quick-actions": "0.4.9"
+    "com.emindeniz99.quick-actions": "0.5.0"
   }
 }
 ```
