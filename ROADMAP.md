@@ -32,11 +32,14 @@ ships it.
   space / Settings" sheet, never the app's shortcut popup: the screenshot
   shows exactly that sheet. Third attempt, in the script: a match that is
   only a launcher prediction counts as a miss, so the drawer escalation
-  runs and tries to find, and then press, a real icon — an attempt, not yet
-  run. If `longpress-unity6` still shows
-  no sheet after that, the remaining unknown is whether the API 35 image's
-  launcher opens its drawer for `KEYCODE_ALL_APPS` at all. The verdict never
-  depends on it.
+  runs and tries to find, and then press, a real icon. Its first run
+  (2026-09-02, PR #18 run 60) recognised the prediction and escalated — and
+  none of the three openers moved the API 35 launcher off its home screen
+  either, so on both images the open question is the same: how to open this
+  Pixel launcher's drawer from `adb` at all. Not yet tried: a swipe that
+  starts above the gesture-navigation band, `KEYCODE_APP_SWITCH`, or the
+  launcher's all-apps activity by component name. The verdict never depends
+  on it.
 - **Port the Android post-processor to `AndroidProjectFilesModifier` (Unity 6).**
   Unity's own notifications package moved to it "for better compatibility with
   incremental build"; the built-ins' distinct-name design was chosen so that
