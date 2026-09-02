@@ -11,21 +11,29 @@ ships it.
   OpenUPM/Git and silently vanish for Asset Store users. Re-check whether Unity
   has fixed this before choosing any design that depends on it.
 
-- **Emulator screenshot of the built-in icons.** The smoke leg proves the
-  shortcuts registered with an icon resource; a capture of the long-press sheet
-  (`adb shell input` long-press on the app icon, then `screencap`) attached as
-  a workflow artifact would be the first look anyone has had at the art. Flaky
-  to drive (the gesture is launcher-dependent); worth one attempt.
-- **Unity 6 incremental Android builds are unmeasured.** CI builds a clean
-  Gradle project on a fresh runner every time. A second player build over the
-  same project directory — where Unity may prune files it did not declare and
-  the `IPostGenerateGradleAndroidProject` path may not re-run — is unproven for
-  the icons, the keep rule and the shortcut resources alike. Build the Unity 6
-  leg twice and aapt2 the SECOND APK. Related: Unity's own notifications package
-  moved to `AndroidProjectFilesModifier` on Unity 6 "for better compatibility
-  with incremental build"; the built-ins' distinct-name design was chosen so
-  that port is mechanical (every output declared up front, nothing inspected in
-  the tree), but the port itself is not done.
+- **Emulator screenshot of the built-in icons — the gesture, not the capture,
+  is what is missing.** The smoke legs now end with a best-effort long-press
+  capture (`CAPTURE_LONGPRESS=1` in `tools~/device-smoke/android_device_smoke.sh`)
+  and upload `longpress-<leg>` (screenshot plus two `uiautomator` dumps) on
+  every push. The first run (2026-09-02) showed why it was flagged flaky: on
+  the API 30 default launcher the swipe never opens the app drawer, so the icon
+  is not found; on the API 35 Pixel launcher the icon IS found (in the
+  predicted-apps dock) and pressed, but `input swipe x y x y 1500` produced no
+  shortcut sheet — the hierarchy after the press is identical to the one
+  before. Next attempt: a real long press via `input motionevent DOWN x y` /
+  sleep / `input motionevent UP x y`, screencap a beat later, and on API 30
+  open the drawer through `am start` of the launcher's all-apps activity
+  instead of a gesture. The verdict never depends on it.
+- **Port the Android post-processor to `AndroidProjectFilesModifier` (Unity 6).**
+  Unity's own notifications package moved to it "for better compatibility with
+  incremental build"; the built-ins' distinct-name design was chosen so that
+  port is mechanical (every output declared up front, nothing inspected in the
+  tree), but the port itself is not done. CI's unity6 leg now builds the
+  Android player twice over one project directory and runs the same aapt2
+  assertions on the second APK (first measured 2026-09-02: 54,951,386 vs
+  54,951,670 bytes, every assertion green on both), so the current
+  `IPostGenerateGradleAndroidProject` path is measured rather than assumed on
+  every push — this is an API-alignment item, not a bug.
 - **Teaching sample for custom Android icons (small, optional).** A
   `Samples~/AndroidIcons/` containing a ready-made `QuickActionIcons.androidlib`
   (correct root-level `AndroidManifest.xml` + `res/drawable-xhdpi/`)

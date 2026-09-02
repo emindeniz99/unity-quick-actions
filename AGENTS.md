@@ -114,7 +114,8 @@ repository root, so the repository **is** the package.
   Android drops the dynamic one.
 - Don't pass `null` to `Add` / `AddList` / `Update`: those throw
   `ArgumentNullException`; every other failure comes back as a `false` return
-  or a logged warning (`AddList` and `RemoveAll` are `void`), never an exception.
+  or a logged warning (`AddList`, `RemoveAll` and the `Locale` setter report
+  their failures only by log), never an exception.
 - Don't ship the define in a production build that must carry zero footprint;
   gate it on a dev Build Profile instead (README "Dev-only").
 
