@@ -1,21 +1,25 @@
 name: unity
 
 # Real-Unity CI via GameCI (game.ci): the stub harness in ci.yml proves the C#
-# type-checks; this workflow runs the REAL editor — Unity Test Runner (EditMode)
-# on all three Examples~ testbeds, an Android IL2CPP APK per testbed (aapt2 then
-# asserts the package's baked shortcuts, keep file and trampoline really are in
-# it) fed into the adb device smoke, and an iOS Simulator-SDK Xcode export per
-# testbed with an unsigned xcodebuild compile on macOS for the lines whose
-# simulator support allows it. A second iOS pair, `ios-export-coex` /
-# `ios-simulator-coex`, re-exports two of those testbeds with a mock HOST stacked
-# on the package — an app-controller subclass, a category `+load` swizzle and a
-# GoogleUtilities-style isa proxy (`Examples~/Coexistence/`) — and asserts on what
-# the native layer actually did, which is the one thing the plain simulator leg
-# (process still alive) cannot see. One further Android leg, `android-shrink-verify`,
-# exports the Gradle project on 2022.3 and runs the resource shrinker's own
-# task (`:launcher:shrinkReleaseRes`, never assembleRelease), reading the
-# stripped `.ap_` it emits, to settle the question no APK leg can — whether
-# AGP's resource shrinker honours the keep rule the package ships for its icon
+# type-checks; this workflow runs the REAL editor — Unity Test Runner
+# (EditMode) on all three Examples~ testbeds, an Android IL2CPP APK per testbed
+# — plus a fourth, `2022.3-release`, built the way a shipping app is
+# (non-development, Managed Stripping Level High, R8 `minifyRelease` on, with
+# the `Assets/Plugins/Android/proguard-user.txt` keep rule README.md tells
+# consumers to add) — with aapt2 then asserting the package's baked shortcuts,
+# keep file and trampoline really are in each, all fed into the adb device
+# smoke, and an iOS Simulator-SDK Xcode export per testbed with an unsigned
+# xcodebuild compile on macOS for the lines whose simulator support allows it.
+# A second iOS pair, `ios-export-coex` / `ios-simulator-coex`, re-exports two
+# of those testbeds with a mock HOST stacked on the package — an app-controller
+# subclass, a category `+load` swizzle and a GoogleUtilities-style isa proxy
+# (`Examples~/Coexistence/`) — and asserts on what the native layer actually
+# did, which is the one thing the plain simulator leg (process still alive)
+# cannot see. One further Android leg, `android-shrink-verify`, exports the
+# Gradle project on 2022.3 and runs the resource shrinker's own task
+# (`:launcher:shrinkReleaseRes`, never assembleRelease), reading the stripped
+# `.ap_` it emits, to settle the question no APK leg can — whether AGP's
+# resource shrinker honours the keep rule the package ships for its icon
 # drawables. And `gate-off` builds the 2022.3 testbed again with
 # QUICKACTIONS_ENABLED OFF (an APK and an iOS export), asserts the package left
 # nothing in either, and diffs the two APKs — the package's measured footprint.
@@ -480,12 +484,21 @@ jobs:
     needs: [license, tests]
     if: ${{ !cancelled() && needs.license.outputs.available == 'true' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    # 90 minutes has covered every development-player leg with room to spare. The
+    # release leg gets more: on top of the same IL2CPP compile it pays a
+    # UnityLinker pass at stripping High and an R8 run, and this repo has already
+    # watched a release-configuration Android build overrun a 120-minute ceiling
+    # twice (see android-shrink-verify's header, runs 30 and 31). That one was a
+    # Gradle `assembleRelease` over an EXPORT, which compiles the native code
+    # itself and is not this shape, so the number is a warning rather than a
+    # prediction — but it is the only measurement there is, so the leg starts
+    # with headroom instead of a 90-minute guess.
+    timeout-minutes: ${{ matrix.testbed.release && 120 || 90 }}
     strategy:
       fail-fast: false
       max-parallel: ${{ fromJSON(vars.UNITY_MAX_PARALLEL || '2') }}
       matrix:
-        # Two per-leg flags, both read by steps below rather than by another job:
+        # Three per-leg flags, all read by steps below rather than by another job:
         #   androidlib  — this testbed carries the consumer-side .androidlib
         #                 fixtures, so the assertion step also holds the README's
         #                 own-icon recipe to the APK. 2022.3 only, because that
@@ -495,10 +508,41 @@ jobs:
         #   incremental — build the player TWICE in this job and assert the
         #                 second APK too. Unity 6 only: the ROADMAP's open
         #                 question is about Unity 6's Gradle staging.
+        #   release     — build the RELEASE player instead of the development one
+        #                 (TestbedBuilder.BuildAndroidPhoneRelease): no
+        #                 BuildOptions.Development, Managed Stripping Level High,
+        #                 and R8 through `minifyRelease`, reading the keep rule in
+        #                 Assets/Plugins/Android/proguard-user.txt — the file, and
+        #                 the rule, README.md tells consumers to add. A SEPARATE
+        #                 leg over the same testbed rather than a replacement, so
+        #                 the development APK everything else is calibrated on is
+        #                 still built and still asserted.
+        #                 It closes PRODUCTION_READINESS.md's last "not run" row.
+        #                 What it puts at risk: the C# runtime finds the Java class
+        #                 com.emindeniz99.quickactions.QuickActionsBridge BY NAME
+        #                 over JNI, so a minifier may rename or strip it and the
+        #                 lookup fails silently; and the package ships no link.xml
+        #                 for stripping High to read. What a green run proves is
+        #                 that the DOCUMENTED recipe survives both — the APK still
+        #                 carries the class, and the smoke leg below still gets a
+        #                 warm and a cold tap back as Performed.
+        #                 What it does NOT prove: that the keep rule is NECESSARY
+        #                 (nothing here builds minified without it to watch that
+        #                 break), anything about `shrinkResources` (Unity leaves it
+        #                 off — resource shrinking is android-shrink-verify's
+        #                 question), or anything on physical hardware.
+        #                 2022.3 only: that line's AGP 7.1.2 always uses R8, while
+        #                 on 2021.3 (AGP 4.x) the same switch would minify with
+        #                 ProGuard instead, which is not what the rule is written
+        #                 against.
         testbed:
           - { name: "2021.3", path: Examples~/Testbed2021 }
           - { name: "2022.3", path: Examples~/Testbed2022, androidlib: true }
           - { name: "unity6", path: Examples~/Testbed6, incremental: true }
+          # `cache: "2022.3"`: the release leg warms up from the 2022.3 leg's
+          # Library (same project, same imports — only build settings differ) and
+          # saves under its own name; without it the leg starts cold every run.
+          - { name: "2022.3-release", path: Examples~/Testbed2022, androidlib: true, release: true, cache: "2022.3" }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -542,7 +586,8 @@ jobs:
           key: Library-${{ matrix.testbed.name }}-android-${{ hashFiles(format('{0}/Packages/**', matrix.testbed.path), format('{0}/ProjectSettings/**', matrix.testbed.path)) }}
           restore-keys: |
             Library-${{ matrix.testbed.name }}-android-
-            Library-${{ matrix.testbed.name }}-
+            Library-${{ matrix.testbed.cache || matrix.testbed.name }}-android-
+            Library-${{ matrix.testbed.cache || matrix.testbed.name }}-
       - uses: game-ci/unity-builder@d829bfc901f2347c8fe18898f06712b66916ef42 # v5.0.0
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
@@ -552,7 +597,10 @@ jobs:
         with:
           projectPath: ${{ matrix.testbed.path }}
           targetPlatform: Android
-          buildMethod: TestbedBuilder.BuildAndroidPhone
+          # Both entry points write Builds/QuickActionsDemo-phone.apk, so every
+          # step after this one — the upload, the assertions, the smoke leg's
+          # download — is identical on all four legs.
+          buildMethod: ${{ matrix.testbed.release && 'TestbedBuilder.BuildAndroidPhoneRelease' || 'TestbedBuilder.BuildAndroidPhone' }}
           versioning: None
           allowDirtyBuild: true
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
@@ -620,6 +668,17 @@ jobs:
       # eyes. Every miss prints the dump it could not match, so a surprise
       # arrives as evidence rather than a bare exit 1. Green on all three lines
       # in every heavy run since the 2026-08-21 dispatch.
+      #
+      # On the `2022.3-release` leg the same step reads a MINIFIED APK, stripped
+      # at Managed level High — and nothing below is gated off for it, because
+      # nothing below stops holding. The keep rule in
+      # Assets/Plugins/Android/proguard-user.txt preserves the package's class
+      # NAMES, which is exactly what the dex strings at the end look for; Unity
+      # sets no `shrinkResources`, so minification leaves the resource table
+      # alone and every resource/manifest check reads the same bytes it always
+      # did. The dex half is a formality on the three development legs. On this
+      # one it is the point: a renamed or stripped QuickActionsBridge is what a
+      # broken recipe looks like, and it fails here before the smoke ever runs.
       - name: Assert the APK carries the package's baked output
         env:
           APK: ${{ matrix.testbed.path }}/Builds/QuickActionsDemo-phone.apk
@@ -876,9 +935,16 @@ jobs:
         # 2021.3/2022.3 boot fine there. The unity6 leg therefore uses the
         # newest image and its far newer translator; the older lines stay on
         # API 30, where they are proven.
+        # `2022.3-release` is the same 2022.3 player built as a shipping app
+        # would be (stripping High + R8 + the README keep rule — see the
+        # android-build matrix), so it runs on the image that line is proven on.
+        # It is the only leg where the smoke's verdict says anything about
+        # minification: the shortcuts it registers travel the same JNI-by-name
+        # path into QuickActionsBridge that R8 was free to rename.
         testbed:
           - { name: "2021.3", api: 30 }
           - { name: "2022.3", api: 30 }
+          - { name: "2022.3-release", api: 30 }
           - { name: "unity6", api: 35 }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
