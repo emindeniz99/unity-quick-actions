@@ -480,6 +480,9 @@ static BOOL QAInstallSceneHooks(Class delegateClass, const char *via) {
     return YES;
 }
 
+API_AVAILABLE(ios(13.0))
+static void QAInstallSceneHooksScoped(Class declared, const char *via);
+
 // Wrapped purely to LEARN the scene-delegate class; the configuration is returned
 // untouched, so the host's scene is built exactly as it would have been.
 API_AVAILABLE(ios(13.0))
@@ -510,8 +513,11 @@ static UISceneConfiguration *QAConfigurationForConnectingSceneSession(
                                                       sessionRole:connectingSceneSession.role];
     }
     // A nil configuration (or one that names no delegate class) messages to Nil here and
-    // is refused by the installer's guard — we stay inert rather than hook a guess.
-    QAInstallSceneHooks(configuration.delegateClass, "configuration");
+    // is refused — we stay inert rather than hook a guess. And the class it does name is
+    // held to the same ownership rule as the notification fallback: a manifest may
+    // declare more than one role, and the first session UIKit brings up is not
+    // necessarily Unity's window (see QAInstallSceneHooksScoped).
+    QAInstallSceneHooksScoped(configuration.delegateClass, "configuration");
     return configuration;
 }
 
@@ -524,6 +530,35 @@ static BOOL QAClassDescendsFrom(Class cls, Class ancestor) {
         if (c == ancestor) return YES;
     }
     return NO;
+}
+
+// The ownership rule BOTH discovery routes apply before binding — the configuration
+// wrapper and the notification fallback alike, because either can be handed a scene
+// that is not Unity's: a manifest may declare more than one role (CarPlay, an
+// external display), and whichever session UIKit brings up first is not necessarily
+// Unity's window. Binding to it would burn the one-shot on a host class, so Unity's
+// real scene never gets hooked, and ADD the warm selector to a class that lacked it,
+// making us "terminal" for the host's own quick actions. So: when this process has
+// Unity's own scene delegate, bind to it and nothing else — without consuming the
+// one-shot on anyone else's class, so Unity's scene is still hooked whenever it
+// connects; when it has none (a host-authored manifest on a trampoline that predates
+// UnityScene) bind to the first declared class, as before, but record the owner as
+// unconfirmed, which turns OFF the unmarked best-effort adoption in
+// QAScenePerformActionForShortcutItem.
+API_AVAILABLE(ios(13.0))
+static void QAInstallSceneHooksScoped(Class declared, const char *via) {
+    if (declared == Nil) return;
+    Class unityScene = NSClassFromString(@"UnityScene");
+    if (unityScene != Nil) {
+        if (!QAClassDescendsFrom(declared, unityScene)) {
+            NSLog(@"[QuickActions] iOS scene hooks: %@ (via %s) is not Unity's scene delegate "
+                  @"— left alone", NSStringFromClass(declared), via);
+            return;
+        }
+        QAInstallSceneHooks(declared, via);
+        return;
+    }
+    if (QAInstallSceneHooks(declared, via)) gQASceneOwnerUnconfirmed = YES;
 }
 
 // FALLBACK for the shape the configuration hook above cannot see: a host
@@ -577,24 +612,10 @@ static void QAInstallSceneHooksFromScene(UIScene *scene) {
         declared = object_getClass(delegate);
     }
 
-    Class unityScene = NSClassFromString(@"UnityScene");
-    if (unityScene != Nil) {
-        // Unity's trampoline ships its own scene delegate (2022.3.72f1+ / 6000.0.68f1+ /
-        // 6000.3.8f1+). Anything that is not UnityScene or a subclass of it is somebody
-        // else's scene: ignore it WITHOUT consuming the one-shot, so Unity's own scene is
-        // still hooked whenever it connects.
-        if (!QAClassDescendsFrom(declared, unityScene)) return;
-        QAInstallSceneHooks(declared, "notification");
-        return;
-    }
-
-    // No UnityScene class in this process: a scene manifest the HOST authored, on a
-    // trampoline that predates Unity's UIScene support. We cannot tell whose scene this
-    // is, so we keep the historical first-connecting-scene behaviour — it is the only
-    // coverage available in the shape this fallback exists for — but record that the
-    // owner is unconfirmed, which turns OFF the unmarked best-effort adoption in
-    // QAScenePerformActionForShortcutItem.
-    if (QAInstallSceneHooks(declared, "notification")) gQASceneOwnerUnconfirmed = YES;
+    // Unity's trampoline ships its own scene delegate (2022.3.72f1+ / 6000.0.68f1+ /
+    // 6000.3.8f1+); the shared rule binds only to it when it exists, and to the first
+    // declared class with the owner recorded as unconfirmed when it does not.
+    QAInstallSceneHooksScoped(declared, "notification");
 }
 
 @interface QuickActionsAppControllerHook : NSObject

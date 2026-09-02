@@ -244,6 +244,20 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **Both scene-discovery routes bind only to Unity's own scene delegate.** The
+  `UISceneWillConnectNotification` fallback learned the `UnityScene`-ancestry
+  rule in this release; the configuration wrapper still installed the scene
+  hooks on whatever class the *first* connecting session declared. A manifest
+  may declare more than one role — CarPlay, an external display — and when
+  such a session connects before Unity's window, that install burned the
+  process-wide one-shot on the host's class (Unity's scene never hooked) and
+  added `windowScene:performActionForShortcutItem:completionHandler:` to a
+  class that lacked it, with the owner still recorded as confirmed. One
+  shared rule now sits in front of both routes: bind only to `UnityScene` or
+  a subclass when this process has that class (a non-Unity class is logged and
+  left alone, one-shot intact), and bind to the first declared class with the
+  owner recorded as unconfirmed when it does not. Found by review; no CI leg
+  drives a multi-role manifest yet.
 - **A hostile local app can no longer crash the game through the trampoline.**
   `QuickActionsTrampolineActivity` is exported (the launcher has to start it),
   so any app can start it with arbitrary extras — and reading the action id
