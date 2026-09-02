@@ -69,11 +69,13 @@ hardware; iOS 13+ opens it with a plain long-press on every device.
    public class ShortcutSetup : MonoBehaviour
    {
    #if QUICKACTIONS_ENABLED
-       void Awake()
-       {
-           // Fires on every tap, including the cold launch that started the app.
-           QuickActions.Performed += id => Debug.Log($"Tapped: {id}");
-       }
+       // Subscribe early: the cold-launch tap arrives one frame after startup.
+       void Awake() => QuickActions.Performed += OnShortcut;
+       // Performed is static and process-wide: never leave a handler behind.
+       void OnDestroy() => QuickActions.Performed -= OnShortcut;
+       
+       // Fires on every tap, including the cold launch that started the app.
+       void OnShortcut(string id) => Debug.Log($"Tapped: {id}");
 
        void Start()
        {
@@ -281,16 +283,16 @@ assemblies as methods 1–4, so the one-copy rule above still applies.
 ---
 
 After installing, import the **Demo** sample from the package page to try it on a
-device. More on packaging/export: [`tools~/export-unitypackage.md`](./tools~/export-unitypackage.md).
+device. More on packaging/export: [`tools~/export-unitypackage.md`](https://github.com/emindeniz99/unity-quick-actions/blob/main/tools~/export-unitypackage.md).
 
 ### Or skip the setup: open a ready-made project
 
 `Examples~/` holds one consuming Unity project per supported editor line —
-[`Testbed2021`](./Examples~/Testbed2021), [`Testbed2022`](./Examples~/Testbed2022)
-and [`Testbed6`](./Examples~/Testbed6) — each with the package linked, the
+[`Testbed2021`](https://github.com/emindeniz99/unity-quick-actions/tree/main/Examples~/Testbed2021), [`Testbed2022`](https://github.com/emindeniz99/unity-quick-actions/tree/main/Examples~/Testbed2022)
+and [`Testbed6`](https://github.com/emindeniz99/unity-quick-actions/tree/main/Examples~/Testbed6) — each with the package linked, the
 define set and three static shortcuts already configured. Clone the repo, open
 the one matching your editor, and compare it against your own integration. See
-[`Examples~/README.md`](./Examples~/README.md).
+[`Examples~/README.md`](https://github.com/emindeniz99/unity-quick-actions/blob/main/Examples~/README.md).
 
 ## Dev-only — excluding it completely from production builds
 
@@ -371,7 +373,7 @@ mechanical steps if your project wants the opposite trade-off.
 
 > The native gating edits the generated Xcode/Gradle project and can't be
 > exercised by the stub harness. CI does the real-build check on every code
-> push: the `gate-off` job in [`unity-ci.yml`](./.github/workflows/unity-ci.yml)
+> push: the `gate-off` job in [`unity-ci.yml`](https://github.com/emindeniz99/unity-quick-actions/blob/main/.github/workflows/unity-ci.yml)
 > builds the 2022.3 testbed with the define **off** — an IL2CPP APK and an iOS
 > Simulator export — and requires the `.pbxproj` to contain **no**
 > `QUICKACTIONS_ENABLED`, the merged Android manifest **no**
@@ -964,13 +966,13 @@ tools~/verify.sh    # .meta + C# compile (10 configs) + unit tests + Android plu
 headless unit tests via `dotnet test`, and compiles and smoke-tests the Android
 Java plugin (**111** checks). Those tests (bar 51 headless-only ones) plus 6
 `JsonUtility` serialization tests run in Unity's **Test Runner** from
-`Tests/Editor/` — **77** there. See [`.verify/README.md`](./.verify/README.md)
+`Tests/Editor/` — **77** there. See [`.verify/README.md`](https://github.com/emindeniz99/unity-quick-actions/blob/main/.verify/README.md)
 for how the stubs work.
 
-Beyond the stubs, [`unity-ci.yml`](./.github/workflows/unity-ci.yml) runs the
+Beyond the stubs, [`unity-ci.yml`](https://github.com/emindeniz99/unity-quick-actions/blob/main/.github/workflows/unity-ci.yml) runs the
 **real editors** via [GameCI](https://game.ci). Every leg runs on every code
 push and PR that touches code (docs-only changes trigger nothing): the
-EditMode suite on all three [`Examples~`](./Examples~) testbeds, plus a
+EditMode suite on all three [`Examples~`](https://github.com/emindeniz99/unity-quick-actions/tree/main/Examples~) testbeds, plus a
 `unity6-latest` canary leg that resolves the newest Unity 6 editor with a
 GameCI image at run time and upgrade-opens Testbed6 with it — so "the latest
 editor broke the package" surfaces here before it surfaces in a user's

@@ -26,7 +26,7 @@ ships it.
   The old item (c) — does the resource shrinker honour the shipped
   `res/raw/quickactions_keep.xml` — is **answered, and stays answered**: the
   `android-shrink-verify` job in
-  [`unity-ci.yml`](./.github/workflows/unity-ci.yml) re-runs the experiment on
+  [`unity-ci.yml`](https://github.com/emindeniz99/unity-quick-actions/blob/main/.github/workflows/unity-ci.yml) re-runs the experiment on
   every code push. On 2026-08-29 it reported, on a real minified release
   resource pipeline (AGP, `minifyEnabled` + `shrinkResources`, Unity 2022.3
   export): the keep-globbed probe `ic_quickaction_probe` went in at 990 bytes

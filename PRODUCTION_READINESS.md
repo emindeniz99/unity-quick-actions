@@ -246,7 +246,7 @@ What is left is physical hardware.
    result this check exists to prevent.
 3. On a physical device: cold + warm taps, static + dynamic shortcuts, both
    OSes. The Android half is scripted in
-   [`tools~/device-smoke/`](./tools~/device-smoke/README.md); iOS is manual (no
+   [`tools~/device-smoke/`](https://github.com/emindeniz99/unity-quick-actions/blob/main/tools~/device-smoke/README.md); iOS is manual (no
    adb analog).
 
    **Android, partially closed 2026-08-07** — Moto G Play 2024 (Android 14,
