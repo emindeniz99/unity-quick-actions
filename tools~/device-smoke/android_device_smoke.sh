@@ -270,8 +270,14 @@ if ! poll "$half" shortcuts_registered; then
     echo "warning: after $((half * POLL_INTERVAL))s the Unity player has logged nothing at all — it never came up" >&2
     echo "         (a known API 30 emulator failure mode); force-stopping and launching once more." >&2
     adb_ shell am force-stop "$APP_ID" >/dev/null 2>&1 || true
-    sleep 2
-    launch_with_autotest
+    # force-stop's status proves nothing and the kill is asynchronous (step 8
+    # says why): launch only once the process is really gone, or the second
+    # `am start` just hands its intent to the same stalled activity.
+    if poll "$LOG_ATTEMPTS" app_stopped; then
+      launch_with_autotest
+    else
+      echo "warning: the stalled process did not stop within $((LOG_ATTEMPTS * POLL_INTERVAL))s — no relaunch; waiting out the budget." >&2
+    fi
   fi
 fi
 if ! shortcuts_registered && ! poll "$((SHORTCUT_ATTEMPTS - half))" shortcuts_registered; then
