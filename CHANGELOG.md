@@ -15,6 +15,27 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **CI now builds and smokes a release-configuration Android player.** The two
+  things a shipping build does that a development build does not — R8
+  minification and Managed Stripping Level **High** — were the last build
+  configuration nothing here had ever run, and both bear on this package
+  specifically: the C# runtime finds the Java class
+  `com.emindeniz99.quickactions.QuickActionsBridge` **by name** over JNI, which
+  a minifier is free to rename or strip, and the package ships no `link.xml` for
+  the managed linker to read. A fourth `android-build` matrix leg,
+  `2022.3-release`, builds Testbed2022 through the new
+  `TestbedBuilder.BuildAndroidPhoneRelease` — non-development player, stripping
+  **High**, `minifyRelease` on — against the keep rule README.md tells consumers
+  to add: `-keep class com.emindeniz99.quickactions.** { *; }` in
+  `Assets/Plugins/Android/proguard-user.txt`, now checked into all three
+  testbeds and switched on through `useCustomProguardFile`, because the
+  documented recipe is the supported configuration and so is the thing worth
+  testing. The minified APK takes the same aapt2/manifest/dex assertions as
+  every other leg (its dex class names are exactly what R8 could have renamed)
+  and then the same API 30 emulator smoke, where a shortcut must register and a
+  warm and a cold tap must each arrive as `Performed`. Nothing in the package
+  itself changed. The leg has not run yet: this is a check that now exists, not
+  a result.
 - **The built-in Android icons now ship an API 26+ adaptive variant.** On API 26+
   AOSP does not draw a legacy shortcut drawable as authored — it wraps it onto a
   white plate at 0.70 of the viewport, so the built-ins rendered as a small
