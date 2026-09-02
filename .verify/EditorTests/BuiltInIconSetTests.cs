@@ -44,18 +44,34 @@ namespace EminDeniz99.QuickActions.Tests
         [Test]
         public void Note_IsSilentForNone_NamesTheBuiltIn_AndNamesTheMissingDrawableOtherwise()
         {
-            Assert.IsNull(QuickActionsIconTypeDrawer.NoteFor(IconType.None));
+            Assert.IsNull(QuickActionsIconTypeDrawer.NoteFor(IconType.None, true));
+            Assert.IsNull(QuickActionsIconTypeDrawer.NoteFor(IconType.None, false));
 
-            var builtIn = QuickActionsIconTypeDrawer.NoteFor(IconType.Add);
+            var builtIn = QuickActionsIconTypeDrawer.NoteFor(IconType.Add, true);
             StringAssert.Contains("built-in", builtIn);
             StringAssert.DoesNotContain("blank", builtIn);
 
-            var missing = QuickActionsIconTypeDrawer.NoteFor(IconType.Search);
+            var missing = QuickActionsIconTypeDrawer.NoteFor(IconType.Search, true);
             StringAssert.Contains("blank", missing);
             StringAssert.Contains("ic_quickaction_search", missing);
             // The compound name is the one that would betray a naive lower-casing.
             StringAssert.Contains("ic_quickaction_mark_location",
-                QuickActionsIconTypeDrawer.NoteFor(IconType.MarkLocation));
+                QuickActionsIconTypeDrawer.NoteFor(IconType.MarkLocation, true));
+        }
+
+        [Test]
+        public void Note_WithTheBuiltInsSwitchedOff_StopsPromisingADrawable()
+        {
+            // WHY: "Write built-in Android icons" off means the post-processor writes
+            // none of the four; a note still saying "ships with the package" would
+            // steer a user into an iconless shortcut. The toggle changes the note for
+            // the four only — the other 25 never had a built-in to lose.
+            var off = QuickActionsIconTypeDrawer.NoteFor(IconType.Add, false);
+            StringAssert.Contains("off", off);
+            StringAssert.Contains("blank", off);
+            StringAssert.Contains("ic_quickaction_add", off);
+            Assert.AreEqual(QuickActionsIconTypeDrawer.NoteFor(IconType.Search, true),
+                QuickActionsIconTypeDrawer.NoteFor(IconType.Search, false));
         }
 
         [Test]

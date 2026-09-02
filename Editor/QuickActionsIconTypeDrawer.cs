@@ -42,21 +42,49 @@ namespace EminDeniz99.QuickActions.Editor
             // A multi-object selection with differing values has no single answer.
             if (property.hasMultipleDifferentValues)
                 return null;
-            return NoteFor((IconType)property.intValue);
+            return NoteFor((IconType)property.intValue, BuiltInIconsEnabled());
+        }
+
+        // The "Write built-in Android icons" toggle lives on the settings asset, and
+        // finding that asset is a project-wide AssetDatabase scan. Inspectors repaint
+        // continuously, so the answer is cached and refreshed at most once a second —
+        // fresh enough for a checkbox, cheap enough for a repaint loop (the settings
+        // page caches for the same reason). No asset means the default: on.
+        private static double _nextSettingsRead;
+        private static bool _builtInIconsEnabled = true;
+
+        private static bool BuiltInIconsEnabled()
+        {
+            var now = EditorApplication.timeSinceStartup;
+            if (now >= _nextSettingsRead)
+            {
+                _nextSettingsRead = now + 1.0;
+                _builtInIconsEnabled = QuickActionsSettings.GetOrNull()?.WriteBuiltInAndroidIcons ?? true;
+            }
+            return _builtInIconsEnabled;
         }
 
         /// <summary>
         /// The one-line Android note for <paramref name="icon"/>, or null for
         /// <see cref="IconType.None"/> (no icon requested, nothing to warn about).
+        /// <paramref name="builtInIconsEnabled"/> is the settings asset's "Write
+        /// built-in Android icons" toggle: off, the four built-ins are not written
+        /// either, and the note has to say so instead of promising a drawable.
         /// </summary>
-        internal static string NoteFor(IconType icon)
+        internal static string NoteFor(IconType icon, bool builtInIconsEnabled)
         {
             if (icon == IconType.None)
                 return null;
+            var projectDrawable = "ic_quickaction_" + SnakeCase(icon);
             if (QuickActionsBuiltInIconSet.HasAndroidArt(icon))
-                return "Android: built-in drawable, ships with the package. iOS: system glyph.";
+            {
+                if (builtInIconsEnabled)
+                    return "Android: built-in drawable, ships with the package. iOS: system glyph.";
+                return "Android: built-in drawable, but \"Write built-in Android icons\" is off — " +
+                       "renders blank unless the project ships " + projectDrawable + ". iOS: system glyph.";
+            }
             return "Android: no built-in drawable — renders blank unless the project ships " +
-                   "ic_quickaction_" + SnakeCase(icon) + ". iOS: system glyph.";
+                   projectDrawable + ". iOS: system glyph.";
         }
 
         /// <summary>

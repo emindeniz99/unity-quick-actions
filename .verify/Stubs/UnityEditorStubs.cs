@@ -78,6 +78,7 @@ namespace UnityEditor
     {
         public static bool isPlaying;
         public static bool isPlayingOrWillChangePlaymode;
+        public static double timeSinceStartup;
         public static void EnterPlaymode() { }
         public static Action delayCall;
         public static Action<PlayModeStateChange> playModeStateChanged;
