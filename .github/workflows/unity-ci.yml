@@ -2523,19 +2523,27 @@ jobs:
           # `lifecycle` and `hooks` are EXPECTATIONS, not descriptions: Testbed2022 is
           # 2022.3.62f3, below the 2022.3.72f1 cut where Unity starts emitting a scene
           # manifest, and Testbed6 is 6000.3.21f1, above the 6000.3.8f1 cut. If a leg
-          # goes red on these, the answer is which lifecycle CI actually exercises —
-          # a thing no check in this repo has ever established.
+          # goes red on these, the answer is which lifecycle CI actually exercises.
+          # The first run (2026-09-02) established both: the app-delegate lifecycle
+          # on 2022.3 and the scene lifecycle on 6000.3.21f1, hooks installed via
+          # configuration and, shadowed, via notification. `hooks` names only the
+          # sceneConfig and manifest branches: `performAction=` is deliberately NOT
+          # pinned, because that run also showed the mock category's +load running
+          # BEFORE the package's class +load on 2022.3 and AFTER it on Unity 6 (every
+          # file in UnityFramework both times), so the package prints "added" or
+          # "wrapped" depending on the toolchain and composes either way — which is
+          # what the chain and exactly-once checks assert.
           - {
               name: "2022.3-coex",
               runner: macos-15,
               lifecycle: "app-delegate",
-              hooks: "didFinishLaunching=wrapped performAction=added sceneConfig=absent manifest=no",
+              hooks: "sceneConfig=absent manifest=no",
             }
           - {
               name: "unity6-coex",
               runner: macos-latest,
               lifecycle: "scene",
-              hooks: "didFinishLaunching=wrapped performAction=added sceneConfig=added manifest=yes",
+              hooks: "sceneConfig=added manifest=yes",
             }
     steps:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -2641,9 +2649,10 @@ jobs:
           }
 
           required=(
-            "[QuickActions] iOS hooks: $EXPECT_HOOKS"
+            "[QuickActions] iOS hooks: didFinishLaunching=wrapped performAction="
+            "$EXPECT_HOOKS"
             "QA-COEX: PASS lifecycle-$EXPECT_LIFECYCLE"
-            "QA-COEX: PASS category-load-after-class-load"
+            "QA-COEX: PASS category-load-ran"
             "QA-COEX: PASS cold-returns-no"
             "QA-COEX: PASS cold-queued-id"
             "QA-COEX: PASS cold-warm-dedup"

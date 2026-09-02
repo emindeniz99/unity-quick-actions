@@ -15,6 +15,8 @@
 #import <UIKit/UIKit.h>
 #import <stdlib.h>
 #import <string.h>
+#import <objc/message.h>
+#import <objc/runtime.h>
 
 // Unity's generated project puts Classes/ on the UnityFramework target's header
 // search path — the same import every vendor app-controller subclass uses. If that
@@ -28,13 +30,37 @@
 int gQACoexSubclassSuperCalls = 0;
 
 @interface QACoexAppController : UnityAppController
-// Declared (not just defined) so the availability annotation lands on the
-// declaration, which is what gives the body its iOS 13 context.
-- (UISceneConfiguration *)application:(UIApplication *)application
-    configurationForConnectingSceneSession:(UISceneSession *)connectingSceneSession
-                                   options:(UISceneConnectionOptions *)options
-    API_AVAILABLE(ios(13.0));
 @end
+
+// The subclass-shadows-the-configuration-selector shape needs this selector on the
+// subclass — but added from +load, and ONLY when the app carries a scene manifest.
+// UIKit treats an app delegate that responds to this selector as having adopted the
+// scene lifecycle even without UIApplicationSceneManifest; the first CI run showed
+// exactly that on the manifest-less 2022.3 export: UIKit called this override, the app
+// went scene-based with no scene delegate to hand it, and never became active. A real
+// host that wants scenes declares the manifest; one that does not must not implement
+// this selector at all, so the mock only does under a manifest.
+// A C function rather than a method so it can be added conditionally. "super" is the
+// COMPILE-TIME superclass, never [self superclass]: once the isa proxy is on this
+// object, [self superclass] is QACoexAppController itself, and forwarding there would
+// recurse into this very function.
+API_AVAILABLE(ios(13.0))
+static UISceneConfiguration *QACoexConfigurationForConnectingSceneSession(
+        id self, SEL _cmd, UIApplication *application, UISceneSession *connectingSceneSession,
+        UISceneConnectionOptions *options) {
+    const char *shadow = getenv("QA_COEX_SHADOW_SCENE_CONFIG");
+    BOOL skipSuper = shadow != NULL && strcmp(shadow, "1") == 0;
+    Class root = class_getSuperclass([QACoexAppController class]);
+    if (!skipSuper && [root instancesRespondToSelector:_cmd]) {
+        QACoexNote(@"host subclass forwards configurationForConnectingSceneSession to super");
+        struct objc_super sup = { self, root };
+        return ((UISceneConfiguration *(*)(struct objc_super *, SEL, UIApplication *, UISceneSession *,
+                                           UISceneConnectionOptions *))objc_msgSendSuper)(
+            &sup, _cmd, application, connectingSceneSession, options);
+    }
+    QACoexNote(@"host subclass shadows configurationForConnectingSceneSession (no super)");
+    return connectingSceneSession.configuration;
+}
 
 @implementation QACoexAppController
 
@@ -115,20 +141,14 @@ int gQACoexSubclassSuperCalls = 0;
 //   1       — return the session's own configuration without calling super, so the
 //             package's wrapper never runs and only the UISceneWillConnectNotification
 //             fallback can install ("via notification").
-- (UISceneConfiguration *)application:(UIApplication *)application
-    configurationForConnectingSceneSession:(UISceneSession *)connectingSceneSession
-                                   options:(UISceneConnectionOptions *)options {
-    const char *shadow = getenv("QA_COEX_SHADOW_SCENE_CONFIG");
-    BOOL skipSuper = shadow != NULL && strcmp(shadow, "1") == 0;
-    SEL sel = @selector(application:configurationForConnectingSceneSession:options:);
-    if (!skipSuper && [[self superclass] instancesRespondToSelector:sel]) {
-        QACoexNote(@"host subclass forwards configurationForConnectingSceneSession to super");
-        return [super application:application
-            configurationForConnectingSceneSession:connectingSceneSession
-                                           options:options];
++ (void)load {
+    // See QACoexConfigurationForConnectingSceneSession above: the selector exists on
+    // this class only when the app declares a scene manifest.
+    if ([NSBundle mainBundle].infoDictionary[@"UIApplicationSceneManifest"] == nil) return;
+    if (@available(iOS 13.0, *)) {
+        class_addMethod(self, @selector(application:configurationForConnectingSceneSession:options:),
+                        (IMP)QACoexConfigurationForConnectingSceneSession, "@@:@@@");
     }
-    QACoexNote(@"host subclass shadows configurationForConnectingSceneSession (no super)");
-    return connectingSceneSession.configuration;
 }
 
 @end

@@ -61,9 +61,20 @@ static void QACoexSwizzledPerform(id self, SEL _cmd, UIApplication *application,
         SEL didFinishSel = @selector(application:didFinishLaunchingWithOptions:);
 
         Method perform = class_getInstanceMethod(cls, performSel);
-        QACoexCheck(perform != NULL, @"category-load-after-class-load",
-                    @"UnityAppController has no performActionForShortcutItem at category "
-                    @"+load time — the package's class +load did not run first");
+        // Which +load ran first is RECORDED, never required. The first CI run showed
+        // why: on the 2022.3.62f3 export this category's +load ran BEFORE the
+        // package's class +load, on the 6000.3.21f1 export AFTER it — every file in
+        // the same UnityFramework target both times. objc4 orders a class's own
+        // +load before its categories' and superclasses before subclasses; what it
+        // promises between a class +load and a category +load on DIFFERENT classes
+        // is nothing, and the two toolchains delivered both orders. So this category
+        // behaves like a real vendor swizzle in either order: when the selector is
+        // already there it wraps and chains, and when nothing implements it yet it
+        // ADDS its own handler (which then completes itself); the package, arriving
+        // later, wraps THAT and chains to it. The probe's chain and exactly-once
+        // checks must hold either way — that is the contract worth asserting.
+        NSLog(@"QA-COEX: PASS category-load-ran order=%s",
+              perform != NULL ? "class-first" : "category-first");
 
         Method didFinish = class_getInstanceMethod(cls, didFinishSel);
         if (didFinish != NULL) {
@@ -74,6 +85,9 @@ static void QACoexSwizzledPerform(id self, SEL _cmd, UIApplication *application,
             gQACoexOrigPerform =
                 (void (*)(id, SEL, UIApplication *, UIApplicationShortcutItem *, void (^)(BOOL)))
                     method_setImplementation(perform, (IMP)QACoexSwizzledPerform);
+        } else {
+            gQACoexOrigPerform = NULL;
+            class_addMethod(cls, performSel, (IMP)QACoexSwizzledPerform, "v@:@@@?");
         }
     });
 }
