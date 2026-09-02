@@ -5,7 +5,9 @@
 // via DllImport("__Internal"). The implementation lives in QuickActions.mm,
 // which also installs the UnityAppController hooks — plus, when the host adopts the
 // UIScene lifecycle and iOS routes taps to the scene delegate instead, the matching
-// hooks on the delegate class named by the scene configuration (cold:
+// hooks on the delegate class named by the CONNECTING SESSION's scene configuration —
+// the manifest entry UIKit resolves, or whatever configuration a host implementation of
+// application:configurationForConnectingSceneSession:options: returns (cold:
 // scene:willConnectToSession:options:, warm:
 // windowScene:performActionForShortcutItem:completionHandler:). This header is
 // informational; the .mm does not depend on it.
