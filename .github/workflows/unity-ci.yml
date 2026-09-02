@@ -6,7 +6,12 @@ name: unity
 # asserts the package's baked shortcuts, keep file and trampoline really are in
 # it) fed into the adb device smoke, and an iOS Simulator-SDK Xcode export per
 # testbed with an unsigned xcodebuild compile on macOS for the lines whose
-# simulator support allows it. One further Android leg, `android-shrink-verify`,
+# simulator support allows it. A second iOS pair, `ios-export-coex` /
+# `ios-simulator-coex`, re-exports two of those testbeds with a mock HOST stacked
+# on the package — an app-controller subclass, a category `+load` swizzle and a
+# GoogleUtilities-style isa proxy (`Examples~/Coexistence/`) — and asserts on what
+# the native layer actually did, which is the one thing the plain simulator leg
+# (process still alive) cannot see. One further Android leg, `android-shrink-verify`,
 # exports the Gradle project on 2022.3 and runs the resource shrinker's own
 # task (`:launcher:shrinkReleaseRes`, never assembleRelease), reading the
 # stripped `.ap_` it emits, to settle the question no APK leg can — whether
@@ -69,14 +74,14 @@ name: unity
 # Licence seats: at most UNITY_MAX_PARALLEL Unity activations run at once —
 # repository variable, default 2 if unset, so the number is tunable from
 # Settings without a commit. (The `|| '2'` default is spelled out at each of
-# the three max-parallel lines — `strategy:` cannot read `env:` — and quoted in
-# README.md and tools~/device-smoke/README.md; change all five together.)
+# the four max-parallel lines — `strategy:` cannot read `env:` — and quoted in
+# README.md and tools~/device-smoke/README.md; change all six together.)
 # Two mechanisms together produce that number, and neither alone would:
-#   * the six Unity jobs are chained with `needs:` (tests -> android-build ->
-#     ios-export -> tests-unity6-latest -> android-shrink-verify -> gate-off),
-#     so exactly ONE of them is ever eligible. max-parallel is a matrix-only
-#     key — it cannot span job definitions — so without the chain the floor is
-#     six.
+#   * the seven Unity jobs are chained with `needs:` (tests -> android-build ->
+#     ios-export -> ios-export-coex -> tests-unity6-latest ->
+#     android-shrink-verify -> gate-off), so exactly ONE of them is ever
+#     eligible. max-parallel is a matrix-only key — it cannot span job
+#     definitions — so without the chain the floor is seven.
 #   * max-parallel on each matrix caps that one job's legs.
 # The chain uses `!cancelled()` rather than the implicit success(), so a red
 # tests leg still lets the Android build run, exactly as before; the
@@ -281,7 +286,7 @@ jobs:
   # required checks, so a red here blocks nothing — it IS the early warning.
   tests-unity6-latest:
     name: tests (unity6-latest)
-    needs: [license, ios-export]
+    needs: [license, ios-export-coex]
     if: ${{ !cancelled() && needs.license.outputs.available == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -2330,6 +2335,94 @@ jobs:
           print("ok: %d marked items %r, exactly one icon key each" % (len(ours), got))
           PY
 
+  # The same iOS export, with a mock HOST stacked on top of the package: an
+  # IMPL_APP_CONTROLLER_SUBCLASS subclass, a category +load swizzle of the two
+  # app-delegate selectors the package owns, and a GoogleUtilities-style isa proxy
+  # of the live delegate — the three shapes every real Unity iOS SDK stack is made
+  # of. Sources live in Examples~/Coexistence/iOS (invisible to Unity, never
+  # shipped, each file wrapped in #if QUICKACTIONS_ENABLED) and are copied into the
+  # testbed here, exactly the way the Demo sample is imported. 2021.3 is absent on
+  # purpose: it is exported but never compiled on macOS (x86_64-only simulator
+  # runtime), so a coex leg there could assert nothing.
+  ios-export-coex:
+    name: ios export coex (${{ matrix.testbed.name }})
+    needs: [license, ios-export]
+    if: ${{ !cancelled() && needs.license.outputs.available == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      max-parallel: ${{ fromJSON(vars.UNITY_MAX_PARALLEL || '2') }}
+      matrix:
+        testbed:
+          - { name: "2022.3-coex", base: "2022.3", path: Examples~/Testbed2022 }
+          - { name: "unity6-coex", base: "unity6", path: Examples~/Testbed6 }
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Import the Demo sample into the testbed
+        env:
+          TESTBED: ${{ matrix.testbed.path }}
+        run: |
+          mkdir -p "$TESTBED/Assets/Samples/QuickActionsDemo"
+          cp -R Samples~/Demo/. "$TESTBED/Assets/Samples/QuickActionsDemo/"
+      - name: Stack the coexistence mock host into the testbed
+        env:
+          TESTBED: ${{ matrix.testbed.path }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$TESTBED/Assets/Plugins/iOS"
+          cp -R Examples~/Coexistence/iOS/. "$TESTBED/Assets/Plugins/iOS/"
+          ls -la "$TESTBED/Assets/Plugins/iOS"
+      # Same shared-memory raise as every other containerised editor job.
+      - name: Give Unity's container the shared memory 6000.6+ needs
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+
+          path = "/etc/docker/daemon.json"
+          cfg = json.load(open(path)) if os.path.exists(path) else {}
+          cfg["default-shm-size"] = "2g"
+          with open("daemon.json.new", "w") as f:
+              json.dump(cfg, f, indent=2)
+          print(json.dumps(cfg, indent=2))
+          PY
+          sudo mv daemon.json.new /etc/docker/daemon.json
+          sudo systemctl restart docker
+          docker info --format '{{.Name}}: docker restarted, default shm raised' \
+            || { echo "docker did not come back after the restart"; exit 1; }
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ matrix.testbed.path }}/Library
+          key: Library-${{ matrix.testbed.name }}-ios-${{ hashFiles(format('{0}/Packages/**', matrix.testbed.path), format('{0}/ProjectSettings/**', matrix.testbed.path)) }}
+          # Falls back to the plain leg's Library for this testbed: the mock host
+          # adds four sources, not a different project.
+          restore-keys: |
+            Library-${{ matrix.testbed.name }}-ios-
+            Library-${{ matrix.testbed.base }}-ios-
+            Library-${{ matrix.testbed.base }}-
+      - uses: game-ci/unity-builder@d829bfc901f2347c8fe18898f06712b66916ef42 # v5.0.0
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+        with:
+          projectPath: ${{ matrix.testbed.path }}
+          targetPlatform: iOS
+          buildMethod: TestbedBuilder.BuildiOSSimulator
+          versioning: None
+          allowDirtyBuild: true
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: ios-simulator-xcodeproj-${{ matrix.testbed.name }}
+          path: ${{ matrix.testbed.path }}/Builds/iOSSimulator
+          if-no-files-found: error
+          retention-days: 14
+
   # Compile the exported project for the iOS Simulator on macOS — unsigned
   # (CODE_SIGNING_ALLOWED=NO), then boot a simulator, install the .app and
   # launch it, asserting the process is still alive afterwards (`simctl
@@ -2405,3 +2498,196 @@ jobs:
               ;;
           esac
           echo "app launched and stayed alive on the simulator"
+
+  # The coexistence assertions. Same compile as ios-simulator, then the app is
+  # launched with its stderr on a pty — which is what makes NSLog duplicate to it —
+  # and every line the mock host prints is required by name. `QA-COEX: FAIL`
+  # anywhere fails the leg, a missing `QA-COEX: DONE` fails it (a probe that never
+  # ran must not pass by silence), and the package's own always-on install line has
+  # to say exactly what this lifecycle should produce. On a scene-manifest testbed
+  # the app is launched a second time with SIMCTL_CHILD_QA_COEX_SHADOW_SCENE_CONFIG=1,
+  # where the host subclass shadows application:configurationForConnectingSceneSession:
+  # without calling super — the only route left is the UISceneWillConnectNotification
+  # fallback, so the install line must flip from "via configuration" to
+  # "via notification". One build, two behaviours, no second export.
+  ios-simulator-coex:
+    name: ios simulator coex (${{ matrix.target.name }})
+    needs: ios-export-coex
+    if: ${{ !cancelled() && needs.ios-export-coex.result != 'skipped' }}
+    runs-on: ${{ matrix.target.runner }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          # `lifecycle` and `hooks` are EXPECTATIONS, not descriptions: Testbed2022 is
+          # 2022.3.62f3, below the 2022.3.72f1 cut where Unity starts emitting a scene
+          # manifest, and Testbed6 is 6000.3.21f1, above the 6000.3.8f1 cut. If a leg
+          # goes red on these, the answer is which lifecycle CI actually exercises —
+          # a thing no check in this repo has ever established.
+          - {
+              name: "2022.3-coex",
+              runner: macos-15,
+              lifecycle: "app-delegate",
+              hooks: "didFinishLaunching=wrapped performAction=added sceneConfig=absent manifest=no",
+            }
+          - {
+              name: "unity6-coex",
+              runner: macos-latest,
+              lifecycle: "scene",
+              hooks: "didFinishLaunching=wrapped performAction=added sceneConfig=added manifest=yes",
+            }
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ios-simulator-xcodeproj-${{ matrix.target.name }}
+          path: ${{ runner.temp }}/iosproj
+      - name: xcodebuild for the iOS Simulator (unsigned)
+        run: |
+          cd "$RUNNER_TEMP/iosproj"
+          xcodebuild -project Unity-iPhone.xcodeproj \
+            -scheme Unity-iPhone \
+            -configuration Release \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            build
+      - name: Boot a simulator and run the coexistence mock host
+        env:
+          EXPECT_LIFECYCLE: ${{ matrix.target.lifecycle }}
+          EXPECT_HOOKS: ${{ matrix.target.hooks }}
+        run: |
+          set -euo pipefail
+          APP="$(find "$RUNNER_TEMP/DerivedData/Build/Products/Release-iphonesimulator" -maxdepth 1 -name '*.app' -print -quit)"
+          [ -n "$APP" ] || { echo "no .app produced"; exit 1; }
+          UDID="$(xcrun simctl list devices available --json | python3 -c '
+          import json, sys
+          devices = json.load(sys.stdin)["devices"]
+          for runtime in sorted(devices, reverse=True):
+              if "iOS" not in runtime:
+                  continue
+              for device in devices[runtime]:
+                  if device.get("isAvailable") and "iPhone" in device["name"]:
+                      print(device["udid"]); raise SystemExit
+          raise SystemExit("no available iPhone simulator")')"
+          echo "Using simulator $UDID"
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl install "$UDID" "$APP"
+          mkdir -p "$RUNNER_TEMP/coex"
+
+          # One launch, captured through a pty. No `timeout(1)`: that is GNU
+          # coreutils, which is not on a macOS runner's PATH — background the launch
+          # and kill it instead. Poll capture-then-case, never `| grep -q`: under
+          # pipefail an early grep exit SIGPIPEs the writer (same rule as the adb
+          # smoke and the plain simulator leg).
+          run_launch() {
+            mode="$1"; out="$2"
+            : > "$out"
+            if [ -n "$mode" ]; then
+              SIMCTL_CHILD_QA_COEX_SHADOW_SCENE_CONFIG="$mode" \
+                xcrun simctl launch --console-pty --terminate-running-process \
+                  "$UDID" com.quickactions.testbed > "$out" 2>&1 &
+            else
+              xcrun simctl launch --console-pty --terminate-running-process \
+                "$UDID" com.quickactions.testbed > "$out" 2>&1 &
+            fi
+            launch_pid=$!
+            waited=0
+            while [ "$waited" -lt 120 ]; do
+              text="$(cat "$out" 2>/dev/null || true)"
+              case "$text" in *"QA-COEX: DONE"*) break ;; esac
+              waited=$((waited + 1))
+              sleep 1
+            done
+            kill "$launch_pid" 2>/dev/null || true
+            wait "$launch_pid" 2>/dev/null || true
+            xcrun simctl terminate "$UDID" com.quickactions.testbed >/dev/null 2>&1 || true
+            echo "launch (mode=${mode:-default}) captured $(wc -l < "$out") line(s) after ${waited}s"
+          }
+
+          # Only on failure, and never asserted on: the unified log is per-device, so
+          # it also holds the PREVIOUS launch's lines and would let one launch pass on
+          # another's evidence. The pty capture is the source of truth.
+          fail_dump() {
+            echo "----- console capture -----"
+            cat "$1" || true
+            echo "----- unified log (best effort, may span earlier launches) -----"
+            xcrun simctl spawn "$UDID" log show --style compact --last 5m \
+              --predicate 'processImagePath CONTAINS "QuickActionsDemo"' 2>/dev/null || true
+          }
+
+          assert_log() {
+            file="$1"; label="$2"; shift 2
+            text="$(cat "$file")"
+            case "$text" in
+              *"QA-COEX: FAIL"*)
+                echo "::error::$label — the mock host reported a failure"
+                fail_dump "$file"; exit 1 ;;
+            esac
+            case "$text" in
+              *"QA-COEX: DONE"*) ;;
+              *) echo "::error::$label — the probe never finished"; fail_dump "$file"; exit 1 ;;
+            esac
+            for want in "$@"; do
+              case "$text" in
+                *"$want"*) ;;
+                *)
+                  echo "::error::$label — missing required line: $want"
+                  fail_dump "$file"; exit 1 ;;
+              esac
+            done
+            echo "$label — every required line present"
+          }
+
+          required=(
+            "[QuickActions] iOS hooks: $EXPECT_HOOKS"
+            "QA-COEX: PASS lifecycle-$EXPECT_LIFECYCLE"
+            "QA-COEX: PASS category-load-after-class-load"
+            "QA-COEX: PASS cold-returns-no"
+            "QA-COEX: PASS cold-queued-id"
+            "QA-COEX: PASS cold-queued-once"
+            "QA-COEX: PASS subclass-super-called-once"
+            "QA-COEX: PASS category-cold-chained"
+            "QA-COEX: PASS isa-proxy-size-equal"
+            "QA-COEX: PASS isa-proxy-warm-hook-resolves"
+            "QA-COEX: PASS isa-proxy-installed"
+            "QA-COEX: PASS isa-proxy-warm-reaches-package"
+            "QA-COEX: PASS category-warm-chained"
+            "QA-COEX: PASS warm-queued-id"
+            "QA-COEX: PASS warm-queued-once"
+            "QA-COEX: PASS warm-completion-once"
+            "QA-COEX: PASS unmarked-completion-once"
+          )
+          if [ "$EXPECT_LIFECYCLE" = "scene" ]; then
+            required+=(
+              "QA-COEX: PASS scene-delegate-is-unityscene"
+              "QA-COEX: PASS scene-config-delegate-class"
+              "QA-COEX: PASS scene-warm-hook-installed"
+            )
+          fi
+
+          run_launch "" "$RUNNER_TEMP/coex/launch-default.log"
+          if [ "$EXPECT_LIFECYCLE" = "scene" ]; then
+            assert_log "$RUNNER_TEMP/coex/launch-default.log" "default launch" \
+              "${required[@]}" \
+              "[QuickActions] iOS scene hooks installed on UnityScene via configuration"
+            run_launch "1" "$RUNNER_TEMP/coex/launch-shadowed.log"
+            assert_log "$RUNNER_TEMP/coex/launch-shadowed.log" "shadowed-configuration launch" \
+              "${required[@]}" \
+              "[QuickActions] iOS scene hooks installed on UnityScene via notification"
+          else
+            assert_log "$RUNNER_TEMP/coex/launch-default.log" "default launch" "${required[@]}"
+          fi
+          echo "coexistence assertions passed for ${{ matrix.target.name }}"
+      # if: always() rather than the usual upload-first ordering — the logs are
+      # produced by the step above, so this is the only way a red leg keeps its
+      # evidence.
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        if: always()
+        with:
+          name: ios-coex-logs-${{ matrix.target.name }}
+          path: ${{ runner.temp }}/coex
+          if-no-files-found: warn
+          retention-days: 14
+
