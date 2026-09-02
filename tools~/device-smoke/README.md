@@ -76,6 +76,15 @@ default 5 — an emulator's GPU process tears the dead app's Vulkan objects
 down asynchronously, and launching the new process into that teardown left a
 restarted player engine-silent in CI).
 
+One wait has a second chance built in. Step 5 spends half of
+`SHORTCUT_ATTEMPTS`, and if by then nothing has been published *and* the Unity
+player has not logged a single line under logcat's `Unity` tag, it force-stops
+the app and launches it once more (loudly, on stderr) before spending the other
+half. That is the API 30 emulator's known failure mode — the activity comes to
+the foreground and the player never initialises, seen twice on APKs that passed
+unchanged on the next run — not the package's. A player that did come up and
+still published nothing is not relaunched: that would be a real failure.
+
 ### What it asserts — and what it does not
 
 It asserts that a `QUICKACTIONS_ENABLED` build publishes dynamic shortcuts the

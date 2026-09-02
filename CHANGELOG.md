@@ -169,6 +169,17 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   contents) in both its generate and `--check` passes.
 ### Changed
 
+- **The Android emulator smoke relaunches an app whose player never came up.**
+  Twice on 2026-09-02 (runs 52 and 65, both on the API 30 image, both on APKs
+  that passed unchanged the next time) the smoke's launch reached the
+  foreground and then nothing happened: no `VkInstance`, not one line under
+  logcat's `Unity` tag, and after the full budget `dumpsys shortcut` still
+  showed zero calls. That is the emulator's ARM translation stalling the
+  player, not the package. Step 5 now spends half its budget, and if nothing
+  has been published *and* the player has not logged at all, force-stops and
+  launches once more before spending the other half — loudly, so a run that
+  needed the second launch says so. A player that did come up and published
+  nothing is not relaunched: that would be the package's failure to report.
 - **The Unity 6000.6 canary retries an editor that died before the suite
   ran.** `tests (unity6-latest)` has twice (main run 41, PR #16 run 53) ended
   with exit 137 at "Begin MonoManager ReloadAssembly" — the editor killed

@@ -228,21 +228,53 @@ case "$COMPONENT" in
   *) fail "could not resolve a launcher activity for '$APP_ID' (got '${COMPONENT:-<empty>}'). Is that the APK's application id?" ;;
 esac
 adb_ logcat -c >/dev/null 2>&1 || fail "could not clear logcat before the launch."
-if ! out="$(adb_ shell am start -W -n "$COMPONENT" \
-    -a android.intent.action.MAIN -c android.intent.category.LAUNCHER \
-    --es "$AUTOTEST_EXTRA" add3 2>&1 | tr -d '\r')"; then
-  fail "adb could not start $COMPONENT:
+# The launch itself, as a function: step 5 may need it a second time.
+launch_with_autotest() {
+  local out
+  if ! out="$(adb_ shell am start -W -n "$COMPONENT" \
+      -a android.intent.action.MAIN -c android.intent.category.LAUNCHER \
+      --es "$AUTOTEST_EXTRA" add3 2>&1 | tr -d '\r')"; then
+    fail "adb could not start $COMPONENT:
 $out"
-fi
-# `am start` reports "Error: ..." on stdout and still exits 0 — check the text.
-case "$out" in
-  *Error*|*Exception*) fail "am start reported an error for $COMPONENT:
+  fi
+  # `am start` reports "Error: ..." on stdout and still exits 0 — check the text.
+  case "$out" in
+    *Error*|*Exception*) fail "am start reported an error for $COMPONENT:
 $out" ;;
-esac
-echo "launched $COMPONENT with $AUTOTEST_EXTRA=add3"
+  esac
+  echo "launched $COMPONENT with $AUTOTEST_EXTRA=add3"
+}
+launch_with_autotest
+
+# Has the Unity player said anything at all since the launch? Its runtime logs
+# under the `Unity` tag from its first frames on; the two header lines logcat
+# prints for its buffers are not it.
+player_has_logged() {
+  [ -n "$(adb_ shell logcat -d -s Unity:V 2>/dev/null | tr -d '\r' | grep -v '^-' | head -n 1)" ]
+}
 
 step "5/8 wait for the demo's shortcuts to reach ShortcutManager"
-if ! poll "$SHORTCUT_ATTEMPTS" shortcuts_registered; then
+# A known failure mode of the API 30 emulator, seen twice on identical APKs
+# that passed on the next run (2026-09-02, runs 52 and 65): the activity reaches
+# the foreground, and then the Unity player never initialises — no VkInstance,
+# not one line under logcat's `Unity` tag — so nothing this script waits for
+# can ever happen. That is the emulator's ARM translation, not the package. So:
+# half the budget, and if NOTHING has been published and the player has not
+# spoken at all, force-stop and launch once more, loudly, then wait out the
+# other half. A player that did come up and still published nothing gets no
+# second chance — that would be the package's failure, and a relaunch would
+# only hide it.
+half=$((SHORTCUT_ATTEMPTS / 2))
+if ! poll "$half" shortcuts_registered; then
+  if ! player_has_logged; then
+    echo "warning: after $((half * POLL_INTERVAL))s the Unity player has logged nothing at all — it never came up" >&2
+    echo "         (a known API 30 emulator failure mode); force-stopping and launching once more." >&2
+    adb_ shell am force-stop "$APP_ID" >/dev/null 2>&1 || true
+    sleep 2
+    launch_with_autotest
+  fi
+fi
+if ! shortcuts_registered && ! poll "$((SHORTCUT_ATTEMPTS - half))" shortcuts_registered; then
   fail "after $((SHORTCUT_ATTEMPTS * POLL_INTERVAL))s, 'dumpsys shortcut' does not list all of: $SHORTCUT_IDS
 This means the app did not publish them — the autotest hook did not run (not a
 QUICKACTIONS_ENABLED dev build of the Demo sample?), the write was rejected, or
