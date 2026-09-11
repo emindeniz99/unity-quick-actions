@@ -11,6 +11,27 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 > as its own section because each is a distinct, self-contained set of API
 > additions; read them as the package's development log.
 
+## [Unreleased]
+
+### Changed
+
+- **Two long-standing ROADMAP items are now recorded decisions, not plans.**
+  The Android post-processor **stays** on `IPostGenerateGradleAndroidProject`:
+  Unity 6.2 still lists it as supported with no obsolete marker, and
+  `AndroidProjectFilesModifier` — 6000.0+ only — cannot write into the default
+  `unityLibrary` and `launcher` modules, where every one of the package's
+  outputs goes; 2021.3 and 2022.3 would keep the old path regardless, and the
+  incremental-build question it would answer is already measured green on every
+  push. The settings asset **keeps** showing as "missing script" when a project
+  is opened with the define off: the setup the README recommends (define on in
+  the Editor, gated only in the production Build Profile) never hits it, and the
+  fix would cost a permanent DTO mirroring `QuickActionItem`'s 12 serialized
+  fields — `QuickActionItem` has to stay gated, being a runtime type — plus an
+  asset-migration test and a rework of the `IconType` drawer. Measured while
+  deciding: an ungated *Editor* assembly costs zero in a player — the one that
+  already ships this way appears 0 times in the APK's IL2CPP metadata. Both
+  entries record what would re-open them.
+
 ## [0.6.0] - 2026-09-02
 
 ### Added

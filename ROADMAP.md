@@ -17,16 +17,27 @@ ships it.
   OpenUPM/Git and silently vanish for Asset Store users. Re-check whether Unity
   has fixed this before choosing any design that depends on it.
 
-- **Port the Android post-processor to `AndroidProjectFilesModifier` (Unity 6).**
-  Unity's own notifications package moved to it "for better compatibility with
-  incremental build"; the built-ins' distinct-name design was chosen so that
-  port is mechanical (every output declared up front, nothing inspected in the
-  tree), but the port itself is not done. CI's unity6 leg now builds the
-  Android player twice over one project directory and runs the same aapt2
-  assertions on the second APK (first measured 2026-09-02: 54,951,386 vs
-  54,951,670 bytes, every assertion green on both), so the current
-  `IPostGenerateGradleAndroidProject` path is measured rather than assumed on
-  every push — this is an API-alignment item, not a bug.
+- **Port the Android post-processor to `AndroidProjectFilesModifier` (Unity 6)
+  — decided against, 2026-09-10.** Unity's own notifications package moved to
+  the new API "for better compatibility with incremental build", and the
+  built-ins' distinct-name design was chosen so that a port would be mechanical.
+  It is still not worth doing, for four measured reasons:
+  (a) `IPostGenerateGradleAndroidProject` is **not deprecated** — Unity 6.2's
+  scripting reference lists it as supported, with no obsolete marker on the
+  interface or on `OnPostGenerateGradleAndroidProject`;
+  (b) `AndroidProjectFilesModifier` exists only on 6000.0+, and Unity's own
+  manual says it **cannot modify files in the default `unityLibrary` and
+  `launcher` modules** — which is where every one of this package's outputs goes
+  (the trampoline `<activity>`, `res/xml`, `res/values`, `res/raw`, the icons);
+  (c) 2021.3 and 2022.3 would stay on the old interface regardless, so the port
+  buys two implementations behind `#if UNITY_6000_0_OR_NEWER` and twice the test
+  surface for one shared set of outputs;
+  (d) the incremental-build worry it would answer is already measured: CI's
+  unity6 leg builds the Android player twice over one project directory and runs
+  the same aapt2 assertions on the second APK (2026-09-02: 54,951,386 vs
+  54,951,670 bytes, every assertion green on both).
+  Re-open when Unity marks the interface obsolete, or when the new API can write
+  into `unityLibrary`.
 
 - **Automated device CI, remaining scope** — 0.4.6 closed the licence half:
   `.github/workflows/unity-ci.yml` (GameCI) builds the dev APK in CI and feeds
@@ -133,12 +144,29 @@ The stub harness compiles the C#/Java but can't confirm Unity-only wiring:
   that FAILS the build if the define was removed without a script recompile.
   On Unity 6, confirm a dev Build Profile carrying the define builds
   coherently (the check reads Player Settings plus the active profile).
-- **Settings-asset orphan when the define is off:** `QuickActionsSettings` (the
-  static-shortcuts ScriptableObject) lives in the gated Editor assembly, so a
-  project that has a `QuickActionsSettings.asset` and is opened with
-  `QUICKACTIONS_ENABLED` off shows it as "missing script". Harmless and reversible
-  (re-enable the define), documented in README. A future cleanup could move the SO
-  *type* into an always-compiled editor assembly so the asset never orphans.
+- **Settings-asset orphan when the define is off — decided against, 2026-09-10.**
+  `QuickActionsSettings` (the static-shortcuts ScriptableObject) lives in the
+  gated Editor assembly, so a project that has a `QuickActionsSettings.asset`
+  and is opened with `QUICKACTIONS_ENABLED` off shows it as "missing script".
+  Harmless and reversible (re-enable the define), documented in README next to
+  the define-off instructions, and **absent from the setup that README actually
+  recommends** — keep the define on in the Editor and gate only the production
+  Build Profile, and the asset is never orphaned.
+  The fix would be to move the SO type into an always-compiled editor assembly.
+  Cost is not size: an ungated *Editor* assembly reaches no player at all, and
+  the one that already exists proves it — `EminDeniz99.QuickActions.Editor.Bootstrap`
+  and `QuickActionsSettings` each appear **0 times** in the shipped APK's IL2CPP
+  metadata, on both the development and the release build of PR #19 run 64.
+  The cost is permanent maintenance: `QuickActionItem` must stay gated (it is a
+  *runtime* type — ungating it would put it in every player), so the ungated SO
+  needs a parallel DTO mirroring its 12 serialized fields, held by a parity test
+  or it drifts silently and loses user data on the next bake; plus a migration
+  test over a fixture asset (the `.meta` GUID must survive the move, or every
+  existing user's asset breaks permanently) and a rework of the `IconType`
+  property drawer, whose enum lives on the gated side. That is a standing tax on
+  every future field, paid for a cosmetic wrinkle in a non-recommended setup.
+  Re-open if a user hits it on the recommended setup, or if `QuickActionItem`
+  stops being gated for another reason.
 - **iOS scene lifecycle + cold dedup (SHIPPED in v0.4.0 — Simulator-measured
   since 2026-09-02, device still open):** the package learns the scene-delegate
   class from the connecting session's `UISceneConfiguration` and installs cold
