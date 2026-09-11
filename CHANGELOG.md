@@ -30,8 +30,14 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   release, or a tap the launcher ignored (the row is still on screen afterwards)
   all record `SKIPPED` and leave the run green, because none of them says
   anything about delivery. Every branch was dry-run against a fake `adb` driven
-  by the real API 30 hierarchy dumps from run 61. The check is new: no result is
-  claimed here yet.
+  by the real API 30 hierarchy dumps from run 61. **Its first run (2026-09-11,
+  PR #23) recorded `PASS daily via 'Claim today'` on all four legs** — 2021.3,
+  2022.3 and 2022.3-release on the API 30 image, unity6 on API 35 — so on every
+  one of them the launcher opened its drawer, the long press produced the
+  popup, and a tap on the row cold-started the force-stopped app and delivered
+  `daily`. That includes the **minified** leg, where R8 had renamed classes
+  around `QuickActionsBridge`. It is the first time anything here has seen a
+  launcher deliver a quick action, on any surface.
 
 - **`llms.txt` at the repo root.** The [llmstxt.org](https://llmstxt.org/)
   convention: a short markdown index an AI agent can fetch before anything else
