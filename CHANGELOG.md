@@ -13,6 +13,16 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **`llms.txt` at the repo root.** The [llmstxt.org](https://llmstxt.org/)
+  convention: a short markdown index an AI agent can fetch before anything else
+  — one paragraph on what the package is, the define that every integration
+  forgets, the install routes, and a curated link list that sends an agent to
+  `AGENTS.md` first and the README second. It ships to nobody (it is a
+  repository file, like `CONTRIBUTING.md`), duplicates no documentation, and
+  links only to raw markdown, so a small model can follow it in one hop.
+
 ### Changed
 
 - **Two long-standing ROADMAP items are now recorded decisions, not plans.**
