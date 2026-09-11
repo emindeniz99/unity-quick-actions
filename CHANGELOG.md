@@ -15,6 +15,24 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **The Android smoke now taps a shortcut in the launcher's own popup.** Every
+  assertion the smoke makes has delivered its tap with `am start` — the intent
+  the launcher would build, built by the script instead — so "a real launcher
+  tap behaves the same" has been listed as unproven in every doc here. The
+  long-press capture already opened the popup and photographed it; it now
+  force-stops the app, clears logcat, taps the row named by `CAPTURE_TAP`
+  (`daily` by default: the one id the synthetic taps never use, so the line
+  cannot be a leftover) and waits for `Performed quick action 'daily'`. That is
+  the launcher starting a dead process through the trampoline. It is also the
+  capture's **only** assertion, and it is conditional: `FAIL` — and a red run —
+  requires the sheet to have *closed on the tap*, meaning the launcher accepted
+  it and nothing arrived. A drawer that never opened, a sheet that vanished on
+  release, or a tap the launcher ignored (the row is still on screen afterwards)
+  all record `SKIPPED` and leave the run green, because none of them says
+  anything about delivery. Every branch was dry-run against a fake `adb` driven
+  by the real API 30 hierarchy dumps from run 61. The check is new: no result is
+  claimed here yet.
+
 - **`llms.txt` at the repo root.** The [llmstxt.org](https://llmstxt.org/)
   convention: a short markdown index an AI agent can fetch before anything else
   — one paragraph on what the package is, the define that every integration

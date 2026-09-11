@@ -112,8 +112,11 @@ It does **not** prove:
   that needs human eyes on a home screen, which is what the opt-in capture
   below *photographs* without asserting anything about it;
 * that a real **launcher tap** on a quit app behaves like the `am start` the
-  script sends — the intent is the same one the launcher builds, but only
-  SpringBoard-style UI automation could tap the icon itself;
+  script sends — the eight asserted steps use the intent the launcher builds,
+  not the launcher. The capture below now taps a row of the real popup when it
+  managed to open one, and *that* tap is asserted when it lands (see step 7);
+  but whether the launcher opens its drawer at all is the emulator's business,
+  so this is proven opportunistically, never on demand, and never on hardware;
 * that an **unregistered** id is *rejected* by the trampoline (the negative half
   of the spoof gate — covered headlessly by the Java smoke test in
   `.verify/JavaSmoke`);
@@ -139,7 +142,8 @@ a sheet that dismisses on release is captured all the same. An icon the launcher
 shows only as a *prediction* (`Predicted app: …` in the hotseat) is not pressed —
 a long press there opens the launcher's suggestions sheet, not the app's popup —
 so such a match counts as a miss and the drawer escalation runs. Into `CAPTURE_DIR`:
-`longpress.png`, `ui-drawer.xml`, `ui-longpress.xml`. The log carries the
+`longpress.png`, `ui-drawer.xml`, `ui-longpress.xml`, and — when step 7 ran —
+`ui-tap.xml`, `ui-after-tap.xml` and `launcher-tap.txt`. The log carries the
 launcher it resolved, the coordinates it pressed, and one grep-able verdict —
 `shortcut sheet visible: yes` / `partial` / `no`. Each `CAPTURE_TITLES` entry is
 a `Title=Subtitle` pair and either half counts — Launcher3 draws the long label
@@ -156,17 +160,42 @@ gesture missed, or that launcher lays its sheet out differently, or that the
 label was truncated past recognition — never that the package is broken. Read
 the picture, not the line.
 
-So it **never fails the job**. The gesture belongs to whatever launcher the
-system image ships (AOSP `default` images run Launcher3; a `google_apis` image
-may run something else entirely), the drawer swipe is a guess derived from
-`wm size`, and UI automation on a software-rendered emulator is flaky by
-nature. Accordingly: the verdict is printed before any of it runs, the whole
-block runs in a subshell with `errexit`/`pipefail` off, every `adb` call is
-bounded by `timeout`, and the script's exit status is 0 regardless. A red smoke
-exits earlier and captures nothing. Knobs: `CAPTURE_DIR`, `CAPTURE_LABEL` (the
+### Step 7 — the one line of the capture that can fail the job
+
+With the sheet up, the capture force-stops the app, clears logcat, re-reads the
+hierarchy, **taps the row** named by `CAPTURE_TAP` (`<id>|<title>|<subtitle>`,
+default `daily|Daily Reward|Claim today`) and waits for
+`Performed quick action '<id>'`. That is the launcher's own intent, starting a
+dead process — the one delivery path the eight asserted steps cannot reach,
+because they build the intent themselves. The id is deliberately the one the
+synthetic taps never use, so the line cannot be a leftover.
+
+It records exactly one verdict in `launcher-tap.txt`, and only the middle one is
+the package's:
+
+* **PASS** — the row was tapped and the id arrived.
+* **FAIL** — the sheet *closed on the tap* (so the launcher accepted it) and
+  nothing arrived within `CAPTURE_TAP_ATTEMPTS` polls. **This fails the run.**
+* **SKIPPED** — no drawer, no sheet, no row after the release, or the row is
+  still on screen afterwards (the tap never registered). None of these is
+  evidence about delivery, so the run stays green and says why.
+
+So the capture **fails the job only on FAIL**. Everything else about it is a
+photograph: the gesture belongs to whatever launcher the system image ships
+(AOSP `default` images run Launcher3; a `google_apis` image may run something
+else entirely), the drawer swipe is a guess derived from `wm size`, and UI
+automation on a software-rendered emulator is flaky by nature. Accordingly: the
+smoke's own verdict is printed before any of it runs, the whole block runs in a
+subshell with `errexit`/`pipefail` off, every `adb` call is bounded by
+`timeout`, and the subshell's status is discarded — the tail of the script reads
+the verdict file instead, which is what makes that one outcome, and only it,
+able to turn the run red. A red smoke exits earlier and captures nothing.
+Knobs: `CAPTURE_DIR`, `CAPTURE_LABEL` (the
 launcher label to search for — `QuickActionsDemo`, the testbeds' `productName`;
 `aapt2 dump badging <apk>` prints it for any other APK), `CAPTURE_TITLES`
-(`|`-separated `Title=Subtitle` pairs), `CAPTURE_TIMEOUT` (60s per adb call),
+(`|`-separated `Title=Subtitle` pairs), `CAPTURE_TAP` and `CAPTURE_TAP_ATTEMPTS`
+(the row to tap and how long to wait for it, defaulting to the cold budget),
+`CAPTURE_TIMEOUT` (60s per adb call),
 `CAPTURE_PRESS_MS`.
 
 CI turns it on for all three `android-smoke` legs and uploads

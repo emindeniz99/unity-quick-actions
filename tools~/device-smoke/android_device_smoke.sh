@@ -446,6 +446,82 @@ printf '\nPASS: %s on API %s — %s registered with ShortcutManager; a WARM tap 
 # is the first thing you need when it misses). A run that finds nothing is an
 # expected outcome: it prints what it saw instead of failing.
 #
+# Step 7's body: tap a row of the sheet that is already up, and see whether the
+# action arrives. Everything before it is a photograph; this is the LAUNCHER
+# itself delivering a tap — the one thing every doc in this repo has had to list
+# as unproven, because `am start` builds the same intent by hand.
+#
+# It force-stops the app first, so what it proves is the COLD path: the launcher
+# starting a dead process with a shortcut id and the game reporting it. The
+# popup belongs to the launcher, not to the app, so stopping the app does not
+# dismiss it — but if some launcher does dismiss it, the re-dump below finds no
+# row and the step records SKIPPED rather than inventing a failure.
+#
+# Reads the caller's `dir` and `py`. Records exactly one of:
+#   PASS     the row was tapped and the id reached logcat
+#   FAIL     the sheet accepted the tap (it closed) and nothing arrived
+#   SKIPPED  nothing was tapped, or the tap never registered — automation, not
+#            the package; the run stays green.
+cap_tap_row() {
+  local id title subtitle form xy tx ty found=""
+  IFS='|' read -r id title subtitle <<<"$CAPTURE_TAP"
+  if [ -z "$id" ]; then
+    cap_verdict SKIPPED "CAPTURE_TAP names no id"
+    return 0
+  fi
+
+  # Cold, and unambiguous: a dead process cannot answer with a line logged
+  # before the tap, and a cleared buffer cannot hand us one either.
+  cap_adb shell am force-stop "$APP_ID" >/dev/null 2>&1 || true
+  sleep 2
+  cap_adb logcat -c >/dev/null 2>&1 || true
+
+  if ! cap_dump_ui "$dir/ui-tap.xml"; then
+    echo "launcher tap: skipped — the hierarchy could not be read after the release"
+    cap_verdict SKIPPED "no hierarchy after the release"
+    return 0
+  fi
+  for form in "$subtitle" "$title"; do
+    [ -n "$form" ] || continue
+    xy="$(python3 "$py" icon "$form" <"$dir/ui-tap.xml" 2>/dev/null)" || continue
+    if [ -n "$xy" ]; then
+      found="$form"
+      break
+    fi
+  done
+  if [ -z "$found" ]; then
+    echo "launcher tap: skipped — no '$subtitle' / '$title' row on screen once the finger was up"
+    echo "              (the sheet did not survive the release or the force-stop; ui-tap.xml has what did)"
+    cap_verdict SKIPPED "the sheet was gone before the tap"
+    return 0
+  fi
+
+  tx="${xy%% *}"
+  ty="${xy##* }"
+  echo "capture: tapping the '$found' row at $tx,$ty — a real launcher tap, app force-stopped"
+  cap_adb shell input tap "$tx" "$ty" >/dev/null 2>&1 || true
+  if poll "$CAPTURE_TAP_ATTEMPTS" cap_performed_logged "$id"; then
+    echo "launcher tap: '$id' arrived as Performed — the launcher's own intent reached the game"
+    cap_verdict PASS "$id via '$found'"
+    return 0
+  fi
+
+  # Nothing arrived. Two very different reasons, and only one of them is the
+  # package's: if the row is still on screen the tap never registered (a pixel
+  # the launcher ignored), which says nothing about delivery. If the sheet is
+  # gone, the launcher accepted the tap and the action vanished.
+  if cap_dump_ui "$dir/ui-after-tap.xml" \
+    && python3 "$py" icon "$found" <"$dir/ui-after-tap.xml" >/dev/null 2>&1; then
+    echo "launcher tap: skipped — the '$found' row is still on screen, so the tap never registered"
+    cap_verdict SKIPPED "the tap did not register"
+    return 0
+  fi
+  echo "launcher tap: FAILED — the sheet closed on the tap and no \"Performed quick action '$id'\" arrived"
+  echo "              within $((CAPTURE_TAP_ATTEMPTS * POLL_INTERVAL))s. The launcher delivered; the game did not report."
+  cap_verdict FAIL "tapped '$found' for '$id', nothing arrived"
+  return 0
+}
+
 # Written into CAPTURE_DIR (default: a temp dir):
 #   longpress.png     the screen after the long press — the artifact for eyes
 #   ui-drawer.xml     the hierarchy the app icon was located in
@@ -470,6 +546,17 @@ CAPTURE_LABEL="${CAPTURE_LABEL:-QuickActionsDemo}"
 # quote to bash's parser and swallows the rest of the file.)
 default_titles="New Game=Start a fresh run|Continue=Resume your save|Daily Reward=Claim today's gift"
 CAPTURE_TITLES="${CAPTURE_TITLES:-$default_titles}"
+# The row the capture TAPS once the sheet is up, as "<id>|<title>|<subtitle>":
+# the id is what has to reach logcat, the two label forms are what the launcher
+# may have drawn (same rule as CAPTURE_TITLES — whichever fits the popup). The
+# dynamic `daily` on purpose: it is the one id the SYNTHETIC taps never use
+# (step 6 taps new_game, step 8 continue), so a "Performed quick action
+# 'daily'" line cannot be a leftover from them, cleared logcat or not.
+default_tap="daily|Daily Reward|Claim today"
+CAPTURE_TAP="${CAPTURE_TAP:-$default_tap}"
+# A launcher tap starts the app from cold (the capture force-stops it first),
+# so it gets the cold budget, not the warm one.
+CAPTURE_TAP_ATTEMPTS="${CAPTURE_TAP_ATTEMPTS:-$COLD_LOG_ATTEMPTS}"
 CAPTURE_TIMEOUT="${CAPTURE_TIMEOUT:-60}"
 CAPTURE_PRESS_MS="${CAPTURE_PRESS_MS:-1500}"
 
@@ -496,6 +583,23 @@ cap_dump_ui() {
   cap_adb shell uiautomator dump /sdcard/quickactions-ui.xml >/dev/null 2>&1 || return 1
   cap_adb pull /sdcard/quickactions-ui.xml "$dest" >/dev/null 2>&1 || return 1
   [ -s "$dest" ]
+}
+
+# performed_logged (step 7's predicate), bounded like everything else here.
+cap_performed_logged() {
+  local log id="$1"
+  log="$(cap_adb logcat -d 2>/dev/null | tr -d '\r')" || return 1
+  case "$log" in
+    *"Performed quick action '$id'"*) return 0 ;;
+  esac
+  return 1
+}
+
+# The capture's one verdict a machine acts on. Written to CAPTURE_DIR so it
+# travels with the artifacts, and read back by the tail of this script — which
+# is outside the capture's subshell and can therefore fail the run.
+cap_verdict() {
+  printf '%s %s\n' "$1" "${2:-}" >"$dir/launcher-tap.txt" 2>/dev/null || true
 }
 
 # Locate the app's icon by its launcher label in a fresh hierarchy dump. Sets
@@ -528,7 +632,7 @@ cap_find_icon() {
 }
 
 capture_longpress() {
-  local dir tmp py wh w h x y_from y_to xy ix iy out rc handle hxy hx hy hold_s pressed
+  local dir tmp py wh w h x y_from y_to xy ix iy out rc handle hxy hx hy hold_s pressed sheet
   local titles=()
 
   printf '\n== capture (best effort, NOT part of the verdict): the long-press sheet ==\n'
@@ -821,14 +925,15 @@ PY
   #    or subtitle, whichever the launcher drew? This is the only line of the
   #    capture worth grepping for, and it is evidence about the LAUNCHER —
   #    step 5 of the smoke already proved the icons resolved.
+  sheet=0
   if [ -z "$xy" ]; then
     echo "shortcut sheet visible: no (nothing was pressed — no icon was found)"
   elif cap_dump_ui "$dir/ui-longpress.xml"; then
     out="$(python3 "$py" labels "${titles[@]}" <"$dir/ui-longpress.xml")"
     rc=$?
     case "$rc" in
-      0) echo "shortcut sheet visible: yes" ;;
-      4) echo "shortcut sheet visible: partial" ;;
+      0) echo "shortcut sheet visible: yes"; sheet=1 ;;
+      4) echo "shortcut sheet visible: partial"; sheet=1 ;;
       3) echo "shortcut sheet visible: no" ;;
       *) echo "shortcut sheet visible: unknown (the hierarchy could not be parsed)" ;;
     esac
@@ -838,9 +943,19 @@ PY
   fi
 
   # 6. Let go. Only now: everything worth keeping was taken with the finger
-  #    still down.
+  #    still down. The sheet stays up after the release — that is what step 7
+  #    taps.
   if [ "$pressed" = 1 ]; then
     cap_adb shell input motionevent UP "$ix" "$iy" >/dev/null 2>&1 || true
+    sleep 1
+  fi
+
+  # 7. Tap a row of that sheet and require the action to arrive — the capture's
+  #    only assertion, and only when its precondition held (see cap_tap_row).
+  if [ "$sheet" = 1 ]; then
+    cap_tap_row
+  else
+    cap_verdict SKIPPED "no shortcut sheet to tap"
   fi
 
   rm -f "$py" || true
@@ -858,4 +973,24 @@ if [ "${CAPTURE_LONGPRESS:-0}" = "1" ]; then
     set +e +o pipefail
     capture_longpress
   ) || true
+  # ...with one exception, and it is deliberately narrow. The capture records a
+  # verdict for its tap (step 7); FAIL means the launcher accepted a tap on a
+  # shortcut row and the action never reached the game, which is the package's
+  # failure and nobody else's. Every other outcome — no drawer, no sheet, a tap
+  # the launcher ignored — records SKIPPED and leaves the run green, because
+  # none of them is evidence about delivery.
+  CAPTURE_VERDICT="$(cat "${CAPTURE_DIR:-${TMPDIR:-/tmp}/quickactions-longpress}/launcher-tap.txt" 2>/dev/null || true)"
+  case "$CAPTURE_VERDICT" in
+    FAIL*)
+      STEP="9/9 launcher tap"
+      fail "a real launcher tap on a shortcut row did not arrive as Performed ($CAPTURE_VERDICT).
+The eight steps above passed, so the trampoline, its ownership gate and the
+synthetic (am start) delivery are all fine. What this adds is the LAUNCHER's own
+intent: it closed the sheet on the tap, and no \"Performed quick action\" line
+followed. The hierarchy before and after the tap is in the capture directory
+(ui-tap.xml, ui-after-tap.xml) next to the screenshot.
+$(app_diagnostics)
+QuickActions lines since the tap:
+$(adb_ logcat -d 2>/dev/null | tr -d '\r' | grep -i quickactions | tail -n 20 || true)" ;;
+  esac
 fi
