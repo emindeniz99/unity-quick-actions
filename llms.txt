@@ -1,0 +1,26 @@
+# Quick Actions for Unity
+
+> Home-screen quick actions for Unity games — iOS Home Screen quick actions (`UIApplicationShortcutItem`) and Android app shortcuts (`ShortcutManager`) behind one C# API: add and remove shortcuts at runtime, get one callback when the player taps one, with no native project edits. Unity 2021 LTS through Unity 6.
+
+The package is opt-in behind the `QUICKACTIONS_ENABLED` scripting define: without it nothing of it compiles and a build carries no trace of it. Forgetting that define is the most common integration failure — set it first. Quick actions cannot be observed in the Unity Editor; verify on a device, the iOS Simulator, or an Android emulator.
+
+Install: UPM Git URL `https://github.com/emindeniz99/unity-quick-actions.git#v0.6.0`, OpenUPM (`com.emindeniz99.quick-actions`), the `.unitypackage` attached to each release, or by vendoring the source as an embedded package.
+
+## Start here
+
+- [AGENTS.md](https://raw.githubusercontent.com/emindeniz99/unity-quick-actions/main/AGENTS.md): the integration path written for a coding agent — install, the define, the asmdef reference, the guarded snippet to paste, the checks that prove it worked, and the don'ts. Read this one first.
+- [README.md](https://raw.githubusercontent.com/emindeniz99/unity-quick-actions/main/README.md): the full documentation — 60-second quickstart, five install routes, the API table, Android icons, iOS host coexistence, every known limit, and an honest account of what is and is not verified.
+- [GETTING_STARTED.md](https://raw.githubusercontent.com/emindeniz99/unity-quick-actions/main/GETTING_STARTED.md): a first integration step by step, ending in what to look for on a real device.
+
+## Reference
+
+- [CHANGELOG.md](https://raw.githubusercontent.com/emindeniz99/unity-quick-actions/main/CHANGELOG.md): the development log, written by hand — each entry states what changed and why.
+- [PRODUCTION_READINESS.md](https://raw.githubusercontent.com/emindeniz99/unity-quick-actions/main/PRODUCTION_READINESS.md): per-feature traceability — every feature, the test that covers it, and what still gates it for production.
+- [SECURITY.md](https://raw.githubusercontent.com/emindeniz99/unity-quick-actions/main/SECURITY.md): the threat model — a shortcut tap is not an authenticated action, and the trampoline is an exported activity.
+- [ROADMAP.md](https://raw.githubusercontent.com/emindeniz99/unity-quick-actions/main/ROADMAP.md): what is still open, what was deliberately not done, and the measurement behind each decision.
+
+## Optional
+
+- [Samples~/AndroidIcons/README.md](https://raw.githubusercontent.com/emindeniz99/unity-quick-actions/main/Samples~/AndroidIcons/README.md): the custom-Android-icon recipe as a working `.androidlib` you can import.
+- [tools~/device-smoke/README.md](https://raw.githubusercontent.com/emindeniz99/unity-quick-actions/main/tools~/device-smoke/README.md): the adb smoke script CI runs on emulators — what it asserts and what it cannot.
+- [CONTRIBUTING.md](https://raw.githubusercontent.com/emindeniz99/unity-quick-actions/main/CONTRIBUTING.md): how to work on the package itself, including `tools~/verify.sh`.
