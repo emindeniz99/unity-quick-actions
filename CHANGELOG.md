@@ -34,8 +34,14 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   step's accessibility tree and screenshot
   ship in the `ios-springboard-*` artifact whatever the verdict. New
   `ios-springboard` job on 2022.3 (macos-15, app-delegate lifecycle) and
-  unity6 (macos-26, scene lifecycle). **No result is recorded here yet** — the
-  first run decides whether any doc may say "SpringBoard delivered a tap".
+  unity6 (macos-26, scene lifecycle). **First run (run 76, 2026-09-15):
+  `SKIPPED` on both legs** — the bundle built, the simulator booted, the app
+  installed, SpringBoard's tree listed the icon (page 2 of 2 on iOS 18.6 and
+  26.5 alike), and the test stopped there: an icon on a page other than the
+  current one reports a zero frame, which the on-screen check read as inside
+  the screen, and the `isHittable` guard then said no. Fixed in the same PR
+  (swipe until the icon has a real frame; press and tap by coordinate); no
+  tap has been delivered through SpringBoard yet, and no doc says otherwise.
 - **Xcode 27 / iOS 27 canary legs.** `ios-simulator`, `ios-simulator-coex` and
   `ios-springboard` gain matrix entries on GitHub's public-preview `xcode-27`
   image (Xcode 27.0 beta 6 today, with the iOS 27 SDK and runtime — the SDK

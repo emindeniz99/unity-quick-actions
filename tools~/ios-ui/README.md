@@ -21,12 +21,16 @@ Apple account** anywhere.
 
 1. Terminates the app if it is running, presses Home, waits for SpringBoard's
    icons, and dumps the tree.
-2. Finds the icon by label (the app's display name; prefix match as fallback;
-   swipes to later pages if the icon exists off-screen).
-3. Long-presses it with the **adaptive duration** flutter/packages settled on
-   after two years of flaky runs: 1.5 s first; a press that lands in edit
-   ("jiggle") mode was too long, one that opens nothing was too short; ±0.2 s,
-   four attempts.
+2. Finds the icon by label (the app's display name; prefix match as fallback).
+   Every page's icons are in SpringBoard's tree, but an icon on a page other
+   than the current one reports a **zero frame** — the first run found the app
+   on page 2 of 2 on both iOS 18.6 and 26.5 — so the test swipes left until
+   the icon has a real frame inside the screen (up to four pages).
+3. Long-presses it — **by coordinate** at the icon's centre, because
+   SpringBoard's icons answer `isHittable` with `false` even when laid out —
+   with the **adaptive duration** flutter/packages settled on after two years
+   of flaky runs: 1.5 s first; a press that lands in edit ("jiggle") mode was
+   too long, one that opens nothing was too short; ±0.2 s, four attempts.
 4. Taps the row whose label **begins with** the configured title — SpringBoard
    may render "Title, Subtitle" as one label — and waits for the app to reach
    the foreground.
@@ -51,7 +55,7 @@ context menu that opened without the app's quick actions in it.
 | verdict | meaning | run |
 |---|---|---|
 | `PASS <id> via '<row label>'` | the row was tapped, the app came up, the id reached `Performed` | green |
-| `SKIPPED <why>` | the automation never reached a tap that counts — no icon, an icon or row with no hit point, the menu never opened, the tap did not register (row still on screen), or no `QA_MARKER` to check delivery against | green, with a warning |
+| `SKIPPED <why>` | the automation never reached a tap that counts — no icon, an icon four swipes could not bring on screen, a row with no frame, the menu never opened, the tap did not register (row still on screen), or no `QA_MARKER` to check delivery against | green, with a warning |
 | `FAIL <why>` | SpringBoard took the tap and nothing arrived: the app never came up, or came up without the id; or the context menu opened **without** the app's quick actions in it | red |
 | *(none)* | the test stopped before writing a verdict — the bundle did not build, or XCUITest recorded a failure first (a lost hit point, a snapshot timeout); read `xcodebuild-test.log` and the `NN-*.txt` trees | red, deliberately — unlike the Android capture, whose crashed capture stays green, because this is also what a broken test bundle looks like |
 

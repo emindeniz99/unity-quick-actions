@@ -29,7 +29,8 @@
 // the test. The automation's own misses are always SKIPPED, never FAIL; the one
 // way a run goes red without a FAIL is a test that stops before writing any
 // verdict (an XCTest failure such as a lost hit point), which CI reports as
-// "no verdict" — the hittability guards below exist to make that rare. Every
+// "no verdict" — pressing and tapping by coordinate, on elements checked for a
+// real frame first, exists to make that rare. Every
 // step also leaves QA_OUT/NN-<step>.txt (SpringBoard's
 // accessibility tree) and NN-<step>.png, so a miss is diagnosable from the
 // artifact alone — the first runs exist to learn what SpringBoard exposes.
@@ -89,19 +90,20 @@ final class SpringBoardTapUITests: XCTestCase {
         let rows = springboard.buttons.matching(
             NSPredicate(format: "label BEGINSWITH[c] %@", rowTitle))
         let menuMarkers = ["Remove App", "Edit Home Screen", "Share App", "Delete App"]
-        // press(forDuration:) on an element with no hit point records an XCTest
-        // failure and ends the test with no verdict; an icon that exists but is
-        // covered or off-screen is the automation's miss, so it is SKIPPED here.
-        guard icon.isHittable else {
-            dump("icon-not-hittable", springboard)
-            try verdict("SKIPPED", "the icon '\(appName)' exists but has no hit point (covered or off-screen)")
-            return
-        }
         var duration: TimeInterval = 1.5
         var row: XCUIElement?
         var attempts: [String] = []
         for attempt in 1...4 {
-            icon.press(forDuration: duration)
+            // The Home press that ends an attempt puts SpringBoard back on page 1;
+            // the icon's page has to be brought back before the next press.
+            guard bringOnScreen(icon, in: springboard) else {
+                try verdict("SKIPPED", "the icon left the screen between attempts and four swipes did not bring it back")
+                return
+            }
+            // By coordinate, not by element: a coordinate press carries no
+            // hittability check, and SpringBoard's icons answer isHittable with
+            // false even when laid out on the current page (run 76, both legs).
+            center(of: icon).press(forDuration: duration)
             let opened = rows.firstMatch.waitForExistence(timeout: 5)
             dump("press-\(attempt)", springboard)
             if opened {
@@ -112,7 +114,7 @@ final class SpringBoardTapUITests: XCTestCase {
             if springboard.buttons["Done"].exists {
                 attempts.append("\(attempt): \(duration) s entered edit mode (too long)")
                 let done = springboard.buttons["Done"]
-                if done.isHittable { done.tap() } // else the Home press below leaves edit mode
+                if hasFrame(done) { center(of: done).tap() } // else the Home press below leaves edit mode
                 duration = max(0.6, duration - 0.2)
             } else if menuMarkers.contains(where: { springboard.buttons[$0].exists }) {
                 // The context menu is open, but with no row starting with our title:
@@ -140,12 +142,12 @@ final class SpringBoardTapUITests: XCTestCase {
         // 4. The tap. Everything above is automation; from here on a miss is
         // SpringBoard's or the app's.
         let label = target.label
-        guard target.isHittable else {
-            try verdict("SKIPPED", "'\(label)' exists but has no hit point")
+        guard hasFrame(target) else {
+            try verdict("SKIPPED", "'\(label)' exists but has no frame to tap")
             return
         }
         let before = markerLines(markerPath)
-        target.tap()
+        center(of: target).tap()
         let launched = app.wait(for: .runningForeground, timeout: waitSeconds)
         dump("after-tap", springboard)
         if !launched {
@@ -183,8 +185,12 @@ final class SpringBoardTapUITests: XCTestCase {
     // MARK: - SpringBoard helpers
 
     /// The app icon by exact label first, then by prefix (SpringBoard may append
-    /// state to the label); swipes to later home-screen pages when it exists but
-    /// is off-screen. Nil when nothing matches.
+    /// state to the label), then brought onto the screen: every icon of every
+    /// home-screen page is in the tree, but an icon on a page that is not the
+    /// current one reports a ZERO frame (run 76: the app landed on page 2 of 2 on
+    /// both iOS 18.6 and 26.5), so the test swipes left until the frame is real
+    /// and inside the screen. Nil when nothing matches or four swipes did not
+    /// reach it.
     private func findIcon(_ springboard: XCUIApplication, named name: String) -> XCUIElement? {
         var icon = springboard.icons[name].firstMatch
         if !icon.waitForExistence(timeout: 10) {
@@ -193,14 +199,38 @@ final class SpringBoardTapUITests: XCTestCase {
             guard byPrefix.waitForExistence(timeout: 5) else { return nil }
             icon = byPrefix
         }
+        return bringOnScreen(icon, in: springboard) ? icon : nil
+    }
+
+    /// Swipes left until the element has a real frame inside the screen — an icon
+    /// on another home-screen page reports a zero frame — at most four pages.
+    private func bringOnScreen(_ element: XCUIElement, in app: XCUIApplication) -> Bool {
         var swipes = 0
-        while !springboard.frame.contains(icon.frame), swipes < 3 {
-            springboard.swipeLeft()
+        while !isOnScreen(element, in: app), swipes < 4 {
+            app.swipeLeft()
             swipes += 1
             Thread.sleep(forTimeInterval: 1)
         }
-        if swipes > 0 { note("swiped \(swipes) page(s) to reach the icon") }
-        return springboard.frame.contains(icon.frame) ? icon : nil
+        if swipes > 0 {
+            note("swiped \(swipes) page(s) to reach '\(element.label)'; frame now \(element.frame)")
+            dump("page-\(swipes + 1)", app)
+        }
+        return isOnScreen(element, in: app)
+    }
+
+    private func hasFrame(_ element: XCUIElement) -> Bool {
+        let frame = element.frame
+        return frame.width > 0 && frame.height > 0
+    }
+
+    private func isOnScreen(_ element: XCUIElement, in app: XCUIApplication) -> Bool {
+        hasFrame(element) && app.frame.contains(element.frame)
+    }
+
+    /// The element's centre as a coordinate: XCUICoordinate taps and presses
+    /// synthesize the touch at that point with no hittability check.
+    private func center(of element: XCUIElement) -> XCUICoordinate {
+        element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
     }
 
     private func iconLabels(_ springboard: XCUIApplication) -> [String] {
