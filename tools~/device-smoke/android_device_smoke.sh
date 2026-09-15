@@ -257,17 +257,25 @@ launch_with_autotest
 
 # Has the Unity player said anything at all since the launch? Its runtime logs
 # under the `Unity` tag from its first frames on; the two header lines logcat
-# prints for its buffers are not it.
+# prints for its buffers are not it — and neither is the Java shim.
+# UnityPlayerActivity logs under the SAME tag before any native player exists
+# (`CommandLine:`, `onActivityResumed:`, `onResume`, `windowFocusChanged:`),
+# and on run 76 (2026-09-15, 2021.3, API 30) that is all the process ever said:
+# the shim spoke, the player never initialised, and the relaunch that exists
+# for exactly that never fired because these lines counted. They don't now.
 player_has_logged() {
-  [ -n "$(adb_ shell logcat -d -s Unity:V 2>/dev/null | tr -d '\r' | grep -v '^-' | head -n 1)" ]
+  [ -n "$(adb_ shell logcat -d -s Unity:V 2>/dev/null | tr -d '\r' | grep -v '^-' \
+        | grep -v -E ' Unity *: *(CommandLine:|onActivity[A-Za-z]*:|on(Resume|Pause|Start|Stop|Destroy|NewIntent|LowMemory|TrimMemory|ConfigurationChanged)\b|windowFocusChanged:)' \
+        | head -n 1)" ]
 }
 
 step "5/8 wait for the demo's shortcuts to reach ShortcutManager"
 # A known failure mode of the API 30 emulator, seen twice on identical APKs
 # that passed on the next run (2026-09-02, runs 52 and 65): the activity reaches
 # the foreground, and then the Unity player never initialises — no VkInstance,
-# not one line under logcat's `Unity` tag — so nothing this script waits for
-# can ever happen. That is the emulator's ARM translation, not the package. So:
+# not one line under logcat's `Unity` tag beyond the Java shim's own — so
+# nothing this script waits for can ever happen. That is the emulator's ARM
+# translation, not the package (run 76 repeated it, 2026-09-15). So:
 # half the budget, and if NOTHING has been published and the player has not
 # spoken at all, force-stop and launch once more, loudly, then wait out the
 # other half. A player that did come up and still published nothing gets no

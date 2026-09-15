@@ -104,6 +104,20 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   already ships this way appears 0 times in the APK's IL2CPP metadata. Both
   entries record what would re-open them.
 
+### Fixed
+
+- **The Android smoke's relaunch-once now fires when only the Java shim spoke.**
+  Run 76 (2026-09-15, 2021.3 on the API 30 image) repeated the known emulator
+  failure — the activity reached the foreground and the Unity player never
+  initialised — but the relaunch that exists for exactly that did not fire:
+  `UnityPlayerActivity` logs under the same `Unity` tag before any native
+  player exists (`CommandLine:`, `onActivityResumed:`, `onResume`,
+  `windowFocusChanged:`), and those four lines counted as "the player has
+  logged". `player_has_logged` now ignores the shim's messages, so a process
+  that said nothing else within half the budget is force-stopped and launched
+  once more, as intended. A player that did come up and published nothing
+  still gets no second chance.
+
 ## [0.6.0] - 2026-09-02
 
 ### Added
