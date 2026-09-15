@@ -15,6 +15,15 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Xcode 27 / iOS 27 canary legs.** `ios-simulator`, `ios-simulator-coex` and
+  `ios-springboard` gain matrix entries on GitHub's public-preview `xcode-27`
+  image (Xcode 27.0 beta 6 today, with the iOS 27 SDK and runtime — the SDK
+  App Store uploads must use from April 2027, which no Unity line documents
+  support for yet), `continue-on-error` so a red canary cannot fail the
+  workflow run — its own check still shows red, and it gates nothing only
+  because none of these jobs is a required check. The existing macos-15 /
+  macos-latest legs are untouched except for one `xcodebuild -version` line
+  printed at the top of their compile step.
 - **The Android smoke now taps a shortcut in the launcher's own popup.** Every
   assertion the smoke makes has delivered its tap with `am start` — the intent
   the launcher would build, built by the script instead — so "a real launcher

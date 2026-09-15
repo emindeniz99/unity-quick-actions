@@ -2498,7 +2498,19 @@ jobs:
   # arm64-only iOS 26 runtimes, and its IL2CPP output needs ld_classic
   # workarounds under Xcode 15+ — a red job there would say nothing about the
   # package. 2022.3 gets macos-15 (Xcode 16.4 default); Unity 6 gets the
-  # current macos-latest (Xcode 26).
+  # current macos-latest (Xcode 26). The two `-xcode27` legs compile the SAME
+  # exports on GitHub's public-preview `xcode-27` image — Xcode 27.0 beta 6
+  # (27A5252f) today; Apple's GA 27A266a of 2026-09-14 is still awaiting
+  # deployment there (actions/runner-images#14709), so read the
+  # `xcodebuild -version` line in a leg's log for the build a result came from
+  # — with the iOS 27 SDK that App Store uploads must use from April 2027, and
+  # that no Unity line documents support for yet. They are canaries:
+  # `continue-on-error` keeps a red one from failing the workflow RUN; the
+  # job's own check still shows its red X (job-level continue-on-error changes
+  # the run's conclusion, never the job's), so a `*-xcode27` name must never
+  # become a required check. The two original legs are untouched — what to do
+  # with them is a decision deferred to October 2026 (see
+  # docs~/ios-toolchain-and-ui-test-research-2026-09.md).
   ios-simulator:
     name: ios simulator (${{ matrix.target.name }})
     needs: ios-export
@@ -2507,6 +2519,7 @@ jobs:
     # that leg failing.
     if: ${{ !cancelled() && needs.ios-export.result != 'skipped' }}
     runs-on: ${{ matrix.target.runner }}
+    continue-on-error: ${{ matrix.target.canary == true }}
     timeout-minutes: 60
     strategy:
       fail-fast: false
@@ -2514,14 +2527,17 @@ jobs:
         target:
           - { name: "2022.3", runner: macos-15 }
           - { name: "unity6", runner: macos-latest }
+          - { name: "2022.3-xcode27", export: "2022.3", runner: xcode-27, canary: true }
+          - { name: "unity6-xcode27", export: "unity6", runner: xcode-27, canary: true }
     steps:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: ios-simulator-xcodeproj-${{ matrix.target.name }}
+          name: ios-simulator-xcodeproj-${{ matrix.target.export || matrix.target.name }}
           path: ${{ runner.temp }}/iosproj
       - name: xcodebuild for the iOS Simulator (unsigned)
         run: |
           cd "$RUNNER_TEMP/iosproj"
+          xcodebuild -version
           xcodebuild -project Unity-iPhone.xcodeproj \
             -scheme Unity-iPhone \
             -configuration Release \
@@ -2581,6 +2597,7 @@ jobs:
     needs: ios-export-coex
     if: ${{ !cancelled() && needs.ios-export-coex.result != 'skipped' }}
     runs-on: ${{ matrix.target.runner }}
+    continue-on-error: ${{ matrix.target.canary == true }}
     timeout-minutes: 60
     strategy:
       fail-fast: false
@@ -2611,14 +2628,28 @@ jobs:
               lifecycle: "scene",
               hooks: "sceneConfig=added manifest=yes",
             }
+          # Canary: the unity6-coex export, same expectations, compiled and run
+          # under Xcode 27 / iOS 27 — the SDK that makes the scene lifecycle
+          # mandatory, i.e. exactly the path this leg asserts. Keeps the run
+          # green but shows its own red X (continue-on-error above); see
+          # ios-simulator for the rationale.
+          - {
+              name: "unity6-coex-xcode27",
+              export: "unity6-coex",
+              runner: xcode-27,
+              lifecycle: "scene",
+              hooks: "sceneConfig=added manifest=yes",
+              canary: true,
+            }
     steps:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: ios-simulator-xcodeproj-${{ matrix.target.name }}
+          name: ios-simulator-xcodeproj-${{ matrix.target.export || matrix.target.name }}
           path: ${{ runner.temp }}/iosproj
       - name: xcodebuild for the iOS Simulator (unsigned)
         run: |
           cd "$RUNNER_TEMP/iosproj"
+          xcodebuild -version
           xcodebuild -project Unity-iPhone.xcodeproj \
             -scheme Unity-iPhone \
             -configuration Release \
