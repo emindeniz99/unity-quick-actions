@@ -45,6 +45,14 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   because none of these jobs is a required check. The existing macos-15 /
   macos-latest legs are untouched except for one `xcodebuild -version` line
   printed at the top of their compile step.
+- **A research record, not shipped:**
+  `docs~/ios-toolchain-and-ui-test-research-2026-09.md` — Apple's Xcode 26
+  upload mandate and the April 2027 iOS 27 one, what each Unity line supports,
+  what the GitHub macOS images carry, the ways the iOS home screen can be
+  automated and what other SDKs actually do, and what a real iPhone from
+  GitHub Actions would cost — every claim with its source and its confidence.
+  The decision it records: keep the Xcode 16.4 legs for now, add the canaries,
+  revisit in October 2026.
 - **The Android smoke now taps a shortcut in the launcher's own popup.** Every
   assertion the smoke makes has delivered its tap with `am start` — the intent
   the launcher would build, built by the script instead — so "a real launcher

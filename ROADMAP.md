@@ -56,6 +56,15 @@ ships it.
   Reward`, read the id back from the testbed's marker file), run by the
   `ios-springboard` job. **Its first run has not been recorded here yet** —
   until it is, nothing in the shipped docs claims a SpringBoard-delivered tap.
+- **Xcode 16.4 legs (`macos-15`) — keep, retarget or drop: decision deferred
+  to October 2026.** Since 2026-04-28 App Store Connect accepts only builds
+  made with Xcode 26+ and the iOS 26 SDK, Xcode 27 went GA on 2026-09-14, and
+  the iOS 27 SDK becomes mandatory in April 2027 — with the scene lifecycle
+  mandatory for apps built with it. CI keeps the existing legs unchanged and
+  adds `xcode-27` canaries that never gate. The measurements, the sources and
+  the options are in
+  <https://github.com/emindeniz99/unity-quick-actions/blob/main/docs~/ios-toolchain-and-ui-test-research-2026-09.md>;
+  re-read the canaries' results and that record before deciding.
 - **Documentation site (considered, deliberately deferred — revisit trigger now
   met)** — the reference docs live in a single [README](./README.md) that has
   roughly tripled since this entry was written (590 lines then, well past 900
