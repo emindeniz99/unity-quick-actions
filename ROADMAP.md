@@ -63,6 +63,17 @@ ships it.
   window, so both went red on a verdict that quoted the id; the window is
   120 s now, and run 78 was green on both legs (`PASS`, 41 s and 46 s after
   the tap). Still the Simulator, still no iPhone.
+- **CI wall clock (40–53 min per run) — the cache is not the lever.** The
+  Library cache hits its primary key on every Unity leg; what costs the
+  minutes is the self-imposed `needs:` chain plus `max-parallel: 2`, the
+  per-job GameCI image pull and activation, and the iOS simulator's first
+  boot behind GitHub's five-concurrent-macOS cap. Decided order, none of it
+  implemented yet: ARM64 simulator export (the testbeds still export x86_64
+  by omission), un-chain the Unity jobs, move the Xcode 27 canaries to the
+  cron, fold `ios-springboard` into `ios-simulator` with a pre-booted
+  simulator. Sources, numbers and the things ruled out (image cache,
+  DerivedData, AVD snapshots, larger runners) are in
+  [`docs~/ci-cost-and-caching-research-2026-09.md`](https://github.com/emindeniz99/unity-quick-actions/blob/main/docs~/ci-cost-and-caching-research-2026-09.md).
 - **Xcode 16.4 legs (`macos-15`) — keep, retarget or drop: decision deferred
   to October 2026.** Since 2026-04-28 App Store Connect accepts only builds
   made with Xcode 26+ and the iOS 26 SDK, Xcode 27 went GA on 2026-09-14, and

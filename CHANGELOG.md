@@ -63,6 +63,16 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   it waits up to 60 s for SpringBoard to go idle around each synthesized
   touch, and the context menu's blur never lets it. A physical iPhone remains
   untested, and nothing in the shipped docs says otherwise.
+- **A second maintainer research record, `docs~/ci-cost-and-caching-research-2026-09.md`**
+  (not shipped): why the `unity` run takes 40–53 minutes and what would
+  shorten it. The Library cache already hits on every leg; the minutes are
+  the `needs:` chain, per-job image pulls and activation, and the simulator's
+  first boot behind GitHub's macOS concurrency cap. GameCI's guidance, 25
+  other projects' workflows, GitHub's and Unity's documentation, a
+  refutation pass over each recommendation, and the finding that the
+  testbeds export an x86_64-only simulator app by omission (the Unity 6
+  Xcode 27 canaries fail on exactly that). Nothing from it is implemented in
+  this release.
 - **Xcode 27 / iOS 27 canary legs.** `ios-simulator`, `ios-simulator-coex` and
   `ios-springboard` gain matrix entries on GitHub's public-preview `xcode-27`
   image (Xcode 27.0 beta 6 today, with the iOS 27 SDK and runtime — the SDK
