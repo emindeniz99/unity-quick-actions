@@ -54,8 +54,10 @@ ships it.
   its harness too: `tools~/ios-ui` is an XCUITest bundle that drives
   SpringBoard on the simulator CI boots (long-press the icon, tap `Daily
   Reward`, read the id back from the testbed's marker file), run by the
-  `ios-springboard` job. **Its first run has not been recorded here yet** —
-  until it is, nothing in the shipped docs claims a SpringBoard-delivered tap.
+  `ios-springboard` job. **First run (run 76, 2026-09-15): `SKIPPED` on
+  both legs** — icon found on home-screen page 2, not reached (zero frame read
+  as on-screen); the harness was fixed in the same PR and no tap has been
+  delivered through SpringBoard yet, so nothing in the shipped docs claims one.
 - **Xcode 16.4 legs (`macos-15`) — keep, retarget or drop: decision deferred
   to October 2026.** Since 2026-04-28 App Store Connect accepts only builds
   made with Xcode 26+ and the iOS 26 SDK, Xcode 27 went GA on 2026-09-14, and

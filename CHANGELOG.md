@@ -50,7 +50,18 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   workflow run — its own check still shows red, and it gates nothing only
   because none of these jobs is a required check. The existing macos-15 /
   macos-latest legs are untouched except for one `xcodebuild -version` line
-  printed at the top of their compile step.
+  printed at the top of their compile step. **What the first run (run 76)
+  measured, Xcode 27.0 beta 6 (27A5252f) on macOS 27.0:** the public
+  2022.3.62f3 export does not compile — "The iOS Simulator deployment target
+  'IPHONEOS_DEPLOYMENT_TARGET' is set to 12.0, but the range of supported
+  deployment target versions is 15.0 to 27.0.x" — so a 2022.3 project needs
+  its minimum iOS raised to 15 before Xcode 27 will build it; the 6000.3.21f1
+  export **compiles**, but the app it produces does not install on the iOS 27
+  simulator — "The executable has code for these platforms and architectures:
+  [iOS-simulator, x86_64]. This device can run code for these platforms:
+  iOS-simulator" — the Simulator build is x86_64-only, which the macOS 26
+  images run and this one no longer does. Both are the canaries' point, and
+  both go into the October decision.
 - **A research record, not shipped:**
   `docs~/ios-toolchain-and-ui-test-research-2026-09.md` — Apple's Xcode 26
   upload mandate and the April 2027 iOS 27 one, what each Unity line supports,

@@ -400,6 +400,24 @@ deployment target iOS 13 in the docs.
 5. The `ios-springboard` results across 2022.3 (iOS 18.6), unity6 (iOS 26.5)
    and the canary (iOS 27): row-label format, icon label, press duration that
    worked — then decide whether the 16.4 leg still earns its place.
+   **Run 76 (2026-09-15), first data:** both non-canary legs `SKIPPED` before
+   any press — the icon label is exactly `QuickActionsDemo`, the app lands on
+   home-screen page 2 of 2 on both iOS versions, off-page icons report a zero
+   frame, and `isHittable` is `false` for SpringBoard icons; the harness now
+   swipes to the page and presses by coordinate. Row labels and the working
+   press duration are still unmeasured.
+6. **Run 76's canary findings, to weigh in October:** on the `xcode-27` image
+   (27.0 beta 6, macOS 27.0) the public 2022.3.62f3 export is rejected at
+   `IPHONEOS_DEPLOYMENT_TARGET = 12.0` ("the range of supported deployment
+   target versions is 15.0 to 27.0.x") — Xcode 27 raises the floor to iOS 15,
+   above even XLTS 2022.3.75f1's minspec bump to 13; the 6000.3.21f1 export
+   compiles under Xcode 27 but its Simulator app is **x86_64-only** and the
+   iOS 27 simulator refuses it ("does not contain code for any platform and
+   CPU architecture combination that is runnable on this device … [iOS-simulator,
+   x86_64]"), where the macOS 26 images still run it (**[plausible]**: Rosetta
+   translation there; not verified from a source). Both are questions for
+   Unity's settings (minimum iOS version; the Simulator architecture the
+   export targets), not for this package.
 
 ## 11. Method and caveats
 
