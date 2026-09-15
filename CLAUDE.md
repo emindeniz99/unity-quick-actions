@@ -108,6 +108,14 @@ The same trailer goes on AI-drafted PR bodies and substantive PR comments. Do
 **not** add an emoji "Generated with …" footer. Never post a PR, comment, or
 push on the owner's behalf without being asked.
 
+## Sub-agents
+
+Sub-agents, workflow agents and review fan-outs never run on the top model
+tier — that tier is for the main session only. Judging, refuting and code
+review go to the mid tier; mechanical stages (log parsing, fetching, listing,
+summarising) to the small tier. The owner pays per token; default to the
+cheaper tier whenever the task does not clearly need the stronger one.
+
 ## Merging
 
 Always a **real merge commit**: `merge_method: "merge"` / `git merge --no-ff`.
