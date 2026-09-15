@@ -34,14 +34,33 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   step's accessibility tree and screenshot
   ship in the `ios-springboard-*` artifact whatever the verdict. New
   `ios-springboard` job on 2022.3 (macos-15, app-delegate lifecycle) and
-  unity6 (macos-26, scene lifecycle). **First run (run 76, 2026-09-15):
-  `SKIPPED` on both legs** — the bundle built, the simulator booted, the app
+  unity6 (macos-26, scene lifecycle). **Two runs on 2026-09-15.** Run 76:
+  `SKIPPED` on both legs — the bundle built, the simulator booted, the app
   installed, SpringBoard's tree listed the icon (page 2 of 2 on iOS 18.6 and
   26.5 alike), and the test stopped there: an icon on a page other than the
   current one reports a zero frame, which the on-screen check read as inside
-  the screen, and the `isHittable` guard then said no. Fixed in the same PR
-  (swipe until the icon has a real frame; press and tap by coordinate); no
-  tap has been delivered through SpringBoard yet, and no doc says otherwise.
+  the screen, and the `isHittable` guard then said no; fixed in the same PR
+  (swipe until the icon has a real frame; press and tap by coordinate).
+  **Run 77, with that fix: SpringBoard's own tap delivered on both legs.**
+  One swipe to page 2, the first 1.5 s press opened the context menu, the
+  `daily_reward` row was tapped — SpringBoard exposes each quick action as a
+  `Button` whose identifier is the shortcut type and whose label is
+  `Daily Reward, Claim today's gift`, identically on iOS 18.6 and 26.5 — the
+  app cold-started, reached the foreground within ten seconds of the touch,
+  and `daily_reward` appeared in the marker file: 35–43 s after the touch on
+  2022.3.62f3 / iOS 18.6 (Xcode 16.4, app-delegate lifecycle) and 41–54 s
+  after it on 6000.3.21f1 / iOS 26.5 (Xcode 26.6, scene manifest — the first
+  quick action UIKit itself has delivered on the UIScene export; its
+  x86_64-only Simulator app still runs there, where the iOS 27 canary
+  refuses it).
+  Both legs still went **red**: the test's delivery window was 30 s, and the
+  `FAIL` it wrote quoted a marker that already held the id. Fixed in the same
+  PR — the window is its own knob (`QA_DELIVERY_SECONDS`, 120 s, counted
+  from the tap), the verdict quotes the read that decided it, and rows are
+  matched by identifier first. Two minutes of every leg are XCUITest's own:
+  it waits up to 60 s for SpringBoard to go idle around each synthesized
+  touch, and the context menu's blur never lets it. A physical iPhone remains
+  untested, and nothing in the shipped docs says otherwise.
 - **Xcode 27 / iOS 27 canary legs.** `ios-simulator`, `ios-simulator-coex` and
   `ios-springboard` gain matrix entries on GitHub's public-preview `xcode-27`
   image (Xcode 27.0 beta 6 today, with the iOS 27 SDK and runtime — the SDK

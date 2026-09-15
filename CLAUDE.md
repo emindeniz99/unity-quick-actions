@@ -57,8 +57,14 @@ the run to finish — read its result — then push.
   `ios-simulator-coex` leg on Testbed6 (6000.3.21f1): scene hooks installed on
   `UnityScene` via the configuration wrapper and, shadowed, via the notification
   fallback, the cold launch item and a warm tap each queued once — through
-  synthetic sends, never a SpringBoard tap, and never on a device. Say exactly
-  that; do not describe device behaviour as verified. (Android has no
+  synthetic sends. CI's `ios-springboard` job adds the real thing on the
+  Simulator: an XCUITest bundle (`tools~/ios-ui`) long-presses the icon on
+  SpringBoard's home screen and taps the `daily_reward` row, and run 77
+  (2026-09-15) saw that tap cold-start both exports — 2022.3.62f3 / iOS 18.6
+  (app-delegate lifecycle) and 6000.3.21f1 / iOS 26.5 (scene manifest) — and
+  `daily_reward` reach `Performed` (the testbed's marker file) 35–54 s after
+  the touch. Still never on a device. Say exactly that; do not describe
+  device behaviour as verified. (Android has no
   simulator equivalent; the 2021.3 line cannot do a Simulator run at all —
   Unity ships an x86_64-only simulator runtime there.) **Physical hardware is
   partly covered**: one Android run (Moto G Play 2024 / Android 14) confirmed

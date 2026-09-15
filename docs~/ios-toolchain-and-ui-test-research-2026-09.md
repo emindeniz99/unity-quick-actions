@@ -404,8 +404,21 @@ deployment target iOS 13 in the docs.
    any press — the icon label is exactly `QuickActionsDemo`, the app lands on
    home-screen page 2 of 2 on both iOS versions, off-page icons report a zero
    frame, and `isHittable` is `false` for SpringBoard icons; the harness now
-   swipes to the page and presses by coordinate. Row labels and the working
-   press duration are still unmeasured.
+   swipes to the page and presses by coordinate.
+   **Run 77 (2026-09-15), with the page fix: both legs delivered.** Icon
+   label `QuickActionsDemo`, one swipe to page 2; a 1.5 s press opened the
+   menu on the first attempt on iOS 18.6 (Xcode 16.4) and on iOS 26.5 (Xcode
+   26.6) alike; the menu rows are `Button`s whose identifier is the shortcut
+   type (`daily_reward`) and whose label is `Title, Subtitle` (`Daily Reward,
+   Claim today's gift`) — the same shape on both iOS versions, so the 16.4
+   leg has surfaced no SpringBoard difference so far. The app came to the
+   foreground within 10 s of the touch and `daily_reward` reached the marker
+   35–43 s (2022.3) / 41–54 s (unity6) after it — past the harness's 30 s
+   window, now 120 s; both legs were red on a verdict that quoted the id.
+   Costs measured on the way: XCUITest's own idle waits are 2 × 60 s per leg
+   (the context menu's blur never lets SpringBoard go idle), and the
+   simulator boot + install step took 9 min on `macos-26` (first-boot data
+   migration) against 3 min on `macos-15`.
 6. **Run 76's canary findings, to weigh in October:** on the `xcode-27` image
    (27.0 beta 6, macOS 27.0) the public 2022.3.62f3 export is rejected at
    `IPHONEOS_DEPLOYMENT_TARGET = 12.0` ("the range of supported deployment
