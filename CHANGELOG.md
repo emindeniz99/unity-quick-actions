@@ -154,7 +154,13 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   logged". `player_has_logged` now ignores the shim's messages, so a process
   that said nothing else within half the budget is force-stopped and launched
   once more, as intended. A player that did come up and published nothing
-  still gets no second chance.
+  still gets no second chance. Run 79 (2026-09-15, 2022.3) then showed the
+  same stall in its other shape — the **cold tap** started the process, the
+  activity was displayed, and only the shim ever spoke for the whole 180 s
+  budget — so the cold tap now has the same second chance: half the budget,
+  then, if the player has logged nothing since that start, a force-stop and
+  one more cold tap (same id), then the other half. One shared helper,
+  `relaunch_once_if_engine_silent`, serves both steps.
 
 ## [0.6.0] - 2026-09-02
 

@@ -269,6 +269,37 @@ player_has_logged() {
         | head -n 1)" ]
 }
 
+# The one second chance this script gives, shared by steps 5 and 8: if the
+# player has said nothing at all (shim lines excluded) after half a budget,
+# force-stop, wait for the process to be really gone, let gfxstream settle,
+# and run the given launch command once more — loudly. Returns 0 when it
+# relaunched, 1 when it did not (the player HAD spoken, or the stalled process
+# would not die). A player that came up and published nothing is never
+# relaunched: that would be the package's failure, and a relaunch would hide it.
+relaunch_once_if_engine_silent() {
+  local waited="$1"
+  shift
+  if player_has_logged; then return 1; fi
+  echo "warning: after ${waited}s the Unity player has logged nothing at all — it never came up" >&2
+  echo "         (a known API 30 emulator failure mode); force-stopping and launching once more." >&2
+  adb_ shell am force-stop "$APP_ID" >/dev/null 2>&1 || true
+  # force-stop's status proves nothing and the kill is asynchronous (step 8
+  # says why): launch only once the process is really gone, or the second
+  # start just hands its intent to the same stalled activity.
+  if ! poll "$LOG_ATTEMPTS" app_stopped; then
+    echo "warning: the stalled process did not stop within $((LOG_ATTEMPTS * POLL_INTERVAL))s — no relaunch; waiting out the budget." >&2
+    return 1
+  fi
+  # A dead process is not yet a settled emulator: step 8 explains why the
+  # cold start waits after the pid is gone (gfxstream is still tearing the
+  # dead process's Vulkan objects down, and a player booted into that sat
+  # engine-silent). This relaunch exists to recover from exactly that
+  # shape, so it waits the same way.
+  sleep "${COLD_SETTLE:-5}"
+  "$@"
+  return 0
+}
+
 step "5/8 wait for the demo's shortcuts to reach ShortcutManager"
 # A known failure mode of the API 30 emulator, seen twice on identical APKs
 # that passed on the next run (2026-09-02, runs 52 and 65): the activity reaches
@@ -283,25 +314,7 @@ step "5/8 wait for the demo's shortcuts to reach ShortcutManager"
 # only hide it.
 half=$((SHORTCUT_ATTEMPTS / 2))
 if ! poll "$half" shortcuts_registered; then
-  if ! player_has_logged; then
-    echo "warning: after $((half * POLL_INTERVAL))s the Unity player has logged nothing at all — it never came up" >&2
-    echo "         (a known API 30 emulator failure mode); force-stopping and launching once more." >&2
-    adb_ shell am force-stop "$APP_ID" >/dev/null 2>&1 || true
-    # force-stop's status proves nothing and the kill is asynchronous (step 8
-    # says why): launch only once the process is really gone, or the second
-    # `am start` just hands its intent to the same stalled activity.
-    if poll "$LOG_ATTEMPTS" app_stopped; then
-      # A dead process is not yet a settled emulator: step 8 explains why the
-      # cold start waits after the pid is gone (gfxstream is still tearing the
-      # dead process's Vulkan objects down, and a player booted into that sat
-      # engine-silent). This relaunch exists to recover from exactly that
-      # shape, so it waits the same way.
-      sleep "${COLD_SETTLE:-5}"
-      launch_with_autotest
-    else
-      echo "warning: the stalled process did not stop within $((LOG_ATTEMPTS * POLL_INTERVAL))s — no relaunch; waiting out the budget." >&2
-    fi
-  fi
+  relaunch_once_if_engine_silent "$((half * POLL_INTERVAL))" launch_with_autotest || true
 fi
 if ! shortcuts_registered && ! poll "$((SHORTCUT_ATTEMPTS - half))" shortcuts_registered; then
   fail "after $((SHORTCUT_ATTEMPTS * POLL_INTERVAL))s, 'dumpsys shortcut' does not list all of: $SHORTCUT_IDS
@@ -406,18 +419,33 @@ sleep "${COLD_SETTLE:-5}"
 # (see COLD_TAP_ID at the top): `logcat -c` alone is not trusted to isolate the
 # two, because it can under-clear on emulators while exiting 0.
 adb_ logcat -c >/dev/null 2>&1 || fail "could not clear logcat before the cold tap."
-if ! out="$(adb_ shell am start -n "$APP_ID/$TRAMPOLINE" \
-    -a android.intent.action.VIEW \
-    --es "$EXTRA_ACTION_ID" "$COLD_TAP_ID" 2>&1 | tr -d '\r')"; then
-  fail "adb could not start the trampoline $APP_ID/$TRAMPOLINE for the cold tap:
+cold_tap() {
+  local out
+  if ! out="$(adb_ shell am start -n "$APP_ID/$TRAMPOLINE" \
+      -a android.intent.action.VIEW \
+      --es "$EXTRA_ACTION_ID" "$COLD_TAP_ID" 2>&1 | tr -d '\r')"; then
+    fail "adb could not start the trampoline $APP_ID/$TRAMPOLINE for the cold tap:
 $out"
-fi
-case "$out" in
-  *Error*|*Exception*) fail "am start reported an error for the cold trampoline tap:
+  fi
+  case "$out" in
+    *Error*|*Exception*) fail "am start reported an error for the cold trampoline tap:
 $out" ;;
-esac
-echo "cold-started $APP_ID/$TRAMPOLINE with $EXTRA_ACTION_ID=$COLD_TAP_ID"
-if ! poll "$COLD_LOG_ATTEMPTS" performed_logged "$COLD_TAP_ID"; then
+  esac
+  echo "cold-started $APP_ID/$TRAMPOLINE with $EXTRA_ACTION_ID=$COLD_TAP_ID"
+}
+cold_tap
+# The same second chance as step 5, for the same emulator stall in its other
+# shape: run 79 (2026-09-15, 2022.3, API 30) cold-started the process, the
+# activity was displayed in 825 ms, and then only the Java shim ever spoke —
+# no VkInstance, no player line — for the whole 180 s budget. The buffer was
+# cleared just before the tap, so "the player has logged nothing" here means
+# nothing since THIS start. A relaunch is a second COLD tap (force-stop first,
+# same id), so what the step proves does not change.
+half=$((COLD_LOG_ATTEMPTS / 2))
+if ! poll "$half" performed_logged "$COLD_TAP_ID"; then
+  relaunch_once_if_engine_silent "$((half * POLL_INTERVAL))" cold_tap || true
+fi
+if ! performed_logged "$COLD_TAP_ID" && ! poll "$((COLD_LOG_ATTEMPTS - half))" performed_logged "$COLD_TAP_ID"; then
   fail "no \"Performed quick action '$COLD_TAP_ID'\" in logcat within $((COLD_LOG_ATTEMPTS * POLL_INTERVAL))s of the COLD tap.
 The equivalent tap passed in step 7 against a running app, so the trampoline and
 its ownership gate are fine: what failed is the launch path — the id did not
