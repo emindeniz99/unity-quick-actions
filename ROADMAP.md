@@ -50,10 +50,12 @@ ships it.
   arriving as `Performed` — then on 2021.3, and finally on Unity 6 (API 35
   image; its earlier warm-tap red exposed the GameActivity delivery gap
   fixed in the runtime, see CHANGELOG): **all three lines now pass the full
-  smoke**. No *real device* has run the cold step yet. Remaining: asserting
-  a shortcut **tap** on iOS (no
-  `simctl` API reads `UIApplicationShortcutItems` or triggers a tap — it needs
-  an XCUITest target driving SpringBoard; see the device-smoke README).
+  smoke**. No *real device* has run the cold step yet. The iOS tap now has
+  its harness too: `tools~/ios-ui` is an XCUITest bundle that drives
+  SpringBoard on the simulator CI boots (long-press the icon, tap `Daily
+  Reward`, read the id back from the testbed's marker file), run by the
+  `ios-springboard` job. **Its first run has not been recorded here yet** —
+  until it is, nothing in the shipped docs claims a SpringBoard-delivered tap.
 - **Documentation site (considered, deliberately deferred — revisit trigger now
   met)** — the reference docs live in a single [README](./README.md) that has
   roughly tripled since this entry was written (590 lines then, well past 900

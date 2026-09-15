@@ -15,6 +15,27 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **A SpringBoard tap on the iOS Simulator, driven by XCUITest.** `tools~/ios-ui`
+  is a UI-testing bundle with no host app — generated with the `xcodeproj` gem,
+  committed, built unsigned, no Apple account — that presses Home, long-presses
+  the app icon (1.5 s, ±0.2 s over four attempts: the adaptive duration
+  Flutter's own `quick_actions_ios` test settled on after two years of flakes),
+  taps the `Daily Reward` row and waits for the id in a marker file the two
+  Simulator-compiled testbeds (2022.3 and Unity 6) now append on every
+  `Performed` (`Examples~/Testbed2022/Assets/Scripts/QuickActionsPerformedMarker.cs`
+  and its identical copy under `Examples~/Testbed6/`; 2021.3 is export-only on
+  the Simulator and carries none), read from the host side of the simulator's
+  data container — a fact, not a log line. Verdicts follow the Android
+  capture: `PASS` / `SKIPPED` (the automation's own misses — no icon, no menu,
+  a tap that did not register; the run stays green) / `FAIL` (SpringBoard took
+  the tap and nothing arrived, or its menu opened without the app's quick
+  actions). One deliberate difference: a run that writes no verdict at all is
+  red, because that is also what a broken test bundle looks like. Every
+  step's accessibility tree and screenshot
+  ship in the `ios-springboard-*` artifact whatever the verdict. New
+  `ios-springboard` job on 2022.3 (macos-15, app-delegate lifecycle) and
+  unity6 (macos-26, scene lifecycle). **No result is recorded here yet** — the
+  first run decides whether any doc may say "SpringBoard delivered a tap".
 - **Xcode 27 / iOS 27 canary legs.** `ios-simulator`, `ios-simulator-coex` and
   `ios-springboard` gain matrix entries on GitHub's public-preview `xcode-27`
   image (Xcode 27.0 beta 6 today, with the iOS 27 SDK and runtime — the SDK
