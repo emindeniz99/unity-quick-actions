@@ -63,6 +63,20 @@ ships it.
   window, so both went red on a verdict that quoted the id; the window is
   120 s now, and run 78 was green on both legs (`PASS`, 41 s and 46 s after
   the tap). Still the Simulator, still no iPhone.
+- **Parity with Flutter's `quick_actions` — compared 2026-09-15, two real
+  gaps.** Four of the five top open feature requests on Flutter's tracker
+  (bitmap icons, SF Symbols, a max-count accessor, managing existing
+  shortcuts) are things this package already ships, and their plugin replaces
+  the whole dynamic-shortcut set where we merge behind an ownership marker.
+  What they have and we do not: Android `reportShortcutUsed` fired
+  automatically on every tap (we expose the API but never call it — belongs in
+  the trampoline, and it would cover static shortcuts too), and a one-call
+  "make the set exactly this" mutator. Smaller: `AddList`/`RemoveAll` return
+  `void`, a build warning when R8 is on without the keep rule, an earlier
+  `Info.plist`-driven scene-hook install, coex-probe assertions over the iOS
+  marshalling layer, and the full 29-row `IconType` table in the README.
+  Sources and the five refuted claims are in
+  [`docs~/flutter-quick-actions-parity-2026-09.md`](https://github.com/emindeniz99/unity-quick-actions/blob/main/docs~/flutter-quick-actions-parity-2026-09.md).
 - **CI wall clock (40–53 min per run) — the cache is not the lever.** The
   Library cache hits its primary key on every Unity leg; what costs the
   minutes is the self-imposed `needs:` chain plus `max-parallel: 2`, the
