@@ -415,6 +415,7 @@ deployment target iOS 13 in the docs.
    foreground within 10 s of the touch and `daily_reward` reached the marker
    35–43 s (2022.3) / 41–54 s (unity6) after it — past the harness's 30 s
    window, now 120 s; both legs were red on a verdict that quoted the id.
+   Run 78, window 120 s: `PASS` on both (41 s / 46 s after the tap).
    Costs measured on the way: XCUITest's own idle waits are 2 × 60 s per leg
    (the context menu's blur never lets SpringBoard go idle), and the
    simulator boot + install step took 9 min on `macos-26` (first-boot data

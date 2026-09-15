@@ -57,7 +57,9 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `FAIL` it wrote quoted a marker that already held the id. Fixed in the same
   PR — the window is its own knob (`QA_DELIVERY_SECONDS`, 120 s, counted
   from the tap), the verdict quotes the read that decided it, and rows are
-  matched by identifier first. Two minutes of every leg are XCUITest's own:
+  matched by identifier first. **Run 78, with those fixes: `PASS` on both
+  legs** — `daily_reward` reached `Performed` 41 s (2022.3) and 46 s (unity6)
+  after the tap. Two minutes of every leg are XCUITest's own:
   it waits up to 60 s for SpringBoard to go idle around each synthesized
   touch, and the context menu's blur never lets it. A physical iPhone remains
   untested, and nothing in the shipped docs says otherwise.

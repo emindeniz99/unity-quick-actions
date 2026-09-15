@@ -61,7 +61,8 @@ ships it.
   and the 6000.3.21f1 / iOS 26.5 exports and `daily_reward` reached
   `Performed` 35–43 s and 41–54 s after the touch, past the test's 30 s
   window, so both went red on a verdict that quoted the id; the window is
-  120 s now. Still the Simulator, still no iPhone.
+  120 s now, and run 78 was green on both legs (`PASS`, 41 s and 46 s after
+  the tap). Still the Simulator, still no iPhone.
 - **Xcode 16.4 legs (`macos-15`) — keep, retarget or drop: decision deferred
   to October 2026.** Since 2026-04-28 App Store Connect accepts only builds
   made with Xcode 26+ and the iOS 26 SDK, Xcode 27 went GA on 2026-09-14, and
