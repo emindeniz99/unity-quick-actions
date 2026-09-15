@@ -8,19 +8,25 @@
 // Configuration arrives through the runner's environment: `TEST_RUNNER_QA_*`
 // on the xcodebuild command line reaches this process as `QA_*`.
 //
-//   QA_OUT          directory the evidence is written to (required)
-//   QA_APP_ID       bundle id of the app under test   (com.quickactions.testbed)
-//   QA_APP_NAME     the icon's label = display name   (QuickActionsDemo)
-//   QA_ROW_TITLE    quick-action title to tap         (Daily Reward)
-//   QA_ACTION_ID    the id that must reach Performed  (daily_reward)
-//   QA_MARKER       host path of the testbed's marker file (unset: SKIPPED
-//                   after the launch — delivery cannot be checked)
-//   QA_WAIT_SECONDS launch / delivery timeout         (30)
+//   QA_OUT              directory the evidence is written to (required)
+//   QA_APP_ID           bundle id of the app under test   (com.quickactions.testbed)
+//   QA_APP_NAME         the icon's label = display name   (QuickActionsDemo)
+//   QA_ROW_TITLE        quick-action title to tap         (Daily Reward)
+//   QA_ACTION_ID        the id that must reach Performed  (daily_reward)
+//   QA_MARKER           host path of the testbed's marker file (unset: SKIPPED
+//                       after the launch — delivery cannot be checked)
+//   QA_WAIT_SECONDS     seconds the app gets to reach the foreground after
+//                       the tap                                        (30)
+//   QA_DELIVERY_SECONDS seconds the id gets to reach Performed after the
+//                       tap — a cold Unity launch on the Simulator spends
+//                       most of its first minute before the first frame
+//                       (run 77, 2022.3 / iOS 18.6: 35–43 s)          (120)
 //
 // The verdict lands in QA_OUT/launcher-tap.txt, one line, with the vocabulary
 // of the Android smoke's launcher tap:
 //
-//   PASS <id> via '<row label>'  the row was tapped, the app came up, the id arrived
+//   PASS <id> via '<row label>' (<n> s after the tap)
+//                                the row was tapped, the app came up, the id arrived
 //   SKIPPED <why>                the automation never reached a tap that counts
 //   FAIL <why>                   SpringBoard took the tap and nothing arrived, or
 //                                its menu opened without the app's quick actions
@@ -57,6 +63,7 @@ final class SpringBoardTapUITests: XCTestCase {
         let rowTitle = env["QA_ROW_TITLE"] ?? "Daily Reward"
         let markerPath = env["QA_MARKER"].flatMap { $0.isEmpty ? nil : $0 }
         let waitSeconds = TimeInterval(env["QA_WAIT_SECONDS"] ?? "") ?? 30
+        let deliverySeconds = TimeInterval(env["QA_DELIVERY_SECONDS"] ?? "") ?? 120
 
         let app = XCUIApplication(bundleIdentifier: appId)
         let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
@@ -87,8 +94,13 @@ final class SpringBoardTapUITests: XCTestCase {
         // UI test settled on after two years of flakes: start at 1.5 s; a press that
         // lands in the jiggle/edit state was too long, one that opens nothing was too
         // short; ±0.2 s, four attempts.
+        // A quick-action row is a Button whose identifier is the shortcut's type
+        // — the id itself — and whose label is "Title, Subtitle" (run 77, iOS
+        // 18.6: identifier 'daily_reward', label 'Daily Reward, Claim today's
+        // gift'); the label prefix is the fallback for a SpringBoard that does
+        // not expose the identifier.
         let rows = springboard.buttons.matching(
-            NSPredicate(format: "label BEGINSWITH[c] %@", rowTitle))
+            NSPredicate(format: "identifier == %@ OR label BEGINSWITH[c] %@", actionId, rowTitle))
         let menuMarkers = ["Remove App", "Edit Home Screen", "Share App", "Delete App"]
         var duration: TimeInterval = 1.5
         var row: XCUIElement?
@@ -147,8 +159,17 @@ final class SpringBoardTapUITests: XCTestCase {
             return
         }
         let before = markerLines(markerPath)
+        let tapCalled = Date()
         center(of: target).tap()
+        // XCUITest waits for SpringBoard to go idle before it synthesizes the
+        // touch and again after it, up to 60 s each, and SpringBoard is not
+        // idle while the context menu's blur animates (run 77: the call returned
+        // 63 s after it was made, the touch itself landed 3 s before the return).
+        // Everything below is timed from the return, i.e. from the touch.
+        let tapped = Date()
+        note("the tap call returned \(Int(tapped.timeIntervalSince(tapCalled))) s after it was made")
         let launched = app.wait(for: .runningForeground, timeout: waitSeconds)
+        note("foreground \(launched ? "reached" : "not reached") \(Int(Date().timeIntervalSince(tapped))) s after the tap")
         dump("after-tap", springboard)
         if !launched {
             if rows.firstMatch.exists {
@@ -167,19 +188,27 @@ final class SpringBoardTapUITests: XCTestCase {
                         "\(appId) launched via '\(label)', but QA_MARKER is not set — delivery not checked")
             return
         }
-        let deadline = Date().addingTimeInterval(waitSeconds)
-        while Date() < deadline {
-            let now = markerLines(marker)
-            if now.count > before.count, now[before.count...].contains(actionId) {
-                dump("delivered", app)
-                try verdict("PASS", "\(actionId) via '\(label)'")
+        // A cold Unity launch spends most of its first minute before the first
+        // frame, and the runtime dispatches the launch id one frame after its
+        // bootstrap: run 77 (2022.3 / iOS 18.6) delivered 35–43 s after the
+        // touch, past the 30 s window this loop had then. The last read is the
+        // one the verdict quotes, so a FAIL can never report a marker that
+        // already holds the id, which is exactly what that run's FAIL did.
+        let deadline = tapped.addingTimeInterval(deliverySeconds)
+        var seen = markerLines(marker)
+        while !(seen.count > before.count && seen[before.count...].contains(actionId)) {
+            guard Date() < deadline else {
+                dump("not-delivered", app)
+                try verdict("FAIL",
+                            "\(appId) came to the foreground but '\(actionId)' never reached Performed within \(Int(deliverySeconds)) s of the tap (marker \(marker): \(seen))")
                 return
             }
             Thread.sleep(forTimeInterval: 1)
+            seen = markerLines(marker)
         }
-        dump("not-delivered", app)
-        try verdict("FAIL",
-                    "\(appId) came to the foreground but '\(actionId)' never reached Performed within \(Int(waitSeconds)) s (marker \(marker): \(markerLines(marker)))")
+        let deliveredAfter = Int(Date().timeIntervalSince(tapped))
+        dump("delivered", app)
+        try verdict("PASS", "\(actionId) via '\(label)' (\(deliveredAfter) s after the tap)")
     }
 
     // MARK: - SpringBoard helpers
