@@ -15,6 +15,92 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **A SpringBoard tap on the iOS Simulator, driven by XCUITest.** `tools~/ios-ui`
+  is a UI-testing bundle with no host app — generated with the `xcodeproj` gem,
+  committed, built unsigned, no Apple account — that presses Home, long-presses
+  the app icon (1.5 s, ±0.2 s over four attempts: the adaptive duration
+  Flutter's own `quick_actions_ios` test settled on after two years of flakes),
+  taps the `Daily Reward` row and waits for the id in a marker file the two
+  Simulator-compiled testbeds (2022.3 and Unity 6) now append on every
+  `Performed` (`Examples~/Testbed2022/Assets/Scripts/QuickActionsPerformedMarker.cs`
+  and its identical copy under `Examples~/Testbed6/`; 2021.3 is export-only on
+  the Simulator and carries none), read from the host side of the simulator's
+  data container — a fact, not a log line. Verdicts follow the Android
+  capture: `PASS` / `SKIPPED` (the automation's own misses — no icon, no menu,
+  a tap that did not register; the run stays green) / `FAIL` (SpringBoard took
+  the tap and nothing arrived, or its menu opened without the app's quick
+  actions). One deliberate difference: a run that writes no verdict at all is
+  red, because that is also what a broken test bundle looks like. Every
+  step's accessibility tree and screenshot
+  ship in the `ios-springboard-*` artifact whatever the verdict. New
+  `ios-springboard` job on 2022.3 (macos-15, app-delegate lifecycle) and
+  unity6 (macos-26, scene lifecycle). **Two runs on 2026-09-15.** Run 76:
+  `SKIPPED` on both legs — the bundle built, the simulator booted, the app
+  installed, SpringBoard's tree listed the icon (page 2 of 2 on iOS 18.6 and
+  26.5 alike), and the test stopped there: an icon on a page other than the
+  current one reports a zero frame, which the on-screen check read as inside
+  the screen, and the `isHittable` guard then said no; fixed in the same PR
+  (swipe until the icon has a real frame; press and tap by coordinate).
+  **Run 77, with that fix: SpringBoard's own tap delivered on both legs.**
+  One swipe to page 2, the first 1.5 s press opened the context menu, the
+  `daily_reward` row was tapped — SpringBoard exposes each quick action as a
+  `Button` whose identifier is the shortcut type and whose label is
+  `Daily Reward, Claim today's gift`, identically on iOS 18.6 and 26.5 — the
+  app cold-started, reached the foreground within ten seconds of the touch,
+  and `daily_reward` appeared in the marker file: 35–43 s after the touch on
+  2022.3.62f3 / iOS 18.6 (Xcode 16.4, app-delegate lifecycle) and 41–54 s
+  after it on 6000.3.21f1 / iOS 26.5 (Xcode 26.6, scene manifest — the first
+  quick action UIKit itself has delivered on the UIScene export; its
+  x86_64-only Simulator app still runs there, where the iOS 27 canary
+  refuses it).
+  Both legs still went **red**: the test's delivery window was 30 s, and the
+  `FAIL` it wrote quoted a marker that already held the id. Fixed in the same
+  PR — the window is its own knob (`QA_DELIVERY_SECONDS`, 120 s, counted
+  from the tap), the verdict quotes the read that decided it, and rows are
+  matched by identifier first. **Run 78, with those fixes: `PASS` on both
+  legs** — `daily_reward` reached `Performed` 41 s (2022.3) and 46 s (unity6)
+  after the tap. Two minutes of every leg are XCUITest's own:
+  it waits up to 60 s for SpringBoard to go idle around each synthesized
+  touch, and the context menu's blur never lets it. A physical iPhone remains
+  untested, and nothing in the shipped docs says otherwise.
+- **A second maintainer research record, `docs~/ci-cost-and-caching-research-2026-09.md`**
+  (not shipped): why the `unity` run takes 40–53 minutes and what would
+  shorten it. The Library cache already hits on every leg; the minutes are
+  the `needs:` chain, per-job image pulls and activation, and the simulator's
+  first boot behind GitHub's macOS concurrency cap. GameCI's guidance, 25
+  other projects' workflows, GitHub's and Unity's documentation, a
+  refutation pass over each recommendation, and the finding that the
+  testbeds export an x86_64-only simulator app by omission (the Unity 6
+  Xcode 27 canaries fail on exactly that). Nothing from it is implemented in
+  this release.
+- **Xcode 27 / iOS 27 canary legs.** `ios-simulator`, `ios-simulator-coex` and
+  `ios-springboard` gain matrix entries on GitHub's public-preview `xcode-27`
+  image (Xcode 27.0 beta 6 today, with the iOS 27 SDK and runtime — the SDK
+  App Store uploads must use from April 2027, which no Unity line documents
+  support for yet), `continue-on-error` so a red canary cannot fail the
+  workflow run — its own check still shows red, and it gates nothing only
+  because none of these jobs is a required check. The existing macos-15 /
+  macos-latest legs are untouched except for one `xcodebuild -version` line
+  printed at the top of their compile step. **What the first run (run 76)
+  measured, Xcode 27.0 beta 6 (27A5252f) on macOS 27.0:** the public
+  2022.3.62f3 export does not compile — "The iOS Simulator deployment target
+  'IPHONEOS_DEPLOYMENT_TARGET' is set to 12.0, but the range of supported
+  deployment target versions is 15.0 to 27.0.x" — so a 2022.3 project needs
+  its minimum iOS raised to 15 before Xcode 27 will build it; the 6000.3.21f1
+  export **compiles**, but the app it produces does not install on the iOS 27
+  simulator — "The executable has code for these platforms and architectures:
+  [iOS-simulator, x86_64]. This device can run code for these platforms:
+  iOS-simulator" — the Simulator build is x86_64-only, which the macOS 26
+  images run and this one no longer does. Both are the canaries' point, and
+  both go into the October decision.
+- **A research record, not shipped:**
+  `docs~/ios-toolchain-and-ui-test-research-2026-09.md` — Apple's Xcode 26
+  upload mandate and the April 2027 iOS 27 one, what each Unity line supports,
+  what the GitHub macOS images carry, the ways the iOS home screen can be
+  automated and what other SDKs actually do, and what a real iPhone from
+  GitHub Actions would cost — every claim with its source and its confidence.
+  The decision it records: keep the Xcode 16.4 legs for now, add the canaries,
+  revisit in October 2026.
 - **The Android smoke now taps a shortcut in the launcher's own popup.** Every
   assertion the smoke makes has delivered its tap with `am start` — the intent
   the launcher would build, built by the script instead — so "a real launcher
@@ -65,6 +151,26 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   deciding: an ungated *Editor* assembly costs zero in a player — the one that
   already ships this way appears 0 times in the APK's IL2CPP metadata. Both
   entries record what would re-open them.
+
+### Fixed
+
+- **The Android smoke's relaunch-once now fires when only the Java shim spoke.**
+  Run 76 (2026-09-15, 2021.3 on the API 30 image) repeated the known emulator
+  failure — the activity reached the foreground and the Unity player never
+  initialised — but the relaunch that exists for exactly that did not fire:
+  `UnityPlayerActivity` logs under the same `Unity` tag before any native
+  player exists (`CommandLine:`, `onActivityResumed:`, `onResume`,
+  `windowFocusChanged:`), and those four lines counted as "the player has
+  logged". `player_has_logged` now ignores the shim's messages, so a process
+  that said nothing else within half the budget is force-stopped and launched
+  once more, as intended. A player that did come up and published nothing
+  still gets no second chance. Run 79 (2026-09-15, 2022.3) then showed the
+  same stall in its other shape — the **cold tap** started the process, the
+  activity was displayed, and only the shim ever spoke for the whole 180 s
+  budget — so the cold tap now has the same second chance: half the budget,
+  then, if the player has logged nothing since that start, a force-stop and
+  one more cold tap (same id), then the other half. One shared helper,
+  `relaunch_once_if_engine_silent`, serves both steps.
 
 ## [0.6.0] - 2026-09-02
 
