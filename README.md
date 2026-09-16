@@ -176,12 +176,12 @@ covered by headless tests only — no device or Simulator run has happened since
 they landed, so what a resolved `v1.4.0 (37)` looks like on a real home screen
 is still unconfirmed.
 
-**Also true:** the suite is 127 headless tests (`dotnet test`) and 82 in Unity's
-Test Runner (it adds 6 `JsonUtility` serialization tests; 51 of the headless ones
-don't run there), plus an Android Java smoke of 111 checks, across 11 C# compile
-configurations with 0 warnings. The last CI-measured Test Runner result was
-77/77 (run 88, 2026-09-16, on 6000.6.0f1), taken before the five `SetList` tests
-landed — 82 is not yet a measured number.
+**Also true:** the suite is 130 headless tests (`dotnet test`) and 82 in Unity's
+Test Runner (it adds 6 `JsonUtility` serialization tests; 54 of the headless ones
+are harness-only and don't run there), plus an Android Java smoke of 111 checks,
+across 11 C# compile configurations with 0 warnings. 82 is a **measured**
+number: run 93 (2026-09-16) reported 82/82 on all four Unity legs — 2021.3,
+2022.3, Unity 6 and 6000.6.0f1.
 The iOS `.mm` compiles cleanly against the current iOS SDK
 (ARC, arm64, deployment target iOS 13) with no deprecation or availability
 errors — a compile result, separate from the Simulator run above. A
