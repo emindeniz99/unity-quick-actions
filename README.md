@@ -155,8 +155,9 @@ static shortcuts on a long-press of a **cold, never-opened install**, runtime
 `Add` published further shortcuts, and a dynamic item whose id collided with a
 static one was dropped in favour of the manifest entry — exactly as documented.
 
-A later hand-run on the owner's Moto G, using the CI demo APK, added two things.
-The long-press menu showed **static and runtime-added items together in one real
+A later hand-run on the same Moto G — Android 14, using the
+`quickactions-demo-apk-2022.3` artifact from CI — added two things. The
+long-press menu showed **static and runtime-added items together in one real
 launcher menu**: two rows carrying the baked shortcuts' subtitles and two
 carrying subtitles the sample only sets at runtime. The second row rendered as a
 **blank tile**, which is what `IconType.None` is documented to do. Which of the
@@ -167,7 +168,8 @@ run** was installed: long-pressing it showed **no quick actions at all**. That i
 the gate below proven on hardware rather than in an APK diff.
 
 **Still not verified on hardware:** a tap arriving as `Performed` (cold or
-warm), and anything at all on a physical iPhone. Plan on validating the tap path
+warm), anything at all on a physical iPhone, and any Android newer than the 14
+on that handset — 17 is the current release. Plan on validating the tap path
 on your own device before you ship. The 0.4.6 build-time
 [placeholders](#build-time-placeholders--app-info-on-long-press) are likewise
 covered by headless tests only — no device or Simulator run has happened since
