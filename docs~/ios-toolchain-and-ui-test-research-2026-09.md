@@ -472,10 +472,11 @@ deployment target iOS 13 in the docs.
    - The SpringBoard leg is the strong one: a real long-press on the home-screen
      icon and a tap on the `daily_reward` row, on **Xcode 27 beta 6 / iOS 27**,
      cold-started the app and `daily_reward` reached `Performed` 20 s after the
-     tap. The two Xcode 26 legs passed the same way (6 s on 6000.3.21f1, 9 s on
-     2022.3.62f3).
-   - Delivery got **much faster**: run 77 measured 35–54 s on the same two
-     Xcode 26 legs, run 84 measured 6–20 s. **[plausible]** the arm64 slice is
+     tap. The two non-canary legs passed the same way (6 s on 6000.3.21f1 under
+     Xcode 26.6, 9 s on 2022.3.62f3 under **Xcode 16.4** — they are not both
+     "Xcode 26": the 2022.3 leg runs on `macos-15`, whose default is 16.4).
+   - Delivery got **much faster**: run 77 measured 35–54 s on those same two
+     non-canary legs, run 84 measured 6–20 s. **[plausible]** the arm64 slice is
      why — the app now runs natively on the arm64 runner instead of being
      translated — but nothing in the run proves the mechanism, only the
      numbers.
@@ -502,13 +503,82 @@ deployment target iOS 13 in the docs.
    §4: the same export survives on Xcode 26 / iOS 26, and Unity 6 — which does
    emit `UIApplicationSceneManifest` — survives on iOS 27, while Testbed2022 is
    2022.3.62f3, below the 2022.3.72f1 floor where Unity started emitting it.
-   Three independent signals point one way, but UIKit's own reason string was
-   never captured, so this is not proven. Confirming it needs either
-   `simctl spawn … log` output from the launch, or a scene manifest injected
-   into the 2022.3 export's `Info.plist` to see whether it then survives.
-   **This is a Unity export question, not a package one** — but it matters to
-   anyone shipping a 2022.3 game to iOS 27, so it belongs in the docs even
-   though nothing in this package can fix it.
+   **[verified] UIKit names the reason itself.** Run 88's report, with the
+   whole file grepped rather than truncated, puts this in frame 0 of the
+   crashing thread:
+
+   ```
+   queue: com.apple.main-thread      "description": "(Breakpoint) brk 0"
+   "pc": { "value": 7592489524, "matchesCrashFrame": 1 }
+   #0  UIKitCore +13386292  ___UIApplicationEvaluateRuntimeIssueForNoSceneLifecycleAdoption_block_invoke +712
+   #1  libdispatch           _dispatch_client_callout +12
+   #2  libdispatch           _dispatch_once_callout +28
+   ```
+
+   The symbol is the diagnosis: *UIApplication Evaluate Runtime Issue For No
+   Scene Lifecycle Adoption*. `matchesCrashFrame: 1` says that frame is the
+   crashing one. No `asi` string was written, so the symbol is the whole of it -
+   but it is UIKit's own naming, not an inference from behaviour.
+
+   **[verified] Apple documents the rule and the mechanism:**
+
+   > "Adopting the scene-based life cycle is required. Beginning in iOS 27,
+   > iPadOS 27, Mac Catalyst 27, tvOS 27, and visionOS 27, apps built with the
+   > latest SDK must adopt the scene-based life cycle or they fail to launch."
+   > — <https://developer.apple.com/documentation/uikit/transitioning-to-the-uikit-scene-based-life-cycle>
+
+   The same page names the two conditions that put an app in the must-migrate
+   bucket, and an old Unity export meets the first: "The
+   `UIApplicationSceneManifest` key is missing from your information property
+   list, or it has no specified configurations." It also documents the ramp
+   that ends here - iOS 18.4 logged "This will become an assert in a future
+   version", iOS 26 "Failure to adopt will result in an assert in the future".
+   An assert is a deliberate trap, which is what `brk 0` is. The gate is worded
+   the same way in TN3187, the iOS 27 release notes, and WWDC 2025 session 282
+   and WWDC 2026 session 278.
+
+10. **[verified] The gate is the linked SDK, not the OS - measured, not
+    inferred (run 88, `ios-crossrun`).** Apple states only the forward rule, so
+    the converse - that a binary built against an older SDK is exempt, which is
+    what would explain shipped Unity 2022 games still launching on iOS 27 - was
+    an inference until this ran. `ios-crossrun` launches an already-built `.app`
+    on a runtime from a different runner image, holding the Unity export
+    (2022.3.62f3) constant so only the SDK/runtime pair moves. `vtool` printed
+    what each binary was actually linked against:
+
+    | binary linked against | iOS 26.2 (23C54) | iOS 27.0 (24A5423a) |
+    | --- | --- | --- |
+    | `sdk 18.5`, `minos 14.0` (Xcode 16.4) | SURVIVED (`ios-simulator`) | **SURVIVED** (`old-sdk-app-on-newest-ios`) |
+    | `sdk 27.0`, `minos 15.0` (Xcode 27) | **SURVIVED** (`new-sdk-app-on-older-ios`) | DIED (`ios-simulator`) |
+
+    ```
+    CROSSRUN VERDICT: SURVIVED — … com.apple.CoreSimulator.SimRuntime.iOS-27-0|iPhone 17 Pro
+    CROSSRUN VERDICT: SURVIVED — … com.apple.CoreSimulator.SimRuntime.iOS-26-2|iPhone 17 Pro
+    ```
+
+    Exactly one cell dies, and it is the one where BOTH conditions hold. Neither
+    the iOS 27 runtime alone nor the iOS 27 SDK alone is enough. So the rule
+    fires on the pair, as Apple words it, and an app already in the App Store -
+    linked against an older SDK - is not affected by it. That is no longer a
+    guess about why those games keep working; it is the same export, run.
+
+    Caveats worth keeping: the iOS 27 runtime here is `24A5423a` and the Xcode
+    is `27A5252f`, both seed builds, so this establishes the SDK-vs-OS
+    mechanism, not released iOS 27 behaviour. The old-SDK side is Xcode 16.4
+    (`sdk 18.5`), not literally Xcode 26 - it brackets the question rather than
+    pinning it to the adjacent release.
+
+11. **What this means for a game shipping with this package.** Nothing is broken
+    today: apps already shipped, and apps still built with pre-Xcode-27
+    toolchains, launch on iOS 27 unchanged - measured above. The package's own
+    native code gates every scene hook on the presence of
+    `UIApplicationSceneManifest`, so on an export that lacks one it stays on the
+    legacy app-delegate path and does nothing wrong. The action is at BUILD
+    time: before rebuilding under Xcode 27, the Unity Editor must be at or above
+    the version where Unity emits the scene manifest - **2022.3.72f1 /
+    6000.0.68f1 / 6000.3.8f1**. Below that floor, which is where Testbed2022
+    (2022.3.62f3) sits, a build linked against the iOS 27 SDK does not launch at
+    all - not intermittently.
 
 ## 11. Method and caveats
 

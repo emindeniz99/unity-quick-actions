@@ -2530,7 +2530,7 @@ jobs:
       fail-fast: false
       matrix:
         target:
-          - { name: "2022.3", runner: macos-15 }
+          - { name: "2022.3", runner: macos-15, upload_app: true }
           - { name: "unity6", runner: macos-latest }
           # build_settings: extra KEY=VALUE pairs appended to this leg's
           # xcodebuild only. The 2022.3 export carries IPHONEOS_DEPLOYMENT_TARGET
@@ -2540,7 +2540,7 @@ jobs:
           # so the macos-15 legs keep proving the package compiles at a target
           # below its own iOS 13 guards - and it mirrors what a developer
           # shipping this 2022.3 project under Xcode 27 would have to do anyway.
-          - { name: "2022.3-xcode27", export: "2022.3", runner: xcode-27, canary: true, build_settings: "IPHONEOS_DEPLOYMENT_TARGET=15.0" }
+          - { name: "2022.3-xcode27", export: "2022.3", runner: xcode-27, canary: true, build_settings: "IPHONEOS_DEPLOYMENT_TARGET=15.0", upload_app: true }
           - { name: "unity6-xcode27", export: "unity6", runner: xcode-27, canary: true }
     steps:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -2565,12 +2565,38 @@ jobs:
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
             $EXTRA_BUILD_SETTINGS \
             build
+      # Kept for ios-crossrun, which launches this exact binary on a runtime
+      # from a different runner image. tar, not a bare directory: GitHub
+      # artifacts do not preserve the executable bit, and simctl will not run a
+      # binary that lost it. This step sits BEFORE the launch on purpose - the
+      # canary legs are expected to fail there, and the app is wanted anyway.
+      - name: Keep the built app for the cross-run experiment
+        if: ${{ matrix.target.upload_app == true }}
+        run: |
+          set -euo pipefail
+          PRODUCTS="$RUNNER_TEMP/DerivedData/Build/Products/Release-iphonesimulator"
+          APP="$(find "$PRODUCTS" -maxdepth 1 -name '*.app' -print -quit)"
+          [ -n "$APP" ] || { echo "no .app produced"; exit 1; }
+          tar -czf "$RUNNER_TEMP/simulator-app.tgz" -C "$PRODUCTS" "$(basename "$APP")"
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        if: ${{ matrix.target.upload_app == true }}
+        with:
+          name: ios-simulator-app-${{ matrix.target.name }}
+          path: ${{ runner.temp }}/simulator-app.tgz
+          retention-days: 3
       - name: Boot a simulator, install and launch the app
         run: |
           set -euo pipefail
           APP="$(find "$RUNNER_TEMP/DerivedData/Build/Products/Release-iphonesimulator" -maxdepth 1 -name '*.app' -print -quit)"
           [ -n "$APP" ] || { echo "no .app produced"; exit 1; }
-          UDID="$(xcrun simctl list devices available --json | python3 -c '
+          # Report the toolchain AND the runtime. Which iOS a leg actually ran
+          # was unanswerable from these logs before: the selector takes the
+          # NEWEST installed iOS runtime, which is a property of the runner
+          # image, not of anything we pin. Print it so every verdict carries the
+          # iOS version it was measured on.
+          xcodebuild -version
+          xcrun simctl list runtimes | sed -n '/iOS/p'
+          SEL="$(xcrun simctl list devices available --json | python3 -c '
           import json, sys
           devices = json.load(sys.stdin)["devices"]
           for runtime in sorted(devices, reverse=True):
@@ -2578,9 +2604,11 @@ jobs:
                   continue
               for device in devices[runtime]:
                   if device.get("isAvailable") and "iPhone" in device["name"]:
-                      print(device["udid"]); raise SystemExit
+                      print(device["udid"], runtime, device["name"], sep="|")
+                      raise SystemExit
           raise SystemExit("no available iPhone simulator")')"
-          echo "Using simulator $UDID"
+          UDID="${SEL%%|*}"
+          echo "Using simulator $SEL"
           xcrun simctl boot "$UDID"
           xcrun simctl bootstatus "$UDID" -b
           xcrun simctl install "$UDID" "$APP"
@@ -2609,6 +2637,18 @@ jobs:
               if [ -n "$REPORT" ]; then
                 echo "--- $REPORT (first 150 lines; the thread backtraces run long) ---"
                 head -150 "$REPORT"
+                # head alone stops before the Application Specific Information,
+                # which is where UIKit would put its own reason for a
+                # deliberate assert - the one piece of evidence that would turn
+                # a plausible diagnosis into a proven one. grep the WHOLE file
+                # for it. Each grep is tolerant (no match exits 1, which
+                # pipefail would otherwise treat as a step failure) and nothing
+                # feeds a consumer that can close early.
+                echo "--- reason keys anywhere in the report ---"
+                ASI="$(grep -o '"asi":[^}]*}' "$REPORT" || true)"
+                echo "asi: ${ASI:-<none written>}"
+                SCENEISH="$(grep -oE '[A-Za-z_]*[Ss]cene[A-Za-z_]*' "$REPORT" | sort -u || true)"
+                echo "scene-ish symbols: ${SCENEISH:-<none>}"
               else
                 echo "no $NAME crash report was written; the whole directory:"
                 ls ~/Library/Logs/DiagnosticReports/ 2>/dev/null || true
@@ -2617,6 +2657,112 @@ jobs:
               ;;
           esac
           echo "app launched and stayed alive on the simulator"
+
+  # The 2x2 that ios-simulator cannot make on its own. That job always builds
+  # and launches on the SAME image, so each of its results confounds two
+  # variables: the SDK the app was LINKED AGAINST and the iOS runtime it ran on.
+  # This job crosses them - it launches a binary built on one image against a
+  # runtime from another, using the SAME Unity export (2022.3) on both sides, so
+  # the engine is held constant and only the SDK/runtime pair moves.
+  #
+  #                       | older iOS runtime | newest iOS runtime
+  #   old-SDK app (16.4)  | ios-simulator: ok | HERE  <- the shipped-game case
+  #   iOS 27 SDK app      | HERE              | ios-simulator: red
+  #
+  # How to read it. If the old-SDK binary LIVES on the newest runtime while the
+  # iOS 27 SDK binary dies on that same runtime, the trigger is the linked SDK,
+  # not the OS - which is what would explain why already-shipped Unity 2022
+  # games keep running on iOS 27. If the old-SDK binary dies there too, that
+  # explanation is refuted and the cause is somewhere else entirely.
+  #
+  # Two limits, stated up front. The newest runtime here comes from the xcode-27
+  # PREVIEW image, which is a seed build of both macOS and Xcode, so this
+  # isolates the SDK variable but proves nothing about released iOS 27. And both
+  # legs are continue-on-error on purpose: the ANSWER is the output, not a pass,
+  # and neither outcome should turn a PR red.
+  ios-crossrun:
+    name: ios cross-run (${{ matrix.target.name }})
+    needs: ios-simulator
+    if: ${{ !cancelled() && needs.ios-simulator.result != 'skipped' }}
+    runs-on: ${{ matrix.target.runner }}
+    continue-on-error: true
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          # What macos-15 built (Xcode 16.4, iOS 18 SDK), run on the newest iOS.
+          - { name: "old-sdk-app-on-newest-ios", app: "2022.3", runner: xcode-27 }
+          # What the xcode-27 image built (iOS 27 SDK), run on an older iOS.
+          - { name: "new-sdk-app-on-older-ios", app: "2022.3-xcode27", runner: macos-15 }
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ios-simulator-app-${{ matrix.target.app }}
+          path: ${{ runner.temp }}/imported
+      - name: Launch the imported app on this image's newest iOS runtime
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/app"
+          tar -xzf "$RUNNER_TEMP/imported/simulator-app.tgz" -C "$RUNNER_TEMP/app"
+          APP="$(find "$RUNNER_TEMP/app" -maxdepth 1 -name '*.app' -print -quit)"
+          [ -n "$APP" ] || { echo "the artifact carried no .app"; exit 1; }
+
+          # What the binary was BUILT against - the whole point of this job.
+          # Both tools are best-effort: neither is load-bearing, and an older
+          # otool may not know a newer platform, so never fail the leg on them.
+          BIN="$APP/$(basename "$APP" .app)"
+          echo "--- what this binary was linked against ---"
+          vtool -show-build-version "$BIN" 2>/dev/null || otool -l "$BIN" 2>/dev/null | grep -A 4 LC_BUILD_VERSION || true
+          echo "--- what this image offers ---"
+          xcodebuild -version
+          xcrun simctl list runtimes | sed -n '/iOS/p'
+
+          SEL="$(xcrun simctl list devices available --json | python3 -c '
+          import json, sys
+          devices = json.load(sys.stdin)["devices"]
+          for runtime in sorted(devices, reverse=True):
+              if "iOS" not in runtime:
+                  continue
+              for device in devices[runtime]:
+                  if device.get("isAvailable") and "iPhone" in device["name"]:
+                      print(device["udid"], runtime, device["name"], sep="|")
+                      raise SystemExit
+          raise SystemExit("no available iPhone simulator")')"
+          UDID="${SEL%%|*}"
+          echo "Using simulator $SEL"
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID" -b
+
+          # install can refuse outright (wrong architecture, a minimum OS the
+          # runtime cannot meet). That is a RESULT, not an infrastructure
+          # failure, so report it in the same vocabulary instead of dying here.
+          if ! xcrun simctl install "$UDID" "$APP"; then
+            echo "CROSSRUN VERDICT: REFUSED — simctl install rejected the app on $SEL"
+            exit 1
+          fi
+          xcrun simctl launch "$UDID" com.quickactions.testbed
+          sleep 15
+          LIST="$(xcrun simctl spawn "$UDID" launchctl list)"
+          case "$LIST" in
+            *com.quickactions.testbed*)
+              echo "CROSSRUN VERDICT: SURVIVED — the app is still running on $SEL"
+              ;;
+            *)
+              echo "CROSSRUN VERDICT: DIED — the app launched then exited on $SEL"
+              NAME="$(basename "$APP" .app)"
+              REPORT=""
+              for f in "$HOME/Library/Logs/DiagnosticReports/$NAME"-*.ips; do
+                [ -e "$f" ] || continue
+                REPORT="$f"
+              done
+              if [ -n "$REPORT" ]; then
+                echo "--- $REPORT (first 60 lines) ---"
+                head -60 "$REPORT"
+              fi
+              exit 1
+              ;;
+          esac
 
   # The launcher tap, iOS edition. An XCUITest bundle with no host app
   # (tools~/ios-ui, built unsigned — no Apple account anywhere) drives
@@ -2682,7 +2828,14 @@ jobs:
           set -euo pipefail
           APP="$(find "$RUNNER_TEMP/DerivedData/Build/Products/Release-iphonesimulator" -maxdepth 1 -name '*.app' -print -quit)"
           [ -n "$APP" ] || { echo "no .app produced"; exit 1; }
-          UDID="$(xcrun simctl list devices available --json | python3 -c '
+          # Report the toolchain AND the runtime. Which iOS a leg actually ran
+          # was unanswerable from these logs before: the selector takes the
+          # NEWEST installed iOS runtime, which is a property of the runner
+          # image, not of anything we pin. Print it so every verdict carries the
+          # iOS version it was measured on.
+          xcodebuild -version
+          xcrun simctl list runtimes | sed -n '/iOS/p'
+          SEL="$(xcrun simctl list devices available --json | python3 -c '
           import json, sys
           devices = json.load(sys.stdin)["devices"]
           for runtime in sorted(devices, reverse=True):
@@ -2690,9 +2843,11 @@ jobs:
                   continue
               for device in devices[runtime]:
                   if device.get("isAvailable") and "iPhone" in device["name"]:
-                      print(device["udid"]); raise SystemExit
+                      print(device["udid"], runtime, device["name"], sep="|")
+                      raise SystemExit
           raise SystemExit("no available iPhone simulator")')"
-          echo "Using simulator $UDID"
+          UDID="${SEL%%|*}"
+          echo "Using simulator $SEL"
           xcrun simctl boot "$UDID"
           xcrun simctl bootstatus "$UDID" -b
           xcrun simctl install "$UDID" "$APP"
@@ -2861,7 +3016,14 @@ jobs:
           set -euo pipefail
           APP="$(find "$RUNNER_TEMP/DerivedData/Build/Products/Release-iphonesimulator" -maxdepth 1 -name '*.app' -print -quit)"
           [ -n "$APP" ] || { echo "no .app produced"; exit 1; }
-          UDID="$(xcrun simctl list devices available --json | python3 -c '
+          # Report the toolchain AND the runtime. Which iOS a leg actually ran
+          # was unanswerable from these logs before: the selector takes the
+          # NEWEST installed iOS runtime, which is a property of the runner
+          # image, not of anything we pin. Print it so every verdict carries the
+          # iOS version it was measured on.
+          xcodebuild -version
+          xcrun simctl list runtimes | sed -n '/iOS/p'
+          SEL="$(xcrun simctl list devices available --json | python3 -c '
           import json, sys
           devices = json.load(sys.stdin)["devices"]
           for runtime in sorted(devices, reverse=True):
@@ -2869,9 +3031,11 @@ jobs:
                   continue
               for device in devices[runtime]:
                   if device.get("isAvailable") and "iPhone" in device["name"]:
-                      print(device["udid"]); raise SystemExit
+                      print(device["udid"], runtime, device["name"], sep="|")
+                      raise SystemExit
           raise SystemExit("no available iPhone simulator")')"
-          echo "Using simulator $UDID"
+          UDID="${SEL%%|*}"
+          echo "Using simulator $SEL"
           xcrun simctl boot "$UDID"
           xcrun simctl bootstatus "$UDID" -b
           xcrun simctl install "$UDID" "$APP"
