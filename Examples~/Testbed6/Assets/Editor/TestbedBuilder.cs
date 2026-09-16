@@ -202,11 +202,26 @@ public static class TestbedBuilder
     private static void BuildSimulator(string relativeOutput)
     {
         PlayerSettings.iOS.sdkVersion = iOSSdkVersion.SimulatorSDK;
-        // 2 = Universal. Unity ships baselib-sim-arm64.a and a fat
-        // baselib-sim-x64arm64.a; asking for ARM64 alone still emitted an
-        // x86_64 project here, which cannot install on an Apple-silicon
-        // simulator, so build fat and let the simulator pick its slice.
+        // The DEVICE architecture. 2 = Universal; it says nothing about the
+        // simulator slice, which is what an earlier comment here got wrong.
         PlayerSettings.SetArchitecture(UnityEditor.Build.NamedBuildTarget.iOS, 2);
+#if UNITY_2022_1_OR_NEWER
+        // The simulator slice, which is a SEPARATE setting and defaults to
+        // X86_64. Left unset, every export CI produced was x86_64-only: fine
+        // under Rosetta on the macOS 15 and 26 runners, refused outright by the
+        // arm64-only iOS 27 simulator ("does not contain code for any platform
+        // and CPU architecture combination that is runnable on this device").
+        // ARM64, not Universal: Universal compiles both slices and doubles the
+        // il2cpp phase, which is the most expensive step of every macOS job,
+        // and no runner GitHub still offers needs the x86_64 one.
+        // The API landed in 2022.3.54f1 and 6000.0.0f1. UNITY_2022_1_OR_NEWER is
+        // coarser than that - it is also true on 2022.3.0f1 through .53f1, where
+        // this would not compile - but each testbed pins its editor in
+        // ProjectVersion.txt (2022.3.62f3, 6000.3.21f1), so the guard only has to
+        // exclude Testbed2021 (2021.3.45f2), which has neither the API nor a
+        // simulator leg.
+        PlayerSettings.iOS.simulatorSdkArchitecture = AppleMobileArchitectureSimulator.ARM64;
+#endif
         Build(BuildTarget.iOS, relativeOutput);
     }
 
