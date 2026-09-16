@@ -103,6 +103,77 @@ namespace EminDeniz99.QuickActions.Tests
         }
 
         [Test]
+        public void SetList_ReplacesTheWholeSet()
+        {
+            QuickActions.Add(Item("a"));
+            QuickActions.Add(Item("b"));
+            Assert.IsTrue(QuickActions.SetList(new List<QuickActionItem>
+            {
+                Item("c"),
+                Item("d"),
+                Item("c"),                          // duplicate -> skipped, like AddList
+                new QuickActionItem("", "bad"),     // invalid   -> skipped, like AddList
+            }));
+            // Exactly the new set: no trace of a or b, and no duplicate c.
+            CollectionAssert.AreEqual(
+                new[] { "c", "d" },
+                QuickActions.GetAll().ConvertAll(i => i.Id));
+        }
+
+        [Test]
+        public void SetList_Empty_ClearsEverything()
+        {
+            QuickActions.Add(Item("a"));
+            Assert.IsTrue(QuickActions.SetList(new List<QuickActionItem>()));
+            Assert.IsEmpty(QuickActions.GetAll());
+        }
+
+        [Test]
+        public void SetList_Null_Throws()
+        {
+            Assert.Throws<System.ArgumentNullException>(() => QuickActions.SetList(null));
+        }
+
+        [Test]
+        public void SetList_WhenTheClearIsRefused_ChangesNothingAndDoesNotMerge()
+        {
+            // The failure the hand-rolled RemoveAll()+AddList() replace gets wrong:
+            // RemoveAll keeps the in-memory list when the OS refuses the clear, and
+            // AddList then skips every id already in it — so the stale set and the new
+            // one MERGE instead of the new one replacing. SetList must refuse instead,
+            // leaving the device exactly as it was.
+            QuickActions.OverrideBridgeForTesting(new FailingRemoveAllBridge());
+            try
+            {
+                Assert.IsTrue(QuickActions.Add(Item("a")));
+                Assert.IsFalse(QuickActions.SetList(new List<QuickActionItem> { Item("b") }));
+                CollectionAssert.AreEqual(
+                    new[] { "a" }, QuickActions.GetAll().ConvertAll(i => i.Id),
+                    "the previous set must survive untouched — and b must NOT have been merged in");
+            }
+            finally { QuickActions.OverrideBridgeForTesting(null); }
+        }
+
+        [Test]
+        public void SetList_WhenCurrentShortcutsCannotBeRead_ChangesNothing()
+        {
+            // Without the read there is no way to know what is live on the device, so
+            // the clear could leave a previous session's shortcuts in place and the add
+            // would merge with them. Refuse before touching anything.
+            var bridge = new ReadErrorBridge("stale");
+            QuickActions.OverrideBridgeForTesting(bridge);
+            try
+            {
+                Assert.IsFalse(QuickActions.SetList(new List<QuickActionItem> { Item("b") }));
+                Assert.AreEqual(0, bridge.SetCount, "nothing may be written to the OS");
+                CollectionAssert.AreEqual(
+                    new[] { "stale" }, bridge.Os.ConvertAll(i => i.Id),
+                    "the device set must be left exactly as it was");
+            }
+            finally { QuickActions.OverrideBridgeForTesting(null); }
+        }
+
+        [Test]
         public void RemoveById_RemovesWhenPresent_ElseFalse()
         {
             QuickActions.Add(Item("a"));

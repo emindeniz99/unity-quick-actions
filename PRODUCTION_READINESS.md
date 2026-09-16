@@ -11,7 +11,7 @@ physical-device work is done — is the **Status** section of the
 the two must not disagree.
 
 **Legend — Verified by:**
-`unit` = headless NUnit (`dotnet test`, 122 tests) · `unity-test` = Unity Test
+`unit` = headless NUnit (`dotnet test`, 127 tests) · `unity-test` = Unity Test
 Runner only (JsonUtility) · `static` = compiles in the stub harness (11 configs) ·
 `review` = code review, several adversarial rounds (see git log) ·
 `device` = **requires a real physical device** — Android partially done
@@ -97,7 +97,7 @@ says "6.3" for work dated later than 2026-07-17, the Editor was `6000.3.21f1`.
 ## Sign-off
 
 - **Headless gate (closable without a Unity Editor): GREEN.** `tools~/verify.sh` → **VERIFY: PASS** —
-  11 C# configs compile with **0 warnings**, **122 unit tests pass** (`dotnet test`),
+  11 C# configs compile with **0 warnings**, **127 unit tests pass** (`dotnet test`),
   the Android plugin compiles and its Java smoke test passes **111 checks, 0
   failed**, and every asset has a stable `.meta`. Every managed feature has a
   dedicated, intent-encoding test. Reviewed feature by feature across repeated
@@ -119,11 +119,12 @@ says "6.3" for work dated later than 2026-07-17, the Editor was `6000.3.21f1`.
     to `UNITY_ANDROID`; the runtime-referencing test asmdef can't see the Editor
     assembly the placeholder pipeline lives in).
 
-  So `dotnet test` reports **122** (71 + 51) and a Unity Test Runner run reports
-  **77** (71 + 6). The measured Test Runner results: **74/74** on 2021.3.45f2,
-  2022.3.62f3 and 6000.3.21f1 at the suite size of that day, and **76/76** on
-  the 2026-09-01 CI run (run 38), taken before the sixth serialization test
-  landed — 77 is not yet a measured number. The `35/35` real-editor runs cited below predate
+  So `dotnet test` reports **127** (76 + 51) and a Unity Test Runner run reports
+  **82** (76 + 6). The measured Test Runner results: **74/74** on 2021.3.45f2,
+  2022.3.62f3 and 6000.3.21f1 at the suite size of that day, **76/76** on
+  the 2026-09-01 CI run (run 38), and **77/77** on 6000.6.0f1 in run 88
+  (2026-09-16), the last one taken before the five `SetList` tests landed — 82
+  is not yet a measured number. The `35/35` real-editor runs cited below predate
   every test added from 2026-07-17 onward (cap-reconcile, failed-read/failed-write
   contracts, empty-accepted, and the later waves), so wherever `35/35` appears it
   is a historical measurement, not the current count. The only line not re-run
@@ -155,7 +156,7 @@ says "6.3" for work dated later than 2026-07-17, the Editor was `6000.3.21f1`.
   proven in **real Standalone builds** (define ON → `EminDeniz99.QuickActions.dll`
   present; OFF → zero `quickactions` trace in the whole build tree). This
   confirms no Unity-6 API deprecation breaks the package. (**35/35** is the
-  historical suite size at that date; the suite is 77 in the Test Runner now.)
+  historical suite size at that date; the suite is 82 in the Test Runner now.)
   The 6.x **Android** Gradle pass (GameActivity era) **has since been run**, on
   `6000.3.21f1`: the player builds with the trampoline `<activity>` injected on
   the `UnityPlayerGameActivity` path, and the define-off build carries no trace

@@ -13,6 +13,20 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **`QuickActions.SetList(IList<QuickActionItem>)` — make the set exactly this
+  list in one call.** Previously this took `RemoveAll()` then `AddList(...)`,
+  which is subtly wrong: `RemoveAll` keeps the in-memory list when the OS
+  refuses the clear, and `AddList` then skips every id already in that list — so
+  a hand-rolled replace silently *merges* the stale set with the new one instead
+  of replacing it. `SetList` reconciles first, refuses with `false` and changes
+  nothing if the read or the clear does not land, and only then adds. It is not
+  atomic (no quick actions exist between the two steps, and a failed add leaves
+  the set empty), which the API doc states. Five tests cover the replace, the
+  empty-list clear, the null argument, the refused clear, and the unreadable
+  set.
+
 ### Fixed
 
 - **A tap now reports shortcut usage to the launcher — for dynamic and pinned

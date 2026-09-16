@@ -568,6 +568,58 @@ namespace EminDeniz99.QuickActions
                     Log($"AddList: the OS dropped '{copy.Id}' (cap reached or id owned by another publisher).");
         }
 
+        /// <summary>
+        /// Make the managed set <b>exactly</b> <paramref name="items"/> in one call —
+        /// clear, then add — instead of chaining <see cref="RemoveAll"/> and
+        /// <see cref="AddList"/> by hand. Invalid and duplicate items are skipped the
+        /// same way <see cref="AddList"/> skips them, and the OS may still drop ids to
+        /// fit the shared budget, so <see cref="GetAll"/> remains the authority on what
+        /// actually landed.
+        /// <para>
+        /// Returns <c>false</c>, having changed <b>nothing</b>, when the current
+        /// shortcuts could not be read, or when the clear did not land (a locked
+        /// profile, a refused write): the previous set is still live on the device and
+        /// retrying later is safe. This is the case chaining the two calls by hand gets
+        /// wrong — <see cref="RemoveAll"/> keeps the in-memory list when the OS refuses
+        /// it, and <see cref="AddList"/> then skips every id already in that list, so a
+        /// hand-rolled replace silently <i>merges</i> the stale set with the new one.
+        /// </para>
+        /// <para>
+        /// Not atomic: between the clear and the add the app has no quick actions. If
+        /// the add then fails, the set is left <b>empty</b> rather than restored — the
+        /// clear already landed. Prefer <see cref="Update"/> for editing one item in
+        /// place, which keeps its launcher rank.
+        /// </para>
+        /// </summary>
+        /// <exception cref="ArgumentNullException">The list is null.</exception>
+        public static bool SetList(IList<QuickActionItem> items)
+        {
+            if (items == null)
+                throw new ArgumentNullException(nameof(items));
+
+            // Reconcile FIRST. RemoveAll does not, so without this a set from a previous
+            // session could still be live on the device while _items is empty, and
+            // AddList's duplicate skip would merge with it instead of replacing it.
+            if (!EnsureLoaded())
+            {
+                Log("SetList deferred: could not read the current shortcuts; OS set left unchanged.");
+                return false;
+            }
+
+            RemoveAll();
+            if (_items.Count != 0)
+            {
+                // RemoveAll kept the list, so the OS refused the clear and the old
+                // shortcuts are still on the device. Adding now would merge, not
+                // replace — report failure instead and leave the device as it was.
+                Log("SetList: the clear did not land, so the previous set is still live — nothing was added. Retry later.");
+                return false;
+            }
+
+            AddList(items);
+            return true;
+        }
+
         /// <summary>Snapshot of the currently installed quick actions.</summary>
         public static List<QuickActionItem> GetAll()
         {
