@@ -1,7 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!-- Compile-only check of the Demo sample against the Runtime. Confirms the
        sample's use of the API resolves (incl. the QuickActions type vs the
-       EminDeniz99.QuickActions namespace from the DemoSample sub-namespace). -->
+       EminDeniz99.QuickActions namespace from the DemoSample sub-namespace).
+       The testbed's own scripts ride along: they are not package content, but
+       only a real Unity build compiles them otherwise, so a typo there costs a
+       CI round-trip instead of a verify. Testbed6 alone — Testbed2022 keeps
+       byte-identical copies, and compiling both would collide on the types. -->
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <LangVersion>9.0</LangVersion>
@@ -17,5 +21,6 @@
     <Compile Include="Stubs/**/*.cs" />
     <Compile Include="../Runtime/**/*.cs" />
     <Compile Include="../Samples~/Demo/**/*.cs" />
+    <Compile Include="../Examples~/Testbed6/Assets/Scripts/**/*.cs" />
   </ItemGroup>
 </Project>

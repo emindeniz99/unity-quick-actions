@@ -114,6 +114,12 @@ namespace UnityEngine
         // Deterministic for the {unityVersion} placeholder tests; spelled like a
         // real 2021.3 editor version (the declared minimum this stub mirrors).
         public static string unityVersion => "2021.3.45f1";
+
+        // Only the testbed scripts read this (their marker and seed files live
+        // under it); the package itself never touches the file system at
+        // runtime. A temp directory keeps the stub honest about the one thing
+        // callers rely on — a writable directory that exists.
+        public static string persistentDataPath => System.IO.Path.GetTempPath();
     }
 
     public static class JsonUtility
