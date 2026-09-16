@@ -11,12 +11,29 @@
 // complement of the gated injector, so the two always agree. The gate itself is
 // never decided by a runtime PlayerSettings read; a runtime read exists only as a
 // stale-assembly COHERENCE check that fails the build loudly instead of choosing
-// a side. It only depends on UNITY_ANDROID. Note: both plugin .java files (this
-// trampoline and the bridge, ~20 KB of bytecode together) still compile into the
-// APK as dead, unreachable classes unless R8 minification removes them — Unity
-// cannot conditionally exclude a loose native source from compilation. For a
-// literally-zero production footprint, keep the package out of the prod project
-// entirely (see README "Dev-only").
+// a side. It only depends on UNITY_ANDROID.
+//
+// It also deletes the package's two plugin .java SOURCES before Gradle compiles
+// them, which is what keeps them out of a define-off APK. UNITY has no mechanism
+// for that — PluginImporter's defineConstraints is a managed-plugin feature and
+// does not gate a loose native source — and the wording here used to take that
+// for "it cannot be done". It can. Run 93 of the CI workflow printed where they
+// land:
+//
+//   unityLibrary/src/main/java/com/emindeniz99/quickactions/QuickActionsBridge.java
+//   unityLibrary/src/main/java/com/emindeniz99/quickactions/QuickActionsTrampolineActivity.java
+//
+// staged at 20:34:12, this callback invoked on that same unityLibrary root at
+// 20:34:23 — before Gradle reads the source set. It is the root the res/xml,
+// res/values and res/raw deletions below already reach. Until 0.7.0 both classes
+// shipped as dead, unreachable bytecode (~20 KB) in every define-off build; the
+// define-off CI job counted them (4 dex references either way) instead of gating
+// them, and now requires zero.
+//
+// Scoped to the package DIRECTORY, never to a source root: only
+// src/main/java/com/emindeniz99/quickactions goes, so no host or third-party
+// Java can be caught by it. A project that wants literally nothing of the
+// package in its prod build can still keep it out entirely (README "Dev-only").
 using System.IO;
 using System.Linq;
 using System.Xml;
@@ -41,6 +58,13 @@ namespace EminDeniz99.QuickActions.Editor.NativeGate
         // is what makes a prefix sweep safe. Pinned across files by
         // tools~/check_frozen_strings.py.
         private const string BuiltInIconPrefix = "ic_quickaction_builtin_";
+        // The package Plugins/Android/*.java declare. Unity stages them into
+        // <module>/src/main/java/<package as directories>, so the directory is
+        // DERIVED from the name below rather than spelled out as a path — a rename
+        // cannot leave the two out of step. The name itself is pinned across files
+        // by tools~/check_frozen_strings.py, which is what makes a rename that
+        // missed this copy an error instead of a silently un-gated build.
+        private const string PluginJavaPackage = "com.emindeniz99.quickactions";
 
         public int callbackOrder => 90;
 
@@ -150,6 +174,17 @@ namespace EminDeniz99.QuickActions.Editor.NativeGate
                             foreach (var icon in Directory.GetFiles(drawableDir, BuiltInIconPrefix + "*"))
                                 SafeDelete(icon);
                 }
+
+                // The plugin sources themselves. Unity stages Plugins/Android/*.java
+                // into this module's source set before calling us, and Gradle has not
+                // read it yet, so deleting the package directory is what keeps the two
+                // classes out of classes.dex rather than leaving them as dead
+                // bytecode. Our own package path only — the sweep never sees a source
+                // root, a host's code, or another plugin's.
+                var javaDir = Path.Combine(module, "src", "main", "java");
+                foreach (var segment in PluginJavaPackage.Split('.'))
+                    javaDir = Path.Combine(javaDir, segment);
+                SafeDeleteDirectory(javaDir);
             }
         }
 
@@ -159,6 +194,18 @@ namespace EminDeniz99.QuickActions.Editor.NativeGate
                 return;
             try { File.Delete(filePath); }
             catch { /* best-effort cleanup; leaving a stale file is non-fatal here */ }
+        }
+
+        // Same contract as SafeDelete, for the one directory this gate owns. Best
+        // effort on purpose: a build must not fail because a file was locked, and
+        // the worst case of a failure here is the pre-0.7.0 behaviour — the dead
+        // classes ship — which CI's define-off job reports.
+        private static void SafeDeleteDirectory(string directoryPath)
+        {
+            if (!Directory.Exists(directoryPath))
+                return;
+            try { Directory.Delete(directoryPath, recursive: true); }
+            catch { /* best-effort cleanup; the classes are unreachable either way */ }
         }
 
         // Kept OUTSIDE the #if so the stub harness type-checks it in every config;

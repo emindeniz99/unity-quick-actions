@@ -154,20 +154,34 @@ will not be backported to 2021 LTS).
 static shortcuts on a long-press of a **cold, never-opened install**, runtime
 `Add` published further shortcuts, and a dynamic item whose id collided with a
 static one was dropped in favour of the manifest entry — exactly as documented.
+
+A later hand-run on the same Moto G — Android 14, using the
+`quickactions-demo-apk-2022.3` artifact from CI — added two things. The
+long-press menu showed **static and runtime-added items together in one real
+launcher menu**: two rows carrying the baked shortcuts' subtitles and two
+carrying subtitles the sample only sets at runtime. The second row rendered as a
+**blank tile**, which is what `IconType.None` is documented to do. Which of the
+five candidate shortcuts the launcher left out, and whether it was the id
+collision or the shared display budget that dropped it, was not investigated —
+the menu was read, not instrumented. Then the **define-off APK from the same CI
+run** was installed: long-pressing it showed **no quick actions at all**. That is
+the gate below proven on hardware rather than in an APK diff.
+
 **Still not verified on hardware:** a tap arriving as `Performed` (cold or
-warm), and anything at all on a physical iPhone. Plan on validating the tap path
+warm), anything at all on a physical iPhone, and any Android newer than the 14
+on that handset — 17 is the current release. Plan on validating the tap path
 on your own device before you ship. The 0.4.6 build-time
 [placeholders](#build-time-placeholders--app-info-on-long-press) are likewise
 covered by headless tests only — no device or Simulator run has happened since
 they landed, so what a resolved `v1.4.0 (37)` looks like on a real home screen
 is still unconfirmed.
 
-**Also true:** the suite is 127 headless tests (`dotnet test`) and 82 in Unity's
-Test Runner (it adds 6 `JsonUtility` serialization tests; 51 of the headless ones
-don't run there), plus an Android Java smoke of 111 checks, across 11 C# compile
-configurations with 0 warnings. The last CI-measured Test Runner result was
-77/77 (run 88, 2026-09-16, on 6000.6.0f1), taken before the five `SetList` tests
-landed — 82 is not yet a measured number.
+**Also true:** the suite is 130 headless tests (`dotnet test`) and 82 in Unity's
+Test Runner (it adds 6 `JsonUtility` serialization tests; 54 of the headless ones
+are harness-only and don't run there), plus an Android Java smoke of 111 checks,
+across 11 C# compile configurations with 0 warnings. 82 is a **measured**
+number: run 93 (2026-09-16) reported 82/82 on all four Unity legs — 2021.3,
+2022.3, Unity 6 and 6000.6.0f1.
 The iOS `.mm` compiles cleanly against the current iOS SDK
 (ARC, arm64, deployment target iOS 13) with no deprecation or availability
 errors — a compile result, separate from the Simulator run above. A
@@ -310,6 +324,19 @@ define set and three static shortcuts already configured. Clone the repo, open
 the one matching your editor, and compare it against your own integration. See
 [`Examples~/README.md`](https://github.com/emindeniz99/unity-quick-actions/blob/main/Examples~/README.md).
 
+**Or try it on a device without building anything.** Every CI run builds the
+testbeds as real APKs and uploads them: open the latest
+[`unity` workflow run](https://github.com/emindeniz99/unity-quick-actions/actions/workflows/unity-ci.yml),
+and download `quickactions-demo-apk-2022.3` (or `-2021.3`, `-unity6`) from its
+Artifacts. `adb install -r QuickActionsDemo-phone.apk`, then long-press the
+icon. The same run also uploads `gate-off-2022.3`, the define-**off** APK built
+from the identical project — install that one and the long-press menu is empty,
+which is the gate in the previous paragraph, on hardware rather than in a diff.
+Two caveats: GitHub artifacts need a signed-in GitHub account (they are not
+anonymous downloads, even on a public repo) and they expire after 14 days, and
+these are debug-signed test builds — install them on a device you are happy to
+sideload onto.
+
 ## Dev-only — excluding it completely from production builds
 
 The package is **opt-in via the `QUICKACTIONS_ENABLED` scripting define**. Without
@@ -336,11 +363,20 @@ Constraints only work for managed code, **not** native plugins):
   nothing is injected, and an *ungated* post-processor
   (`Editor/NativeGate/QuickActionsTrampolineStripperAndroid`) additionally
   strips any pre-existing entry (defense in depth), so the trampoline can't be
-  launched (the package is **inert**). One caveat: the two plugin `.java` files
-  (the trampoline and the bridge, ~20 KB of bytecode together) still compile
-  into the APK as dead, unreachable classes unless R8 minification removes
-  them — Unity can't conditionally exclude a loose native source. The `gate-off`
-  CI job's APK diff reports exactly what remains. For a *literally*-zero Android
+  launched (the package is **inert**). Since **0.7.0** that same ungated
+  post-processor also deletes the two plugin `.java` **sources** — Unity stages
+  them into `unityLibrary/src/main/java/com/emindeniz99/quickactions/`, the very
+  module whose `res/xml`, `res/values` and `res/raw` it already cleans, and the
+  callback runs before Gradle reads the source set — so they are no longer
+  compiled at all. Through 0.6.x they shipped as dead, unreachable classes
+  (~20 KB of bytecode) unless R8 minification removed them: **Unity** has no
+  mechanism for gating a loose native source (`PluginImporter`'s
+  `defineConstraints` is a managed-plugin feature), and that was taken to mean
+  nobody could. The `gate-off` CI job now requires **zero** references to
+  `com/emindeniz99/quickactions/` in the define-off `classes.dex`, alongside the
+  manifest, resource and IL2CPP-metadata checks it already made. Only the
+  package's own directory is removed, never a source root, so nothing of yours
+  or of another plugin is touched. For a *literally*-zero Android
   footprint, keep the package out of the prod project (see below). All these
   post-processors edit the **build output**, so they work for read-only UPM
   packages.
@@ -492,7 +528,7 @@ assembly entirely.
 | `int MaxShortcutCount` | The OS shortcut budget: Android `getMaxShortcutCountPerActivity`; iOS 4 (display limit, no OS query). Shared with static shortcuts on **both** platforms (and with host-published dynamic ones on Android), so fewer slots may be free. 0 in-Editor. |
 | `bool IsPinSupported` | True when the launcher can pin shortcuts (Android 8.0+; always false on iOS/Editor). |
 | `bool RequestPin(string)` | Ask the launcher to pin an **added** action to the home screen. True = request *dispatched* (the user still confirms in launcher UI — the OS reports no outcome). |
-| `bool ReportUsed(string)` | Tell the launcher the user reached this action's feature **in-app** (Android `reportShortcutUsed`, improves ranking predictions). Call on normal-UI usage, not on shortcut taps. False on iOS/Editor (no analog), for a not-added id, or when the native call failed. |
+| `bool ReportUsed(string)` | Tell the launcher the user reached this action's feature **in-app** (Android `reportShortcutUsed`, improves ranking predictions). Call it for normal-UI usage only — **a shortcut tap already reports itself**: the trampoline fires this on every tap of a *dynamic or pinned* shortcut, so calling it again there double-reports. (A tap on a **static** shortcut is not reported: the native call's ownership check reads the dynamic and pinned sets only.) False on iOS/Editor (no analog), for a not-added id, or when the native call failed. |
 | `string Locale` | The locale labels resolve against (defaults to the device language via `Application.systemLanguage`). Set it from an in-app language picker — a **different** value re-pushes the current set so the launcher re-renders immediately. A device-language change while the app was closed is caught on next launch: the cold-start reconcile detects stale labels and refreshes them with one push. If the OS refuses that push (Android rate-limits writes while backgrounded), the managed list stays authoritative — only the on-screen labels are stale — and exactly **one** retry is attempted on the next list call; after that the labels are fixed by your next successful `Add`/`Update`/`Remove`, so read-only calls never turn into a stream of OS writes. |
 
 `QuickActionItem` fields:

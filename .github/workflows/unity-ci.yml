@@ -17,7 +17,9 @@ name: unity
 # did, which is the one thing the plain simulator leg (process still alive)
 # cannot see. A third iOS job, `ios-springboard`, drives SpringBoard itself
 # with an unsigned XCUITest bundle (`tools~/ios-ui`): long-press the icon, tap
-# a quick action, read the id back from the app. One further Android leg,
+# a quick action, read the id back from the app — twice per leg, once on a row
+# Info.plist baked in and once on a row QuickActions.Add published while the app
+# ran. One further Android leg,
 # `android-shrink-verify`, exports the
 # Gradle project on 2022.3 and runs the resource shrinker's own task
 # (`:launcher:shrinkReleaseRes`, never assembleRelease), reading the stripped
@@ -2041,6 +2043,32 @@ jobs:
           buildMethod: TestbedBuilder.BuildAndroidPhoneNoDefine
           versioning: None
           allowDirtyBuild: true
+      # Where the plugin .java files sit in the generated Gradle project.
+      #
+      # This step asked an open question when it was added, and run 93 answered
+      # it: the sources are staged at
+      # unityLibrary/src/main/java/com/emindeniz99/quickactions/, the same
+      # unityLibrary root QuickActionsTrampolineStripperAndroid is handed on
+      # IPostGenerateGradleAndroidProject, and the callback runs eleven seconds
+      # after the copy and before Gradle reads the source set. So the stripper
+      # deletes them, and the dex assertion below requires a define-off count of
+      # zero.
+      #
+      # It stays because it is now the diagnostic for that assertion: a leak means
+      # Unity staged the sources somewhere this listing will show. Purely
+      # informational - it must never fail the job, whatever it finds.
+      - name: Where the plugin .java lands in the generated Gradle project
+        continue-on-error: true
+        run: |
+          set -uo pipefail
+          echo "--- any .java under the testbed's Library mentioning quickactions ---"
+          find "$TESTBED/Library" -name '*.java' -path '*quickactions*' 2>/dev/null | sed "s|^|  |" || true
+          echo "--- unityLibrary source roots (depth-limited) ---"
+          find "$TESTBED/Library" -type d -path '*unityLibrary/src/main*' -maxdepth 12 2>/dev/null \
+            | head -40 | sed "s|^|  |" || true
+          echo "--- any .java anywhere under Library/Bee (first 40) ---"
+          find "$TESTBED/Library" -name '*.java' 2>/dev/null | head -40 | sed "s|^|  |" || true
+          echo "(informational only - this step never fails the job)"
       # Invocation 3 of 3: the define-off iOS Simulator export.
       - name: Export the define-off iOS project
         uses: game-ci/unity-builder@d829bfc901f2347c8fe18898f06712b66916ef42 # v5.0.0
@@ -2125,10 +2153,13 @@ jobs:
             [ "${meta:-0}" -gt 0 ] && hits="$hits metadata:EminDeniz99.QuickActions(x$meta)"
             printf '%s' "$hits"
           }
-          # The two plugin .java classes are compiled into EVERY build (Unity cannot
-          # gate a loose native source), so the dex is not part of the gate — but it
-          # is counted, so the "dead classes remain" line in the docs is a number
-          # from this run rather than a belief. Diagnostics to stderr, count to stdout.
+          # The two plugin .java classes. Until 0.7.0 they were compiled into EVERY
+          # build and this counted them without gating them (4 references either
+          # way); the stripper now deletes the staged sources under
+          # unityLibrary/src/main/java before Gradle reads the source set, so the
+          # define-off count must be ZERO and this is part of the gate. The step
+          # above it prints where the sources are, which is the first thing to read
+          # when this fails. Diagnostics to stderr, count to stdout.
           dex_refs() {
             local apk="$1" dex
             dex="$(unzip -p "$apk" 'classes*.dex' 2>/dev/null | strings -a || true)"
@@ -2141,8 +2172,9 @@ jobs:
           off_dex="$(dex_refs "$OFF_APK")"
           echo "define ON  ($ON_APK):$on_hits"
           echo "define OFF ($OFF_APK):${off_hits:-<nothing of the package>}"
-          echo "dex references to com/emindeniz99/quickactions/: define ON $on_dex, define OFF $off_dex (the two plugin classes ship either way — documented, counted, not gated)"
+          echo "dex references to com/emindeniz99/quickactions/: define ON $on_dex, define OFF $off_dex (define off must be 0 — the stripper deletes the staged .java before Gradle compiles it)"
           [ "$on_dex" -gt 0 ] || { echo "CONTROL FAILED: the define-on dex carries no package class reference, so the dex count cannot be trusted."; exit 1; }
+          [ "$off_dex" -eq 0 ] || { echo "GATE LEAK: the define-off dex still carries $off_dex reference(s) to com/emindeniz99/quickactions/ — the plugin sources were not stripped. Read the '.java lands' step above for where Unity staged them."; exit 1; }
           # Control first: EVERY probe scan() knows must fire on the define-on APK,
           # or the check is blind to that probe and says so instead of passing.
           for want in res:quickactions_shortcuts res:quickactions_keep res:qa_short_ res:qa_long_ res:ic_quickaction_builtin_ \
@@ -2163,7 +2195,7 @@ jobs:
             unzip -p "$OFF_APK" assets/bin/Data/Managed/Metadata/global-metadata.dat | strings -a | grep 'EminDeniz99.QuickActions' || echo "(none)"
             exit 1
           fi
-          echo "PASS: nothing of the package in the define-off APK (manifest, resources, IL2CPP metadata); the dex keeps the two plugin classes ($off_dex references), as documented"
+          echo "PASS: nothing of the package in the define-off APK — manifest, resources, IL2CPP metadata, and now the dex too ($off_dex references to the plugin classes)"
       - name: Measure the package's footprint (define-on APK minus define-off APK)
         env:
           OFF_APK: Examples~/Testbed2022/Builds/NoDefine-phone.apk
@@ -2855,75 +2887,105 @@ jobs:
           # and the static shortcuts come from Info.plist, so installing is all
           # the menu needs.
           echo "udid=$UDID" >> "$GITHUB_OUTPUT"
-      - name: Long-press the icon and tap a quick action (XCUITest on SpringBoard)
+      - name: Long-press the icon and tap a static quick action (XCUITest on SpringBoard)
+        id: static-tap
         env:
           UDID: ${{ steps.sim.outputs.udid }}
           APP_ID: com.quickactions.testbed
           LEG: ${{ matrix.target.name }}
         run: |
           set -euo pipefail
-          OUT="$RUNNER_TEMP/springboard"
-          mkdir -p "$OUT"
           # The project lives under a `~` folder of the checkout; build a copy
-          # outside it so DerivedData never points back into the repo.
+          # outside it so DerivedData never points back into the repo. Copied
+          # once here; the runtime pass below reuses this copy and its
+          # DerivedData, so the bundle is compiled only for the first tap.
           cp -R "$GITHUB_WORKSPACE/tools~/ios-ui" "$RUNNER_TEMP/ios-ui"
           # The marker the testbed writes on Performed, read from the host side
           # of the simulator's data container. It is the job's only delivery
-          # evidence (the app is never launched here), so not finding the
-          # container is an error, not a warning.
+          # evidence (the app is never launched before this tap), so not finding
+          # the container is an error, not a warning.
           CONTAINER="$(xcrun simctl get_app_container "$UDID" "$APP_ID" data)" \
             || { echo "::error::could not resolve the app's data container — the delivery check cannot run"; exit 1; }
-          MARKER="$CONTAINER/Documents/quickactions-performed.log"
-          echo "marker: $MARKER"
-          # xcodebuild forwards TEST_RUNNER_* from its own environment into the
-          # test runner's, prefix stripped — that is how the test is configured.
-          export TEST_RUNNER_QA_OUT="$OUT"
-          export TEST_RUNNER_QA_APP_ID="$APP_ID"
-          export TEST_RUNNER_QA_APP_NAME="QuickActionsDemo"
-          export TEST_RUNNER_QA_ROW_TITLE="Daily Reward"
-          export TEST_RUNNER_QA_ACTION_ID="daily_reward"
-          export TEST_RUNNER_QA_MARKER="$MARKER"
-          set +e
-          xcodebuild test \
-            -project "$RUNNER_TEMP/ios-ui/SpringBoardTap.xcodeproj" \
-            -scheme SpringBoardTap \
-            -destination "id=$UDID" \
-            -derivedDataPath "$RUNNER_TEMP/DerivedData-ui" \
-            -resultBundlePath "$OUT/SpringBoardTap.xcresult" \
-            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
-            2>&1 | tee "$OUT/xcodebuild-test.log"
-          rc="${PIPESTATUS[0]}"
-          set -e
-          echo "xcodebuild test exit: $rc"
-          # Context only, never asserted on: the unified log is per device and
-          # spans launches (same caveat as the coex leg).
-          xcrun simctl spawn "$UDID" log show --style compact --last 10m \
-            --predicate 'processImagePath CONTAINS "QuickActionsDemo"' \
-            >"$OUT/unified-log.txt" 2>/dev/null || true
-          if [ -n "$MARKER" ] && [ -f "$MARKER" ]; then cp "$MARKER" "$OUT/marker.txt"; fi
-          VERDICT="$(cat "$OUT/launcher-tap.txt" 2>/dev/null || true)"
-          echo "verdict: ${VERDICT:-<none written>}"
-          {
-            echo "### ios springboard tap ($LEG)"
-            echo
-            echo '```'
-            echo "${VERDICT:-no verdict written — see xcodebuild-test.log in the artifact}"
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
-          case "$VERDICT" in
-            PASS*) echo "SpringBoard tap delivered: $VERDICT" ;;
-            SKIPPED*) echo "::warning::SpringBoard tap not asserted — $VERDICT" ;;
-            FAIL*) echo "::error::SpringBoard tap — $VERDICT"; exit 1 ;;
+          echo "container=$CONTAINER" >> "$GITHUB_OUTPUT"
+          echo "marker: $CONTAINER/Documents/quickactions-performed.log"
+          QA_PROJECT="$RUNNER_TEMP/ios-ui/SpringBoardTap.xcodeproj" \
+          QA_MARKER="$CONTAINER/Documents/quickactions-performed.log" \
+          QA_APP_ID="$APP_ID" \
+          QA_DERIVED="$RUNNER_TEMP/DerivedData-ui" \
+          QA_PASS="static row (Info.plist)" \
+          QA_LEG="$LEG" \
+            "$RUNNER_TEMP/ios-ui/run_springboard_tap.sh" \
+              "$UDID" "$RUNNER_TEMP/springboard/static" daily_reward "Daily Reward"
+      # The same long press and tap again, on a row NOTHING baked into
+      # Info.plist. Every iOS tap CI has ever taken was on a static shortcut, so
+      # the runtime path — QuickActions.Add, then a real finger on what it
+      # published — was covered only by synthetic sends (ios-simulator-coex) and
+      # by one Android handset. The menu cannot show a runtime item until the app
+      # has run and published one, and the demo's own "Add" button is IMGUI,
+      # which puts no element on screen for XCUITest to tap: so the testbed
+      # publishes one itself when asked (Assets/Scripts/QuickActionsRuntimeSeeder.cs),
+      # and this step asks, waits for the confirmation it writes, and quits the
+      # app again so the tap still cold-starts it.
+      - name: Seed a runtime shortcut and tap it (XCUITest on SpringBoard)
+        if: ${{ !cancelled() && steps.static-tap.outputs.container != '' }}
+        env:
+          UDID: ${{ steps.sim.outputs.udid }}
+          APP_ID: com.quickactions.testbed
+          LEG: ${{ matrix.target.name }}
+          CONTAINER: ${{ steps.static-tap.outputs.container }}
+        run: |
+          set -euo pipefail
+          OUT="$RUNNER_TEMP/springboard/runtime"
+          mkdir -p "$OUT"
+          SEED="$CONTAINER/Documents/quickactions-seeded.log"
+          rm -f "$SEED"
+          # Asked two ways at once — an environment variable through simctl's
+          # SIMCTL_CHILD_ prefix and a launch argument — because which of the two
+          # an IL2CPP player on iOS actually sees is not written down anywhere we
+          # could check. The seed file records which one arrived, so one run
+          # answers it and the artifact keeps the answer.
+          SIMCTL_CHILD_QA_SEED_RUNTIME=1 \
+            xcrun simctl launch --terminate-running-process "$UDID" "$APP_ID" -qa-seed-runtime
+          waited=0
+          while [ ! -f "$SEED" ] && [ "$waited" -lt 180 ]; do
+            sleep 2
+            waited=$((waited + 2))
+          done
+          SEEDED="$(cat "$SEED" 2>/dev/null || true)"
+          echo "seed after ${waited}s: ${SEEDED:-<no file written>}"
+          if [ -n "$SEEDED" ]; then printf '%s\n' "$SEEDED" > "$OUT/seeded.txt"; fi
+          # A seed that never lands is the harness missing, not the package
+          # failing: report it the way the test reports its own misses — SKIPPED,
+          # with a warning — and leave the leg green. `refused` is NOT that case:
+          # QuickActions.Add returns false when the id is already published, so
+          # the row is there to tap either way, and a menu that then comes up
+          # without it is a real finding the tap itself will report.
+          case "${SEEDED:-}" in
+            added\ *|refused\ *) ;;
             *)
-              echo "::error::the test wrote no verdict (xcodebuild exit $rc) — read xcodebuild-test.log in the artifact"
-              exit 1 ;;
+              WHY="${SEEDED:-the testbed wrote no seed file within ${waited} s (neither SIMCTL_CHILD_QA_SEED_RUNTIME nor -qa-seed-runtime reached the player)}"
+              echo "::warning::runtime row not asserted — $WHY"
+              printf 'SKIPPED %s\n' "$WHY" > "$OUT/launcher-tap.txt"
+              {
+                echo "### ios springboard tap ($LEG) — runtime row (QuickActions.Add)"
+                echo
+                echo '```'
+                echo "SKIPPED $WHY"
+                echo '```'
+              } >> "$GITHUB_STEP_SUMMARY"
+              exit 0 ;;
           esac
-          # The verdict is authoritative, but a non-zero xcodebuild behind a
-          # PASS or SKIPPED means the runner tripped AFTER writing it.
-          if [ "$rc" -ne 0 ]; then
-            echo "::error::xcodebuild test exited $rc despite the verdict above"
-            exit 1
-          fi
+          # Back to a quit app: the tap has to cold-start it, exactly as the
+          # static pass does.
+          xcrun simctl terminate "$UDID" "$APP_ID" >/dev/null 2>&1 || true
+          QA_PROJECT="$RUNNER_TEMP/ios-ui/SpringBoardTap.xcodeproj" \
+          QA_MARKER="$CONTAINER/Documents/quickactions-performed.log" \
+          QA_APP_ID="$APP_ID" \
+          QA_DERIVED="$RUNNER_TEMP/DerivedData-ui" \
+          QA_PASS="runtime row (QuickActions.Add)" \
+          QA_LEG="$LEG" \
+            "$RUNNER_TEMP/ios-ui/run_springboard_tap.sh" \
+              "$UDID" "$OUT" runtime_add "Runtime Add"
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         if: ${{ always() }}
         with:

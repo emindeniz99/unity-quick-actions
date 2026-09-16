@@ -3,7 +3,9 @@
        unset and the Runtime absent (the gated runtime assembly is not compiled at
        all in that configuration), so the sample's #else branch — the inert IMGUI
        shell — must stand on the stubs alone. CI's gate-off job builds exactly this;
-       this config catches a broken #else branch before the push. -->
+       this config catches a broken #else branch before the push. The testbed's
+       scripts are here for the same reason: gate-off builds them too, and their
+       define-off branches have to stand on the stubs alone as well. -->
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <LangVersion>9.0</LangVersion>
@@ -18,5 +20,6 @@
   <ItemGroup>
     <Compile Include="Stubs/**/*.cs" />
     <Compile Include="../Samples~/Demo/**/*.cs" />
+    <Compile Include="../Examples~/Testbed6/Assets/Scripts/**/*.cs" />
   </ItemGroup>
 </Project>

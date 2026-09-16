@@ -15,6 +15,48 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **The iOS SpringBoard test now also taps a shortcut nothing baked into
+  `Info.plist`.** Every iOS tap CI had ever taken was on a *static* shortcut:
+  the app is installed and never launched, so the only rows in SpringBoard's
+  menu were the three the settings asset baked in. A runtime row cannot exist
+  until the app has run and published one, and the demo's own "Add" button is
+  IMGUI, which puts no element on screen for XCUITest to tap. So the testbed
+  publishes one itself when asked
+  (`Examples~/Testbed*/Assets/Scripts/QuickActionsRuntimeSeeder.cs`, one item
+  because iOS shows at most four and the statics take three), and
+  `ios-springboard` runs the long press twice per leg — `daily_reward` from the
+  plist, then `runtime_add` from `QuickActions.Add` — through the new
+  `tools~/ios-ui/run_springboard_tap.sh`. The seed is asked for over both
+  `SIMCTL_CHILD_QA_SEED_RUNTIME` and a launch argument, because which of the two
+  an IL2CPP player on iOS receives is not documented anywhere we could check;
+  the seeder records which one arrived. A seed that never lands is the harness
+  missing, so it reports `SKIPPED`; a menu that opens without the row after a
+  confirmed seed is a `FAIL` like any other missing quick action. **Run 94
+  (2026-09-16): `PASS` on both supported legs** — `runtime_add` reached
+  `Performed` 5 s after the tap on 2022.3 / iOS 26.2 and on 6000.3.21f1 /
+  iOS 26.5, and SpringBoard's menu held all four rows at once, three from
+  `Info.plist` and one from `QuickActions.Add`. It also answered the seeding
+  question: the player sees the `SIMCTL_CHILD_` environment variable, never the
+  launch argument. The `unity6-xcode27` canary opened the same menu and its tap
+  never delivered, with the app in the foreground 0 s after it (5 s on the green
+  legs), so it did not cold-start there and the cause is not established.
+- **With the define off, the package's Java no longer ships at all.** The
+  define-off APK used to carry both plugin classes in `classes.dex` — dead and
+  unreachable, but there (4 dex references, the same as a define-on build) — and
+  the reason given was "Unity cannot conditionally exclude a loose native
+  source". That is true of *Unity's* mechanism (`PluginImporter.defineConstraints`
+  gates managed plugins) but it never established that *this package* cannot.
+  A CI step added in this release printed the answer: Unity stages the sources at
+  `unityLibrary/src/main/java/com/emindeniz99/quickactions/` — the very module
+  whose `res/xml`, `res/values` and `res/raw` the ungated stripper already
+  deletes — and that callback runs eleven seconds after the copy, before Gradle
+  reads the source set. So `QuickActionsTrampolineStripperAndroid` now deletes
+  that directory, and `gate-off` **requires zero** references to it in the
+  define-off dex instead of merely counting them. Only the package's own
+  directory goes, never a source root, so Unity's `UnityPlayerActivity`, a host
+  app's Java and another plugin's are untouched — three tests pin both ends. The
+  Java package name the directory is derived from is pinned by
+  `tools~/check_frozen_strings.py`, so a rename cannot silently un-gate it.
 - **`QuickActions.SetList(IList<QuickActionItem>)` — make the set exactly this
   list in one call.** Previously this took `RemoveAll()` then `AddList(...)`,
   which is subtly wrong: `RemoveAll` keeps the in-memory list when the OS
@@ -29,6 +71,11 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **The README says how to try it on a device without building anything**, and
+  records what a hand-run on a Moto G (Android 14, the `2022.3` demo APK) showed: static and runtime-added shortcuts
+  side by side in one real launcher menu, `IconType.None` rendering as a blank
+  tile, and the define-**off** APK from the same CI run showing no quick actions
+  at all — the gate on hardware rather than in an APK diff.
 - **A tap now reports shortcut usage to the launcher — for dynamic and pinned
   shortcuts.** `QuickActionsTrampolineActivity` recorded the tap for `Performed`
   and stopped there, so Android's predictive ranking only ever saw usage a game

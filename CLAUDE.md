@@ -63,7 +63,14 @@ the run to finish — read its result — then push.
   (2026-09-15) saw that tap cold-start both exports — 2022.3.62f3 / iOS 18.6
   (app-delegate lifecycle) and 6000.3.21f1 / iOS 26.5 (scene manifest) — and
   `daily_reward` reach `Performed` (the testbed's marker file) 35–54 s after
-  the touch. Still never on a device. Say exactly that; do not describe
+  the touch. Since run 94 (2026-09-16) the job taps a **second** row per leg,
+  `runtime_add`, which `QuickActions.Add` published while the app ran (the
+  testbed seeds it on request) rather than `Info.plist` baking it: `PASS` on
+  both supported legs, 5 s after the tap, with all four rows — three static,
+  one runtime — in the one menu SpringBoard opened. The `unity6-xcode27` canary
+  is the exception: same menu, same row, the id never arrived, and the app was
+  in the foreground 0 s after the tap so it did not cold-start there; the cause
+  is NOT established. Still never on a device. Say exactly that; do not describe
   device behaviour as verified. (Android has no
   simulator equivalent; the 2021.3 line cannot do a Simulator run at all —
   Unity ships an x86_64-only simulator runtime there.) **Physical hardware is

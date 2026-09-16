@@ -69,6 +69,14 @@ FROZEN: dict[str, list[str]] = {
     "com.emindeniz99.quickactions.ACTION_ID": [
         "Plugins/Android/QuickActionsBridge.java",
     ],
+    # The package both plugin sources declare. The define-off stripper turns it
+    # into the directory Unity stages them in
+    # (unityLibrary/src/main/java/com/emindeniz99/quickactions) and deletes it
+    # before Gradle compiles; a rename that missed that copy would put the two
+    # dead classes back into every production APK with nothing reporting it.
+    "com.emindeniz99.quickactions": [
+        "Editor/NativeGate/QuickActionsTrampolineStripperAndroid.cs",
+    ],
     # The JNI class the C# bridge looks up by name.
     "com.emindeniz99.quickactions.QuickActionsBridge": [
         "Runtime/Internal/AndroidQuickActionsBridge.cs",

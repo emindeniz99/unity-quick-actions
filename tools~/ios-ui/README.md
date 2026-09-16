@@ -15,7 +15,14 @@ Apple account** anywhere.
 |---|---|
 | `SpringBoardTap.xcodeproj` | a project whose only target is the UI-testing bundle `SpringBoardTapUITests`, with **no host application** ("Target to be Tested: None") — generated, committed |
 | `SpringBoardTapUITests/SpringBoardTapUITests.swift` | the test |
+| `run_springboard_tap.sh` | one pass: runs the test against a booted simulator and turns its verdict into an exit status and a job-summary block |
 | `gen_project.rb` | regenerates the project with the `xcodeproj` gem; only needed when the target's shape changes, never on CI |
+
+The test taps **one** row per run, named by `QA_ACTION_ID` / `QA_ROW_TITLE`, so
+CI runs it twice per leg through `run_springboard_tap.sh`: once for
+`daily_reward`, which the settings asset baked into `Info.plist`, and once for
+`runtime_add`, which nothing baked anywhere — see [Tapping a runtime-added
+row](#tapping-a-runtime-added-row).
 
 ## What the test does
 
@@ -86,12 +93,28 @@ compile the Unity-exported Simulator project, boot a simulator, `simctl
 install` the app (never launch it — the tap must cold-start it), then:
 
 ```sh
+CONTAINER="$(xcrun simctl get_app_container "$UDID" com.quickactions.testbed data)"
+QA_PROJECT="$PWD/SpringBoardTap.xcodeproj" \
+QA_MARKER="$CONTAINER/Documents/quickactions-performed.log" \
+  ./run_springboard_tap.sh "$UDID" "$PWD/out" daily_reward "Daily Reward"
+```
+
+Point `QA_PROJECT` at a copy **outside** this repo when you run it from a
+checkout: `tools~` ends in `~`, and derived data must never be written back
+under one. The script exits 0 on `PASS` and on `SKIPPED` and non-zero on
+`FAIL`; `QA_APP_ID`, `QA_APP_NAME`, `QA_DERIVED`, `QA_PASS` and `QA_LEG` are
+optional.
+
+Underneath it is one `xcodebuild test` with the test's own configuration in the
+environment:
+
+```sh
 export TEST_RUNNER_QA_OUT="$PWD/out"                 # required
 export TEST_RUNNER_QA_APP_ID=com.quickactions.testbed
 export TEST_RUNNER_QA_APP_NAME=QuickActionsDemo      # the icon's label
 export TEST_RUNNER_QA_ROW_TITLE="Daily Reward"
 export TEST_RUNNER_QA_ACTION_ID=daily_reward
-export TEST_RUNNER_QA_MARKER="$(xcrun simctl get_app_container "$UDID" com.quickactions.testbed data)/Documents/quickactions-performed.log"
+export TEST_RUNNER_QA_MARKER="$CONTAINER/Documents/quickactions-performed.log"
 # optional: TEST_RUNNER_QA_WAIT_SECONDS (foreground, 30) and
 #           TEST_RUNNER_QA_DELIVERY_SECONDS (Performed, 120), both from the tap
 xcodebuild test -project SpringBoardTap.xcodeproj -scheme SpringBoardTap \
@@ -102,6 +125,54 @@ xcodebuild test -project SpringBoardTap.xcodeproj -scheme SpringBoardTap \
 prefix stripped. Without `QA_MARKER` the test cannot check delivery and reports
 `SKIPPED` after the launch (the launch is still in the evidence); CI always
 sets it and fails the job if the container cannot be resolved.
+
+## Tapping a runtime-added row
+
+A freshly installed app shows only the quick actions its `Info.plist` carries,
+so every tap this harness took until now was on a **static** shortcut. A row
+that `QuickActions.Add` published can only exist after the app has run and
+published one, and the demo's own "Add" button cannot be reached: it is drawn
+with IMGUI, which puts no accessibility element on screen for XCUITest to find.
+
+So the testbed publishes one itself, on request —
+`Examples~/Testbed2022` and `Examples~/Testbed6`,
+`Assets/Scripts/QuickActionsRuntimeSeeder.cs`, one item
+(`runtime_add` / "Runtime Add"), because iOS shows at most four quick actions
+and the three statics take the rest. CI asks for it between the two passes:
+
+```sh
+SIMCTL_CHILD_QA_SEED_RUNTIME=1 \
+  xcrun simctl launch --terminate-running-process "$UDID" com.quickactions.testbed -qa-seed-runtime
+```
+
+Both channels at once — an environment variable through simctl's
+`SIMCTL_CHILD_` prefix and a launch argument — because which of the two an
+IL2CPP player on iOS actually receives is not documented anywhere we could
+check. The seeder writes `Documents/quickactions-seeded.log` naming the one it
+saw, and run 94 answered it on all three legs: **`added runtime_add (asked via
+env)`** — `Environment.GetEnvironmentVariable` sees the `SIMCTL_CHILD_`
+variable, and `Environment.GetCommandLineArgs()` never reported the launch
+argument (the seeder would have said `env+argv`). Both are still sent: the
+argument costs nothing and the day it starts arriving, the file says so. The
+file is also CI's signal that the shortcut is published; the app is then
+terminated so the tap still cold-starts it.
+
+Run 94 (2026-09-16) tapped the seeded row on all three legs: `PASS` 5 s after
+the tap on 2022.3 / iOS 26.2 and on 6000.3.21f1 / iOS 26.5, and SpringBoard's
+own menu held both kinds at once —
+
+```
+"New Game, Start a fresh run", "Continue, Resume your save",
+"Daily Reward, Claim today's gift", "Runtime Add, Added by QuickActions.Add"
+```
+
+— three from `Info.plist`, one from `QuickActions.Add`. The `unity6-xcode27`
+canary opened the same menu with the same four rows and its tap never
+delivered; the app was in the foreground 0 s after that tap (5 s on the green
+legs), so it did not cold-start there and the cause is not established. No seed file means the harness
+missed, not that the package failed, so that case is a `SKIPPED` with a
+warning — but a menu that opens **without** the row after a confirmed seed is a
+`FAIL`, like any other missing quick action.
 
 ## What it cannot do
 

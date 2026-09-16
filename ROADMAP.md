@@ -62,7 +62,20 @@ ships it.
   `Performed` 35–43 s and 41–54 s after the touch, past the test's 30 s
   window, so both went red on a verdict that quoted the id; the window is
   120 s now, and run 78 was green on both legs (`PASS`, 41 s and 46 s after
-  the tap). Still the Simulator, still no iPhone.
+  the tap). Every one of those taps landed on a **static** shortcut, because
+  an app that was installed and never launched has nothing else in its menu;
+  the leg now runs the long press a **second** time per leg on a row
+  `QuickActions.Add` published while the app ran — the testbed seeds one when
+  CI asks — so the runtime path gets the same real-menu treatment the Moto G
+  gave it on Android. **Run 94 (2026-09-16): `PASS` on both supported legs** —
+  `runtime_add` delivered 5 s after the tap on 2022.3 / iOS 26.2 and on
+  6000.3.21f1 / iOS 26.5, and the menu SpringBoard opened held all four rows at
+  once, three from `Info.plist` and one from `QuickActions.Add`. The
+  `unity6-xcode27` canary tapped the same row on iOS 27.0 and the id never
+  arrived; the app reached the foreground 0 s after the tap there (5 s on the
+  green legs), so it did not cold-start and what failed is not established —
+  iOS 27 is a preview toolchain no Unity line supports yet. Still the
+  Simulator, still no iPhone.
 - **Parity with Flutter's `quick_actions` — compared 2026-09-15, two real
   gaps.** Four of the five top open feature requests on Flutter's tracker
   (bitmap icons, SF Symbols, a max-count accessor, managing existing
