@@ -13,7 +13,57 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **`QuickActions.SetList(IList<QuickActionItem>)` — make the set exactly this
+  list in one call.** Previously this took `RemoveAll()` then `AddList(...)`,
+  which is subtly wrong: `RemoveAll` keeps the in-memory list when the OS
+  refuses the clear, and `AddList` then skips every id already in that list — so
+  a hand-rolled replace silently *merges* the stale set with the new one instead
+  of replacing it. `SetList` reconciles first, refuses with `false` and changes
+  nothing if the read or the clear does not land, and only then adds. It is not
+  atomic (no quick actions exist between the two steps, and a failed add leaves
+  the set empty), which the API doc states. Five tests cover the replace, the
+  empty-list clear, the null argument, the refused clear, and the unreadable
+  set.
+
 ### Fixed
+
+- **A tap now reports shortcut usage to the launcher — for dynamic and pinned
+  shortcuts.** `QuickActionsTrampolineActivity` recorded the tap for `Performed`
+  and stopped there, so Android's predictive ranking only ever saw usage a game
+  remembered to report by hand via `QuickActions.ReportUsed(id)`. It now also
+  calls `reportShortcutUsed`. **Static (manifest-baked) shortcuts are not
+  covered:** that call's ownership gate scans the dynamic and pinned sets only,
+  so a tap on a baked shortcut records `Performed` as before and reports
+  nothing. `ROADMAP.md` previously claimed this fix would cover static shortcuts
+  — it does not, and that line is corrected. The report is wrapped so it can
+  never affect delivery, and `reportShortcutUsed` is not on Android's
+  worker-thread-warned method list.
+- **`Update()` now says which pinned copies it cannot reach.** It already
+  refreshes a user-pinned copy whose id is still added — `addDynamicShortcuts`
+  is documented as updating same-id dynamic *and pinned* entries — but a copy
+  surviving *only* as a pinned shortcut is refused as not-added, and the stale
+  label stays on the home screen. The package's own writes disable a dropped
+  managed id rather than orphaning it, so reaching that state takes outside
+  interference; the XML doc now names it instead of leaving it implied.
+- **iOS's 4-shortcut count is described as observed, not documented.**
+  `MaxShortcutCount` still returns 4 on iOS and nothing about the behaviour
+  changes — but Apple publishes no integer ("up to the system-defined limit")
+  and its own sample article says not to cap client-side, so calling 4 "the
+  documented Home Screen display limit" asserted something Apple does not.
+  Nothing in the package enforces it either: the iOS bridge accepts every item.
+  The comment and both XML docs now say so.
+- **The iOS UIScene version floor now says how to actually get it.** The docs
+  named Unity 2022.3.72f1 as the floor for building under Xcode 27 / the iOS 27
+  SDK without saying that Unity's own release-catalog API — the one behind Unity
+  Hub's version picker — lists nothing newer than **2022.3.62f3** for that line.
+  2022.3.63f1 through .76f1 carry an `XLTS` entitlement and Enterprise/Industry
+  branding, so Hub never offers them to a Personal account; the installer itself
+  is not paywalled (direct download and the `unityhub://` deep link both work),
+  but it is off the normal path, and **Unity 6 is the supported route** for a
+  2022.3 project that must build under Xcode 27. README and
+  `PRODUCTION_READINESS.md` now say so.
 
 - **CI's iOS Simulator exports are ARM64 now, and the Xcode 27 leg gets a
   deployment target it will accept.** The four `*-xcode27` legs had been red

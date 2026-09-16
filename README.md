@@ -162,11 +162,12 @@ covered by headless tests only — no device or Simulator run has happened since
 they landed, so what a resolved `v1.4.0 (37)` looks like on a real home screen
 is still unconfirmed.
 
-**Also true:** the suite is 122 headless tests (`dotnet test`) and 77 in Unity's
+**Also true:** the suite is 127 headless tests (`dotnet test`) and 82 in Unity's
 Test Runner (it adds 6 `JsonUtility` serialization tests; 51 of the headless ones
 don't run there), plus an Android Java smoke of 111 checks, across 11 C# compile
 configurations with 0 warnings. The last CI-measured Test Runner result was
-76/76 (run 38, 2026-09-01), taken before the sixth serialization test landed.
+77/77 (run 88, 2026-09-16, on 6000.6.0f1), taken before the five `SetList` tests
+landed — 82 is not yet a measured number.
 The iOS `.mm` compiles cleanly against the current iOS SDK
 (ARC, arm64, deployment target iOS 13) with no deprecation or availability
 errors — a compile result, separate from the Simulator run above. A
@@ -481,6 +482,7 @@ assembly entirely.
 | `void ResetLastPerformed()` | Clear `LastPerformed`. |
 | `bool Add(QuickActionItem)` | Add one; false if invalid, id already added, or the OS set couldn't be read / the OS rejected the write (transient — retry later). A `null` item throws `ArgumentNullException` — the only way any call here throws. |
 | `void AddList(IList<QuickActionItem>)` | Add several in one OS update (same transient no-op cases as `Add`; a `null` list throws). |
+| `bool SetList(IList<QuickActionItem>)` | Make the set **exactly** this list, in one call — clear, then add. False, having changed **nothing**, when the OS set couldn't be read or the clear was refused (the previous set is still live; retry later). Not atomic: between the two steps there are no quick actions, and if the add then fails the set is left empty. Invalid/duplicate items are skipped and the OS may still drop ids to fit the budget, as with `AddList` — `GetAll()` is the authority. A `null` list throws. |
 | `List<QuickActionItem> GetAll()` | Snapshot of the currently installed dynamic actions (OS-reconciled). |
 | `QuickActionItem GetById(string)` | Lookup by id. |
 | `bool Update(QuickActionItem)` | `null` throws `ArgumentNullException`. Replace the added action with the same `Id` **in place** — list position (launcher rank) preserved, one OS update, Android user-pinned copies refresh too. False when not added (use `Add`), invalid, the OS set couldn't be read, or the OS refused the write (all leave the previous item in place) — or when the OS **dropped** the pushed item (budget shrank; the shortcut is then gone, re-`Add` when there's room). |
@@ -800,6 +802,20 @@ their tokens show raw there.
   owns the `UIApplicationDelegate`, so taps never reach `UnityAppController`) and
   Unity 6.5's Swift Xcode project type — see [Coexisting with other native iOS
   plugins](#coexisting-with-other-native-ios-plugins).
+
+  **Getting 2022.3.72f1 is not as simple as the version number suggests.** The
+  iOS 27 SDK *requires* the scene lifecycle — an app built with Xcode 27 that
+  does not adopt it fails to launch — so on the 2022.3 line that patch is the
+  floor. But Unity's own release-catalog API, the one behind Unity Hub's version
+  picker, returns nothing for 2022.3.63f1, .72f1 or .76f1: the newest 2022.3 it
+  lists is **2022.3.62f3**, which emits no scene manifest. Those later patches
+  carry an `XLTS` entitlement and Enterprise/Industry LTS branding on their
+  release pages, so Hub will not offer them to a Personal account. The installer
+  itself is not paywalled — the release page's direct download and its
+  `unityhub://2022.3.72f1/<hash>` deep link both work without a login — but it is
+  off the normal path. **If you are on 2022.3 and must build under Xcode 27, the
+  supported route is Unity 6** (`6000.0.68f1+` or `6000.3.8f1+`): both are in
+  Hub's catalog, free on Personal, and inside their standard support window.
 - **Android** — `Plugins/Android/QuickActionsBridge.java` builds `ShortcutInfo`s
   whose intents target `QuickActionsTrampolineActivity`. The trampoline records
   the tapped id and brings the Unity activity forward.
@@ -1149,7 +1165,7 @@ tools~/verify.sh    # .meta + C# compile (11 configs) + unit tests + Android plu
 headless unit tests via `dotnet test`, and compiles and smoke-tests the Android
 Java plugin (**111** checks). Those tests (bar 51 headless-only ones) plus 6
 `JsonUtility` serialization tests run in Unity's **Test Runner** from
-`Tests/Editor/` — **77** there. See [`.verify/README.md`](https://github.com/emindeniz99/unity-quick-actions/blob/main/.verify/README.md)
+`Tests/Editor/` — **82** there. See [`.verify/README.md`](https://github.com/emindeniz99/unity-quick-actions/blob/main/.verify/README.md)
 for how the stubs work.
 
 Beyond the stubs, [`unity-ci.yml`](https://github.com/emindeniz99/unity-quick-actions/blob/main/.github/workflows/unity-ci.yml) runs the

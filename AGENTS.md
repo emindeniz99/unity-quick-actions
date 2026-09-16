@@ -112,7 +112,7 @@ repository root, so the repository **is** the package.
   (README "Security", `SECURITY.md`).
 - Don't reuse a static shortcut's id in a runtime `Add`: iOS shows it twice,
   Android drops the dynamic one.
-- Don't pass `null` to `Add` / `AddList` / `Update`: those throw
+- Don't pass `null` to `Add` / `AddList` / `SetList` / `Update`: those throw
   `ArgumentNullException`; every other failure comes back as a `false` return
   or a logged warning (`AddList`, `RemoveAll` and the `Locale` setter report
   their failures only by log), never an exception.
@@ -126,8 +126,13 @@ repository root, so the repository **is** the package.
   (transient — retry later).
 - `Performed` fires on the main thread for warm and cold taps alike;
   `LastPerformed` is sticky until `ResetLastPerformed()`.
-- `MaxShortcutCount` is the OS budget (Android queries it; iOS is 4). Static
+- `MaxShortcutCount` is the OS budget (Android queries it; iOS is 4 — an
+  observed value, not one Apple publishes, and nothing enforces it). Static
   shortcuts share it.
+- `SetList(items)` makes the set exactly `items` in one call. It returns
+  `false` having changed nothing if the OS set could not be read or the clear
+  was refused — don't hand-roll it as `RemoveAll()` + `AddList(...)`, which
+  merges the old set into the new one when the clear fails.
 - Icons: iOS renders system glyphs (`IconType`) or SF Symbols
   (`IosSystemImage`); Android resolves a drawable named
   `ic_quickaction_<name>` from the project first, then the package's four

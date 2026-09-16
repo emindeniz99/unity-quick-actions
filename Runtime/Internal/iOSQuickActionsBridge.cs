@@ -21,8 +21,12 @@ namespace EminDeniz99.QuickActions.Internal
 
         public bool IsPlatformSupported => true;
 
-        // No OS query exists; 4 is the documented Home Screen display limit (extra
-        // items are accepted by the API but never shown).
+        // 4 is an OBSERVED value, not an Apple-documented one: there is no OS
+        // query, Apple publishes no integer ("up to the system-defined limit"),
+        // and its own sample article says not to cap client-side because "the
+        // system displays only the number of items that fit the screen". Nothing
+        // here enforces it either - SetShortcuts below accepts every item.
+        // Advisory only, and 4 is what devices are commonly seen to show.
         public int MaxShortcutCount => 4;
 
         // iOS has no pinned-shortcut concept, and no usage-reporting analog.

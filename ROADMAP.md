@@ -68,11 +68,17 @@ ships it.
   (bitmap icons, SF Symbols, a max-count accessor, managing existing
   shortcuts) are things this package already ships, and their plugin replaces
   the whole dynamic-shortcut set where we merge behind an ownership marker.
-  What they have and we do not: Android `reportShortcutUsed` fired
-  automatically on every tap (we expose the API but never call it — belongs in
-  the trampoline, and it would cover static shortcuts too), and a one-call
-  "make the set exactly this" mutator. Smaller: `AddList`/`RemoveAll` return
-  `void`, a build warning when R8 is on without the keep rule, an earlier
+  Both gaps are now **closed**: `QuickActions.SetList` is the one-call "make the
+  set exactly this" mutator, and the trampoline fires Android
+  `reportShortcutUsed` on a **dynamic or pinned** tap. One residual, found while
+  closing that second one: `reportShortcutUsed`'s ownership gate scans
+  `getDynamicShortcuts()` and `getPinnedShortcuts()` only, so a tap on a
+  **static** (manifest-baked) shortcut records `Performed` as before and reports
+  nothing. An earlier version of this entry claimed the trampoline fix "would
+  cover static shortcuts too"; it does not. Closing that needs the gate to
+  recognise manifest ids the way the trampoline already does — through the baked
+  intent action, since static shortcuts cannot carry the extras marker. Smaller: `AddList`/`RemoveAll`
+  return `void`, a build warning when R8 is on without the keep rule, an earlier
   `Info.plist`-driven scene-hook install, coex-probe assertions over the iOS
   marshalling layer, and the full 29-row `IconType` table in the README.
   Sources and the five refuted claims are in
