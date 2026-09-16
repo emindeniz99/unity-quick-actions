@@ -800,6 +800,20 @@ their tokens show raw there.
   owns the `UIApplicationDelegate`, so taps never reach `UnityAppController`) and
   Unity 6.5's Swift Xcode project type — see [Coexisting with other native iOS
   plugins](#coexisting-with-other-native-ios-plugins).
+
+  **Getting 2022.3.72f1 is not as simple as the version number suggests.** The
+  iOS 27 SDK *requires* the scene lifecycle — an app built with Xcode 27 that
+  does not adopt it fails to launch — so on the 2022.3 line that patch is the
+  floor. But Unity's own release-catalog API, the one behind Unity Hub's version
+  picker, returns nothing for 2022.3.63f1, .72f1 or .76f1: the newest 2022.3 it
+  lists is **2022.3.62f3**, which emits no scene manifest. Those later patches
+  carry an `XLTS` entitlement and Enterprise/Industry LTS branding on their
+  release pages, so Hub will not offer them to a Personal account. The installer
+  itself is not paywalled — the release page's direct download and its
+  `unityhub://2022.3.72f1/<hash>` deep link both work without a login — but it is
+  off the normal path. **If you are on 2022.3 and must build under Xcode 27, the
+  supported route is Unity 6** (`6000.0.68f1+` or `6000.3.8f1+`): both are in
+  Hub's catalog, free on Personal, and inside their standard support window.
 - **Android** — `Plugins/Android/QuickActionsBridge.java` builds `ShortcutInfo`s
   whose intents target `QuickActionsTrampolineActivity`. The trampoline records
   the tapped id and brings the Unity activity forward.

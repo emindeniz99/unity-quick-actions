@@ -15,6 +15,17 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **The iOS UIScene version floor now says how to actually get it.** The docs
+  named Unity 2022.3.72f1 as the floor for building under Xcode 27 / the iOS 27
+  SDK without saying that Unity's own release-catalog API — the one behind Unity
+  Hub's version picker — lists nothing newer than **2022.3.62f3** for that line.
+  2022.3.63f1 through .76f1 carry an `XLTS` entitlement and Enterprise/Industry
+  branding, so Hub never offers them to a Personal account; the installer itself
+  is not paywalled (direct download and the `unityhub://` deep link both work),
+  but it is off the normal path, and **Unity 6 is the supported route** for a
+  2022.3 project that must build under Xcode 27. README and
+  `PRODUCTION_READINESS.md` now say so.
+
 - **CI's iOS Simulator exports are ARM64 now, and the Xcode 27 leg gets a
   deployment target it will accept.** The four `*-xcode27` legs had been red
   since run 76 for two reasons, both in the testbed projects and neither in the
