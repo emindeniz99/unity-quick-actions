@@ -63,6 +63,26 @@ public final class QuickActionsTrampolineActivity extends Activity {
         // can't spoof a "user performed X" signal into the game.
         if (isKnownShortcut(actionId)) {
             QuickActionsBridge.recordPerformed(actionId);
+            // Tell the launcher/assistant the shortcut was used, so its predictive
+            // ranking sees real taps instead of only whatever a game remembers to
+            // report by hand through QuickActions.ReportUsed(id).
+            //
+            // DYNAMIC AND PINNED ONLY. reportShortcutUsed's ownership gate scans
+            // getDynamicShortcuts() and getPinnedShortcuts(); it never looks at
+            // getManifestShortcuts(), so a tap on a STATIC (manifest-baked)
+            // shortcut reaches here, records Performed, and reports nothing - it
+            // just logs that no managed dynamic or pinned shortcut has the id.
+            // isKnownShortcut() above is deliberately wider than that: it accepts
+            // static ids too, because recording the tap must work for them.
+            //
+            // Never let the usage report affect delivery: Performed is the
+            // contract, ranking is a nicety, and the call is not on Android's
+            // worker-thread-warned list, so it stays inline next to recordPerformed.
+            try {
+                QuickActionsBridge.reportShortcutUsed(this, actionId);
+            } catch (RuntimeException e) {
+                android.util.Log.w("QuickActions", "reportShortcutUsed on tap failed", e);
+            }
         } else if (actionId != null) {
             android.util.Log.w("QuickActions", "Ignored a trampoline intent for an unknown shortcut id");
         }

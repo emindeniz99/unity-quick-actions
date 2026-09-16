@@ -15,6 +15,17 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **A tap now reports shortcut usage to the launcher — for dynamic and pinned
+  shortcuts.** `QuickActionsTrampolineActivity` recorded the tap for `Performed`
+  and stopped there, so Android's predictive ranking only ever saw usage a game
+  remembered to report by hand via `QuickActions.ReportUsed(id)`. It now also
+  calls `reportShortcutUsed`. **Static (manifest-baked) shortcuts are not
+  covered:** that call's ownership gate scans the dynamic and pinned sets only,
+  so a tap on a baked shortcut records `Performed` as before and reports
+  nothing. `ROADMAP.md` previously claimed this fix would cover static shortcuts
+  — it does not, and that line is corrected. The report is wrapped so it can
+  never affect delivery, and `reportShortcutUsed` is not on Android's
+  worker-thread-warned method list.
 - **`Update()` now says which pinned copies it cannot reach.** It already
   refreshes a user-pinned copy whose id is still added — `addDynamicShortcuts`
   is documented as updating same-id dynamic *and pinned* entries — but a copy
