@@ -480,14 +480,35 @@ deployment target iOS 13 in the docs.
      translated — but nothing in the run proves the mechanism, only the
      numbers.
    - `ios simulator (2022.3-xcode27)` is **still red, and further along**: it
-     now builds, installs and launches on iOS 27, then the process dies within
-     ~20 s (`launchctl` no longer lists it; a `QuickActionsDemo-….ips` report is
-     written). The cause is **not established** — the step printed only a
-     directory listing, which is why it now prints the report itself. Unity 6
-     on the same image and the same runtime does not crash, so this is specific
-     to the 2022.3.62f3 player on iOS 27, not to the package or the toolchain.
-     One suggestive detail, unexplained: the simulator's own
-     `AppIntentsLiveEntityService` crashed twice in the same seconds.
+     now builds, installs and launches on iOS 27, then the process dies. Unity 6
+     on the same image and the same runtime does not crash.
+9. **What kills the 2022.3 player on iOS 27 (run 85, crash report read).** Run
+   85 reproduced run 84 exactly — 29 of 30 legs green, the same single canary
+   red — and its step printed the `.ips`. Verified from that report:
+   - `"exception": {"type":"EXC_BREAKPOINT","signal":"SIGTRAP","codes":
+     "0x0000000000000001, 0x00000001c48c3234"}`,
+     `"termination": {"indicator":"Trace\/BPT trap: 5","byProc":"exc handler"}`,
+     `"faultingThread": 0`. The process launched at 06:13:35.48 and exited at
+     06:13:37.83 — dead in **2.4 s**, on the main thread.
+   - The instruction at PC decodes to `brk #0` (`atPC` base64 → `00 00 20 d4`,
+     i.e. `0xd4200000`). This is a **deliberate trap**, not a memory fault.
+   - The faulting address `0x1c48c3234` falls inside **UIKitCore**
+     (`base 0x1c3bff000`, size 37 171 437 → `…0x1c5f4d6ad`). Not
+     `UnityFramework`, not `libiPhone-lib.dylib`, not our binary. UIKit is
+     killing the app on purpose.
+   - `"translated": false`, `"cpuType": "ARM-64"` — incidental confirmation that
+     the arm64 slice fix landed and nothing is being translated.
+   **[plausible, not established]** the reason is the scene-lifecycle mandate in
+   §4: the same export survives on Xcode 26 / iOS 26, and Unity 6 — which does
+   emit `UIApplicationSceneManifest` — survives on iOS 27, while Testbed2022 is
+   2022.3.62f3, below the 2022.3.72f1 floor where Unity started emitting it.
+   Three independent signals point one way, but UIKit's own reason string was
+   never captured, so this is not proven. Confirming it needs either
+   `simctl spawn … log` output from the launch, or a scene manifest injected
+   into the 2022.3 export's `Info.plist` to see whether it then survives.
+   **This is a Unity export question, not a package one** — but it matters to
+   anyone shipping a 2022.3 game to iOS 27, so it belongs in the docs even
+   though nothing in this package can fix it.
 
 ## 11. Method and caveats
 
