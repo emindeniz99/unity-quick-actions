@@ -472,10 +472,11 @@ deployment target iOS 13 in the docs.
    - The SpringBoard leg is the strong one: a real long-press on the home-screen
      icon and a tap on the `daily_reward` row, on **Xcode 27 beta 6 / iOS 27**,
      cold-started the app and `daily_reward` reached `Performed` 20 s after the
-     tap. The two Xcode 26 legs passed the same way (6 s on 6000.3.21f1, 9 s on
-     2022.3.62f3).
-   - Delivery got **much faster**: run 77 measured 35–54 s on the same two
-     Xcode 26 legs, run 84 measured 6–20 s. **[plausible]** the arm64 slice is
+     tap. The two non-canary legs passed the same way (6 s on 6000.3.21f1 under
+     Xcode 26.6, 9 s on 2022.3.62f3 under **Xcode 16.4** — they are not both
+     "Xcode 26": the 2022.3 leg runs on `macos-15`, whose default is 16.4).
+   - Delivery got **much faster**: run 77 measured 35–54 s on those same two
+     non-canary legs, run 84 measured 6–20 s. **[plausible]** the arm64 slice is
      why — the app now runs natively on the arm64 runner instead of being
      translated — but nothing in the run proves the mechanism, only the
      numbers.
@@ -503,9 +504,40 @@ deployment target iOS 13 in the docs.
    emit `UIApplicationSceneManifest` — survives on iOS 27, while Testbed2022 is
    2022.3.62f3, below the 2022.3.72f1 floor where Unity started emitting it.
    Three independent signals point one way, but UIKit's own reason string was
-   never captured, so this is not proven. Confirming it needs either
-   `simctl spawn … log` output from the launch, or a scene manifest injected
-   into the 2022.3 export's `Info.plist` to see whether it then survives.
+   never captured, so this is not proven. The dump is also truncated at
+   `head -150`, ahead of any Application Specific Information the `.ips`
+   carries — the cheapest of the open experiments is simply to grep the whole
+   report for that key, which the step now does.
+
+   **[verified] Apple documents the mechanism and the gate**, which is what
+   makes the inference reasonable rather than a guess:
+
+   > "Adopting the scene-based life cycle is required. Beginning in iOS 27,
+   > iPadOS 27, Mac Catalyst 27, tvOS 27, and visionOS 27, apps built with the
+   > latest SDK must adopt the scene-based life cycle or they fail to launch."
+   > — <https://developer.apple.com/documentation/uikit/transitioning-to-the-uikit-scene-based-life-cycle>
+
+   The same page names the two conditions that put an app in the must-migrate
+   bucket, and an old Unity export meets the first: "The `UIApplicationSceneManifest`
+   key is missing from your information property list, or it has no specified
+   configurations." It also documents the ramp that ends in exactly the kind of
+   failure we saw — iOS 18.4 logged "This will become an assert in a future
+   version", iOS 26 "Failure to adopt will result in an assert in the future".
+   An assert is a deliberate trap, which is what `brk #0` is.
+
+   The **gate** is stated the same way in TN3187 ("when building with the latest
+   SDK; otherwise, your app won't launch"), in the iOS 27 release notes, and in
+   WWDC 2025 session 282 and WWDC 2026 session 278. **[plausible, not
+   [verified]]** the converse — that an app built with an OLDER SDK is exempt,
+   which is what would explain shipped Unity 2022 games still launching on
+   iOS 27. Apple states only the forward rule; the converse rests on an Apple
+   engineer's forum reply plus Flutter's, Capacitor's and Expo's migration docs
+   all describing the same rebuild-triggers-it pattern. Expo puts it plainly:
+   "The iOS 27 SDK requires it: apps built with Xcode 27 that still use the
+   application-based life cycle do not launch correctly on iOS 27."
+   (<https://github.com/expo/fyi/blob/main/ios-scene-lifecycle.md>)
+
+   That converse is what `ios-crossrun` exists to test.
    **This is a Unity export question, not a package one** — but it matters to
    anyone shipping a 2022.3 game to iOS 27, so it belongs in the docs even
    though nothing in this package can fix it.
