@@ -420,7 +420,32 @@ deployment target iOS 13 in the docs.
    (the context menu's blur never lets SpringBoard go idle), and the
    simulator boot + install step took 9 min on `macos-26` (first-boot data
    migration) against 3 min on `macos-15`.
-6. **Run 76's canary findings, to weigh in October:** on the `xcode-27` image
+6. **What the canaries turned out to be measuring (2026-09-16).** Both failure
+   modes were the testbeds' own iOS player settings, not the toolchain and not
+   the package: `Runtime/`, `Editor/` and `Plugins/` never read or write a
+   deployment target or an architecture on any line. (a) The simulator slice is
+   a **separate** setting from the device architecture —
+   `PlayerSettings.iOS.simulatorSdkArchitecture`, default `X86_64` — and was
+   never set, so every export was x86_64-only: fine under Rosetta on the macOS
+   15 and 26 runners, refused by the arm64-only iOS 27 simulator. Fixed by
+   setting `ARM64` in `TestbedBuilder.BuildSimulator`. (b) Xcode 27 rejects an
+   iOS Simulator deployment target below **15.0** and Testbed2022 carries 12.0;
+   overridden on that one leg's `xcodebuild` command line rather than in the
+   checked-in asset, so the other legs keep proving the package compiles below
+   its own iOS 13 guards.
+   Related facts established the same day, all
+   verified-from-source: Xcode 27 went GA on 2026-09-14 (27A266a) but GitHub's
+   `xcode-27` image still carries **beta 6** (27A5252f) behind a preview badge,
+   arm64-only, on macOS 27.0; there is no `macos-27` label and `macos-26` has
+   not picked up Xcode 27; App Store uploads still require Xcode 26, unchanged
+   since 2026-04-28. **Simulator floors** (Apple's support matrix): Xcode 16.4
+   and every Xcode 26.x run **iOS 15 or later**, Xcode 27 runs **iOS 17 or
+   later**; iOS 12 last appears in Xcode 14.0.x, which needs a macOS host
+   GitHub retired in December 2025 — so no pre-iOS-15 simulator leg is
+   achievable on hosted runners, and the oldest one that is would exercise the
+   same `@available(iOS 13.0, *)` branch as the legs we already run, i.e. prove
+   nothing new. The package's sub-iOS-13 behaviour stays a compile-time claim.
+7. **Run 76's canary findings, to weigh in October:** on the `xcode-27` image
    (27.0 beta 6, macOS 27.0) the public 2022.3.62f3 export is rejected at
    `IPHONEOS_DEPLOYMENT_TARGET = 12.0` ("the range of supported deployment
    target versions is 15.0 to 27.0.x") — Xcode 27 raises the floor to iOS 15,

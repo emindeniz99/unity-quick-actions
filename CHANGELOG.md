@@ -13,6 +13,30 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- **CI's iOS Simulator exports are ARM64 now, and the Xcode 27 leg gets a
+  deployment target it will accept.** The four `*-xcode27` legs had been red
+  since run 76 for two reasons, both in the testbed projects and neither in the
+  package, which never reads or writes a deployment target or an architecture:
+  (1) `TestbedBuilder.BuildSimulator` set the **device** architecture and never
+  `PlayerSettings.iOS.simulatorSdkArchitecture`, whose default is `X86_64`, so
+  every simulator export was x86_64-only — tolerated under Rosetta on the macOS
+  15 and 26 runners, refused outright by the arm64-only iOS 27 simulator; (2)
+  Xcode 27 rejects an iOS Simulator deployment target below 15.0 and
+  Testbed2022 carries 12.0. The architecture is now set to `ARM64` (not
+  `Universal`, which would compile both slices and double the il2cpp phase)
+  behind `#if UNITY_2022_1_OR_NEWER`, since 2021.3 has no such API and no
+  simulator leg. The deployment target is overridden on that one leg's
+  `xcodebuild` command line through a new per-leg `build_settings` matrix
+  field, deliberately **not** in the checked-in `ProjectSettings.asset`: every
+  Library cache key hashes `ProjectSettings/**`, and the 12.0 value is what
+  proves the package compiles below its own `@available(iOS 13.0, *)` guards.
+  The `*-xcode27` legs stay `continue-on-error` canaries; the image still
+  carries Xcode 27.0 beta 6 behind a preview badge, and the 2022.3 one is
+  expected to stay red for a third reason (2022.3.62f3 emits no UIScene
+  manifest, which the iOS 27 SDK requires).
+
 ### Added
 
 - **A SpringBoard tap on the iOS Simulator, driven by XCUITest.** `tools~/ios-ui`
