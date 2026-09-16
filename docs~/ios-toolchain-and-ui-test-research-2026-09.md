@@ -420,7 +420,32 @@ deployment target iOS 13 in the docs.
    (the context menu's blur never lets SpringBoard go idle), and the
    simulator boot + install step took 9 min on `macos-26` (first-boot data
    migration) against 3 min on `macos-15`.
-6. **Run 76's canary findings, to weigh in October:** on the `xcode-27` image
+6. **What the canaries turned out to be measuring (2026-09-16).** Both failure
+   modes were the testbeds' own iOS player settings, not the toolchain and not
+   the package: `Runtime/`, `Editor/` and `Plugins/` never read or write a
+   deployment target or an architecture on any line. (a) The simulator slice is
+   a **separate** setting from the device architecture —
+   `PlayerSettings.iOS.simulatorSdkArchitecture`, default `X86_64` — and was
+   never set, so every export was x86_64-only: fine under Rosetta on the macOS
+   15 and 26 runners, refused by the arm64-only iOS 27 simulator. Fixed by
+   setting `ARM64` in `TestbedBuilder.BuildSimulator`. (b) Xcode 27 rejects an
+   iOS Simulator deployment target below **15.0** and Testbed2022 carries 12.0;
+   overridden on that one leg's `xcodebuild` command line rather than in the
+   checked-in asset, so the other legs keep proving the package compiles below
+   its own iOS 13 guards.
+   Related facts established the same day, all
+   verified-from-source: Xcode 27 went GA on 2026-09-14 (27A266a) but GitHub's
+   `xcode-27` image still carries **beta 6** (27A5252f) behind a preview badge,
+   arm64-only, on macOS 27.0; there is no `macos-27` label and `macos-26` has
+   not picked up Xcode 27; App Store uploads still require Xcode 26, unchanged
+   since 2026-04-28. **Simulator floors** (Apple's support matrix): Xcode 16.4
+   and every Xcode 26.x run **iOS 15 or later**, Xcode 27 runs **iOS 17 or
+   later**; iOS 12 last appears in Xcode 14.0.x, which needs a macOS host
+   GitHub retired in December 2025 — so no pre-iOS-15 simulator leg is
+   achievable on hosted runners, and the oldest one that is would exercise the
+   same `@available(iOS 13.0, *)` branch as the legs we already run, i.e. prove
+   nothing new. The package's sub-iOS-13 behaviour stays a compile-time claim.
+7. **Run 76's canary findings, to weigh in October:** on the `xcode-27` image
    (27.0 beta 6, macOS 27.0) the public 2022.3.62f3 export is rejected at
    `IPHONEOS_DEPLOYMENT_TARGET = 12.0` ("the range of supported deployment
    target versions is 15.0 to 27.0.x") — Xcode 27 raises the floor to iOS 15,
@@ -432,6 +457,58 @@ deployment target iOS 13 in the docs.
    translation there; not verified from a source). Both are questions for
    Unity's settings (minimum iOS version; the Simulator architecture the
    export targets), not for this package.
+8. **Run 84 (2026-09-16) — what the two fixes measured.** Both were the
+   testbeds' own settings, and fixing them moved three of the four canaries to
+   green. `PlayerSettings.iOS.simulatorSdkArchitecture = ARM64` and
+   `IPHONEOS_DEPLOYMENT_TARGET=15.0` passed on the `xcodebuild` command line
+   (never into `ProjectSettings.asset`, which would bust the Library cache key
+   and erase the 12.0 value that proves the `@available(iOS 13.0, *)` guards
+   compile below 13). Results, all verified from the run's own logs:
+   - `ios simulator (unity6-xcode27)`, `ios simulator coex
+     (unity6-coex-xcode27)` and the new `ios springboard tap (unity6-xcode27)`
+     all **passed** — `-target arm64-apple-ios15.0-simulator`,
+     `** BUILD SUCCEEDED **`, the app installed on an iPhone 17 Pro running
+     iOS 27, launched and stayed alive.
+   - The SpringBoard leg is the strong one: a real long-press on the home-screen
+     icon and a tap on the `daily_reward` row, on **Xcode 27 beta 6 / iOS 27**,
+     cold-started the app and `daily_reward` reached `Performed` 20 s after the
+     tap. The two Xcode 26 legs passed the same way (6 s on 6000.3.21f1, 9 s on
+     2022.3.62f3).
+   - Delivery got **much faster**: run 77 measured 35–54 s on the same two
+     Xcode 26 legs, run 84 measured 6–20 s. **[plausible]** the arm64 slice is
+     why — the app now runs natively on the arm64 runner instead of being
+     translated — but nothing in the run proves the mechanism, only the
+     numbers.
+   - `ios simulator (2022.3-xcode27)` is **still red, and further along**: it
+     now builds, installs and launches on iOS 27, then the process dies. Unity 6
+     on the same image and the same runtime does not crash.
+9. **What kills the 2022.3 player on iOS 27 (run 85, crash report read).** Run
+   85 reproduced run 84 exactly — 29 of 30 legs green, the same single canary
+   red — and its step printed the `.ips`. Verified from that report:
+   - `"exception": {"type":"EXC_BREAKPOINT","signal":"SIGTRAP","codes":
+     "0x0000000000000001, 0x00000001c48c3234"}`,
+     `"termination": {"indicator":"Trace\/BPT trap: 5","byProc":"exc handler"}`,
+     `"faultingThread": 0`. The process launched at 06:13:35.48 and exited at
+     06:13:37.83 — dead in **2.4 s**, on the main thread.
+   - The instruction at PC decodes to `brk #0` (`atPC` base64 → `00 00 20 d4`,
+     i.e. `0xd4200000`). This is a **deliberate trap**, not a memory fault.
+   - The faulting address `0x1c48c3234` falls inside **UIKitCore**
+     (`base 0x1c3bff000`, size 37 171 437 → `…0x1c5f4d6ad`). Not
+     `UnityFramework`, not `libiPhone-lib.dylib`, not our binary. UIKit is
+     killing the app on purpose.
+   - `"translated": false`, `"cpuType": "ARM-64"` — incidental confirmation that
+     the arm64 slice fix landed and nothing is being translated.
+   **[plausible, not established]** the reason is the scene-lifecycle mandate in
+   §4: the same export survives on Xcode 26 / iOS 26, and Unity 6 — which does
+   emit `UIApplicationSceneManifest` — survives on iOS 27, while Testbed2022 is
+   2022.3.62f3, below the 2022.3.72f1 floor where Unity started emitting it.
+   Three independent signals point one way, but UIKit's own reason string was
+   never captured, so this is not proven. Confirming it needs either
+   `simctl spawn … log` output from the launch, or a scene manifest injected
+   into the 2022.3 export's `Info.plist` to see whether it then survives.
+   **This is a Unity export question, not a package one** — but it matters to
+   anyone shipping a 2022.3 game to iOS 27, so it belongs in the docs even
+   though nothing in this package can fix it.
 
 ## 11. Method and caveats
 
