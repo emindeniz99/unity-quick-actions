@@ -2595,7 +2595,24 @@ jobs:
             *com.quickactions.testbed*) ;;
             *)
               echo "app is no longer running — crashed after launch"
-              ls ~/Library/Logs/DiagnosticReports/ 2>/dev/null || true
+              # A canary that only says "crashed" costs a whole run to diagnose.
+              # A simulator app's crash report lands in the HOST's
+              # DiagnosticReports; print the newest one for our binary. No pipe
+              # from the glob: under pipefail `ls … | head -1` SIGPIPEs ls and
+              # an empty glob exits non-zero (same rule as the case above).
+              NAME="$(basename "$APP" .app)"
+              REPORT=""
+              for f in "$HOME/Library/Logs/DiagnosticReports/$NAME"-*.ips; do
+                [ -e "$f" ] || continue
+                REPORT="$f"  # timestamped names sort chronologically; keep the last
+              done
+              if [ -n "$REPORT" ]; then
+                echo "--- $REPORT (first 150 lines; the thread backtraces run long) ---"
+                head -150 "$REPORT"
+              else
+                echo "no $NAME crash report was written; the whole directory:"
+                ls ~/Library/Logs/DiagnosticReports/ 2>/dev/null || true
+              fi
               exit 1
               ;;
           esac
