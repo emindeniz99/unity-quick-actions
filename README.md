@@ -154,6 +154,18 @@ will not be backported to 2021 LTS).
 static shortcuts on a long-press of a **cold, never-opened install**, runtime
 `Add` published further shortcuts, and a dynamic item whose id collided with a
 static one was dropped in favour of the manifest entry — exactly as documented.
+
+A later hand-run on the owner's Moto G, using the CI demo APK, added two things.
+The long-press menu showed **static and runtime-added items together in one real
+launcher menu**: two rows carrying the baked shortcuts' subtitles and two
+carrying subtitles the sample only sets at runtime. The second row rendered as a
+**blank tile**, which is what `IconType.None` is documented to do. Which of the
+five candidate shortcuts the launcher left out, and whether it was the id
+collision or the shared display budget that dropped it, was not investigated —
+the menu was read, not instrumented. Then the **define-off APK from the same CI
+run** was installed: long-pressing it showed **no quick actions at all**. That is
+the gate below proven on hardware rather than in an APK diff.
+
 **Still not verified on hardware:** a tap arriving as `Performed` (cold or
 warm), and anything at all on a physical iPhone. Plan on validating the tap path
 on your own device before you ship. The 0.4.6 build-time
@@ -309,6 +321,19 @@ and [`Testbed6`](https://github.com/emindeniz99/unity-quick-actions/tree/main/Ex
 define set and three static shortcuts already configured. Clone the repo, open
 the one matching your editor, and compare it against your own integration. See
 [`Examples~/README.md`](https://github.com/emindeniz99/unity-quick-actions/blob/main/Examples~/README.md).
+
+**Or try it on a device without building anything.** Every CI run builds the
+testbeds as real APKs and uploads them: open the latest
+[`unity` workflow run](https://github.com/emindeniz99/unity-quick-actions/actions/workflows/unity-ci.yml),
+and download `quickactions-demo-apk-2022.3` (or `-2021.3`, `-unity6`) from its
+Artifacts. `adb install -r QuickActionsDemo-phone.apk`, then long-press the
+icon. The same run also uploads `gate-off-2022.3`, the define-**off** APK built
+from the identical project — install that one and the long-press menu is empty,
+which is the gate in the previous paragraph, on hardware rather than in a diff.
+Two caveats: GitHub artifacts need a signed-in GitHub account (they are not
+anonymous downloads, even on a public repo) and they expire after 14 days, and
+these are debug-signed test builds — install them on a device you are happy to
+sideload onto.
 
 ## Dev-only — excluding it completely from production builds
 

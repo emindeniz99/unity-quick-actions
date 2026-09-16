@@ -40,6 +40,11 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **The README says how to try it on a device without building anything**, and
+  records what a hand-run on a Moto G showed: static and runtime-added shortcuts
+  side by side in one real launcher menu, `IconType.None` rendering as a blank
+  tile, and the define-**off** APK from the same CI run showing no quick actions
+  at all — the gate on hardware rather than in an APK diff.
 - **A tap now reports shortcut usage to the launcher — for dynamic and pinned
   shortcuts.** `QuickActionsTrampolineActivity` recorded the tap for `Performed`
   and stopped there, so Android's predictive ranking only ever saw usage a game
