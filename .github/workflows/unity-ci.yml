@@ -2637,6 +2637,18 @@ jobs:
               if [ -n "$REPORT" ]; then
                 echo "--- $REPORT (first 150 lines; the thread backtraces run long) ---"
                 head -150 "$REPORT"
+                # head alone stops before the Application Specific Information,
+                # which is where UIKit would put its own reason for a
+                # deliberate assert - the one piece of evidence that would turn
+                # a plausible diagnosis into a proven one. grep the WHOLE file
+                # for it. Each grep is tolerant (no match exits 1, which
+                # pipefail would otherwise treat as a step failure) and nothing
+                # feeds a consumer that can close early.
+                echo "--- reason keys anywhere in the report ---"
+                ASI="$(grep -o '"asi":[^}]*}' "$REPORT" || true)"
+                echo "asi: ${ASI:-<none written>}"
+                SCENEISH="$(grep -oE '[A-Za-z_]*[Ss]cene[A-Za-z_]*' "$REPORT" | sort -u || true)"
+                echo "scene-ish symbols: ${SCENEISH:-<none>}"
               else
                 echo "no $NAME crash report was written; the whole directory:"
                 ls ~/Library/Logs/DiagnosticReports/ 2>/dev/null || true
