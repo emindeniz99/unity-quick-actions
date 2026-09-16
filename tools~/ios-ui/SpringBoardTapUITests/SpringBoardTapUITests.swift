@@ -121,6 +121,11 @@ final class SpringBoardTapUITests: XCTestCase {
             if opened {
                 row = rows.firstMatch
                 attempts.append("\(attempt): \(duration) s opened the menu")
+                // Every button the open menu exposes, once: the rows of a single
+                // real menu are the only place a static shortcut and a
+                // runtime-added one are seen side by side, and this is the line
+                // that shows it without reading the whole tree.
+                note("menu buttons: \(buttonLabels(springboard))")
                 break
             }
             if springboard.buttons["Done"].exists {

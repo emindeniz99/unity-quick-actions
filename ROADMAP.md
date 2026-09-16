@@ -62,7 +62,13 @@ ships it.
   `Performed` 35–43 s and 41–54 s after the touch, past the test's 30 s
   window, so both went red on a verdict that quoted the id; the window is
   120 s now, and run 78 was green on both legs (`PASS`, 41 s and 46 s after
-  the tap). Still the Simulator, still no iPhone.
+  the tap). Every one of those taps landed on a **static** shortcut, because
+  an app that was installed and never launched has nothing else in its menu;
+  the leg now runs the long press a **second** time per leg on a row
+  `QuickActions.Add` published while the app ran — the testbed seeds one when
+  CI asks — so the runtime path gets the same real-menu treatment the Moto G
+  gave it on Android. No verdict on that second pass yet. Still the
+  Simulator, still no iPhone.
 - **Parity with Flutter's `quick_actions` — compared 2026-09-15, two real
   gaps.** Four of the five top open feature requests on Flutter's tracker
   (bitmap icons, SF Symbols, a max-count accessor, managing existing

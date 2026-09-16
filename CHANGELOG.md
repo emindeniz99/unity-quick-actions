@@ -15,6 +15,23 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **The iOS SpringBoard test now also taps a shortcut nothing baked into
+  `Info.plist`.** Every iOS tap CI had ever taken was on a *static* shortcut:
+  the app is installed and never launched, so the only rows in SpringBoard's
+  menu were the three the settings asset baked in. A runtime row cannot exist
+  until the app has run and published one, and the demo's own "Add" button is
+  IMGUI, which puts no element on screen for XCUITest to tap. So the testbed
+  publishes one itself when asked
+  (`Examples~/Testbed*/Assets/Scripts/QuickActionsRuntimeSeeder.cs`, one item
+  because iOS shows at most four and the statics take three), and
+  `ios-springboard` runs the long press twice per leg — `daily_reward` from the
+  plist, then `runtime_add` from `QuickActions.Add` — through the new
+  `tools~/ios-ui/run_springboard_tap.sh`. The seed is asked for over both
+  `SIMCTL_CHILD_QA_SEED_RUNTIME` and a launch argument, because which of the two
+  an IL2CPP player on iOS receives is not documented anywhere we could check;
+  the seeder records which one arrived. A seed that never lands is the harness
+  missing, so it reports `SKIPPED`; a menu that opens without the row after a
+  confirmed seed is a `FAIL` like any other missing quick action.
 - **The define-off CI job now prints where Unity puts the plugin `.java`.** The
   define-off APK carries both plugin classes in `classes.dex` (the job counts
   them: 4 references either way), and the reason given for not stripping them
