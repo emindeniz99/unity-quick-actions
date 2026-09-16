@@ -457,6 +457,37 @@ deployment target iOS 13 in the docs.
    translation there; not verified from a source). Both are questions for
    Unity's settings (minimum iOS version; the Simulator architecture the
    export targets), not for this package.
+8. **Run 84 (2026-09-16) — what the two fixes measured.** Both were the
+   testbeds' own settings, and fixing them moved three of the four canaries to
+   green. `PlayerSettings.iOS.simulatorSdkArchitecture = ARM64` and
+   `IPHONEOS_DEPLOYMENT_TARGET=15.0` passed on the `xcodebuild` command line
+   (never into `ProjectSettings.asset`, which would bust the Library cache key
+   and erase the 12.0 value that proves the `@available(iOS 13.0, *)` guards
+   compile below 13). Results, all verified from the run's own logs:
+   - `ios simulator (unity6-xcode27)`, `ios simulator coex
+     (unity6-coex-xcode27)` and the new `ios springboard tap (unity6-xcode27)`
+     all **passed** — `-target arm64-apple-ios15.0-simulator`,
+     `** BUILD SUCCEEDED **`, the app installed on an iPhone 17 Pro running
+     iOS 27, launched and stayed alive.
+   - The SpringBoard leg is the strong one: a real long-press on the home-screen
+     icon and a tap on the `daily_reward` row, on **Xcode 27 beta 6 / iOS 27**,
+     cold-started the app and `daily_reward` reached `Performed` 20 s after the
+     tap. The two Xcode 26 legs passed the same way (6 s on 6000.3.21f1, 9 s on
+     2022.3.62f3).
+   - Delivery got **much faster**: run 77 measured 35–54 s on the same two
+     Xcode 26 legs, run 84 measured 6–20 s. **[plausible]** the arm64 slice is
+     why — the app now runs natively on the arm64 runner instead of being
+     translated — but nothing in the run proves the mechanism, only the
+     numbers.
+   - `ios simulator (2022.3-xcode27)` is **still red, and further along**: it
+     now builds, installs and launches on iOS 27, then the process dies within
+     ~20 s (`launchctl` no longer lists it; a `QuickActionsDemo-….ips` report is
+     written). The cause is **not established** — the step printed only a
+     directory listing, which is why it now prints the report itself. Unity 6
+     on the same image and the same runtime does not crash, so this is specific
+     to the 2022.3.62f3 player on iOS 27, not to the package or the toolchain.
+     One suggestive detail, unexplained: the simulator's own
+     `AppIntentsLiveEntityService` crashed twice in the same seconds.
 
 ## 11. Method and caveats
 
