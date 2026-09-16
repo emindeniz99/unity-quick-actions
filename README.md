@@ -53,7 +53,7 @@ hardware; iOS 13+ opens it with a plain long-press on every device.
 ## 60-second quickstart
 
 1. **Install** — Package Manager ▸ *Add package from git URL…*:
-   `https://github.com/emindeniz99/unity-quick-actions.git#v0.6.0`
+   `https://github.com/emindeniz99/unity-quick-actions.git#v0.7.0`
 2. **Turn it on** — **Window ▸ Quick Actions ▸ Enable Quick Actions** adds the
    `QUICKACTIONS_ENABLED` define for Standalone, Android and iOS. The package is
    inert without it, by design.
@@ -114,7 +114,7 @@ integration to an AI coding agent: [AGENTS.md](./AGENTS.md).
 
 ## Status
 
-This is **0.6.0**, a pre-1.0 release. Here is exactly what has been proven and
+This is **0.7.0**, a pre-1.0 release. Here is exactly what has been proven and
 what has not — one place, no hedging. (Per-feature detail:
 [PRODUCTION_READINESS.md](./PRODUCTION_READINESS.md).)
 
@@ -231,7 +231,7 @@ https://github.com/emindeniz99/unity-quick-actions.git
 Pin a version by appending a tag, e.g.:
 
 ```
-https://github.com/emindeniz99/unity-quick-actions.git#v0.6.0
+https://github.com/emindeniz99/unity-quick-actions.git#v0.7.0
 ```
 
 (Without a tag you track the default branch. `v0.4.0` is the first tag, so
@@ -265,7 +265,7 @@ package under `dependencies`:
     }
   ],
   "dependencies": {
-    "com.emindeniz99.quick-actions": "0.6.0"
+    "com.emindeniz99.quick-actions": "0.7.0"
   }
 }
 ```
