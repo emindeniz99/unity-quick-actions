@@ -234,8 +234,11 @@ namespace EminDeniz99.QuickActions
 
         /// <summary>
         /// How many shortcuts the OS accepts/shows for this app. Android:
-        /// <c>getMaxShortcutCountPerActivity</c>. iOS: 4 (the Home Screen display
-        /// limit; there is no OS query — extra items are accepted but not shown).
+        /// <c>getMaxShortcutCountPerActivity</c>. iOS: 4 — an <i>observed</i>
+        /// value rather than an Apple-published one. Apple documents no integer
+        /// and advises against capping client-side, and nothing in this package
+        /// enforces the 4: extra items are accepted, the system just shows what
+        /// fits.
         /// On <b>both</b> platforms the budget is shared with static (baked)
         /// shortcuts — and on Android also with any dynamic shortcuts the host app
         /// published outside this API — so fewer slots may actually be free for

@@ -15,6 +15,13 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **iOS's 4-shortcut count is described as observed, not documented.**
+  `MaxShortcutCount` still returns 4 on iOS and nothing about the behaviour
+  changes — but Apple publishes no integer ("up to the system-defined limit")
+  and its own sample article says not to cap client-side, so calling 4 "the
+  documented Home Screen display limit" asserted something Apple does not.
+  Nothing in the package enforces it either: the iOS bridge accepts every item.
+  The comment and both XML docs now say so.
 - **The iOS UIScene version floor now says how to actually get it.** The docs
   named Unity 2022.3.72f1 as the floor for building under Xcode 27 / the iOS 27
   SDK without saying that Unity's own release-catalog API — the one behind Unity
