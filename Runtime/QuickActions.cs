@@ -599,6 +599,16 @@ namespace EminDeniz99.QuickActions
         /// the previous item and the OS kept neither, so
         /// <see cref="GetAll"/>/<see cref="IsAdded"/> report it absent — re-<see cref="Add"/>
         /// once there is room if you still want it.
+        /// <para>
+        /// A pinned copy is reached only while its id is still <i>added</i> here:
+        /// the push goes through <c>addDynamicShortcuts</c>, which Android
+        /// documents as updating same-id dynamic <b>and pinned</b> entries. A copy
+        /// that survives <i>only</i> as a pinned shortcut is therefore out of
+        /// reach — <c>Update</c> refuses it as not-added and the stale label stays
+        /// on the home screen. Our own writes do not create that state (a managed
+        /// id dropped from the set is disabled, not orphaned), so it takes
+        /// something outside this package to produce it.
+        /// </para>
         /// </summary>
         /// <exception cref="ArgumentNullException">The item is null.</exception>
         public static bool Update(QuickActionItem item)

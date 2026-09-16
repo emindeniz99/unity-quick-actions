@@ -15,6 +15,13 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **`Update()` now says which pinned copies it cannot reach.** It already
+  refreshes a user-pinned copy whose id is still added — `addDynamicShortcuts`
+  is documented as updating same-id dynamic *and pinned* entries — but a copy
+  surviving *only* as a pinned shortcut is refused as not-added, and the stale
+  label stays on the home screen. The package's own writes disable a dropped
+  managed id rather than orphaning it, so reaching that state takes outside
+  interference; the XML doc now names it instead of leaving it implied.
 - **iOS's 4-shortcut count is described as observed, not documented.**
   `MaxShortcutCount` still returns 4 on iOS and nothing about the behaviour
   changes — but Apple publishes no integer ("up to the system-defined limit")
