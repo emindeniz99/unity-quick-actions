@@ -50,10 +50,53 @@ ships it.
   arriving as `Performed` — then on 2021.3, and finally on Unity 6 (API 35
   image; its earlier warm-tap red exposed the GameActivity delivery gap
   fixed in the runtime, see CHANGELOG): **all three lines now pass the full
-  smoke**. No *real device* has run the cold step yet. Remaining: asserting
-  a shortcut **tap** on iOS (no
-  `simctl` API reads `UIApplicationShortcutItems` or triggers a tap — it needs
-  an XCUITest target driving SpringBoard; see the device-smoke README).
+  smoke**. No *real device* has run the cold step yet. The iOS tap now has
+  its harness too: `tools~/ios-ui` is an XCUITest bundle that drives
+  SpringBoard on the simulator CI boots (long-press the icon, tap `Daily
+  Reward`, read the id back from the testbed's marker file), run by the
+  `ios-springboard` job. **Run 76 (2026-09-15): `SKIPPED` on both legs** —
+  icon found on home-screen page 2, not reached (zero frame read as
+  on-screen); fixed in the same PR. **Run 77: delivered on both legs** —
+  SpringBoard's own context-menu tap cold-started the 2022.3.62f3 / iOS 18.6
+  and the 6000.3.21f1 / iOS 26.5 exports and `daily_reward` reached
+  `Performed` 35–43 s and 41–54 s after the touch, past the test's 30 s
+  window, so both went red on a verdict that quoted the id; the window is
+  120 s now, and run 78 was green on both legs (`PASS`, 41 s and 46 s after
+  the tap). Still the Simulator, still no iPhone.
+- **Parity with Flutter's `quick_actions` — compared 2026-09-15, two real
+  gaps.** Four of the five top open feature requests on Flutter's tracker
+  (bitmap icons, SF Symbols, a max-count accessor, managing existing
+  shortcuts) are things this package already ships, and their plugin replaces
+  the whole dynamic-shortcut set where we merge behind an ownership marker.
+  What they have and we do not: Android `reportShortcutUsed` fired
+  automatically on every tap (we expose the API but never call it — belongs in
+  the trampoline, and it would cover static shortcuts too), and a one-call
+  "make the set exactly this" mutator. Smaller: `AddList`/`RemoveAll` return
+  `void`, a build warning when R8 is on without the keep rule, an earlier
+  `Info.plist`-driven scene-hook install, coex-probe assertions over the iOS
+  marshalling layer, and the full 29-row `IconType` table in the README.
+  Sources and the five refuted claims are in
+  [`docs~/flutter-quick-actions-parity-2026-09.md`](https://github.com/emindeniz99/unity-quick-actions/blob/main/docs~/flutter-quick-actions-parity-2026-09.md).
+- **CI wall clock (40–53 min per run) — the cache is not the lever.** The
+  Library cache hits its primary key on every Unity leg; what costs the
+  minutes is the self-imposed `needs:` chain plus `max-parallel: 2`, the
+  per-job GameCI image pull and activation, and the iOS simulator's first
+  boot behind GitHub's five-concurrent-macOS cap. Decided order, none of it
+  implemented yet: ARM64 simulator export (the testbeds still export x86_64
+  by omission), un-chain the Unity jobs, move the Xcode 27 canaries to the
+  cron, fold `ios-springboard` into `ios-simulator` with a pre-booted
+  simulator. Sources, numbers and the things ruled out (image cache,
+  DerivedData, AVD snapshots, larger runners) are in
+  [`docs~/ci-cost-and-caching-research-2026-09.md`](https://github.com/emindeniz99/unity-quick-actions/blob/main/docs~/ci-cost-and-caching-research-2026-09.md).
+- **Xcode 16.4 legs (`macos-15`) — keep, retarget or drop: decision deferred
+  to October 2026.** Since 2026-04-28 App Store Connect accepts only builds
+  made with Xcode 26+ and the iOS 26 SDK, Xcode 27 went GA on 2026-09-14, and
+  the iOS 27 SDK becomes mandatory in April 2027 — with the scene lifecycle
+  mandatory for apps built with it. CI keeps the existing legs unchanged and
+  adds `xcode-27` canaries that never gate. The measurements, the sources and
+  the options are in
+  <https://github.com/emindeniz99/unity-quick-actions/blob/main/docs~/ios-toolchain-and-ui-test-research-2026-09.md>;
+  re-read the canaries' results and that record before deciding.
 - **Documentation site (considered, deliberately deferred — revisit trigger now
   met)** — the reference docs live in a single [README](./README.md) that has
   roughly tripled since this entry was written (590 lines then, well past 900

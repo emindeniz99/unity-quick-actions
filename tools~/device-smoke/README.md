@@ -7,8 +7,9 @@ a tap on one really comes back into the game. That is what this directory is
 for.
 
 Android has `adb`, so that half is automated: `android_device_smoke.sh`.
-iOS has no equivalent — see [iOS](#ios--no-automation-shipped) below, which
-documents the manual run instead of pretending it is covered.
+iOS has no `adb`, but it does have SpringBoard driven by XCUITest — see
+[iOS](#ios--the-springboard-tap-lives-in-toolsios-ui) below, which points at
+that harness and keeps the manual device run.
 
 ## `android_device_smoke.sh`
 
@@ -76,14 +77,22 @@ default 5 — an emulator's GPU process tears the dead app's Vulkan objects
 down asynchronously, and launching the new process into that teardown left a
 restarted player engine-silent in CI).
 
-One wait has a second chance built in. Step 5 spends half of
+Two waits have a second chance built in, the same one. Step 5 spends half of
 `SHORTCUT_ATTEMPTS`, and if by then nothing has been published *and* the Unity
-player has not logged a single line under logcat's `Unity` tag, it force-stops
-the app and launches it once more (loudly, on stderr) before spending the other
-half. That is the API 30 emulator's known failure mode — the activity comes to
-the foreground and the player never initialises, seen twice on APKs that passed
-unchanged on the next run — not the package's. A player that did come up and
-still published nothing is not relaunched: that would be a real failure.
+player has not logged a single line under logcat's `Unity` tag — beyond the
+Java shim's own (`UnityPlayerActivity` prints `CommandLine:`,
+`onActivityResumed:`, `onResume`, `windowFocusChanged:` under that tag before
+any native player exists; those do not count) — it force-stops the app and
+launches it once more (loudly, on stderr) before spending the other half. Step
+8 does the same with half of `COLD_LOG_ATTEMPTS`: the buffer is cleared right
+before the cold tap, so "logged nothing" there means nothing since that start,
+and the relaunch is a second cold tap (force-stop first, same id), so what the
+step proves does not change. That is the API 30 emulator's known failure mode
+— the activity comes to the foreground and the player never initialises, seen
+on the launch in runs 52, 65 and 76 and on the cold tap in run 79
+(2026-09-15), every time on APKs that passed unchanged on the next run — not
+the package's. A player that did come up and still published nothing is not
+relaunched: that would be a real failure.
 
 ### What it asserts — and what it does not
 
@@ -232,24 +241,23 @@ the older, standalone lane: it takes a URL to an already-built APK and runs
 this script against an API 30 emulator, `workflow_dispatch`-only. It predates
 the licence secrets and is kept for driving an APK this repo did not build.
 
-## iOS — no automation shipped
+## iOS — the SpringBoard tap lives in `tools~/ios-ui`
 
-There is no `adb` analog for iOS, and the gap is not one that a script can paper
-over:
+There is no `adb` analog for iOS: a quick-action tap is delivered by
+**SpringBoard**, no public `simctl` command triggers one, and the package uses
+no URL scheme, so `simctl openurl` cannot stand in for a tap. What can reach
+the home-screen menu is an **XCUITest bundle driving SpringBoard**, and that is
+what [`tools~/ios-ui`](../ios-ui/README.md) is: no host app, unsigned, run by
+CI's `ios-springboard` job on the simulator it boots — long-press the icon,
+tap `Daily Reward`, read the id back from the marker the testbed writes on
+`Performed`. Same verdict vocabulary as the capture above (`PASS` / `SKIPPED`
+/ `FAIL`), same rule — the automation's own misses are `SKIPPED`; only a tap
+SpringBoard accepted that delivered nothing, or a menu that opened without the
+app's quick actions, is a `FAIL` — with one deliberate difference: a run with
+no verdict at all is red there, not green. Read that README for what it
+asserts and what it cannot.
 
-* A quick-action tap is delivered by **SpringBoard** to the app delegate
-  (`application:performActionForShortcutItem:` / the launch-options path). No
-  public `simctl` command triggers one, and the package uses no URL scheme, so
-  `simctl openurl` cannot stand in for a tap.
-* The home-screen long-press menu is SpringBoard UI. Reaching it programmatically
-  means an XCUITest bundle driving SpringBoard. Two of its three prerequisites
-  now exist: `.github/workflows/unity-ci.yml` builds the Xcode project on a
-  licensed Unity and compiles it on a macOS runner, where it also boots a
-  simulator and cold-launches the app. What is still missing is the XCUITest
-  target itself — and `simctl` still cannot read `UIApplicationShortcutItems`
-  or trigger a tap, so the assertion above remains out of reach.
-
-So the iOS half is run **by hand**:
+The **manual** run below is still the only way to observe a physical iPhone:
 
 1. Build the Demo sample for iOS with `QUICKACTIONS_ENABLED` and open the
    generated Xcode project.

@@ -1123,8 +1123,12 @@ scene manifest) under a mock native host and asserts by name that the scene
 hooks land on `UnityScene` — via the configuration wrapper, and via the
 `UISceneWillConnectNotification` fallback when the host shadows the selector —
 and that a cold launch item and a warm tap are each queued exactly once. Every
-one of those is a synthetic send; a tap UIKit itself delivers (SpringBoard,
-`connectionOptions`) and any physical device remain open. OS read-back can't recover icons natively; the package persists icon
+one of those is a synthetic send. The `ios-springboard` leg adds the tap UIKit
+itself delivers: an XCUITest bundle long-presses the icon on the Simulator's
+home screen and taps the `daily_reward` row, and on 2026-09-15 (run 77) that
+tap cold-started both the 2022.3.62f3 / iOS 18.6 and the 6000.3.21f1 / iOS 26.5
+exports with `daily_reward` reaching `Performed`. Any physical device remains
+open. OS read-back can't recover icons natively; the package persists icon
 identity in its ownership-marker payload — Android extras, iOS `userInfo` — so
 reconciled items keep their icons on both platforms.
 
