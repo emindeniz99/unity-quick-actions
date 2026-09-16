@@ -2570,7 +2570,14 @@ jobs:
           set -euo pipefail
           APP="$(find "$RUNNER_TEMP/DerivedData/Build/Products/Release-iphonesimulator" -maxdepth 1 -name '*.app' -print -quit)"
           [ -n "$APP" ] || { echo "no .app produced"; exit 1; }
-          UDID="$(xcrun simctl list devices available --json | python3 -c '
+          # Report the toolchain AND the runtime. Which iOS a leg actually ran
+          # was unanswerable from these logs before: the selector takes the
+          # NEWEST installed iOS runtime, which is a property of the runner
+          # image, not of anything we pin. Print it so every verdict carries the
+          # iOS version it was measured on.
+          xcodebuild -version
+          xcrun simctl list runtimes | sed -n '/iOS/p'
+          SEL="$(xcrun simctl list devices available --json | python3 -c '
           import json, sys
           devices = json.load(sys.stdin)["devices"]
           for runtime in sorted(devices, reverse=True):
@@ -2578,9 +2585,11 @@ jobs:
                   continue
               for device in devices[runtime]:
                   if device.get("isAvailable") and "iPhone" in device["name"]:
-                      print(device["udid"]); raise SystemExit
+                      print(device["udid"], runtime, device["name"], sep="|")
+                      raise SystemExit
           raise SystemExit("no available iPhone simulator")')"
-          echo "Using simulator $UDID"
+          UDID="${SEL%%|*}"
+          echo "Using simulator $SEL"
           xcrun simctl boot "$UDID"
           xcrun simctl bootstatus "$UDID" -b
           xcrun simctl install "$UDID" "$APP"
@@ -2682,7 +2691,14 @@ jobs:
           set -euo pipefail
           APP="$(find "$RUNNER_TEMP/DerivedData/Build/Products/Release-iphonesimulator" -maxdepth 1 -name '*.app' -print -quit)"
           [ -n "$APP" ] || { echo "no .app produced"; exit 1; }
-          UDID="$(xcrun simctl list devices available --json | python3 -c '
+          # Report the toolchain AND the runtime. Which iOS a leg actually ran
+          # was unanswerable from these logs before: the selector takes the
+          # NEWEST installed iOS runtime, which is a property of the runner
+          # image, not of anything we pin. Print it so every verdict carries the
+          # iOS version it was measured on.
+          xcodebuild -version
+          xcrun simctl list runtimes | sed -n '/iOS/p'
+          SEL="$(xcrun simctl list devices available --json | python3 -c '
           import json, sys
           devices = json.load(sys.stdin)["devices"]
           for runtime in sorted(devices, reverse=True):
@@ -2690,9 +2706,11 @@ jobs:
                   continue
               for device in devices[runtime]:
                   if device.get("isAvailable") and "iPhone" in device["name"]:
-                      print(device["udid"]); raise SystemExit
+                      print(device["udid"], runtime, device["name"], sep="|")
+                      raise SystemExit
           raise SystemExit("no available iPhone simulator")')"
-          echo "Using simulator $UDID"
+          UDID="${SEL%%|*}"
+          echo "Using simulator $SEL"
           xcrun simctl boot "$UDID"
           xcrun simctl bootstatus "$UDID" -b
           xcrun simctl install "$UDID" "$APP"
@@ -2861,7 +2879,14 @@ jobs:
           set -euo pipefail
           APP="$(find "$RUNNER_TEMP/DerivedData/Build/Products/Release-iphonesimulator" -maxdepth 1 -name '*.app' -print -quit)"
           [ -n "$APP" ] || { echo "no .app produced"; exit 1; }
-          UDID="$(xcrun simctl list devices available --json | python3 -c '
+          # Report the toolchain AND the runtime. Which iOS a leg actually ran
+          # was unanswerable from these logs before: the selector takes the
+          # NEWEST installed iOS runtime, which is a property of the runner
+          # image, not of anything we pin. Print it so every verdict carries the
+          # iOS version it was measured on.
+          xcodebuild -version
+          xcrun simctl list runtimes | sed -n '/iOS/p'
+          SEL="$(xcrun simctl list devices available --json | python3 -c '
           import json, sys
           devices = json.load(sys.stdin)["devices"]
           for runtime in sorted(devices, reverse=True):
@@ -2869,9 +2894,11 @@ jobs:
                   continue
               for device in devices[runtime]:
                   if device.get("isAvailable") and "iPhone" in device["name"]:
-                      print(device["udid"]); raise SystemExit
+                      print(device["udid"], runtime, device["name"], sep="|")
+                      raise SystemExit
           raise SystemExit("no available iPhone simulator")')"
-          echo "Using simulator $UDID"
+          UDID="${SEL%%|*}"
+          echo "Using simulator $SEL"
           xcrun simctl boot "$UDID"
           xcrun simctl bootstatus "$UDID" -b
           xcrun simctl install "$UDID" "$APP"
