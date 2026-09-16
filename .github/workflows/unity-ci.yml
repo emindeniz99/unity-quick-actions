@@ -2041,6 +2041,34 @@ jobs:
           buildMethod: TestbedBuilder.BuildAndroidPhoneNoDefine
           versioning: None
           allowDirtyBuild: true
+      # Where do the plugin .java files sit in the generated Gradle project?
+      #
+      # The define-off APK still carries both plugin classes in classes.dex (the
+      # assertion below counts them: 4 refs either way). The stripper's header
+      # explains that as "Unity cannot conditionally exclude a loose native
+      # source from compilation" - true of UNITY's own mechanism, since
+      # PluginImporter defineConstraints is a managed-plugin feature. But it does
+      # not follow that WE cannot: QuickActionsTrampolineStripperAndroid runs on
+      # IPostGenerateGradleAndroidProject, after the Gradle project is generated
+      # and before Gradle compiles it, and already deletes files under
+      # unityLibrary/src/main (res/xml, res/values, res/raw). If the .java lands
+      # there too, the same hook could delete it.
+      #
+      # This step answers that empirically instead of by argument, and is purely
+      # informational: it must never fail the job, whatever it finds. Read its
+      # output before deciding whether stripping the sources is even possible.
+      - name: Where the plugin .java lands in the generated Gradle project
+        continue-on-error: true
+        run: |
+          set -uo pipefail
+          echo "--- any .java under the testbed's Library mentioning quickactions ---"
+          find "$TESTBED/Library" -name '*.java' -path '*quickactions*' 2>/dev/null | sed "s|^|  |" || true
+          echo "--- unityLibrary source roots (depth-limited) ---"
+          find "$TESTBED/Library" -type d -path '*unityLibrary/src/main*' -maxdepth 12 2>/dev/null \
+            | head -40 | sed "s|^|  |" || true
+          echo "--- any .java anywhere under Library/Bee (first 40) ---"
+          find "$TESTBED/Library" -name '*.java' 2>/dev/null | head -40 | sed "s|^|  |" || true
+          echo "(informational only - this step never fails the job)"
       # Invocation 3 of 3: the define-off iOS Simulator export.
       - name: Export the define-off iOS project
         uses: game-ci/unity-builder@d829bfc901f2347c8fe18898f06712b66916ef42 # v5.0.0

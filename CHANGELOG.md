@@ -15,6 +15,17 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **The define-off CI job now prints where Unity puts the plugin `.java`.** The
+  define-off APK carries both plugin classes in `classes.dex` (the job counts
+  them: 4 references either way), and the reason given for not stripping them
+  was "Unity cannot conditionally exclude a loose native source". That is true of
+  *Unity's* mechanism — `PluginImporter.defineConstraints` gates managed plugins
+  — but it never established that *this package* cannot: its Gradle
+  post-processor runs before Gradle compiles and already deletes `res/xml`,
+  `res/values` and `res/raw` from `unityLibrary`. Whether the `.java` lands under
+  that same root was never checked. An informational step (it cannot fail the
+  job) now lists it, and the wording in the stripper and the README no longer
+  claims more than is known.
 - **`QuickActions.SetList(IList<QuickActionItem>)` — make the set exactly this
   list in one call.** Previously this took `RemoveAll()` then `AddList(...)`,
   which is subtly wrong: `RemoveAll` keeps the in-memory list when the OS

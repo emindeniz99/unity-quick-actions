@@ -13,10 +13,24 @@
 // stale-assembly COHERENCE check that fails the build loudly instead of choosing
 // a side. It only depends on UNITY_ANDROID. Note: both plugin .java files (this
 // trampoline and the bridge, ~20 KB of bytecode together) still compile into the
-// APK as dead, unreachable classes unless R8 minification removes them — Unity
-// cannot conditionally exclude a loose native source from compilation. For a
-// literally-zero production footprint, keep the package out of the prod project
-// entirely (see README "Dev-only").
+// APK as dead, unreachable classes unless R8 minification removes them. They are
+// unreachable either way — with the define off no <activity> is registered and
+// no managed code calls the bridge — but the bytecode is there, and the
+// define-off CI job counts it rather than gating it.
+//
+// The reason is narrower than "it cannot be done", and the earlier wording here
+// overstated it. What is true: UNITY has no mechanism for this — PluginImporter's
+// defineConstraints is a managed-plugin feature and does not gate a loose native
+// source. What is NOT established: whether THIS class could delete them. It runs
+// on IPostGenerateGradleAndroidProject, after the Gradle project is generated and
+// before Gradle compiles it, and it already deletes files under
+// unityLibrary/src/main (res/xml, res/values, res/raw). If Unity copies the loose
+// .java under that same root, the same hook could remove it. Nobody has checked
+// where it lands — the define-off CI job now prints that, and the answer decides
+// whether this is a missing gate or a real impossibility.
+//
+// For a literally-zero production footprint today, keep the package out of the
+// prod project entirely (see README "Dev-only").
 using System.IO;
 using System.Linq;
 using System.Xml;

@@ -339,8 +339,15 @@ Constraints only work for managed code, **not** native plugins):
   launched (the package is **inert**). One caveat: the two plugin `.java` files
   (the trampoline and the bridge, ~20 KB of bytecode together) still compile
   into the APK as dead, unreachable classes unless R8 minification removes
-  them — Unity can't conditionally exclude a loose native source. The `gate-off`
-  CI job's APK diff reports exactly what remains. For a *literally*-zero Android
+  them. The claim to make here is narrow: **Unity** has no mechanism for it —
+  `PluginImporter`'s `defineConstraints` gates managed plugins, not a loose
+  native source. Whether this package's own Gradle post-processor could delete
+  them before Gradle compiles (it already deletes `res/xml`, `res/values` and
+  `res/raw` from the same module) is **not established** — the `gate-off` CI job
+  now prints where Unity puts those `.java` files, and that answer decides it.
+  Either way they are unreachable: no `<activity>` is registered and no managed
+  code calls the bridge. The `gate-off` job's APK diff reports exactly what
+  remains. For a *literally*-zero Android
   footprint, keep the package out of the prod project (see below). All these
   post-processors edit the **build output**, so they work for read-only UPM
   packages.
