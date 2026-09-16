@@ -32,17 +32,23 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   the seeder records which one arrived. A seed that never lands is the harness
   missing, so it reports `SKIPPED`; a menu that opens without the row after a
   confirmed seed is a `FAIL` like any other missing quick action.
-- **The define-off CI job now prints where Unity puts the plugin `.java`.** The
-  define-off APK carries both plugin classes in `classes.dex` (the job counts
-  them: 4 references either way), and the reason given for not stripping them
-  was "Unity cannot conditionally exclude a loose native source". That is true of
-  *Unity's* mechanism — `PluginImporter.defineConstraints` gates managed plugins
-  — but it never established that *this package* cannot: its Gradle
-  post-processor runs before Gradle compiles and already deletes `res/xml`,
-  `res/values` and `res/raw` from `unityLibrary`. Whether the `.java` lands under
-  that same root was never checked. An informational step (it cannot fail the
-  job) now lists it, and the wording in the stripper and the README no longer
-  claims more than is known.
+- **With the define off, the package's Java no longer ships at all.** The
+  define-off APK used to carry both plugin classes in `classes.dex` — dead and
+  unreachable, but there (4 dex references, the same as a define-on build) — and
+  the reason given was "Unity cannot conditionally exclude a loose native
+  source". That is true of *Unity's* mechanism (`PluginImporter.defineConstraints`
+  gates managed plugins) but it never established that *this package* cannot.
+  A CI step added in this release printed the answer: Unity stages the sources at
+  `unityLibrary/src/main/java/com/emindeniz99/quickactions/` — the very module
+  whose `res/xml`, `res/values` and `res/raw` the ungated stripper already
+  deletes — and that callback runs eleven seconds after the copy, before Gradle
+  reads the source set. So `QuickActionsTrampolineStripperAndroid` now deletes
+  that directory, and `gate-off` **requires zero** references to it in the
+  define-off dex instead of merely counting them. Only the package's own
+  directory goes, never a source root, so Unity's `UnityPlayerActivity`, a host
+  app's Java and another plugin's are untouched — three tests pin both ends. The
+  Java package name the directory is derived from is pinned by
+  `tools~/check_frozen_strings.py`, so a rename cannot silently un-gate it.
 - **`QuickActions.SetList(IList<QuickActionItem>)` — make the set exactly this
   list in one call.** Previously this took `RemoveAll()` then `AddList(...)`,
   which is subtly wrong: `RemoveAll` keeps the in-memory list when the OS

@@ -363,18 +363,20 @@ Constraints only work for managed code, **not** native plugins):
   nothing is injected, and an *ungated* post-processor
   (`Editor/NativeGate/QuickActionsTrampolineStripperAndroid`) additionally
   strips any pre-existing entry (defense in depth), so the trampoline can't be
-  launched (the package is **inert**). One caveat: the two plugin `.java` files
-  (the trampoline and the bridge, ~20 KB of bytecode together) still compile
-  into the APK as dead, unreachable classes unless R8 minification removes
-  them. The claim to make here is narrow: **Unity** has no mechanism for it —
-  `PluginImporter`'s `defineConstraints` gates managed plugins, not a loose
-  native source. Whether this package's own Gradle post-processor could delete
-  them before Gradle compiles (it already deletes `res/xml`, `res/values` and
-  `res/raw` from the same module) is **not established** — the `gate-off` CI job
-  now prints where Unity puts those `.java` files, and that answer decides it.
-  Either way they are unreachable: no `<activity>` is registered and no managed
-  code calls the bridge. The `gate-off` job's APK diff reports exactly what
-  remains. For a *literally*-zero Android
+  launched (the package is **inert**). Since **0.7.0** that same ungated
+  post-processor also deletes the two plugin `.java` **sources** — Unity stages
+  them into `unityLibrary/src/main/java/com/emindeniz99/quickactions/`, the very
+  module whose `res/xml`, `res/values` and `res/raw` it already cleans, and the
+  callback runs before Gradle reads the source set — so they are no longer
+  compiled at all. Through 0.6.x they shipped as dead, unreachable classes
+  (~20 KB of bytecode) unless R8 minification removed them: **Unity** has no
+  mechanism for gating a loose native source (`PluginImporter`'s
+  `defineConstraints` is a managed-plugin feature), and that was taken to mean
+  nobody could. The `gate-off` CI job now requires **zero** references to
+  `com/emindeniz99/quickactions/` in the define-off `classes.dex`, alongside the
+  manifest, resource and IL2CPP-metadata checks it already made. Only the
+  package's own directory is removed, never a source root, so nothing of yours
+  or of another plugin is touched. For a *literally*-zero Android
   footprint, keep the package out of the prod project (see below). All these
   post-processors edit the **build output**, so they work for read-only UPM
   packages.

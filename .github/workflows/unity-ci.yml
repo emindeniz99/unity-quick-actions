@@ -2043,22 +2043,20 @@ jobs:
           buildMethod: TestbedBuilder.BuildAndroidPhoneNoDefine
           versioning: None
           allowDirtyBuild: true
-      # Where do the plugin .java files sit in the generated Gradle project?
+      # Where the plugin .java files sit in the generated Gradle project.
       #
-      # The define-off APK still carries both plugin classes in classes.dex (the
-      # assertion below counts them: 4 refs either way). The stripper's header
-      # explains that as "Unity cannot conditionally exclude a loose native
-      # source from compilation" - true of UNITY's own mechanism, since
-      # PluginImporter defineConstraints is a managed-plugin feature. But it does
-      # not follow that WE cannot: QuickActionsTrampolineStripperAndroid runs on
-      # IPostGenerateGradleAndroidProject, after the Gradle project is generated
-      # and before Gradle compiles it, and already deletes files under
-      # unityLibrary/src/main (res/xml, res/values, res/raw). If the .java lands
-      # there too, the same hook could delete it.
+      # This step asked an open question when it was added, and run 93 answered
+      # it: the sources are staged at
+      # unityLibrary/src/main/java/com/emindeniz99/quickactions/, the same
+      # unityLibrary root QuickActionsTrampolineStripperAndroid is handed on
+      # IPostGenerateGradleAndroidProject, and the callback runs eleven seconds
+      # after the copy and before Gradle reads the source set. So the stripper
+      # deletes them, and the dex assertion below requires a define-off count of
+      # zero.
       #
-      # This step answers that empirically instead of by argument, and is purely
-      # informational: it must never fail the job, whatever it finds. Read its
-      # output before deciding whether stripping the sources is even possible.
+      # It stays because it is now the diagnostic for that assertion: a leak means
+      # Unity staged the sources somewhere this listing will show. Purely
+      # informational - it must never fail the job, whatever it finds.
       - name: Where the plugin .java lands in the generated Gradle project
         continue-on-error: true
         run: |
@@ -2155,10 +2153,13 @@ jobs:
             [ "${meta:-0}" -gt 0 ] && hits="$hits metadata:EminDeniz99.QuickActions(x$meta)"
             printf '%s' "$hits"
           }
-          # The two plugin .java classes are compiled into EVERY build (Unity cannot
-          # gate a loose native source), so the dex is not part of the gate — but it
-          # is counted, so the "dead classes remain" line in the docs is a number
-          # from this run rather than a belief. Diagnostics to stderr, count to stdout.
+          # The two plugin .java classes. Until 0.7.0 they were compiled into EVERY
+          # build and this counted them without gating them (4 references either
+          # way); the stripper now deletes the staged sources under
+          # unityLibrary/src/main/java before Gradle reads the source set, so the
+          # define-off count must be ZERO and this is part of the gate. The step
+          # above it prints where the sources are, which is the first thing to read
+          # when this fails. Diagnostics to stderr, count to stdout.
           dex_refs() {
             local apk="$1" dex
             dex="$(unzip -p "$apk" 'classes*.dex' 2>/dev/null | strings -a || true)"
@@ -2171,8 +2172,9 @@ jobs:
           off_dex="$(dex_refs "$OFF_APK")"
           echo "define ON  ($ON_APK):$on_hits"
           echo "define OFF ($OFF_APK):${off_hits:-<nothing of the package>}"
-          echo "dex references to com/emindeniz99/quickactions/: define ON $on_dex, define OFF $off_dex (the two plugin classes ship either way — documented, counted, not gated)"
+          echo "dex references to com/emindeniz99/quickactions/: define ON $on_dex, define OFF $off_dex (define off must be 0 — the stripper deletes the staged .java before Gradle compiles it)"
           [ "$on_dex" -gt 0 ] || { echo "CONTROL FAILED: the define-on dex carries no package class reference, so the dex count cannot be trusted."; exit 1; }
+          [ "$off_dex" -eq 0 ] || { echo "GATE LEAK: the define-off dex still carries $off_dex reference(s) to com/emindeniz99/quickactions/ — the plugin sources were not stripped. Read the '.java lands' step above for where Unity staged them."; exit 1; }
           # Control first: EVERY probe scan() knows must fire on the define-on APK,
           # or the check is blind to that probe and says so instead of passing.
           for want in res:quickactions_shortcuts res:quickactions_keep res:qa_short_ res:qa_long_ res:ic_quickaction_builtin_ \
@@ -2193,7 +2195,7 @@ jobs:
             unzip -p "$OFF_APK" assets/bin/Data/Managed/Metadata/global-metadata.dat | strings -a | grep 'EminDeniz99.QuickActions' || echo "(none)"
             exit 1
           fi
-          echo "PASS: nothing of the package in the define-off APK (manifest, resources, IL2CPP metadata); the dex keeps the two plugin classes ($off_dex references), as documented"
+          echo "PASS: nothing of the package in the define-off APK — manifest, resources, IL2CPP metadata, and now the dex too ($off_dex references to the plugin classes)"
       - name: Measure the package's footprint (define-on APK minus define-off APK)
         env:
           OFF_APK: Examples~/Testbed2022/Builds/NoDefine-phone.apk
