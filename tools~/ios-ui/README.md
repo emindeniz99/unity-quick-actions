@@ -149,9 +149,27 @@ Both channels at once — an environment variable through simctl's
 `SIMCTL_CHILD_` prefix and a launch argument — because which of the two an
 IL2CPP player on iOS actually receives is not documented anywhere we could
 check. The seeder writes `Documents/quickactions-seeded.log` naming the one it
-saw (`added runtime_add (asked via env)`), which is both the answer to that
-question and CI's signal that the shortcut is published; the app is then
-terminated so the tap still cold-starts it. No seed file means the harness
+saw, and run 94 answered it on all three legs: **`added runtime_add (asked via
+env)`** — `Environment.GetEnvironmentVariable` sees the `SIMCTL_CHILD_`
+variable, and `Environment.GetCommandLineArgs()` never reported the launch
+argument (the seeder would have said `env+argv`). Both are still sent: the
+argument costs nothing and the day it starts arriving, the file says so. The
+file is also CI's signal that the shortcut is published; the app is then
+terminated so the tap still cold-starts it.
+
+Run 94 (2026-09-16) tapped the seeded row on all three legs: `PASS` 5 s after
+the tap on 2022.3 / iOS 26.2 and on 6000.3.21f1 / iOS 26.5, and SpringBoard's
+own menu held both kinds at once —
+
+```
+"New Game, Start a fresh run", "Continue, Resume your save",
+"Daily Reward, Claim today's gift", "Runtime Add, Added by QuickActions.Add"
+```
+
+— three from `Info.plist`, one from `QuickActions.Add`. The `unity6-xcode27`
+canary opened the same menu with the same four rows and its tap never
+delivered; the app was in the foreground 0 s after that tap (5 s on the green
+legs), so it did not cold-start there and the cause is not established. No seed file means the harness
 missed, not that the package failed, so that case is a `SKIPPED` with a
 warning — but a menu that opens **without** the row after a confirmed seed is a
 `FAIL`, like any other missing quick action.

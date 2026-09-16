@@ -31,7 +31,15 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   an IL2CPP player on iOS receives is not documented anywhere we could check;
   the seeder records which one arrived. A seed that never lands is the harness
   missing, so it reports `SKIPPED`; a menu that opens without the row after a
-  confirmed seed is a `FAIL` like any other missing quick action.
+  confirmed seed is a `FAIL` like any other missing quick action. **Run 94
+  (2026-09-16): `PASS` on both supported legs** — `runtime_add` reached
+  `Performed` 5 s after the tap on 2022.3 / iOS 26.2 and on 6000.3.21f1 /
+  iOS 26.5, and SpringBoard's menu held all four rows at once, three from
+  `Info.plist` and one from `QuickActions.Add`. It also answered the seeding
+  question: the player sees the `SIMCTL_CHILD_` environment variable, never the
+  launch argument. The `unity6-xcode27` canary opened the same menu and its tap
+  never delivered, with the app in the foreground 0 s after it (5 s on the green
+  legs), so it did not cold-start there and the cause is not established.
 - **With the define off, the package's Java no longer ships at all.** The
   define-off APK used to carry both plugin classes in `classes.dex` — dead and
   unreachable, but there (4 dex references, the same as a define-on build) — and
