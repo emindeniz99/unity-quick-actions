@@ -11,6 +11,20 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 > as its own section because each is a distinct, self-contained set of API
 > additions; read them as the package's development log.
 
+## [Unreleased]
+
+### Fixed
+
+- **A shortcut tap arrives as `Performed` on real Android hardware.** Every tap
+  this package had ever observed was an emulator's or the iOS Simulator's. On
+  2026-09-17 the owner long-pressed the demo icon on a Moto G Play 2024
+  (Android 14, the `quickactions-demo-apk-2022.3` artifact) and tapped the
+  runtime-added `daily` row — "Claim today", the long label Android renders —
+  and the id reached `Performed`. Recorded with the limit it has: the run did
+  not note whether the app had been force-stopped first, so **cold and warm
+  delivery are still not distinguished on hardware**. No code changed; the docs
+  that listed hardware tap delivery as unverified no longer do.
+
 ## [0.7.0] - 2026-09-16
 
 ### Added

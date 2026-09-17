@@ -15,8 +15,8 @@ the two must not disagree.
 Runner only (JsonUtility) · `static` = compiles in the stub harness (11 configs) ·
 `review` = code review, several adversarial rounds (see git log) ·
 `device` = **requires a real physical device** — Android partially done
-(2026-08-07, Moto G Play 2024: static + dynamic shortcuts render, tap delivery
-not yet captured); iOS not done. See "Exact remaining steps" below ·
+(Moto G Play 2024: static + dynamic shortcuts render 2026-08-07, a tap arrives
+as `Performed` 2026-09-17 without cold/warm being distinguished); iOS not done. See "Exact remaining steps" below ·
 `editor-2022.3` = **executed in a real licensed Unity 2022.3.9f1 Editor
 (2026-07-17)** — import 0 errors, Test Runner 35/35 (historical count), real
 player builds (incl. Android APKs); re-run on **2022.3.62f3** — import 0
@@ -68,7 +68,7 @@ says "6.3" for work dated later than 2026-07-17, the Editor was `6000.3.21f1`.
 | iOS UIScene lifecycle (2022.3.72f1+ / 6000.0.68f1+ / 6000.3.8f1+ — on the 2022.3 line that patch is XLTS-branded and absent from Unity Hub's picker, which lists 2022.3.62f3 as its newest; see the README's iOS note) — scene-delegate discovery + cold/warm capture | review + **CI mock-host coexistence leg (Testbed6 6000.3.21f1, iOS Simulator)** | ✅ **CI** (first run 2026-09-02) — `ios-simulator-coex (unity6-coex)` launches the scene-manifest export twice under a mock host that is at once an `IMPL_APP_CONTROLLER_SUBCLASS` subclass, a vendor-style category swizzle and a GoogleUtilities-style isa proxy: on the default launch the package's configuration wrapper installs the scene hooks on `UnityScene` before `willConnect` (`[QuickActions] iOS scene hooks installed on UnityScene via configuration`); on the second, where the host shadows `application:configurationForConnectingSceneSession:options:` without calling super, the `UISceneWillConnectNotification` fallback installs them (`via notification`). Both launches pass by name: `lifecycle-scene`, `scene-delegate-is-unityscene`, `scene-config-delegate-class`, `scene-warm-hook-installed`, the cold launch item queued once with `NO` returned and the host's discarded `NO` not double-delivering, a warm tap through `windowScene:performActionForShortcutItem:` queued once with one completion, an unmarked item's completion run once. Synthetic sends there; the `ios-springboard (unity6)` leg adds SpringBoard's own tap on this export — run 77 (2026-09-15): an XCUITest bundle long-pressed the icon, tapped the context-menu row `daily_reward`, the app cold-started and the id reached `Performed` (the testbed's marker file) 41–54 s after the touch, iOS 26.5; run 78, with the 120 s window, `PASS` (46 s) — the first cold tap UIKit itself has delivered on the scene manifest (the app was not running, so UIKit could only hand it over in `connectionOptions`; the test does not see the hook itself); run 94 added a second tap per leg on `runtime_add`, published by `QuickActions.Add` at runtime rather than baked into `Info.plist` — `PASS` 5 s after the tap on iOS 26.5, all four rows in one menu. The `unity6-xcode27` canary took the same tap on iOS 27.0 and nothing arrived, with the app in the foreground 0 s after it (so no cold start); cause not established, and no Unity line supports that toolchain yet. Not covered: the first cold tap in the shadowed shape, any device |
 | Android JNI bridge + `ShortcutManager` + manifest-collision guard + JNI-safe reads | static + review | ✅ Java compiles (SDK stubs) & reviewed; **device**: real `ShortcutManager` |
 | Android trampoline (version-proof, foreground task) | review + **editor-2022.3 + editor-6.x** (declared in real APKs on both activity paths — see §4 injector row) | ⏳ **device** — injection is build-proven on the `UnityPlayerActivity` path (2021.3, 2022.3) **and** the Unity 6 `UnityPlayerGameActivity` path (6.3); tap delivery is proven on **CI emulators** — the adb smoke starts the exported trampoline with a registered id on 2021.3/2022.3 (API 30) and Unity 6 (API 35), and both a warm tap and a post-`force-stop` cold tap arrive as `Performed`, which also exercises the ownership gate. Those taps are `am start` — the intent the launcher builds, built by the script; the capture tail now also taps a row of the **launcher's own popup** after force-stopping the app and requires the id to arrive, but only when the launcher actually opened the sheet (otherwise it records SKIPPED and the run stays green), so it is opportunistic evidence rather than a gate. **First run 2026-09-11 (PR #23): `PASS` on all four legs** — 2021.3, 2022.3 and 2022.3-release on API 30, unity6 on API 35 — each one a real long press, a real tap on the "Claim today" row and `Performed quick action 'daily'` from a force-stopped app, the minified release build included; ⏳ **device** — a launcher tap on physical hardware is still unobserved |
-| Cold + warm delivery end-to-end | review + **editor-6.x iOS Simulator run** (cold half) + **CI emulator smoke** (Android, all three lines) | ⏳ **device** — the iOS **cold** path is proven on the Simulator: by hand on 6.3, and by CI's `ios-springboard` legs (run 77, 2026-09-15) on 2022.3.62f3 / iOS 18.6 and 6000.3.21f1 / iOS 26.5, where SpringBoard's own context-menu tap cold-started the app and `daily_reward` reached `Performed`; on Android both warm and cold delivery are proven on emulators (2021.3/2022.3 API 30, Unity 6 API 35 — the run that exposed and then confirmed the GameActivity beat). iOS **warm** re-entry, multiple buffered taps, and every path on physical hardware are still unobserved |
+| Cold + warm delivery end-to-end | review + **editor-6.x iOS Simulator run** (cold half) + **CI emulator smoke** (Android, all three lines) | ⏳ **device** — the iOS **cold** path is proven on the Simulator: by hand on 6.3, and by CI's `ios-springboard` legs (run 77, 2026-09-15) on 2022.3.62f3 / iOS 18.6 and 6000.3.21f1 / iOS 26.5, where SpringBoard's own context-menu tap cold-started the app and `daily_reward` reached `Performed`; on Android both warm and cold delivery are proven on emulators (2021.3/2022.3 API 30, Unity 6 API 35 — the run that exposed and then confirmed the GameActivity beat). iOS **warm** re-entry and multiple buffered taps are still unobserved; on hardware a Moto G Play 2024 tap arrived as `Performed` on 2026-09-17, without cold and warm being distinguished, and no iPhone has run any of it |
 
 ## 4. Editor / build-time features (Unity-only)
 
@@ -208,8 +208,9 @@ says "6.3" for work dated later than 2026-07-17, the Editor was `6000.3.21f1`.
   which is the cheapest way to tell before downloading ~10 GB.
 - **Device gate: PARTLY OPEN — one Android handset, nothing on iOS.** The 2026-08-07
   Moto G Play run (below) confirmed static shortcuts on a cold install, dynamic
-  `Add` and the same-id collision rule; tap delivery on hardware and every iPhone
-  check remain undone. The rest of this bullet is what is still missing on either
+  `Add` and the same-id collision rule, and a 2026-09-17 tap on the same handset
+  arrived as `Performed`; which of cold and warm that tap was, and every iPhone
+  check, remain undone. The rest of this bullet is what is still missing on either
   platform.** Everything marked ⏳ above needs each claimed Unity line (2021.3,
   2022.3, 6.0, 6.3 — full pass on all) + an iOS device (via macOS/Xcode) + an
   Android API-25+ device. Editor coverage so far: **2022.3.9f1** — managed gate
@@ -272,10 +273,17 @@ What is left is physical hardware.
      opening screenshot caption and the `Subtitle` row of the field table both
      say so, and it is worth knowing when authoring labels for Android.
 
-   Still open on Android: **tap delivery** — a shortcut tap arriving as
-   `Performed` on a cold and on a warm launch. The device run above published
-   and rendered shortcuts but did not capture a tap. That is a few minutes with
-   `adb logcat -s Unity` or by reading the demo's on-screen log.
+   **Tap delivery, closed 2026-09-17** — same handset, the
+   `quickactions-demo-apk-2022.3` artifact from CI. Long-pressing the icon and
+   tapping the runtime-added `daily` row ("Claim today", the long label Android
+   renders) delivered the id into the game as `Performed`. Every earlier tap
+   observation was an emulator's or the iOS Simulator's.
+
+   Still open on Android: **which launch state that tap was**. The run did not
+   record whether the app had been force-stopped, so cold and warm delivery are
+   not distinguished on hardware — the emulator smoke asserts each separately,
+   and the hardware run covers one of them without saying which. Re-running it
+   twice, once after `adb shell am force-stop`, would close it.
 
 Until step 3 passes on both platforms, ship honestly as a **`0.x`
 pre-device-validation release** (the first public one is `0.4.0`, tagged and

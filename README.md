@@ -167,9 +167,17 @@ the menu was read, not instrumented. Then the **define-off APK from the same CI
 run** was installed: long-pressing it showed **no quick actions at all**. That is
 the gate below proven on hardware rather than in an APK diff.
 
-**Still not verified on hardware:** a tap arriving as `Performed` (cold or
-warm), anything at all on a physical iPhone, and any Android newer than the 14
-on that handset — 17 is the current release. Plan on validating the tap path
+**A tap on that handset arrives as `Performed`** (2026-09-17). Long-pressing the
+demo icon and tapping the runtime-added `daily` row — "Claim today", the label
+Android shows — delivered the id into the game. Every earlier observation of a
+tap was an emulator's or the iOS Simulator's; this is the first on real
+hardware. What the run did **not** record is whether the app was force-stopped
+first, so **cold and warm delivery are not distinguished** — the emulator smoke
+covers both separately, hardware covers one of them without saying which.
+
+**Still not verified on hardware:** which of cold and warm that tap was,
+anything at all on a physical iPhone, and any Android newer than the 14 on that
+handset — 17 is the current release. Plan on validating the tap path
 on your own device before you ship. The 0.4.6 build-time
 [placeholders](#build-time-placeholders--app-info-on-long-press) are likewise
 covered by headless tests only — no device or Simulator run has happened since
