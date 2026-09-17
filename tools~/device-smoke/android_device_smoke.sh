@@ -578,9 +578,16 @@ CAPTURE_LABEL="${CAPTURE_LABEL:-QuickActionsDemo}"
 # QuickActionsSettings.asset bakes statically; the smoke's AUTOTEST=add3 re-adds
 # new_game and continue under the same ids (dropped as duplicates) and a dynamic
 # `daily`, which the sheet lists as a fourth row.
+# Continue's subtitle is "Resume v{version} ({build})" in the asset
+# and the value below is what the testbeds' Player Settings resolve it to
+# (bundleVersion 1.4.0, versionCode 37) — so this line is also the one place the
+# capture SHOWS a build-time placeholder rendered by a real launcher. It only
+# reports, though: the labels check prints yes/partial/no and the capture's one
+# assertion is the tap in step 7. The gate on the resolved value is CI's, in
+# assert_apk (the baked resource) and in the iOS Info.plist step.
 # (The default lives in its own variable: an apostrophe inside "${…:-…}" is a
 # quote to bash's parser and swallows the rest of the file.)
-default_titles="New Game=Start a fresh run|Continue=Resume your save|Daily Reward=Claim today's gift"
+default_titles="New Game=Start a fresh run|Continue=Resume v1.4.0 (37)|Daily Reward=Claim today's gift"
 CAPTURE_TITLES="${CAPTURE_TITLES:-$default_titles}"
 # The row the capture TAPS once the sheet is up, as "<id>|<title>|<subtitle>":
 # the id is what has to reach logcat, the two label forms are what the launcher

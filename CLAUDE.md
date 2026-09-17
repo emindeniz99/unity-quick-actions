@@ -74,10 +74,12 @@ the run to finish — read its result — then push.
   device behaviour as verified. (Android has no
   simulator equivalent; the 2021.3 line cannot do a Simulator run at all —
   Unity ships an x86_64-only simulator runtime there.) **Physical hardware is
-  partly covered**: one Android run (Moto G Play 2024 / Android 14) confirmed
-  static shortcuts on a cold install, runtime `Add`, and the static/dynamic
-  id-collision rule; a tap arriving as `Performed` on hardware, and any iPhone
-  run, are still unverified. Do not claim real-device behaviour you did not run;
+  partly covered**: Android runs on a Moto G Play 2024 / Android 14 confirmed
+  static shortcuts on a cold install, runtime `Add`, the static/dynamic
+  id-collision rule, and — 2026-09-17 — a tap on the runtime-added `daily` row
+  arriving as `Performed`. That tap did not record whether the app had been
+  force-stopped, so **cold and warm are not distinguished on hardware**. Any
+  iPhone run is still unverified. Do not claim real-device behaviour you did not run;
   the static harness cannot reach it.
 
 ## Commits

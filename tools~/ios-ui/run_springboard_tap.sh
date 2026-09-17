@@ -18,6 +18,7 @@
 #   QA_APP_NAME  the home-screen icon's label      (QuickActionsDemo)
 #   QA_DERIVED   derived data for the test bundle  (<out-dir>/DerivedData-ui)
 #   QA_PASS      what this pass is called in the summary            (the id)
+#   QA_EXPECT_LABEL  substring one button of the open menu must carry, or FAIL
 #   QA_LEG       the CI leg's name, for the summary heading
 #
 # Exit 0 on PASS and on SKIPPED — the automation's own misses never fail a run —
@@ -48,6 +49,9 @@ export TEST_RUNNER_QA_APP_NAME="$APP_NAME"
 export TEST_RUNNER_QA_ROW_TITLE="$ROW_TITLE"
 export TEST_RUNNER_QA_ACTION_ID="$ACTION_ID"
 export TEST_RUNNER_QA_MARKER="$MARKER"
+# Forwarded even when empty: xcodebuild only hands the runner TEST_RUNNER_* vars
+# it is itself given, and the test treats an empty value as "not checked".
+export TEST_RUNNER_QA_EXPECT_LABEL="${QA_EXPECT_LABEL:-}"
 
 set +e
 xcodebuild test \

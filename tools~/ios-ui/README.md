@@ -121,6 +121,16 @@ xcodebuild test -project SpringBoardTap.xcodeproj -scheme SpringBoardTap \
   -destination "id=$UDID" CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=""
 ```
 
+`QA_EXPECT_LABEL` is optional and opt-in: set it and the run FAILs unless some
+button of the **open** menu contains it. A substring, not the whole label —
+SpringBoard's "Title, Subtitle" format was read from other projects' tests, not
+from a contract, so matching only the part that matters survives a format change
+that an equality check would turn into a false red. CI passes the interpolated
+subtitle of the one static shortcut carrying build-time placeholders
+(`Resume v1.4.0 (37)`), which is how a resolved `{version}` /
+`{build}` is proven to reach a real home screen rather than only the files the
+build wrote.
+
 `xcodebuild` hands every `TEST_RUNNER_*` variable to the test runner with the
 prefix stripped. Without `QA_MARKER` the test cannot check delivery and reports
 `SKIPPED` after the launch (the launch is still in the evidence); CI always

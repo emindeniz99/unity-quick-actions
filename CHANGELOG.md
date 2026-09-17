@@ -11,6 +11,58 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 > as its own section because each is a distinct, self-contained set of API
 > additions; read them as the package's development log.
 
+## [Unreleased]
+
+### Added
+
+- **The demo shows a build-time placeholder, and CI gates on the resolved
+  value.** `{version}` / `{build}` and friends landed in 0.4.6 with headless
+  tests only: no build CI produced, and no device or Simulator anyone ran, had
+  ever carried one, so what a resolved `v1.4.0 (37)` looks like on a real home
+  screen was unconfirmed. Every testbed now bakes `Continue`'s subtitle as
+  `Resume v{version} ({build})` and pins `bundleVersion 1.4.0` with
+  build number `37` on both platforms, so it resolves to the exact literal the
+  docs already cite. It rides an existing static rather than adding a fourth:
+  iOS shows at most four quick actions and the demo's three statics plus the
+  seeded runtime item already fill them.
+
+  Three checks read the resolved value back, so interpolation silently ceasing
+  to run turns a leg red instead of shipping the raw token — which on a launcher
+  looks like a label, not a bug. `ios-export` parses the exported `Info.plist`
+  (ubuntu, every push, all three Unity lines including 2021.3, which has no
+  Simulator coverage at all) and also rejects a stray `{` in *any* baked label;
+  `android-build` reads the string out of the APK resource table with `aapt2`,
+  on all four legs including the minified release one; and `ios-springboard`
+  now requires it among the labels of the menu SpringBoard actually opens, which
+  is the only one of the three that proves it *rendered*.
+
+  Run 99 also measured something worth knowing when you author Android labels: a
+  launcher draws **one** label per row and falls back to the short one when the
+  long one does not fit, so an over-long version subtitle does not truncate — it
+  *disappears*. With `Resume your save - v1.4.0 (37)` the emulator's popup drew
+  `Continue`, while its neighbours at 16 and 18 characters drew their subtitles.
+  The demo's subtitle is the shorter `Resume v{version} ({build})` for that
+  reason, and README's placeholders section now warns about it.
+
+  **Run 100 (2026-09-17) is the verdict on all of it.** The three checks passed
+  on every leg, and both platforms render the resolved value: the Android
+  emulator's popup drew `Resume v1.4.0 (37)` on 2021.3, 2022.3 and Unity 6, and
+  SpringBoard's own menu listed `Continue, Resume v1.4.0 (37)` on iOS 26.2 and
+  26.5, with both taps on each leg still passing. Emulator and Simulator only —
+  no handset and no iPhone has shown it.
+
+### Fixed
+
+- **A shortcut tap arrives as `Performed` on real Android hardware.** Every tap
+  this package had ever observed was an emulator's or the iOS Simulator's. On
+  2026-09-17 the owner long-pressed the demo icon on a Moto G Play 2024
+  (Android 14, the `quickactions-demo-apk-2022.3` artifact) and tapped the
+  runtime-added `daily` row — "Claim today", the long label Android renders —
+  and the id reached `Performed`. Recorded with the limit it has: the run did
+  not note whether the app had been force-stopped first, so **cold and warm
+  delivery are still not distinguished on hardware**. No code changed; the docs
+  that listed hardware tap delivery as unverified no longer do.
+
 ## [0.7.0] - 2026-09-16
 
 ### Added

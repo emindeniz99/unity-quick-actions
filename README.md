@@ -167,14 +167,28 @@ the menu was read, not instrumented. Then the **define-off APK from the same CI
 run** was installed: long-pressing it showed **no quick actions at all**. That is
 the gate below proven on hardware rather than in an APK diff.
 
-**Still not verified on hardware:** a tap arriving as `Performed` (cold or
-warm), anything at all on a physical iPhone, and any Android newer than the 14
-on that handset — 17 is the current release. Plan on validating the tap path
+**A tap on that handset arrives as `Performed`** (2026-09-17). Long-pressing the
+demo icon and tapping the runtime-added `daily` row — "Claim today", the label
+Android shows — delivered the id into the game. Every earlier observation of a
+tap was an emulator's or the iOS Simulator's; this is the first on real
+hardware. What the run did **not** record is whether the app was force-stopped
+first, so **cold and warm delivery are not distinguished** — the emulator smoke
+covers both separately, hardware covers one of them without saying which.
+
+**Still not verified on hardware:** which of cold and warm that tap was,
+anything at all on a physical iPhone, and any Android newer than the 14 on that
+handset — 17 is the current release. Plan on validating the tap path
 on your own device before you ship. The 0.4.6 build-time
-[placeholders](#build-time-placeholders--app-info-on-long-press) are likewise
-covered by headless tests only — no device or Simulator run has happened since
-they landed, so what a resolved `v1.4.0 (37)` looks like on a real home screen
-is still unconfirmed.
+[placeholders](#build-time-placeholders--app-info-on-long-press) were likewise
+covered by headless tests only until now: nothing CI built, and nothing anyone
+ran, had ever carried one. The demo's `Continue` shortcut now does, and three CI
+checks read the resolved `v1.4.0 (37)` back — from the exported `Info.plist`,
+from the APK's resource table, and from the labels of the menu SpringBoard
+itself opens on the Simulator. **Run 100 (2026-09-17) reported on all three**,
+and both platforms *render* it: the Android emulator's long-press popup drew
+`Resume v1.4.0 (37)` on 2021.3, 2022.3 and Unity 6, and SpringBoard's own menu
+listed `Continue, Resume v1.4.0 (37)` on iOS 26.2 and 26.5. Still an emulator
+and a Simulator — no iPhone, and no Android handset since the subtitle changed.
 
 **Also true:** the suite is 130 headless tests (`dotnet test`) and 82 in Unity's
 Test Runner (it adds 6 `JsonUtility` serialization tests; 54 of the headless ones
@@ -728,6 +742,16 @@ belongs in the **subtitle** because that is the line long-press actually shows:
 Android launchers render the long label (the subtitle), iOS shows title and
 subtitle.
 
+**Keep an Android subtitle short.** A launcher draws **one** label per row and
+falls back to the short one (your `Title`) when the long one does not fit — so
+an over-long version subtitle does not truncate, it *disappears*, and the row
+silently reads like an ordinary shortcut. Measured on the API 30 emulator in CI
+(run 99): with `Resume your save - v1.4.0 (37)` the row drew `Continue`, while
+the neighbouring `Start a fresh run` (16 characters) and `Claim today's gift`
+(18) both drew their subtitles. The demo's is `Resume v{version} ({build})` for
+that reason, and run 100 confirmed the shorter one draws: `Resume v1.4.0 (37)`
+on all three emulator legs. iOS is not affected — it renders both lines.
+
 Built-in tokens (matched case-insensitively):
 
 | Token | Bakes to |
@@ -738,6 +762,25 @@ Built-in tokens (matched case-insensitively):
 | `{productName}` | `PlayerSettings.productName`. |
 | `{unityVersion}` | The Editor version building the player. |
 | `{platform}` | `iOS` / `Android`. |
+
+**The demo ships one.** Every testbed under `Examples~/` — the projects CI
+builds and whose APKs it uploads — bakes `Continue`'s subtitle as
+`Resume v{version} ({build})`, which with their pinned
+`bundleVersion 1.4.0` and build number `37` resolves to
+`Resume v1.4.0 (37)`. Install a demo APK
+([above](#try-it-on-a-device-without-building-anything)) and long-press: the
+`Continue` row carries it. (Which rows a given launcher shows, and in what
+order, is the launcher's business — the hardware run below saw one candidate
+dropped entirely.) It rides an existing shortcut rather than adding a fourth:
+iOS shows at most four quick actions, and the demo's three static plus one
+runtime-added item already fill them.
+
+Three CI checks read that resolved value, so a build where interpolation stopped
+running goes red instead of quietly shipping the raw token: the `ios-export`
+job parses the exported `Info.plist` (every push, all three Unity lines, and it
+also fails on a stray `{` in *any* baked label), `android-build` reads the
+string back out of the APK's resource table with `aapt2`, and `ios-springboard`
+requires it among the labels of the menu SpringBoard actually opens.
 
 Rules: `{{` / `}}` produce a literal brace; an unknown token is left verbatim
 (the settings page and the build log both warn); anything not token-shaped —
