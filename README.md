@@ -184,8 +184,11 @@ covered by headless tests only until now: nothing CI built, and nothing anyone
 ran, had ever carried one. The demo's `Continue` shortcut now does, and three CI
 checks read the resolved `v1.4.0 (37)` back — from the exported `Info.plist`,
 from the APK's resource table, and from the labels of the menu SpringBoard
-itself opens on the Simulator. **No run has reported on them yet**; this line
-gets the verdict when one does.
+itself opens on the Simulator. **Run 100 (2026-09-17) reported on all three**,
+and both platforms *render* it: the Android emulator's long-press popup drew
+`Resume v1.4.0 (37)` on 2021.3, 2022.3 and Unity 6, and SpringBoard's own menu
+listed `Continue, Resume v1.4.0 (37)` on iOS 26.2 and 26.5. Still an emulator
+and a Simulator — no iPhone, and no Android handset since the subtitle changed.
 
 **Also true:** the suite is 130 headless tests (`dotnet test`) and 82 in Unity's
 Test Runner (it adds 6 `JsonUtility` serialization tests; 54 of the headless ones
@@ -746,7 +749,8 @@ silently reads like an ordinary shortcut. Measured on the API 30 emulator in CI
 (run 99): with `Resume your save - v1.4.0 (37)` the row drew `Continue`, while
 the neighbouring `Start a fresh run` (16 characters) and `Claim today's gift`
 (18) both drew their subtitles. The demo's is `Resume v{version} ({build})` for
-that reason. iOS is not affected — it renders both lines.
+that reason, and run 100 confirmed the shorter one draws: `Resume v1.4.0 (37)`
+on all three emulator legs. iOS is not affected — it renders both lines.
 
 Built-in tokens (matched case-insensitively):
 

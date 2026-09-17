@@ -44,6 +44,13 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   The demo's subtitle is the shorter `Resume v{version} ({build})` for that
   reason, and README's placeholders section now warns about it.
 
+  **Run 100 (2026-09-17) is the verdict on all of it.** The three checks passed
+  on every leg, and both platforms render the resolved value: the Android
+  emulator's popup drew `Resume v1.4.0 (37)` on 2021.3, 2022.3 and Unity 6, and
+  SpringBoard's own menu listed `Continue, Resume v1.4.0 (37)` on iOS 26.2 and
+  26.5, with both taps on each leg still passing. Emulator and Simulator only —
+  no handset and no iPhone has shown it.
+
 ### Fixed
 
 - **A shortcut tap arrives as `Performed` on real Android hardware.** Every tap
