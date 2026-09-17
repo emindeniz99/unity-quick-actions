@@ -755,6 +755,25 @@ jobs:
                 *) missing="$missing $want" ;;
               esac
             done
+            # The interpolated Subtitle, checked on its own rather than through the
+            # loop above: the resolved literal contains SPACES, and `for want in
+            # $wants` word-splits, so appending it there would silently check four
+            # meaningless fragments instead of the one string. qa_long_1 is
+            # `continue` - the baker numbers per item in settings order (new_game 0,
+            # continue 1, daily_reward 2, see QuickActionsBuildPostProcessorAndroid)
+            # - and `aapt2 dump resources` already prints each string's value inline
+            # under its resource line, so the capture above is all this needs. A raw
+            # "v{version} ({build})" shipping here is invisible on a launcher; this
+            # is what makes it red.
+            case "$res" in
+              *"Resume your save - v1.4.0 (37)"*)
+                echo "ok: qa_long_1 carries the interpolated Subtitle" ;;
+              *)
+                echo "MISSING the interpolated Subtitle (continue / qa_long_1) from the resource table"
+                echo "--- every qa_long line aapt2 reported ---"
+                printf '%s\n' "$res" | grep -A2 -iE 'qa_long_' || echo "(no qa_long entry at all)"
+                exit 1 ;;
+            esac
             if [ -n "$missing" ]; then
               echo "MISSING from the APK resource table:$missing"
               echo "--- every quickactions/qa_short line aapt2 did report ---"
@@ -2404,6 +2423,16 @@ jobs:
                        "UIApplicationShortcutItemIconFile",
                        "UIApplicationShortcutItemIconType")
           EXPECTED = ["new_game", "continue", "daily_reward"]
+          # The one static whose Subtitle carries build-time placeholders
+          # ("Resume your save - v{version} ({build})" in every testbed's
+          # QuickActionsSettings.asset). The testbeds pin bundleVersion 1.4.0 and
+          # BOTH build numbers to 37, so the bake resolves to the same literal on
+          # either platform - and to the exact string the package's own docs cite
+          # as the example. This is the cheapest proof that interpolation ran:
+          # ubuntu, every push, all three Unity lines, including 2021.3, which has
+          # no Simulator coverage at all.
+          PLACEHOLDER_ID = "continue"
+          PLACEHOLDER_SUBTITLE = "Resume your save - v1.4.0 (37)"
 
           path = sys.argv[1]
           with open(path, "rb") as f:
@@ -2427,6 +2456,20 @@ jobs:
                   problems.append("%s carries %d icon keys %r — iOS accepts exactly one"
                                   % (d.get("UIApplicationShortcutItemType"),
                                      len(present), present))
+              # A raw {token} in ANY shipped label means interpolation did not run
+              # (or ran and could not resolve the name), which is silent on device:
+              # the shortcut still works, it just reads "v{version} ({build})".
+              for key in ("UIApplicationShortcutItemTitle",
+                          "UIApplicationShortcutItemSubtitle"):
+                  value = d.get(key) or ""
+                  if "{" in value or "}" in value:
+                      problems.append("%s's %s still carries a raw placeholder: %r"
+                                      % (d.get("UIApplicationShortcutItemType"), key, value))
+          baked = {d.get("UIApplicationShortcutItemType"):
+                   d.get("UIApplicationShortcutItemSubtitle") for d in ours}
+          if baked.get(PLACEHOLDER_ID) != PLACEHOLDER_SUBTITLE:
+              problems.append("%s's subtitle is %r, expected the interpolated %r"
+                              % (PLACEHOLDER_ID, baked.get(PLACEHOLDER_ID), PLACEHOLDER_SUBTITLE))
 
           if problems:
               print("iOS bake assertion FAILED:")
@@ -2436,6 +2479,7 @@ jobs:
               print(plistlib.dumps(items).decode())
               raise SystemExit(1)
           print("ok: %d marked items %r, exactly one icon key each" % (len(ours), got))
+          print("ok: %s's subtitle interpolated to %r" % (PLACEHOLDER_ID, PLACEHOLDER_SUBTITLE))
           PY
 
   # The same iOS export, with a mock HOST stacked on top of the package: an
@@ -2914,6 +2958,7 @@ jobs:
           QA_DERIVED="$RUNNER_TEMP/DerivedData-ui" \
           QA_PASS="static row (Info.plist)" \
           QA_LEG="$LEG" \
+          QA_EXPECT_LABEL="Resume your save - v1.4.0 (37)" \
             "$RUNNER_TEMP/ios-ui/run_springboard_tap.sh" \
               "$UDID" "$RUNNER_TEMP/springboard/static" daily_reward "Daily Reward"
       # The same long press and tap again, on a row NOTHING baked into

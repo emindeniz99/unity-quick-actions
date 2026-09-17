@@ -179,10 +179,13 @@ covers both separately, hardware covers one of them without saying which.
 anything at all on a physical iPhone, and any Android newer than the 14 on that
 handset — 17 is the current release. Plan on validating the tap path
 on your own device before you ship. The 0.4.6 build-time
-[placeholders](#build-time-placeholders--app-info-on-long-press) are likewise
-covered by headless tests only — no device or Simulator run has happened since
-they landed, so what a resolved `v1.4.0 (37)` looks like on a real home screen
-is still unconfirmed.
+[placeholders](#build-time-placeholders--app-info-on-long-press) were likewise
+covered by headless tests only until now: nothing CI built, and nothing anyone
+ran, had ever carried one. The demo's `Continue` shortcut now does, and three CI
+checks read the resolved `v1.4.0 (37)` back — from the exported `Info.plist`,
+from the APK's resource table, and from the labels of the menu SpringBoard
+itself opens on the Simulator. **No run has reported on them yet**; this line
+gets the verdict when one does.
 
 **Also true:** the suite is 130 headless tests (`dotnet test`) and 82 in Unity's
 Test Runner (it adds 6 `JsonUtility` serialization tests; 54 of the headless ones
@@ -746,6 +749,25 @@ Built-in tokens (matched case-insensitively):
 | `{productName}` | `PlayerSettings.productName`. |
 | `{unityVersion}` | The Editor version building the player. |
 | `{platform}` | `iOS` / `Android`. |
+
+**The demo ships one.** Every testbed under `Examples~/` — the projects CI
+builds and whose APKs it uploads — bakes `Continue`'s subtitle as
+`Resume your save - v{version} ({build})`, which with their pinned
+`bundleVersion 1.4.0` and build number `37` resolves to
+`Resume your save - v1.4.0 (37)`. Install a demo APK
+([above](#try-it-on-a-device-without-building-anything)) and long-press: the
+`Continue` row carries it. (Which rows a given launcher shows, and in what
+order, is the launcher's business — the hardware run below saw one candidate
+dropped entirely.) It rides an existing shortcut rather than adding a fourth:
+iOS shows at most four quick actions, and the demo's three static plus one
+runtime-added item already fill them.
+
+Three CI checks read that resolved value, so a build where interpolation stopped
+running goes red instead of quietly shipping the raw token: the `ios-export`
+job parses the exported `Info.plist` (every push, all three Unity lines, and it
+also fails on a stray `{` in *any* baked label), `android-build` reads the
+string back out of the APK's resource table with `aapt2`, and `ios-springboard`
+requires it among the labels of the menu SpringBoard actually opens.
 
 Rules: `{{` / `}}` produce a literal brace; an unknown token is left verbatim
 (the settings page and the build log both warn); anything not token-shaped —

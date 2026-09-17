@@ -15,6 +15,17 @@
 //   QA_ACTION_ID        the id that must reach Performed  (daily_reward)
 //   QA_MARKER           host path of the testbed's marker file (unset: SKIPPED
 //                       after the launch — delivery cannot be checked)
+//   QA_EXPECT_LABEL     substring that at least one button of the OPEN menu must
+//                       carry, or the run FAILs (unset: not checked). A
+//                       SUBSTRING, not the whole label: SpringBoard's "Title,
+//                       Subtitle" format was read from other projects' tests
+//                       rather than from a contract, so matching the part we
+//                       actually care about survives a format change that an
+//                       equality check would turn into a false red. CI passes
+//                       the interpolated Subtitle of the one static that carries
+//                       build-time placeholders, which is how a resolved
+//                       {version}/{build} is proven to reach a real home screen
+//                       rather than only the files a build wrote.
 //   QA_WAIT_SECONDS     seconds the app gets to reach the foreground after
 //                       the tap                                        (30)
 //   QA_DELIVERY_SECONDS seconds the id gets to reach Performed after the
@@ -62,6 +73,7 @@ final class SpringBoardTapUITests: XCTestCase {
         let actionId = env["QA_ACTION_ID"] ?? "daily_reward"
         let rowTitle = env["QA_ROW_TITLE"] ?? "Daily Reward"
         let markerPath = env["QA_MARKER"].flatMap { $0.isEmpty ? nil : $0 }
+        let expectLabel = env["QA_EXPECT_LABEL"].flatMap { $0.isEmpty ? nil : $0 }
         let waitSeconds = TimeInterval(env["QA_WAIT_SECONDS"] ?? "") ?? 30
         let deliverySeconds = TimeInterval(env["QA_DELIVERY_SECONDS"] ?? "") ?? 120
 
@@ -125,7 +137,19 @@ final class SpringBoardTapUITests: XCTestCase {
                 // real menu are the only place a static shortcut and a
                 // runtime-added one are seen side by side, and this is the line
                 // that shows it without reading the whole tree.
-                note("menu buttons: \(buttonLabels(springboard))")
+                let menuButtons = buttonLabels(springboard)
+                note("menu buttons: \(menuButtons)")
+                // …and, when CI asks, the one thing about those labels worth
+                // failing over. A label that still reads "v{version} ({build})"
+                // is a build whose interpolation never ran: the shortcut works,
+                // it just shows the token. Nothing else here can see that.
+                if let expected = expectLabel,
+                   !menuButtons.contains(where: { $0.contains(expected) }) {
+                    XCUIDevice.shared.press(.home)
+                    try verdict("FAIL",
+                                "no menu button contains '\(expected)' (buttons: \(menuButtons))")
+                    return
+                }
                 break
             }
             if springboard.buttons["Done"].exists {

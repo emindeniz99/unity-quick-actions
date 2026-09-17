@@ -13,6 +13,29 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **The demo shows a build-time placeholder, and CI gates on the resolved
+  value.** `{version}` / `{build}` and friends landed in 0.4.6 with headless
+  tests only: no build CI produced, and no device or Simulator anyone ran, had
+  ever carried one, so what a resolved `v1.4.0 (37)` looks like on a real home
+  screen was unconfirmed. Every testbed now bakes `Continue`'s subtitle as
+  `Resume your save - v{version} ({build})` and pins `bundleVersion 1.4.0` with
+  build number `37` on both platforms, so it resolves to the exact literal the
+  docs already cite. It rides an existing static rather than adding a fourth:
+  iOS shows at most four quick actions and the demo's three statics plus the
+  seeded runtime item already fill them.
+
+  Three checks read the resolved value back, so interpolation silently ceasing
+  to run turns a leg red instead of shipping the raw token — which on a launcher
+  looks like a label, not a bug. `ios-export` parses the exported `Info.plist`
+  (ubuntu, every push, all three Unity lines including 2021.3, which has no
+  Simulator coverage at all) and also rejects a stray `{` in *any* baked label;
+  `android-build` reads the string out of the APK resource table with `aapt2`,
+  on all four legs including the minified release one; and `ios-springboard`
+  now requires it among the labels of the menu SpringBoard actually opens, which
+  is the only one of the three that proves it *rendered*.
+
 ### Fixed
 
 - **A shortcut tap arrives as `Performed` on real Android hardware.** Every tap
