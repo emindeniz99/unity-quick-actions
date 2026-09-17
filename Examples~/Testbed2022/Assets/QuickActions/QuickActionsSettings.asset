@@ -28,7 +28,7 @@ MonoBehaviour:
     L10n: 
   - Id: continue
     Title: Continue
-    Subtitle: Resume your save - v{version} ({build})
+    Subtitle: Resume v{version} ({build})
     LocalizedTitles: []
     LocalizedSubtitles: []
     Icon: 0

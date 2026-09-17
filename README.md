@@ -739,6 +739,15 @@ belongs in the **subtitle** because that is the line long-press actually shows:
 Android launchers render the long label (the subtitle), iOS shows title and
 subtitle.
 
+**Keep an Android subtitle short.** A launcher draws **one** label per row and
+falls back to the short one (your `Title`) when the long one does not fit — so
+an over-long version subtitle does not truncate, it *disappears*, and the row
+silently reads like an ordinary shortcut. Measured on the API 30 emulator in CI
+(run 99): with `Resume your save - v1.4.0 (37)` the row drew `Continue`, while
+the neighbouring `Start a fresh run` (16 characters) and `Claim today's gift`
+(18) both drew their subtitles. The demo's is `Resume v{version} ({build})` for
+that reason. iOS is not affected — it renders both lines.
+
 Built-in tokens (matched case-insensitively):
 
 | Token | Bakes to |
@@ -752,9 +761,9 @@ Built-in tokens (matched case-insensitively):
 
 **The demo ships one.** Every testbed under `Examples~/` — the projects CI
 builds and whose APKs it uploads — bakes `Continue`'s subtitle as
-`Resume your save - v{version} ({build})`, which with their pinned
+`Resume v{version} ({build})`, which with their pinned
 `bundleVersion 1.4.0` and build number `37` resolves to
-`Resume your save - v1.4.0 (37)`. Install a demo APK
+`Resume v1.4.0 (37)`. Install a demo APK
 ([above](#try-it-on-a-device-without-building-anything)) and long-press: the
 `Continue` row carries it. (Which rows a given launcher shows, and in what
 order, is the launcher's business — the hardware run below saw one candidate

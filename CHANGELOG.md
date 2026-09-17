@@ -20,7 +20,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   tests only: no build CI produced, and no device or Simulator anyone ran, had
   ever carried one, so what a resolved `v1.4.0 (37)` looks like on a real home
   screen was unconfirmed. Every testbed now bakes `Continue`'s subtitle as
-  `Resume your save - v{version} ({build})` and pins `bundleVersion 1.4.0` with
+  `Resume v{version} ({build})` and pins `bundleVersion 1.4.0` with
   build number `37` on both platforms, so it resolves to the exact literal the
   docs already cite. It rides an existing static rather than adding a fourth:
   iOS shows at most four quick actions and the demo's three statics plus the
@@ -35,6 +35,14 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   on all four legs including the minified release one; and `ios-springboard`
   now requires it among the labels of the menu SpringBoard actually opens, which
   is the only one of the three that proves it *rendered*.
+
+  Run 99 also measured something worth knowing when you author Android labels: a
+  launcher draws **one** label per row and falls back to the short one when the
+  long one does not fit, so an over-long version subtitle does not truncate — it
+  *disappears*. With `Resume your save - v1.4.0 (37)` the emulator's popup drew
+  `Continue`, while its neighbours at 16 and 18 characters drew their subtitles.
+  The demo's subtitle is the shorter `Resume v{version} ({build})` for that
+  reason, and README's placeholders section now warns about it.
 
 ### Fixed
 

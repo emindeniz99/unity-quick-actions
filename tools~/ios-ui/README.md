@@ -127,7 +127,7 @@ SpringBoard's "Title, Subtitle" format was read from other projects' tests, not
 from a contract, so matching only the part that matters survives a format change
 that an equality check would turn into a false red. CI passes the interpolated
 subtitle of the one static shortcut carrying build-time placeholders
-(`Resume your save - v1.4.0 (37)`), which is how a resolved `{version}` /
+(`Resume v1.4.0 (37)`), which is how a resolved `{version}` /
 `{build}` is proven to reach a real home screen rather than only the files the
 build wrote.
 

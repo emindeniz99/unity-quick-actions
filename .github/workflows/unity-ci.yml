@@ -766,7 +766,7 @@ jobs:
             # "v{version} ({build})" shipping here is invisible on a launcher; this
             # is what makes it red.
             case "$res" in
-              *"Resume your save - v1.4.0 (37)"*)
+              *"Resume v1.4.0 (37)"*)
                 echo "ok: qa_long_1 carries the interpolated Subtitle" ;;
               *)
                 echo "MISSING the interpolated Subtitle (continue / qa_long_1) from the resource table"
@@ -2424,7 +2424,7 @@ jobs:
                        "UIApplicationShortcutItemIconType")
           EXPECTED = ["new_game", "continue", "daily_reward"]
           # The one static whose Subtitle carries build-time placeholders
-          # ("Resume your save - v{version} ({build})" in every testbed's
+          # ("Resume v{version} ({build})" in every testbed's
           # QuickActionsSettings.asset). The testbeds pin bundleVersion 1.4.0 and
           # BOTH build numbers to 37, so the bake resolves to the same literal on
           # either platform - and to the exact string the package's own docs cite
@@ -2432,7 +2432,7 @@ jobs:
           # ubuntu, every push, all three Unity lines, including 2021.3, which has
           # no Simulator coverage at all.
           PLACEHOLDER_ID = "continue"
-          PLACEHOLDER_SUBTITLE = "Resume your save - v1.4.0 (37)"
+          PLACEHOLDER_SUBTITLE = "Resume v1.4.0 (37)"
 
           path = sys.argv[1]
           with open(path, "rb") as f:
@@ -2958,7 +2958,7 @@ jobs:
           QA_DERIVED="$RUNNER_TEMP/DerivedData-ui" \
           QA_PASS="static row (Info.plist)" \
           QA_LEG="$LEG" \
-          QA_EXPECT_LABEL="Resume your save - v1.4.0 (37)" \
+          QA_EXPECT_LABEL="Resume v1.4.0 (37)" \
             "$RUNNER_TEMP/ios-ui/run_springboard_tap.sh" \
               "$UDID" "$RUNNER_TEMP/springboard/static" daily_reward "Daily Reward"
       # The same long press and tap again, on a row NOTHING baked into
