@@ -13,6 +13,25 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- **CI fans out instead of running in series.** The seven Unity jobs were
+  chained with `needs:` — `tests` → `android-build` → `ios-export` →
+  `ios-export-coex` → `tests-unity6-latest` → `android-shrink-verify` →
+  `gate-off` — so that exactly one editor ever activated at a time. The chain
+  cost 29–38 minutes of wall clock against 13 unchained, and runner minutes are
+  free on a public repo, so it bought nothing else. What it insured against has
+  never happened: across 30 runs no `game-ci` step has conclusion `failure`, and
+  run 25 activated eleven legs at once with every one logging
+  `Successfully returned ULF license` — and GameCI's own documentation says the
+  concurrency limit "is not an issue for free licenses", which is what a
+  Personal `.ulf` with no `UNITY_SERIAL` is. Every job now waits on the licence
+  gate alone, except `gate-off`, which waits on its **real** producers: it
+  downloads the demo APK from `android-build` and the Xcode project from
+  `ios-export`, so the licence gate alone would have raced them. `max-parallel`
+  stays at 2 so this is the only variable that moved; the workflow header
+  records how to put the chain back.
+
 ### Added
 
 - **The demo shows a build-time placeholder, and CI gates on the resolved
