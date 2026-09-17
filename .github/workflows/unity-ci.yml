@@ -121,6 +121,25 @@ name: unity
 # can be attributed to it rather than to two changes at once. The ceiling is
 # now roughly eleven concurrent activations, which run 25 already survived.
 #
+# What it actually bought, measured on run 103 (the first unchained run):
+# 36m01s wall clock — INSIDE the chained 29–38 range, not the ~13 the old
+# comment's unchained figure predicted. That figure was measured before the
+# macOS matrix grew to ten jobs, and it no longer describes this workflow. The
+# run splits like this:
+#   * the Linux half finishes at 16 min, and ten jobs were running at once
+#     three minutes in — that part is what the un-chain fixed, and it is why
+#     the Linux side will not become the bottleneck as the macOS side shrinks;
+#   * the macOS half runs to 35 min and owns the critical path. Its jobs enter
+#     in waves (t=3, 6, 9, 11, 12, 18, 23) behind GitHub's concurrent-macOS
+#     cap, and the two longest are the springboard taps: unity6-xcode27 at
+#     12→35 and unity6 at 12→34.
+# The single biggest remaining cost is therefore a CANARY that gates nothing:
+# ios springboard tap (unity6-xcode27), 23 minutes, holding a macOS slot on
+# every PR. Four xcode-27 canary legs do that between them. Moving them to the
+# weekly cron is the next change, and this measurement is why.
+# Every Unity job on run 103 still logged "Successfully returned ULF license"
+# under full parallelism, which is the one thing the un-chain could have broken.
+#
 # To restore the old behaviour: put android-build, ios-export, ios-export-coex,
 # tests-unity6-latest, android-shrink-verify and gate-off back on
 # `needs: [license, <the previous job>]` in the order listed above.

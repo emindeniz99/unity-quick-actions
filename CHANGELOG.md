@@ -32,6 +32,18 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   stays at 2 so this is the only variable that moved; the workflow header
   records how to put the chain back.
 
+  **Measured, and not what was predicted.** Run 103, the first unchained run,
+  took 36m01s — inside the chained 29–38 range, not the ~13 the old comment's
+  unchained figure suggested (that figure predates the macOS matrix growing to
+  ten jobs). What the un-chain did fix is the Linux half, which now finishes at
+  16 minutes with ten jobs running three minutes in; the macOS half runs to 35
+  and owns the critical path, entering in waves behind GitHub's concurrent-macOS
+  cap. The largest single cost turns out to be a canary that gates nothing —
+  `ios springboard tap (unity6-xcode27)`, 23 minutes of a macOS slot on every
+  PR. The chain still had to go (it constrained the Linux side for nothing, and
+  `gate-off` had no real dependencies at all), but the next change is the one
+  that moves wall clock.
+
 ### Added
 
 - **The demo shows a build-time placeholder, and CI gates on the resolved
