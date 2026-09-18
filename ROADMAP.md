@@ -107,13 +107,15 @@ ships it.
   macOS half owns the critical path — and that measurement found the real
   lever: six xcode-27 macOS jobs (four canaries plus both `ios-crossrun` legs,
   which are xcode-27-bound too) held slots on every PR while gating nothing,
-  one of them for 23 minutes. **They moved to the cron 2026-09-18 — and that did not
-  make it faster either.** Run 105: 41m27s with six macOS jobs, against 36m01s
-  and 46m37s with twelve. The measurement that ends this line of work: macOS
-  **runner queue wait** totalled 34 minutes over twelve jobs (run 103) and 80
-  minutes over six (run 105), while Linux queue wait was 13 minutes in both.
-  Wall clock is set by how long GitHub takes to hand out a macOS runner, which
-  no workflow shape controls. **Treat the remaining graph-level ideas as
+  one of them for 23 minutes. **They moved to the cron 2026-09-18.** Four runs:
+  36m01s and 46m37s with twelve macOS jobs, 41m27s and 25m37s with six — so no
+  total here settles what that change bought on its own. The measurement that
+  ends this line of work is the queue: runs 105 and 106 ran the *same* six-job
+  workflow one docs-only commit apart, and their total macOS **runner queue
+  wait** was 1h20m16s against 5m09s, while Linux queue wait stayed 13-15 minutes
+  throughout. Wall clock is set by how long GitHub takes to hand out a macOS
+  runner, which no workflow shape controls, and that swing is larger than any
+  graph change could be. **Treat the remaining graph-level ideas as
   closed** — folding `ios-springboard` into `ios-simulator` and pre-booting the
   simulator would remove two more macOS jobs and, on this evidence, change
   nothing measurable. What the two changes did buy is real but different: half

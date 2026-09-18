@@ -192,17 +192,26 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   the same PR. Every per-leg comment moved with the legs — the conditional
   matrices carry the same documentation the lists did.
 
-  **It did not make the pipeline faster, and the measurement says nothing will.**
-  Run 105 took 41m27s with six macOS jobs, against 36m01s and 46m37s with
-  twelve. What actually governs the wall clock is how long GitHub takes to hand
-  out a macOS runner: the total macOS queue wait was 34 minutes across twelve
-  jobs on run 103 and **80 minutes across six** on run 105, while the Linux
-  queue wait was 13 minutes in both. Halving the jobs did not halve the waiting,
-  and three runs of 36/46/41 minutes show variance that swamps any structural
-  change we can make. Two attempts at shortening this pipeline by reshaping the
+  **What governs the wall clock is runner availability, not the job graph.**
+  Four runs: 36m01s and 46m37s with twelve macOS jobs, then 41m27s and 25m37s
+  with six. The cleanest measurement is the last pair — runs 105 and 106 ran the
+  *same* six-macOS-job workflow, one docs-only commit apart, and their total
+  macOS **runner queue wait** was 1h20m16s against **5m09s**: a sixteenfold
+  swing with nothing in the workflow changed. Linux queue wait stayed 13-15
+  minutes throughout. Two attempts at shortening this pipeline by reshaping the
   job graph — un-chaining, then halving the macOS matrix — both came back inside
-  the noise, so the remaining graph-level ideas (folding `ios-springboard` into
-  `ios-simulator`, pre-booting the simulator) are not worth their risk either.
+  noise that large, so the remaining graph-level ideas (folding
+  `ios-springboard` into `ios-simulator`, pre-booting the simulator) are not
+  worth their risk either.
+
+  An earlier revision of this entry said flatly that the change "did not make
+  the pipeline faster", written when runs 103-105 were all there was. Run 106's
+  25m37s — the fastest recorded, and the only one under the chained 29-38 range
+  — does not support that as stated: six macOS jobs average 33 minutes against
+  twelve jobs' 41. Four points cannot separate that from the queue swing above,
+  so the claim is narrowed to the one the evidence carries: the job graph is not
+  the lever, and no total measured here settles what this change bought on its
+  own.
   What this change is actually worth: half the macOS demand, six fewer jobs, and
   — because the canaries were the only permanently-red checks — a run where a
   red check means something again.
