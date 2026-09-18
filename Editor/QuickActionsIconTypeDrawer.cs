@@ -26,11 +26,21 @@ namespace EminDeniz99.QuickActions.Editor
         private static GUIStyle NoteStyle() =>
             _noteStyle ?? (_noteStyle = new GUIStyle(EditorStyles.miniLabel) { wordWrap = true });
 
-        // The width GetPropertyHeight does not receive: the inspector's, less the
-        // margins the property rect loses to it. Slightly narrow is the safe error —
-        // a line too many, never a clipped one.
-        private static float NoteWidth(float propertyWidth) =>
-            propertyWidth > 0 ? propertyWidth : EditorGUIUtility.currentViewWidth - 40f;
+        // GetPropertyHeight is not told the rect OnGUI will draw into, and the gap is
+        // not small: an IconType sits inside the static-shortcut LIST, so its element
+        // width is the window's less the foldout indent, the drag handle and the list
+        // padding. Guessing WIDE wraps the note into fewer lines than OnGUI then needs
+        // and clips it — the opposite of the intended error. So remember the width
+        // OnGUI actually used and measure the next height against that; it is exact
+        // from the second layout pass on, and the first falls back to a deliberately
+        // narrow estimate, which over-reserves (a blank line) rather than clipping.
+        private float _lastNoteWidth;
+
+        private static float FallbackNoteWidth()
+        {
+            var width = EditorGUIUtility.currentViewWidth - 80f;
+            return width > 80f ? width : 80f; // a docked-narrow inspector must not go to zero
+        }
 
         public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
         {
@@ -38,7 +48,8 @@ namespace EminDeniz99.QuickActions.Editor
             var note = Note(property);
             if (note != null)
                 height += EditorGUIUtility.standardVerticalSpacing +
-                          NoteStyle().CalcHeight(new GUIContent(note), NoteWidth(0f));
+                          NoteStyle().CalcHeight(new GUIContent(note),
+                              _lastNoteWidth > 0f ? _lastNoteWidth : FallbackNoteWidth());
             return height;
         }
 
@@ -61,9 +72,11 @@ namespace EminDeniz99.QuickActions.Editor
             var note = Note(property);
             if (note == null)
                 return;
+            // Feed the real width back to GetPropertyHeight for the next pass.
+            _lastNoteWidth = position.width;
             var content = new GUIContent(note);
             var noteRect = new Rect(position.x, field.y + field.height + EditorGUIUtility.standardVerticalSpacing,
-                position.width, NoteStyle().CalcHeight(content, NoteWidth(position.width)));
+                position.width, NoteStyle().CalcHeight(content, position.width));
             EditorGUI.LabelField(noteRect, content, NoteStyle());
         }
 
