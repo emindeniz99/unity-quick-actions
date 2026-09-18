@@ -44,14 +44,15 @@ no Apple hardware.
   an x86_64-only simulator runtime there, which Apple silicon cannot execute,
   and arm64 Simulator support was added in Unity 6 and will not be backported.
   2022.3 does ship arm64 simulator libraries.
-- **Physical-device validation is partial.** On Android it has now happened once
+- **Physical-device validation is partial.** On Android it has happened
   (Moto G Play 2024 / Android 14): static shortcuts appeared on a long-press of
-  a cold, never-opened install, runtime `Add` published more, and a static/
-  dynamic id collision resolved as documented. What a human has **not** yet
-  confirmed on hardware is the tap itself arriving as `Performed`, on either
-  platform — that path is confirmed on the **iOS Simulator** (6.3 / iOS 26.5)
-  and by what the build artifacts contain, not by tapping a physical icon. No
-  physical iPhone run has happened at all.
+  a cold, never-opened install, runtime `Add` published more, a static/dynamic
+  id collision resolved as documented, and — 2026-09-17 — a tap on the
+  runtime-added row arrived as `Performed`. That run did not record whether the
+  app had been force-stopped first, so **cold and warm are not distinguished on
+  hardware**. On iOS nothing has run on a device at all: cold launch, warm
+  re-entry and the runtime-added row are confirmed on the **iOS Simulator**
+  only, by CI's SpringBoard tap. No physical iPhone run has happened.
 
 ---
 

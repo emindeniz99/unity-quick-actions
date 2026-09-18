@@ -23,7 +23,7 @@ It runs seven checks (see [`.verify/README.md`](./.verify/README.md) for the
 rationale):
 
 1. every asset has a committed, stable `.meta`;
-2. the C# type-checks against UnityEngine/UnityEditor stubs in **ten** build
+2. the C# type-checks against UnityEngine/UnityEditor stubs in **eleven** build
    configurations (editor / iOS / Android / native gates / bootstrap / sample),
    so every `#if` branch is compiled;
 3. the NUnit suite runs via `dotnet test`;

@@ -65,8 +65,8 @@ namespace EminDeniz99.QuickActions
         /// </summary>
         /// <returns>
         /// True when the managed set now reflects the OS (loaded, or already loaded) —
-        /// including when the localization refresh push failed, since that changes only
-        /// the rendered language, not which ids are installed; false when the current OS
+        /// including when the localization refresh push failed, which is a deliberate
+        /// trade rather than a guarantee: see the remark below; false when the current OS
         /// shortcuts could not be read (so callers must not mutate/push against an
         /// unknown baseline) or during a re-entrant load. A true answer therefore always
         /// means <c>_loaded</c> is true and <c>_items</c> is the authoritative set —
@@ -128,10 +128,21 @@ namespace EminDeniz99.QuickActions
                 Log($"Localization refresh: {stale} quick action(s) still rendered in another locale; re-pushing for '{Locale}'.");
                 if (!Push())
                 {
-                    // The OS refused it (rate-limited, locked profile…). The LOAD
-                    // succeeded, so _items stays authoritative and _loaded stays true —
-                    // only the rendered language is wrong. Arm one retry instead of
-                    // re-reading forever (see _refreshRetryArmed).
+                    // The OS refused it (rate-limited, locked profile…). Keep _loaded
+                    // true and arm one retry instead of re-reading forever (see
+                    // _refreshRetryArmed) — dropping _loaded here would make every
+                    // later read a write, and EnsureLoaded's own contract is that a
+                    // true return means _loaded is true (AddList relies on it).
+                    //
+                    // The cost, stated rather than hidden: this is NOT quite "only the
+                    // rendered language is wrong". Push sends the whole set, so on
+                    // Android a refused write can still have applied its stale-removal
+                    // phase first (see Push) — a newly appeared manifest/pinned
+                    // collision can already have dropped one of our ids on the device
+                    // while _items keeps claiming it. GetAll/IsAdded can therefore
+                    // over-report that one id until the next successful push or
+                    // reconcile. Narrower than the read-amplification it buys, and no
+                    // shortcut is lost either way.
                     _refreshRetryArmed = true;
                     Log("Localization refresh failed: the OS did not accept the update; the shortcuts still show the previous locale (one retry armed).");
                 }
@@ -219,10 +230,12 @@ namespace EminDeniz99.QuickActions
                 if (!Push())
                 {
                     // The OS refused the re-render (rate-limited, locked profile…):
-                    // the device still shows the previous locale's labels. Only the
-                    // rendered language is wrong — _items is still what the OS holds —
-                    // so arm the same single retry a refused reconcile refresh arms,
-                    // rather than dropping _loaded and making every later read a write.
+                    // the device still shows the previous locale's labels. Arm the same
+                    // single retry a refused reconcile refresh arms, rather than
+                    // dropping _loaded and making every later read a write — with the
+                    // same caveat recorded at that site: a refused write can still have
+                    // applied its stale-removal phase on Android, so _items may
+                    // over-report one id until the next successful push.
                     _refreshRetryArmed = true;
                     Log("Locale change failed: the OS did not accept the update; the shortcuts still show the previous locale (one retry armed).");
                 }

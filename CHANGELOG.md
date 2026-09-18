@@ -13,6 +13,52 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- **The icon note in Project Settings no longer clips.** `IconType`'s property
+  drawer reserved the note's height by measuring it against the whole view width
+  less 40 px, then drew it into the real property rect — which, for the
+  `IconType` inside the static-shortcut list, is narrower by the foldout indent,
+  the drag handle and the list padding. Narrower wraps into *more* lines, so the
+  reserved height fell short and the last line was cut off: the opposite of the
+  error the code's own comment intended ("a line too many, never a clipped
+  one"). The drawer now remembers the width it actually drew at and measures the
+  next pass against that; the first pass uses a deliberately narrow fallback,
+  which over-reserves instead.
+
+- **Two documentation claims that the previous two changes left behind.**
+  `GETTING_STARTED.md` still told readers that no hardware tap had been
+  confirmed as `Performed` on either platform — the Moto G Play run on
+  2026-09-17 confirmed the Android one, and `CHANGELOG.md`, `CLAUDE.md`,
+  `README.md` and `PRODUCTION_READINESS.md` were all updated then while this file
+  was missed. `CONTRIBUTING.md` said `verify.sh` compiles the C# in **ten** build
+  configurations; there are eleven, which `.verify/README.md` and `CLAUDE.md`
+  already said.
+
+- **`EnsureLoaded` no longer states a guarantee the code does not make.** Its
+  documented return contract said a failed localization re-push "changes only the
+  rendered language, not which ids are installed". `Push` already documented the
+  opposite: it sends the whole set, and on Android the stale-removal phase runs
+  before the add that was refused, so a newly appeared manifest or pinned
+  collision can have dropped one of our ids on the device while the managed list
+  keeps claiming it. The behaviour is unchanged and still the right trade —
+  dropping `_loaded` there would turn every later read into an OS write, and
+  `AddList` relies on a true return meaning loaded — but the cost is now recorded
+  at both sites: `GetAll`/`IsAdded` can over-report one id until the next
+  successful push. No shortcut is lost either way.
+
+### Added
+
+- **The Android string-resource escaper has tests.** `EscapeResValue` runs over
+  every static shortcut's label on every build that configures one, and had no
+  coverage at all: XML metacharacters, Android's own span delimiters, a leading
+  `@`/`?`, edge whitespace and dropped control characters were each one edit away
+  from a regression nothing would catch until aapt2 failed a real Gradle build or
+  a device rendered a truncated label. Seven tests now pin the exact written form,
+  driven through `AppendLocalized` (the real emission path) rather than the
+  private escaper. All seven pass against the current implementation — a guard,
+  not a fix.
+
 ### Changed
 
 - **CI fans out instead of running in series.** The seven Unity jobs were
