@@ -3290,6 +3290,8 @@ jobs:
             "QA-COEX: PASS warm-queued-id"
             "QA-COEX: PASS warm-queued-once"
             "QA-COEX: PASS warm-completion-once"
+            "QA-COEX: PASS multi-id-queue-order"
+            "QA-COEX: PASS multi-id-completion-each"
             "QA-COEX: PASS unmarked-completion-once"
           )
           if [ "$EXPECT_LIFECYCLE" = "scene" ]; then

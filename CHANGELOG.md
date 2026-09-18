@@ -46,6 +46,15 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **The iOS coexistence probe pins queue order across several taps.** Taps
+  arriving back to back before C# drains were unasserted on every platform: the
+  probe sent one id at a time. It now sends `a`, `b`, `a` on one runloop turn
+  and requires the queue to hand back exactly that — which pins both properties
+  at once, FIFO order and no collapsing of a repeat (only a COLD source arms the
+  dedup marker, and it is spent by the time the probe runs). Each of the three
+  completion handlers must also run exactly once. `multi-id-queue-order` and
+  `multi-id-completion-each` join the PASS names the workflow requires by name.
+
 - **`QuickActions.IsRateLimitingActive` — why a write was refused.** A refused
   `Add` / `AddList` / `Update` returned the same `false` for all three of its
   causes: Android's background write throttle, an exhausted shortcut budget, and
