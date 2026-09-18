@@ -67,7 +67,16 @@ the run to finish — read its result — then push.
   `runtime_add`, which `QuickActions.Add` published while the app ran (the
   testbed seeds it on request) rather than `Info.plist` baking it: `PASS` on
   both supported legs, 5 s after the tap, with all four rows — three static,
-  one runtime — in the one menu SpringBoard opened. The `unity6-xcode27` canary
+  one runtime — in the one menu SpringBoard opened. Since run 110 (2026-09-18) a
+  **third** pass per leg taps `daily_reward` on an app that is already running:
+  `PASS` on both supported legs, the id reaching `Performed` **1 s** after the
+  tap, with the app's pid identical before and after (2022.3: 28398; unity6:
+  32706) — so that tap was a re-entry, not a relaunch. That pid comparison is
+  the evidence, not XCUITest's `app.state`: on run 109 the same check asked
+  `app.state` instead and got `.runningForeground` on both legs fifteen seconds
+  after the Home press, with SpringBoard's home screen covering the app.
+  **Warm delivery is therefore established on the Simulator, and only there.**
+  The `unity6-xcode27` canary
   is the exception: same menu, same row, the id never arrived, and the app was
   in the foreground 0 s after the tap so it did not cold-start there; the cause
   is NOT established. Still never on a device. Say exactly that; do not describe

@@ -89,6 +89,14 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   reporting the process gone at tap time — because a tap on a dead app is the
   cold pass, which two other passes already cover.
 
+  **What run 110 saw:** `PASS` on both supported legs — 2022.3.62f3 / iOS 18.6
+  (app-delegate lifecycle) and 6000.3.21f1 / iOS 26.5 (scene manifest) — with
+  `daily_reward` reaching `Performed` **1 second** after the tap, against the
+  35–54 s a cold launch takes, and the pid identical either side of it (28398
+  and 32706). All four rows were in the one menu SpringBoard opened, the
+  `Continue` row still reading its resolved `Resume v1.4.0 (37)`. Warm delivery
+  is now established on the Simulator; it remains unobserved on a device.
+
 - **The iOS coexistence probe pins queue order across several taps.** Taps
   arriving back to back before C# drains were unasserted on every platform: the
   probe sent one id at a time. It now sends `a`, `b`, `a` on one runloop turn
@@ -96,7 +104,9 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   at once, FIFO order and no collapsing of a repeat (only a COLD source arms the
   dedup marker, and it is spent by the time the probe runs). Each of the three
   completion handlers must also run exactly once. `multi-id-queue-order` and
-  `multi-id-completion-each` join the PASS names the workflow requires by name.
+  `multi-id-completion-each` join the PASS names the workflow requires by name,
+  and passed on their first run (109) on both coex legs, in the default launch
+  and in the shadowed-configuration one.
 
 - **`QuickActions.IsRateLimitingActive` — why a write was refused.** A refused
   `Add` / `AddList` / `Update` returned the same `false` for all three of its
