@@ -84,6 +84,28 @@ namespace EminDeniz99.QuickActions.Internal
             }
         }
 
+        // Advisory: the OS throttles background shortcut writes and resets the
+        // flag on foreground. Racy by nature (it can flip before the next write),
+        // so it explains a refused Add/AddRange/Update rather than gating one.
+        public bool IsRateLimitingActive
+        {
+            get
+            {
+                if (!IsPlatformSupported) return false;
+                try
+                {
+                    using (var bridge = new AndroidJavaClass(BridgeClass))
+                    using (var activity = CurrentActivity())
+                        return bridge.CallStatic<bool>("isRateLimitingActive", activity);
+                }
+                catch (AndroidJavaException e)
+                {
+                    Debug.LogWarning("[QuickActions] IsRateLimitingActive failed: " + e.Message);
+                    return false;
+                }
+            }
+        }
+
         // requestPinShortcut is API 26+; below that pinning doesn't exist.
         public bool IsPinSupported
         {

@@ -11,6 +11,7 @@ namespace EminDeniz99.QuickActions.Internal
         public bool IsPlatformSupported => false;
         public int MaxShortcutCount => 0;
         public bool IsPinSupported => false;
+        public bool IsRateLimitingActive => false;
         public bool RequestPin(string id) => false;
         public bool ReportUsed(string id) => false;
         // Accept-all: return the same reference so the facade prunes nothing (there

@@ -33,6 +33,14 @@ namespace EminDeniz99.QuickActions.Internal
         bool IsPinSupported { get; }
 
         /// <summary>
+        /// True while the OS is throttling this app's shortcut writes (Android
+        /// <c>isRateLimitingActive</c>). Advisory and racy — it can flip between
+        /// this read and the next write — so it explains a refusal rather than
+        /// gating one. Always false on iOS (no throttle) and in the Editor.
+        /// </summary>
+        bool IsRateLimitingActive { get; }
+
+        /// <summary>
         /// Ask the launcher to pin the (already added, package-managed) shortcut
         /// with this id. Returns true when the request was DISPATCHED — the user
         /// still confirms/denies in launcher UI and the OS reports no outcome.

@@ -54,6 +54,7 @@ public final class QuickActionsBridgeSmokeTest {
         adaptiveAndPinDegradeBelowApi26();
         usageReportIsOwnershipGated();
         bitmapIconsAreClampedToTheOsBudget();
+        rateLimitFlagIsExposed();
 
         System.out.println("SMOKE: " + (failures == 0 ? "PASS" : "FAIL") + " (" + checks + " checks, " + failures + " failed)");
         if (failures != 0) System.exit(1);
@@ -583,6 +584,26 @@ public final class QuickActionsBridgeSmokeTest {
             BitmapFactory.decodedHeight = 1;
             png.delete();
         }
+    }
+
+    private static void rateLimitFlagIsExposed() throws Exception {
+        // The flag explains a refused write; it must follow the OS, never the last
+        // write's outcome, and must degrade to false where ShortcutManager is absent.
+        ShortcutManager mgr = new ShortcutManager();
+        check(!QuickActionsBridge.isRateLimitingActive(activity(mgr)), "an unthrottled device reports false");
+        mgr.rateLimited = true;
+        check(QuickActionsBridge.isRateLimitingActive(activity(mgr)), "a throttled device reports true");
+        check(QuickActionsBridge.setShortcuts(activity(mgr), itemsJson("a")) == null,
+                "…and the write it explains is indeed refused");
+        check(QuickActionsBridge.isRateLimitingActive(activity(mgr)), "reading the flag does not consume it");
+        mgr.rateLimited = false;
+        check(!QuickActionsBridge.isRateLimitingActive(activity(mgr)), "the flag clears with the throttle");
+
+        int prev = Build.VERSION.SDK_INT;
+        Build.VERSION.SDK_INT = 24;
+        check(!QuickActionsBridge.isRateLimitingActive(activity(mgr)), "below API 25 reports false");
+        Build.VERSION.SDK_INT = prev;
+        check(!QuickActionsBridge.isRateLimitingActive(null), "a null activity reports false");
     }
 
     private static Activity activity(ShortcutManager mgr) {

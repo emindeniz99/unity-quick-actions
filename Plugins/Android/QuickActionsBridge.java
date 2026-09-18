@@ -594,6 +594,27 @@ public final class QuickActionsBridge {
     }
 
     /**
+     * True when the OS is currently throttling this app's shortcut writes
+     * ({@code isRateLimitingActive}, API 25+). Advisory and inherently racy — the
+     * flag can flip between this read and the next write — so it explains a
+     * refusal rather than gating one: the authoritative answer is still the
+     * boolean {@code addDynamicShortcuts} returns. Resets when the app comes to
+     * the foreground. False below API 25 and on any failure; never throws across
+     * JNI.
+     */
+    public static boolean isRateLimitingActive(Activity activity) {
+        if (activity == null || Build.VERSION.SDK_INT < 25) return false;
+        ShortcutManager manager = activity.getSystemService(ShortcutManager.class);
+        if (manager == null) return false;
+        try {
+            return manager.isRateLimitingActive();
+        } catch (RuntimeException e) {
+            android.util.Log.w("QuickActions", "isRateLimitingActive failed", e);
+            return false;
+        }
+    }
+
+    /**
      * True when the launcher supports pin requests ({@code
      * isRequestPinShortcutSupported}, API 26+). Never throws across JNI.
      */

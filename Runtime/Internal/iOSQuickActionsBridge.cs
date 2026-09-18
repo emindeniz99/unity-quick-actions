@@ -29,8 +29,10 @@ namespace EminDeniz99.QuickActions.Internal
         // Advisory only, and 4 is what devices are commonly seen to show.
         public int MaxShortcutCount => 4;
 
-        // iOS has no pinned-shortcut concept, and no usage-reporting analog.
+        // iOS has no pinned-shortcut concept, no usage-reporting analog, and no
+        // write throttle: setShortcutItems is a plain property assignment.
         public bool IsPinSupported => false;
+        public bool IsRateLimitingActive => false;
         public bool RequestPin(string id) => false;
         public bool ReportUsed(string id) => false;
 

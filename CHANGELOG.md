@@ -46,6 +46,19 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **`QuickActions.IsRateLimitingActive` — why a write was refused.** A refused
+  `Add` / `AddList` / `Update` returned the same `false` for all three of its
+  causes: Android's background write throttle, an exhausted shortcut budget, and
+  an id another publisher owns. Only the first one clears by itself, and only
+  the log line said which had happened. The new read-only property surfaces
+  Android's `isRateLimitingActive`, so a game that writes its "continue playing"
+  shortcut on backgrounding can tell "retry once foregrounded" from "retrying
+  will never work". It is advisory: the flag is racy by nature — the OS can
+  apply or lift the throttle between the read and the next write — so nothing
+  in this package gates on it, and the write's own return value stays
+  authoritative. False on iOS (no throttle exists) and in the Editor, like
+  `MaxShortcutCount` is 0 there.
+
 - **The demo shows a build-time placeholder, and CI gates on the resolved
   value.** `{version}` / `{build}` and friends landed in 0.4.6 with headless
   tests only: no build CI produced, and no device or Simulator anyone ran, had
