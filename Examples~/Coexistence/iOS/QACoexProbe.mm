@@ -147,6 +147,29 @@ static void QACoexRunChecks(void) {
                                            completions]);
     QACoexDrain();
 
+    // Several taps arriving before C# drains: the queue must keep them all, in
+    // arrival order, and must not collapse a repeat. Only the COLD source arms a
+    // dedup marker, and it is consumed by the time this runs, so a,b,a is the
+    // shape that pins both properties at once. Everything happens on this one
+    // runloop turn, so the C# drain cannot interleave.
+    __block int multiCompletions = 0;
+    void (^count)(BOOL) = ^(BOOL ok) { multiCompletions++; };
+    BOOL multiSent = QACoexSendWarm(windowScene, QACoexMakeItem(@"qa_ci_multi_a", YES), count);
+    multiSent = QACoexSendWarm(windowScene, QACoexMakeItem(@"qa_ci_multi_b", YES), count) && multiSent;
+    multiSent = QACoexSendWarm(windowScene, QACoexMakeItem(@"qa_ci_multi_a", YES), count) && multiSent;
+    NSMutableArray<NSString *> *drained = [NSMutableArray array];
+    for (NSString *one = QACoexConsume(); one != nil; one = QACoexConsume()) {
+        [drained addObject:one];
+    }
+    NSArray<NSString *> *expected = @[ @"qa_ci_multi_a", @"qa_ci_multi_b", @"qa_ci_multi_a" ];
+    QACoexCheck(multiSent && [drained isEqualToArray:expected], @"multi-id-queue-order",
+                [NSString stringWithFormat:@"sent=%d queue handed back [%@]", (int)multiSent,
+                                           [drained componentsJoinedByString:@", "]]);
+    QACoexCheck(multiSent && multiCompletions == 3, @"multi-id-completion-each",
+                [NSString stringWithFormat:@"the completion handler ran %d time(s), wanted 3",
+                                           multiCompletions]);
+    QACoexDrain();
+
     // An UNMARKED item — a host's own quick action. Whether the package adopts it is a
     // documented, path-dependent decision (it does when it is the only handler, it does
     // not when it is wrapped or when the scene owner is unconfirmed), so the portable

@@ -62,6 +62,43 @@ long-press, the `launchOptions` / `connectionOptions` UIKit fills in for a real 
 tap, physical-device behaviour, and any Unity version outside the two testbeds are all
 still unobserved. A green leg is not device coverage.
 
+## Does any real SDK compete for these selectors?
+
+Read 2026-09-18, and re-read by CI on every run: **no.** The SDKs a Unity game
+is most likely to link swizzle the app delegate for URL opening, universal links
+and remote notifications — not for quick actions. Neither
+`application:performActionForShortcutItem:completionHandler:` nor
+`windowScene:performActionForShortcutItem:completionHandler:` appears in any of
+them.
+
+The one with a pinnable shared source is **GoogleUtilities**, the swizzler under
+Firebase and the only widely shipped iOS SDK that rewrites a live delegate's
+`isa` rather than swizzling methods on a class — which is why `QACoexIsaProxy.mm`
+imitates it. At tag `8.1.0`:
+
+* `GULAppDelegateSwizzler.m` hooks `application:continueUserActivity:restorationHandler:`,
+  `application:openURL:options:`,
+  `application:handleEventsForBackgroundURLSession:completionHandler:`,
+  `application:openURL:sourceApplication:annotation:` and `description`, plus three
+  remote-notification donor methods. The word *shortcut* does not occur in the file.
+* `GULSceneDelegateSwizzler.m` hooks exactly one scene selector,
+  `scene:openURLContexts:`. Same: no *shortcut* anywhere.
+
+That answer has a shelf life — it was true of one version on one day — so it is
+not left as prose. `tools~/check_sdk_swizzlers.py` re-reads both files at that
+pinned tag and fails the `sdk-swizzler-sentinel` job in `.github/workflows/ci.yml`
+the day either starts mentioning a shortcut, printing the selector list each one
+*does* hook so a narrower change is visible in the log too. It reads upstream
+over the network and vendors nothing; an unreachable network warns and passes,
+because that is the automation missing rather than a finding.
+
+The other audited SDKs — AppsFlyer, Branch, OneSignal, Adjust, Singular, Braze —
+swizzle or subclass by hand, with no single source file worth pinning. None was
+found near these selectors either, but the sentinel deliberately does not try to
+watch them: an unpinnable grep per SDK would trade this check's reproducibility
+for coverage it could not actually keep. The mock host above is what covers
+their *shape*.
+
 ## Output contract
 
 Every check prints one line via `NSLog`:

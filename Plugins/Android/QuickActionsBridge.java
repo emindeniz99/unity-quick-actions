@@ -492,7 +492,10 @@ public final class QuickActionsBridge {
             try {
                 android.graphics.Bitmap bitmap = android.graphics.BitmapFactory.decodeFile(bitmapFile);
                 if (bitmap != null) {
-                    return item.optBoolean("AndroidBitmapAdaptive", false) && Build.VERSION.SDK_INT >= 26
+                    boolean adaptive = item.optBoolean("AndroidBitmapAdaptive", false)
+                            && Build.VERSION.SDK_INT >= 26;
+                    bitmap = clampToIconBudget(context, bitmap, adaptive);
+                    return adaptive
                             ? Icon.createWithAdaptiveBitmap(bitmap)
                             : Icon.createWithBitmap(bitmap);
                 }
@@ -523,6 +526,57 @@ public final class QuickActionsBridge {
     }
 
     /**
+     * Downscale a runtime bitmap to the OS icon budget, preserving aspect ratio.
+     * A Unity {@code Texture2D} encoded to PNG is commonly 512 or 1024 px square,
+     * far above the typical limit, and the full bitmap crosses a binder
+     * transaction on every publish.
+     *
+     * <p>{@code getIconMaxWidth/Height} bound the icon's <i>visible part</i>. An
+     * adaptive bitmap additionally carries the launcher mask's inset, so its
+     * allowance is the visible box multiplied by
+     * {@code 1 + 2 * AdaptiveIconDrawable.getExtraInsetFraction()} — the formula
+     * the platform documents for exactly this conversion.
+     *
+     * <p>Best-effort: any failure returns the bitmap untouched, because an
+     * oversized icon is still a valid icon (the OS downscales it itself) while a
+     * thrown exception would cost the whole write.
+     */
+    private static android.graphics.Bitmap clampToIconBudget(
+            Context context, android.graphics.Bitmap bitmap, boolean adaptive) {
+        try {
+            ShortcutManager manager = context.getSystemService(ShortcutManager.class);
+            if (manager == null) return bitmap;
+            int maxWidth = manager.getIconMaxWidth();
+            int maxHeight = manager.getIconMaxHeight();
+            if (maxWidth <= 0 || maxHeight <= 0) return bitmap;
+            if (adaptive) {
+                float inset = 1f + 2f
+                        * android.graphics.drawable.AdaptiveIconDrawable.getExtraInsetFraction();
+                maxWidth = Math.round(maxWidth * inset);
+                maxHeight = Math.round(maxHeight * inset);
+            }
+            int width = bitmap.getWidth();
+            int height = bitmap.getHeight();
+            if (width <= 0 || height <= 0) return bitmap;
+            if (width <= maxWidth && height <= maxHeight) return bitmap;
+
+            float factor = Math.min((float) maxWidth / width, (float) maxHeight / height);
+            int scaledWidth = Math.max(1, Math.round(width * factor));
+            int scaledHeight = Math.max(1, Math.round(height * factor));
+            android.graphics.Bitmap scaled =
+                    android.graphics.Bitmap.createScaledBitmap(bitmap, scaledWidth, scaledHeight, true);
+            if (scaled == null) return bitmap;
+            android.util.Log.i("QuickActions", "Bitmap icon downscaled from "
+                    + width + "x" + height + " to " + scaledWidth + "x" + scaledHeight
+                    + " (OS icon budget " + maxWidth + "x" + maxHeight + ")");
+            return scaled;
+        } catch (RuntimeException e) {
+            android.util.Log.w("QuickActions", "Bitmap icon clamp failed, using it unscaled", e);
+            return bitmap;
+        }
+    }
+
+    /**
      * The OS shortcut budget for the app's activity —
      * {@code getMaxShortcutCountPerActivity} (shared with manifest shortcuts and
      * any dynamic shortcuts other publishers installed). 0 when unavailable.
@@ -536,6 +590,27 @@ public final class QuickActionsBridge {
         } catch (RuntimeException e) {
             android.util.Log.w("QuickActions", "getMaxShortcutCount failed", e);
             return 0;
+        }
+    }
+
+    /**
+     * True when the OS is currently throttling this app's shortcut writes
+     * ({@code isRateLimitingActive}, API 25+). Advisory and inherently racy — the
+     * flag can flip between this read and the next write — so it explains a
+     * refusal rather than gating one: the authoritative answer is still the
+     * boolean {@code addDynamicShortcuts} returns. Resets when the app comes to
+     * the foreground. False below API 25 and on any failure; never throws across
+     * JNI.
+     */
+    public static boolean isRateLimitingActive(Activity activity) {
+        if (activity == null || Build.VERSION.SDK_INT < 25) return false;
+        ShortcutManager manager = activity.getSystemService(ShortcutManager.class);
+        if (manager == null) return false;
+        try {
+            return manager.isRateLimitingActive();
+        } catch (RuntimeException e) {
+            android.util.Log.w("QuickActions", "isRateLimitingActive failed", e);
+            return false;
         }
     }
 

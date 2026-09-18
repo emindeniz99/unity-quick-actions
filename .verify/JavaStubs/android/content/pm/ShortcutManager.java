@@ -11,6 +11,13 @@ public class ShortcutManager {
   public final List<ShortcutInfo> manifest = new ArrayList<>();
   public final List<ShortcutInfo> pinned = new ArrayList<>();
   public int getMaxShortcutCountPerActivity(){return maxShortcutCountPerActivity;}
+  // Icon-size budget (bounds the icon's VISIBLE part) and the live
+  // rate-limiting flag. AOSP reports both as plain getters.
+  public int iconMaxWidth = 96;
+  public int iconMaxHeight = 96;
+  public int getIconMaxWidth(){return iconMaxWidth;}
+  public int getIconMaxHeight(){return iconMaxHeight;}
+  public boolean isRateLimitingActive(){return rateLimited;}
   public boolean setDynamicShortcuts(List<ShortcutInfo> s){
     if (rateLimited) return false;
     dynamic.clear(); dynamic.addAll(s); return true;

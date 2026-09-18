@@ -634,6 +634,40 @@ namespace EminDeniz99.QuickActions.Tests
         }
 
         [Test]
+        public void IsRateLimitingActive_SurfacesTheBridgeFlag_AndIsNotConsumedByReading()
+        {
+            // WHY: a refused Add returns the same false for all three causes
+            // (background throttle, cap exhausted, id owned by another publisher).
+            // This flag is the one that separates "retry once foregrounded" from
+            // "retrying will never work", so it has to come from the platform —
+            // and reading it must neither clear it nor change the refusal.
+            var bridge = new RefusedWriteBridge { RateLimited = true };
+            QuickActions.OverrideBridgeForTesting(bridge);
+            try
+            {
+                Assert.IsTrue(QuickActions.IsRateLimitingActive);
+                Assert.IsFalse(QuickActions.Add(Item("a")), "the throttled write is still refused");
+                Assert.IsTrue(QuickActions.IsRateLimitingActive, "reading the flag does not consume it");
+
+                // Throttle lifted (foregrounded): the same write now lands, and the
+                // flag follows the bridge rather than the last write's outcome.
+                bridge.RateLimited = false;
+                bridge.WritesToRefuse = 0;
+                Assert.IsFalse(QuickActions.IsRateLimitingActive);
+                Assert.IsTrue(QuickActions.Add(Item("a")));
+            }
+            finally { QuickActions.OverrideBridgeForTesting(null); }
+        }
+
+        [Test]
+        public void IsRateLimitingActive_IsFalseWhereNoThrottleExists()
+        {
+            // The Editor/unsupported no-op bridge has no OS behind it; iOS has no
+            // write throttle at all. Both must read false, never a stale default.
+            Assert.IsFalse(new NullQuickActionsBridge().IsRateLimitingActive);
+        }
+
+        [Test]
         public void Payload_SurvivesAddAndIsReadableById()
         {
             // WHY: the documented payload pattern is "Performed gives the id, read
@@ -1186,10 +1220,16 @@ namespace EminDeniz99.QuickActions.Tests
             // refuse→accept transition inside a single call (a one-off JNI /
             // system_server failure), which is the window the AddList loss needs.
             public int WritesToRefuse = int.MaxValue;
+            // What the OS would answer for isRateLimitingActive. Independent of
+            // WritesToRefuse on purpose: the two disagree on a real device (the
+            // flag is racy, and a write can also fail for cap/ownership reasons),
+            // so the facade must surface this one rather than infer it.
+            public bool RateLimited;
             public int SetCount;
             public bool IsPlatformSupported => true;
             public int MaxShortcutCount => 4;
             public bool IsPinSupported => false;
+            public bool IsRateLimitingActive => RateLimited;
             public bool RequestPin(string id) => false;
             public bool ReportUsed(string id) => false;
             public IList<QuickActionItem> SetShortcuts(IList<QuickActionItem> items)
@@ -1433,6 +1473,7 @@ namespace EminDeniz99.QuickActions.Tests
             // silently absorbed by a duplicate check here.
             public readonly List<string> PinRequests = new List<string>();
             public bool IsPinSupported => true;
+            public bool IsRateLimitingActive => false;
             public bool RequestPin(string id) { PinRequests.Add(id); return true; }
             // Accept-all recorder, same rationale as RequestPin: the facade's
             // managed-set gate is the code under test, not a duplicate here.
@@ -1463,6 +1504,7 @@ namespace EminDeniz99.QuickActions.Tests
             public bool IsPlatformSupported => true;
             public int MaxShortcutCount => 4;
             public bool IsPinSupported => false;
+            public bool IsRateLimitingActive => false;
             public bool RequestPin(string id) => false;
             public bool ReportUsed(string id) => false;
             public IList<QuickActionItem> SetShortcuts(IList<QuickActionItem> items) => items;
@@ -1481,6 +1523,7 @@ namespace EminDeniz99.QuickActions.Tests
             public bool IsPlatformSupported => true;
             public int MaxShortcutCount => 4;
             public bool IsPinSupported => false;
+            public bool IsRateLimitingActive => false;
             public bool RequestPin(string id) => false;
             public bool ReportUsed(string id) => false;
             public IList<QuickActionItem> SetShortcuts(IList<QuickActionItem> items) => items;
@@ -1498,6 +1541,7 @@ namespace EminDeniz99.QuickActions.Tests
             public bool IsPlatformSupported => true;
             public int MaxShortcutCount => 4;
             public bool IsPinSupported => false;
+            public bool IsRateLimitingActive => false;
             public bool RequestPin(string id) => false;
             public bool ReportUsed(string id) => false;
             public IList<QuickActionItem> SetShortcuts(IList<QuickActionItem> items)
@@ -1519,6 +1563,7 @@ namespace EminDeniz99.QuickActions.Tests
             public bool IsPlatformSupported => true;
             public int MaxShortcutCount => 4;
             public bool IsPinSupported => false;
+            public bool IsRateLimitingActive => false;
             public bool RequestPin(string id) => false;
             public bool ReportUsed(string id) => false;
             public IList<QuickActionItem> SetShortcuts(IList<QuickActionItem> items) => items;
@@ -1548,6 +1593,7 @@ namespace EminDeniz99.QuickActions.Tests
             public bool IsPlatformSupported => true;
             public int MaxShortcutCount => 4;
             public bool IsPinSupported => false;
+            public bool IsRateLimitingActive => false;
             public bool RequestPin(string id) => false;
             public bool ReportUsed(string id) => false;
             public IList<QuickActionItem> SetShortcuts(IList<QuickActionItem> items)
@@ -1581,6 +1627,7 @@ namespace EminDeniz99.QuickActions.Tests
             public bool IsPlatformSupported => true;
             public int MaxShortcutCount => 4;
             public bool IsPinSupported => false;
+            public bool IsRateLimitingActive => false;
             public bool RequestPin(string id) => false;
             public bool ReportUsed(string id) => false;
             public IList<QuickActionItem> SetShortcuts(IList<QuickActionItem> items)
@@ -1613,6 +1660,7 @@ namespace EminDeniz99.QuickActions.Tests
             public bool IsPlatformSupported => true;
             public int MaxShortcutCount => 4;
             public bool IsPinSupported => false;
+            public bool IsRateLimitingActive => false;
             public bool RequestPin(string id) => false;
             public bool ReportUsed(string id) => false;
             public IList<QuickActionItem> SetShortcuts(IList<QuickActionItem> items) => null; // write failed
@@ -1635,6 +1683,7 @@ namespace EminDeniz99.QuickActions.Tests
             public bool IsPlatformSupported => true;
             public int MaxShortcutCount => 4;
             public bool IsPinSupported => false;
+            public bool IsRateLimitingActive => false;
             public bool RequestPin(string id) => false;
             public bool ReportUsed(string id) => false;
             public IList<QuickActionItem> SetShortcuts(IList<QuickActionItem> items)
@@ -1659,6 +1708,7 @@ namespace EminDeniz99.QuickActions.Tests
             public bool IsPlatformSupported => true;
             public int MaxShortcutCount => 4;
             public bool IsPinSupported => false;
+            public bool IsRateLimitingActive => false;
             public bool RequestPin(string id) => false;
             public bool ReportUsed(string id) => false;
             public IList<QuickActionItem> SetShortcuts(IList<QuickActionItem> items) => items;

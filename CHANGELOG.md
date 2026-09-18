@@ -46,6 +46,81 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **A sentinel watches whether any real iOS SDK starts competing for the
+  quick-action selectors.** `Examples~/Coexistence/` proves this package composes
+  with a swizzler shaped like the real ones, but a mock host cannot say whether a
+  real SDK has begun hooking
+  `application:performActionForShortcutItem:completionHandler:` itself. An audit
+  said none does — Firebase/GoogleUtilities, AppsFlyer, Branch, OneSignal,
+  Adjust, Singular and Braze all swizzle for URL opening, universal links and
+  remote notifications instead — and that answer was true of one version on one
+  day. `tools~/check_sdk_swizzlers.py` now re-reads GoogleUtilities'
+  `GULAppDelegateSwizzler.m` and `GULSceneDelegateSwizzler.m` at pinned tag
+  `8.1.0` on every CI run (the new `sdk-swizzler-sentinel` job — Linux, seconds,
+  no Unity), fails the day either file mentions a shortcut, and prints the
+  selectors each one *does* hook so a narrower change is visible too. It reads
+  upstream and vendors nothing; an unreachable network warns and passes, because
+  that is the automation missing, not a finding. Linking a real SDK into a CI
+  build was considered and rejected: the audit says there is nothing to catch
+  there, and `Examples~/Coexistence/README.md` now carries the citation for that
+  claim instead of leaving it as prose.
+
+- **CI taps a quick action on an app that is already running.** Both real
+  SpringBoard taps this repo asserts — the static row, and since run 94 the
+  runtime-added one — cold-start the app, so every id CI has ever watched arrive
+  travelled the launch options. The warm path, a tap handed to a live process
+  through the lifecycle's own `performActionForShortcutItem`, was exercised only
+  by `ios-simulator-coex`'s synthetic sends, which prove what the package does
+  with a payload and never that UIKit would route one to it. `ios-springboard`
+  now runs a third pass per leg: `run_springboard_tap.sh` launches the app,
+  lets the Unity runtime boot, records the pid, and the XCUITest — in `QA_WARM`
+  mode — only sends it behind SpringBoard and taps, without terminating it.
+
+  **The pid is the evidence, and finding that out cost a run.** The first
+  attempt asked XCUITest whether the app had backgrounded. Run 109 answered
+  `.runningForeground` on *both* legs, fifteen seconds after the Home press,
+  with SpringBoard's own home screen up and covering the app — so its
+  `app.state` for an app reached by bundle id simply does not follow a Home
+  press, and both legs skipped with a message that read as if the app had died.
+  What the warm claim actually needs is "this is the same process", which only
+  `simctl` can see: the pass compares the pid before the launch-and-settle with
+  the pid after the tap. Unchanged means re-entered, not relaunched. A mismatch
+  warns and retracts the claim rather than failing the leg — as does XCUITest
+  reporting the process gone at tap time — because a tap on a dead app is the
+  cold pass, which two other passes already cover.
+
+  **What run 110 saw:** `PASS` on both supported legs — 2022.3.62f3 / iOS 18.6
+  (app-delegate lifecycle) and 6000.3.21f1 / iOS 26.5 (scene manifest) — with
+  `daily_reward` reaching `Performed` **1 second** after the tap, against the
+  35–54 s a cold launch takes, and the pid identical either side of it (28398
+  and 32706). All four rows were in the one menu SpringBoard opened, the
+  `Continue` row still reading its resolved `Resume v1.4.0 (37)`. Warm delivery
+  is now established on the Simulator; it remains unobserved on a device.
+
+- **The iOS coexistence probe pins queue order across several taps.** Taps
+  arriving back to back before C# drains were unasserted on every platform: the
+  probe sent one id at a time. It now sends `a`, `b`, `a` on one runloop turn
+  and requires the queue to hand back exactly that — which pins both properties
+  at once, FIFO order and no collapsing of a repeat (only a COLD source arms the
+  dedup marker, and it is spent by the time the probe runs). Each of the three
+  completion handlers must also run exactly once. `multi-id-queue-order` and
+  `multi-id-completion-each` join the PASS names the workflow requires by name,
+  and passed on their first run (109) on both coex legs, in the default launch
+  and in the shadowed-configuration one.
+
+- **`QuickActions.IsRateLimitingActive` — why a write was refused.** A refused
+  `Add` / `AddList` / `Update` returned the same `false` for all three of its
+  causes: Android's background write throttle, an exhausted shortcut budget, and
+  an id another publisher owns. Only the first one clears by itself, and only
+  the log line said which had happened. The new read-only property surfaces
+  Android's `isRateLimitingActive`, so a game that writes its "continue playing"
+  shortcut on backgrounding can tell "retry once foregrounded" from "retrying
+  will never work". It is advisory: the flag is racy by nature — the OS can
+  apply or lift the throttle between the read and the next write — so nothing
+  in this package gates on it, and the write's own return value stays
+  authoritative. False on iOS (no throttle exists) and in the Editor, like
+  `MaxShortcutCount` is 0 there.
+
 - **The demo shows a build-time placeholder, and CI gates on the resolved
   value.** `{version}` / `{build}` and friends landed in 0.4.6 with headless
   tests only: no build CI produced, and no device or Simulator anyone ran, had
@@ -84,6 +159,23 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **Runtime bitmap icons are downscaled to the Android icon budget.**
+  `resolveIcon` handed whatever `AndroidBitmapFile` decoded to straight to
+  `Icon.createWithBitmap` / `createWithAdaptiveBitmap` — no dimension check.
+  The documented way to build one is `tex.EncodeToPNG()`, and a Unity
+  `Texture2D` is commonly 512 or 1024 px square, so the full bitmap crossed a
+  binder transaction on every publish and the launcher rescaled it afterwards
+  anyway. The bitmap is now measured against `getIconMaxWidth/Height` and, only
+  when it exceeds them, scaled down with the aspect ratio preserved. An
+  adaptive bitmap gets 1.5× that box — `1 + 2 *
+  AdaptiveIconDrawable.getExtraInsetFraction()`, the platform's own formula for
+  the mask inset — so a correctly authored safe zone survives the downscale.
+  Best-effort throughout: an unreadable budget (0), a missing `ShortcutManager`
+  or any throw leaves the bitmap untouched, because an oversized icon is still
+  a valid icon while a thrown exception would cost the whole write. Five new
+  Java smoke checks pin the ratio, the adaptive allowance, the in-budget
+  pass-through and the unreadable-budget case.
+
 - **A shortcut tap arrives as `Performed` on real Android hardware.** Every tap
   this package had ever observed was an emulator's or the iOS Simulator's. On
   2026-09-17 the owner long-pressed the demo icon on a Moto G Play 2024
@@ -110,17 +202,26 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   the same PR. Every per-leg comment moved with the legs — the conditional
   matrices carry the same documentation the lists did.
 
-  **It did not make the pipeline faster, and the measurement says nothing will.**
-  Run 105 took 41m27s with six macOS jobs, against 36m01s and 46m37s with
-  twelve. What actually governs the wall clock is how long GitHub takes to hand
-  out a macOS runner: the total macOS queue wait was 34 minutes across twelve
-  jobs on run 103 and **80 minutes across six** on run 105, while the Linux
-  queue wait was 13 minutes in both. Halving the jobs did not halve the waiting,
-  and three runs of 36/46/41 minutes show variance that swamps any structural
-  change we can make. Two attempts at shortening this pipeline by reshaping the
+  **What governs the wall clock is runner availability, not the job graph.**
+  Four runs: 36m01s and 46m37s with twelve macOS jobs, then 41m27s and 25m37s
+  with six. The cleanest measurement is the last pair — runs 105 and 106 ran the
+  *same* six-macOS-job workflow, one docs-only commit apart, and their total
+  macOS **runner queue wait** was 1h20m16s against **5m09s**: a sixteenfold
+  swing with nothing in the workflow changed. Linux queue wait stayed 13-15
+  minutes throughout. Two attempts at shortening this pipeline by reshaping the
   job graph — un-chaining, then halving the macOS matrix — both came back inside
-  the noise, so the remaining graph-level ideas (folding `ios-springboard` into
-  `ios-simulator`, pre-booting the simulator) are not worth their risk either.
+  noise that large, so the remaining graph-level ideas (folding
+  `ios-springboard` into `ios-simulator`, pre-booting the simulator) are not
+  worth their risk either.
+
+  An earlier revision of this entry said flatly that the change "did not make
+  the pipeline faster", written when runs 103-105 were all there was. Run 106's
+  25m37s — the fastest recorded, and the only one under the chained 29-38 range
+  — does not support that as stated: six macOS jobs average 33 minutes against
+  twelve jobs' 41. Four points cannot separate that from the queue swing above,
+  so the claim is narrowed to the one the evidence carries: the job graph is not
+  the lever, and no total measured here settles what this change bought on its
+  own.
   What this change is actually worth: half the macOS demand, six fewer jobs, and
   — because the canaries were the only permanently-red checks — a run where a
   red check means something again.

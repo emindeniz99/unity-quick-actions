@@ -27,8 +27,8 @@ a threading contract we do not honour.
 | 1 | Every `ShortcutManager` call is synchronous on Unity's main thread | implement |
 | 2 | No runtime read-back of our own static shortcuts → free-slot budget is uncomputable | implement |
 | 3 | `RequestPin` has no result callback | implement |
-| 4 | Runtime bitmap icons are never sized against `getIconMaxWidth/Height` | consider |
-| 5 | No machine-readable reason for a refused write (rate limit vs cap vs collision) | consider |
+| 4 | Runtime bitmap icons are never sized against `getIconMaxWidth/Height` | **done 2026-09-18** |
+| 5 | No machine-readable reason for a refused write (rate limit vs cap vs collision) | **partly done 2026-09-18** |
 | 6 | iOS `MaxShortcutCount => 4` is called "documented"; Apple documents no integer | document-only |
 | 7 | `Update()` cannot refresh a pinned-only copy | document-only (near-unreachable) |
 
@@ -294,3 +294,44 @@ And one capability neither reading pass surfaced was added by the judge from
 the live reference page: the worker-thread sentence in §3.1, which reframes the
 highest-cost gap. `getShortcuts(int matchFlags)` (API 30) was also missed —
 it is the modern one-call read-back covering §3.2.
+
+## 6. What this document produced — resolution log (2026-09-18)
+
+Added after the fact, so the table above keeps reading as it was written.
+
+- **§3.4 — done.** `resolveIcon` now measures a decoded `AndroidBitmapFile`
+  against `getIconMaxWidth/Height` and downscales past them with the aspect
+  ratio preserved, giving an adaptive bitmap the
+  `1 + 2 * AdaptiveIconDrawable.getExtraInsetFraction()` allowance the platform
+  documents. Both halves the section asked for shipped — the behaviour and the
+  doc — and the README's `AndroidBitmapFile` / `AndroidBitmapAdaptive` rows say
+  so. Every failure path (no `ShortcutManager`, a budget reported as 0, any
+  throw) leaves the bitmap untouched, because an oversized icon is still a valid
+  icon while a throw would cost the whole write. Note the section's own
+  **[plausible]** label stands: we still have not observed what an unclamped
+  oversized icon does on a device, so this is a cost fix, not a bug fix.
+
+- **§3.5 — partly done.** `QuickActions.IsRateLimitingActive` surfaces the
+  Android flag, which is the half that separates "retry once foregrounded" from
+  "this will never work". The other half — a machine-readable code on the write
+  itself, distinguishing cap exhaustion from an id another publisher owns — is
+  still only `Debug.Log` text. That one is an API-shape change to every write's
+  return type and is deliberately not bundled here.
+
+- **§3.7 — not doing, and that is the decision.** `updateShortcuts` stays out.
+  The section already downgraded it: a pinned-only live copy of one of our
+  shortcuts is close to unreachable through this API (`setShortcuts` disables
+  our pinned ids the moment they leave the new set, and `getShortcutsJson`
+  reads dynamics only, so such an entry would be invisible to
+  `GetAll`/`GetById`/`IsAdded` anyway), and the only route to one is external
+  interference. Adding it would buy a second rate-limited write path guarding a
+  state our own code does not produce. Revisit only together with pinned
+  shortcuts becoming first-class in `GetAll`/`GetById`, when `updateShortcuts`
+  and `getShortcuts(FLAG_MATCH_PINNED)` would land as one change.
+
+- **§3.6 — done earlier.** No copy of the 4 calls itself documented any more:
+  `iOSQuickActionsBridge.cs`, `IQuickActionsBridge.cs` and `QuickActions.cs`
+  say *observed*, and `README.md` says "display limit, no OS query".
+
+Gaps 1, 2 and 3 — the main-thread contract, the static-shortcut read-back and
+the `RequestPin` result callback — are untouched and stay `implement`.

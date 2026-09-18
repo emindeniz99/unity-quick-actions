@@ -254,6 +254,21 @@ namespace EminDeniz99.QuickActions
         public static bool IsPinSupported => Bridge.IsPinSupported;
 
         /// <summary>
+        /// True while Android is rate-limiting this app's shortcut writes — the
+        /// throttle that makes <see cref="Add"/>/<see cref="AddRange"/>/<see cref="Update"/>
+        /// return false for a game that writes shortcuts while backgrounded. It
+        /// tells "retry once the app is foregrounded again" apart from "this write
+        /// will never work" (cap exhausted, id owned elsewhere).
+        /// <para>
+        /// Advisory only: the flag is racy — the OS can lift or apply the throttle
+        /// between this read and the next write — and nothing here gates on it. The
+        /// authoritative answer stays the write's own return value. Always false on
+        /// iOS (no throttle exists) and in the Editor.
+        /// </para>
+        /// </summary>
+        public static bool IsRateLimitingActive => Bridge.IsRateLimitingActive;
+
+        /// <summary>
         /// Ask the launcher to pin the added quick action with this id to the home
         /// screen (Android 8.0+). The launcher shows its own confirm UI; the OS
         /// reports no outcome, so true means the request was <b>dispatched</b>, not

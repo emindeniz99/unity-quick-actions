@@ -26,6 +26,17 @@
 //                       build-time placeholders, which is how a resolved
 //                       {version}/{build} is proven to reach a real home screen
 //                       rather than only the files a build wrote.
+//   QA_WARM             non-empty: the app is ALREADY RUNNING and must stay
+//                       that way — the caller launched it and let its runtime
+//                       boot. This test then only sends it behind SpringBoard
+//                       and taps, so the id travels the warm delivery path.
+//                       Empty/unset is the cold pass, which terminates first.
+//                       The caller owns the proof that it is still the same
+//                       process (run_springboard_tap.sh's pid comparison):
+//                       XCUITest's own app.state cannot supply it — run 109
+//                       reported .runningForeground on BOTH legs a full 15 s
+//                       after the Home press, for an app SpringBoard had
+//                       plainly covered.
 //   QA_WAIT_SECONDS     seconds the app gets to reach the foreground after
 //                       the tap                                        (30)
 //   QA_DELIVERY_SECONDS seconds the id gets to reach Performed after the
@@ -36,7 +47,7 @@
 // The verdict lands in QA_OUT/launcher-tap.txt, one line, with the vocabulary
 // of the Android smoke's launcher tap:
 //
-//   PASS <id> via '<row label>' (<n> s after the tap)
+//   PASS <id> via '<row label>' (<n> s after the [warm ]tap)
 //                                the row was tapped, the app came up, the id arrived
 //   SKIPPED <why>                the automation never reached a tap that counts
 //   FAIL <why>                   SpringBoard took the tap and nothing arrived, or
@@ -76,16 +87,33 @@ final class SpringBoardTapUITests: XCTestCase {
         let expectLabel = env["QA_EXPECT_LABEL"].flatMap { $0.isEmpty ? nil : $0 }
         let waitSeconds = TimeInterval(env["QA_WAIT_SECONDS"] ?? "") ?? 30
         let deliverySeconds = TimeInterval(env["QA_DELIVERY_SECONDS"] ?? "") ?? 120
+        let warm = env["QA_WARM"].map { !$0.isEmpty } ?? false
 
         let app = XCUIApplication(bundleIdentifier: appId)
         let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
 
-        // 1. Cold state: the app must not be running, and the home screen must be up.
-        if app.state != .notRunning {
-            app.terminate()
-            _ = app.wait(for: .notRunning, timeout: 15)
+        // 1. The state the tap has to start from, and the home screen up.
+        if warm {
+            // The app is already up and its runtime has booted — the caller did
+            // that, and owns the evidence that this stays the SAME process. All
+            // this branch must do is get out of the way: put it behind
+            // SpringBoard WITHOUT terminating it.
+            //
+            // Deliberately no wait on .runningBackground: XCUITest's state for
+            // an app reached by bundle id does not follow a Home press. Run 109
+            // polled it for 15 s on both legs and got .runningForeground every
+            // time, while SpringBoard's own home screen was up — so "iOS calls
+            // it backgrounded" is not a signal this test can read. What the warm
+            // claim actually needs is "the process was never relaunched", and
+            // that is the caller's pid comparison.
+            XCUIDevice.shared.press(.home)
+        } else {
+            if app.state != .notRunning {
+                app.terminate()
+                _ = app.wait(for: .notRunning, timeout: 15)
+            }
+            XCUIDevice.shared.press(.home)
         }
-        XCUIDevice.shared.press(.home)
         let homeUp = springboard.icons.firstMatch.waitForExistence(timeout: 30)
         dump("home", springboard)
         guard homeUp else {
@@ -187,6 +215,20 @@ final class SpringBoardTapUITests: XCTestCase {
             try verdict("SKIPPED", "'\(label)' exists but has no frame to tap")
             return
         }
+        // A backgrounded app can be killed while the long press retries. The
+        // state read over-reports liveness (see above), so this catches only the
+        // unambiguous case — XCUITest saying the process is gone — and the
+        // caller's pid comparison is what settles the rest. Recorded either way,
+        // so the artifact keeps what was read.
+        if warm {
+            let atTap = app.state
+            note("app state immediately before the tap: \(atTap.rawValue)")
+            guard isAlive(atTap) else {
+                try verdict("SKIPPED",
+                            "the app was no longer running when '\(label)' was tapped (state \(atTap.rawValue)) — this would have been a cold tap")
+                return
+            }
+        }
         let before = markerLines(markerPath)
         let tapCalled = Date()
         center(of: target).tap()
@@ -237,7 +279,8 @@ final class SpringBoardTapUITests: XCTestCase {
         }
         let deliveredAfter = Int(Date().timeIntervalSince(tapped))
         dump("delivered", app)
-        try verdict("PASS", "\(actionId) via '\(label)' (\(deliveredAfter) s after the tap)")
+        try verdict("PASS",
+                    "\(actionId) via '\(label)' (\(deliveredAfter) s after the \(warm ? "warm " : "")tap)")
     }
 
     // MARK: - SpringBoard helpers
@@ -274,6 +317,15 @@ final class SpringBoardTapUITests: XCTestCase {
             dump("page-\(swipes + 1)", app)
         }
         return isOnScreen(element, in: app)
+    }
+
+    /// The app is still a live process — in front, backgrounded, or suspended.
+    /// iOS suspends a backgrounded app quickly and XCUITest surfaces that as a
+    /// state of its own, so "still warm" cannot be asked of `.runningBackground`
+    /// alone.
+    private func isAlive(_ state: XCUIApplication.State) -> Bool {
+        state == .runningForeground || state == .runningBackground
+            || state == .runningBackgroundSuspended
     }
 
     private func hasFrame(_ element: XCUIElement) -> Bool {

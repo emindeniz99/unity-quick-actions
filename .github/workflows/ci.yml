@@ -46,6 +46,24 @@ jobs:
           path: dist~/QuickActions.unitypackage
           if-no-files-found: error
 
+  # The one check here that reads the outside world. Examples~/Coexistence/
+  # proves this package composes with a swizzler shaped like the real SDKs; what
+  # that mock host cannot answer is whether a real SDK has started COMPETING for
+  # the two performActionForShortcutItem selectors we own. The audit that said
+  # none does was read once, from one version, so this re-reads the pinned
+  # upstream sources on every run and turns a future upstream change into a red
+  # check instead of a bug report. No Unity, no toolchain, a few seconds.
+  # A failed fetch warns and passes — an unreachable network is the automation
+  # missing, not a finding.
+  sdk-swizzler-sentinel:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: No pinned third-party swizzler touches a quick-action selector
+        run: python3 tools~/check_sdk_swizzlers.py
+
   # unity-ci.yml's comments lean on actionlint ("actionlint shellchecks every
   # run: block in this workflow"); this is the job that makes that true in CI
   # rather than on whoever remembers to run it locally. The official image
