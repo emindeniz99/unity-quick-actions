@@ -3096,11 +3096,14 @@ jobs:
       # tap handed to a live process through the lifecycle's own
       # performActionForShortcutItem — was covered only by the synthetic sends
       # in ios-simulator-coex, which prove what the package does with a payload
-      # and never that UIKit would route one. The test does the warming itself
-      # (activate, settle, Home), so the previous pass's leftover state does not
-      # matter; a static row is used because a warm run cannot re-ask the
-      # seeder. It reuses the DerivedData the first pass built, so the cost is
-      # one more xcodebuild test, not one more compile.
+      # and never that UIKit would route one. run_springboard_tap.sh owns the
+      # warm-up (simctl launch, settle, record the pid) because only simctl can
+      # see the process id, and "same pid across the tap" is the evidence that
+      # the app was re-entered rather than relaunched — XCUITest's own app.state
+      # cannot supply it, having reported .runningForeground on both legs 15 s
+      # after the Home press on run 109. A static row is used because a warm run
+      # cannot re-ask the seeder. It reuses the DerivedData the first pass
+      # built, so the cost is one more xcodebuild test, not one more compile.
       - name: Tap a quick action on the already-running app (warm re-entry)
         if: ${{ !cancelled() && steps.static-tap.outputs.container != '' }}
         env:

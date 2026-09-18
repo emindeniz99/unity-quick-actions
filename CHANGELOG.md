@@ -65,19 +65,29 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   there, and `Examples~/Coexistence/README.md` now carries the citation for that
   claim instead of leaving it as prose.
 
-- **CI taps a quick action on an app that is already running.** All three real
+- **CI taps a quick action on an app that is already running.** Both real
   SpringBoard taps this repo asserts — the static row, and since run 94 the
   runtime-added one — cold-start the app, so every id CI has ever watched arrive
   travelled the launch options. The warm path, a tap handed to a live process
   through the lifecycle's own `performActionForShortcutItem`, was exercised only
   by `ios-simulator-coex`'s synthetic sends, which prove what the package does
-  with a payload and never that UIKit would route one to it. The XCUITest takes
-  a `QA_WARM` mode that activates the app, leaves it in the foreground long
-  enough for the Unity runtime to be genuinely up, backgrounds it with Home and
-  only then long-presses and taps; `ios-springboard` runs it as a third pass per
-  leg, reusing the DerivedData the first pass built. It reports SKIPPED — never
-  FAIL — if the app will not stay alive in the background, because a tap on a
-  dead app is the cold pass two other passes already cover.
+  with a payload and never that UIKit would route one to it. `ios-springboard`
+  now runs a third pass per leg: `run_springboard_tap.sh` launches the app,
+  lets the Unity runtime boot, records the pid, and the XCUITest — in `QA_WARM`
+  mode — only sends it behind SpringBoard and taps, without terminating it.
+
+  **The pid is the evidence, and finding that out cost a run.** The first
+  attempt asked XCUITest whether the app had backgrounded. Run 109 answered
+  `.runningForeground` on *both* legs, fifteen seconds after the Home press,
+  with SpringBoard's own home screen up and covering the app — so its
+  `app.state` for an app reached by bundle id simply does not follow a Home
+  press, and both legs skipped with a message that read as if the app had died.
+  What the warm claim actually needs is "this is the same process", which only
+  `simctl` can see: the pass compares the pid before the launch-and-settle with
+  the pid after the tap. Unchanged means re-entered, not relaunched. A mismatch
+  warns and retracts the claim rather than failing the leg — as does XCUITest
+  reporting the process gone at tap time — because a tap on a dead app is the
+  cold pass, which two other passes already cover.
 
 - **The iOS coexistence probe pins queue order across several taps.** Taps
   arriving back to back before C# drains were unasserted on every platform: the

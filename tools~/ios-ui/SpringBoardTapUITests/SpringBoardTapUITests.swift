@@ -26,15 +26,17 @@
 //                       build-time placeholders, which is how a resolved
 //                       {version}/{build} is proven to reach a real home screen
 //                       rather than only the files a build wrote.
-//   QA_WARM             non-empty: do NOT cold-start. The app is brought up
-//                       first and only then backgrounded with Home, so the row
-//                       is tapped against a process that is already alive — the
-//                       warm delivery path. Empty/unset is the cold pass, which
-//                       terminates the app first.
-//   QA_SETTLE_SECONDS   with QA_WARM, seconds the app is left in the foreground
-//                       before Home, so the Unity runtime is genuinely up and
-//                       not merely launched (a cold Unity launch on the
-//                       Simulator spends 35-54 s before its first frame)  (60)
+//   QA_WARM             non-empty: the app is ALREADY RUNNING and must stay
+//                       that way — the caller launched it and let its runtime
+//                       boot. This test then only sends it behind SpringBoard
+//                       and taps, so the id travels the warm delivery path.
+//                       Empty/unset is the cold pass, which terminates first.
+//                       The caller owns the proof that it is still the same
+//                       process (run_springboard_tap.sh's pid comparison):
+//                       XCUITest's own app.state cannot supply it — run 109
+//                       reported .runningForeground on BOTH legs a full 15 s
+//                       after the Home press, for an app SpringBoard had
+//                       plainly covered.
 //   QA_WAIT_SECONDS     seconds the app gets to reach the foreground after
 //                       the tap                                        (30)
 //   QA_DELIVERY_SECONDS seconds the id gets to reach Performed after the
@@ -86,45 +88,25 @@ final class SpringBoardTapUITests: XCTestCase {
         let waitSeconds = TimeInterval(env["QA_WAIT_SECONDS"] ?? "") ?? 30
         let deliverySeconds = TimeInterval(env["QA_DELIVERY_SECONDS"] ?? "") ?? 120
         let warm = env["QA_WARM"].map { !$0.isEmpty } ?? false
-        let settleSeconds = TimeInterval(env["QA_SETTLE_SECONDS"] ?? "") ?? 60
 
         let app = XCUIApplication(bundleIdentifier: appId)
         let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
 
         // 1. The state the tap has to start from, and the home screen up.
         if warm {
-            // Warm: the app must be ALIVE and in the background when the row is
-            // tapped, so the id travels the lifecycle's performActionForShortcutItem
-            // instead of the launch options. Bringing it to the foreground first also
-            // gives the Unity runtime time to boot and drain whatever an earlier pass
-            // queued, so the marker line this pass waits for can only be its own.
-            app.activate()
-            guard app.wait(for: .runningForeground, timeout: waitSeconds) else {
-                try verdict("SKIPPED",
-                            "the app never reached the foreground to warm up (state \(app.state.rawValue))")
-                return
-            }
-            note("warmed up; \(Int(settleSeconds)) s in the foreground before backgrounding")
-            Thread.sleep(forTimeInterval: settleSeconds)
+            // The app is already up and its runtime has booted — the caller did
+            // that, and owns the evidence that this stays the SAME process. All
+            // this branch must do is get out of the way: put it behind
+            // SpringBoard WITHOUT terminating it.
+            //
+            // Deliberately no wait on .runningBackground: XCUITest's state for
+            // an app reached by bundle id does not follow a Home press. Run 109
+            // polled it for 15 s on both legs and got .runningForeground every
+            // time, while SpringBoard's own home screen was up — so "iOS calls
+            // it backgrounded" is not a signal this test can read. What the warm
+            // claim actually needs is "the process was never relaunched", and
+            // that is the caller's pid comparison.
             XCUIDevice.shared.press(.home)
-            // NOT wait(for: .runningBackground): iOS suspends a backgrounded app
-            // within seconds and XCUITest reports that as its own state
-            // (.runningBackgroundSuspended), so waiting for the un-suspended one
-            // would skip most genuinely warm runs. Wait for "no longer in front",
-            // then require the process to still be alive in either shape.
-            let leftForeground = Date().addingTimeInterval(15)
-            while app.state == .runningForeground, Date() < leftForeground {
-                Thread.sleep(forTimeInterval: 0.5)
-            }
-            let afterHome = app.state
-            note("after Home the app is in state \(afterHome.rawValue)")
-            guard isAlive(afterHome), afterHome != .runningForeground else {
-                // Not a finding about the package: a tap on a dead app is the cold
-                // pass, which two other passes already assert.
-                try verdict("SKIPPED",
-                            "the app did not stay alive in the background (state \(afterHome.rawValue)) — this tap could not be told from a cold one")
-                return
-            }
         } else {
             if app.state != .notRunning {
                 app.terminate()
@@ -233,9 +215,11 @@ final class SpringBoardTapUITests: XCTestCase {
             try verdict("SKIPPED", "'\(label)' exists but has no frame to tap")
             return
         }
-        // The long press can take four attempts, and a backgrounded app can be
-        // killed inside that window — after which this would be a cold tap
-        // reported as a warm one. Re-read the state at the last possible moment.
+        // A backgrounded app can be killed while the long press retries. The
+        // state read over-reports liveness (see above), so this catches only the
+        // unambiguous case — XCUITest saying the process is gone — and the
+        // caller's pid comparison is what settles the rest. Recorded either way,
+        // so the artifact keeps what was read.
         if warm {
             let atTap = app.state
             note("app state immediately before the tap: \(atTap.rawValue)")
