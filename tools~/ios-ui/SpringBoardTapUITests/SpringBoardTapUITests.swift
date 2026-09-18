@@ -26,6 +26,15 @@
 //                       build-time placeholders, which is how a resolved
 //                       {version}/{build} is proven to reach a real home screen
 //                       rather than only the files a build wrote.
+//   QA_WARM             non-empty: do NOT cold-start. The app is brought up
+//                       first and only then backgrounded with Home, so the row
+//                       is tapped against a process that is already alive — the
+//                       warm delivery path. Empty/unset is the cold pass, which
+//                       terminates the app first.
+//   QA_SETTLE_SECONDS   with QA_WARM, seconds the app is left in the foreground
+//                       before Home, so the Unity runtime is genuinely up and
+//                       not merely launched (a cold Unity launch on the
+//                       Simulator spends 35-54 s before its first frame)  (60)
 //   QA_WAIT_SECONDS     seconds the app gets to reach the foreground after
 //                       the tap                                        (30)
 //   QA_DELIVERY_SECONDS seconds the id gets to reach Performed after the
@@ -36,7 +45,7 @@
 // The verdict lands in QA_OUT/launcher-tap.txt, one line, with the vocabulary
 // of the Android smoke's launcher tap:
 //
-//   PASS <id> via '<row label>' (<n> s after the tap)
+//   PASS <id> via '<row label>' (<n> s after the [warm ]tap)
 //                                the row was tapped, the app came up, the id arrived
 //   SKIPPED <why>                the automation never reached a tap that counts
 //   FAIL <why>                   SpringBoard took the tap and nothing arrived, or
@@ -76,16 +85,53 @@ final class SpringBoardTapUITests: XCTestCase {
         let expectLabel = env["QA_EXPECT_LABEL"].flatMap { $0.isEmpty ? nil : $0 }
         let waitSeconds = TimeInterval(env["QA_WAIT_SECONDS"] ?? "") ?? 30
         let deliverySeconds = TimeInterval(env["QA_DELIVERY_SECONDS"] ?? "") ?? 120
+        let warm = env["QA_WARM"].map { !$0.isEmpty } ?? false
+        let settleSeconds = TimeInterval(env["QA_SETTLE_SECONDS"] ?? "") ?? 60
 
         let app = XCUIApplication(bundleIdentifier: appId)
         let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
 
-        // 1. Cold state: the app must not be running, and the home screen must be up.
-        if app.state != .notRunning {
-            app.terminate()
-            _ = app.wait(for: .notRunning, timeout: 15)
+        // 1. The state the tap has to start from, and the home screen up.
+        if warm {
+            // Warm: the app must be ALIVE and in the background when the row is
+            // tapped, so the id travels the lifecycle's performActionForShortcutItem
+            // instead of the launch options. Bringing it to the foreground first also
+            // gives the Unity runtime time to boot and drain whatever an earlier pass
+            // queued, so the marker line this pass waits for can only be its own.
+            app.activate()
+            guard app.wait(for: .runningForeground, timeout: waitSeconds) else {
+                try verdict("SKIPPED",
+                            "the app never reached the foreground to warm up (state \(app.state.rawValue))")
+                return
+            }
+            note("warmed up; \(Int(settleSeconds)) s in the foreground before backgrounding")
+            Thread.sleep(forTimeInterval: settleSeconds)
+            XCUIDevice.shared.press(.home)
+            // NOT wait(for: .runningBackground): iOS suspends a backgrounded app
+            // within seconds and XCUITest reports that as its own state
+            // (.runningBackgroundSuspended), so waiting for the un-suspended one
+            // would skip most genuinely warm runs. Wait for "no longer in front",
+            // then require the process to still be alive in either shape.
+            let leftForeground = Date().addingTimeInterval(15)
+            while app.state == .runningForeground, Date() < leftForeground {
+                Thread.sleep(forTimeInterval: 0.5)
+            }
+            let afterHome = app.state
+            note("after Home the app is in state \(afterHome.rawValue)")
+            guard isAlive(afterHome), afterHome != .runningForeground else {
+                // Not a finding about the package: a tap on a dead app is the cold
+                // pass, which two other passes already assert.
+                try verdict("SKIPPED",
+                            "the app did not stay alive in the background (state \(afterHome.rawValue)) — this tap could not be told from a cold one")
+                return
+            }
+        } else {
+            if app.state != .notRunning {
+                app.terminate()
+                _ = app.wait(for: .notRunning, timeout: 15)
+            }
+            XCUIDevice.shared.press(.home)
         }
-        XCUIDevice.shared.press(.home)
         let homeUp = springboard.icons.firstMatch.waitForExistence(timeout: 30)
         dump("home", springboard)
         guard homeUp else {
@@ -187,6 +233,18 @@ final class SpringBoardTapUITests: XCTestCase {
             try verdict("SKIPPED", "'\(label)' exists but has no frame to tap")
             return
         }
+        // The long press can take four attempts, and a backgrounded app can be
+        // killed inside that window — after which this would be a cold tap
+        // reported as a warm one. Re-read the state at the last possible moment.
+        if warm {
+            let atTap = app.state
+            note("app state immediately before the tap: \(atTap.rawValue)")
+            guard isAlive(atTap) else {
+                try verdict("SKIPPED",
+                            "the app was no longer running when '\(label)' was tapped (state \(atTap.rawValue)) — this would have been a cold tap")
+                return
+            }
+        }
         let before = markerLines(markerPath)
         let tapCalled = Date()
         center(of: target).tap()
@@ -237,7 +295,8 @@ final class SpringBoardTapUITests: XCTestCase {
         }
         let deliveredAfter = Int(Date().timeIntervalSince(tapped))
         dump("delivered", app)
-        try verdict("PASS", "\(actionId) via '\(label)' (\(deliveredAfter) s after the tap)")
+        try verdict("PASS",
+                    "\(actionId) via '\(label)' (\(deliveredAfter) s after the \(warm ? "warm " : "")tap)")
     }
 
     // MARK: - SpringBoard helpers
@@ -274,6 +333,15 @@ final class SpringBoardTapUITests: XCTestCase {
             dump("page-\(swipes + 1)", app)
         }
         return isOnScreen(element, in: app)
+    }
+
+    /// The app is still a live process — in front, backgrounded, or suspended.
+    /// iOS suspends a backgrounded app quickly and XCUITest surfaces that as a
+    /// state of its own, so "still warm" cannot be asked of `.runningBackground`
+    /// alone.
+    private func isAlive(_ state: XCUIApplication.State) -> Bool {
+        state == .runningForeground || state == .runningBackground
+            || state == .runningBackgroundSuspended
     }
 
     private func hasFrame(_ element: XCUIElement) -> Bool {

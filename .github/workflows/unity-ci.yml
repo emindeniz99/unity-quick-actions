@@ -3090,6 +3090,35 @@ jobs:
           QA_LEG="$LEG" \
             "$RUNNER_TEMP/ios-ui/run_springboard_tap.sh" \
               "$UDID" "$OUT" runtime_add "Runtime Add"
+      # Third pass: the same long press and tap, but on an app that is ALREADY
+      # RUNNING. Both passes above cold-start it, so every real iOS tap this
+      # repo has asserted arrived through the launch options; the warm path — a
+      # tap handed to a live process through the lifecycle's own
+      # performActionForShortcutItem — was covered only by the synthetic sends
+      # in ios-simulator-coex, which prove what the package does with a payload
+      # and never that UIKit would route one. The test does the warming itself
+      # (activate, settle, Home), so the previous pass's leftover state does not
+      # matter; a static row is used because a warm run cannot re-ask the
+      # seeder. It reuses the DerivedData the first pass built, so the cost is
+      # one more xcodebuild test, not one more compile.
+      - name: Tap a quick action on the already-running app (warm re-entry)
+        if: ${{ !cancelled() && steps.static-tap.outputs.container != '' }}
+        env:
+          UDID: ${{ steps.sim.outputs.udid }}
+          APP_ID: com.quickactions.testbed
+          LEG: ${{ matrix.target.name }}
+          CONTAINER: ${{ steps.static-tap.outputs.container }}
+        run: |
+          set -euo pipefail
+          QA_PROJECT="$RUNNER_TEMP/ios-ui/SpringBoardTap.xcodeproj" \
+          QA_MARKER="$CONTAINER/Documents/quickactions-performed.log" \
+          QA_APP_ID="$APP_ID" \
+          QA_DERIVED="$RUNNER_TEMP/DerivedData-ui" \
+          QA_PASS="warm re-entry (app already running)" \
+          QA_LEG="$LEG" \
+          QA_WARM=1 \
+            "$RUNNER_TEMP/ios-ui/run_springboard_tap.sh" \
+              "$UDID" "$RUNNER_TEMP/springboard/warm" daily_reward "Daily Reward"
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         if: ${{ always() }}
         with:

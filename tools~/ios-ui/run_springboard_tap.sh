@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # One pass of the iOS SpringBoard tap: point the XCUITest bundle at a booted
 # simulator, tap ONE quick-action row, and turn the verdict the test writes into
-# an exit status and a job-summary block. CI calls it twice per leg — once for a
-# row Info.plist baked in, once for a row QuickActions.Add published at runtime —
-# and a human can call it for either, which is why this lives in a script rather
-# than inline in .github/workflows/unity-ci.yml.
+# an exit status and a job-summary block. CI calls it three times per leg — a row
+# Info.plist baked in, a row QuickActions.Add published at runtime, and one warm
+# re-entry into an app that is already running — and a human can call it for any
+# of them, which is why this lives in a script rather than inline in
+# .github/workflows/unity-ci.yml.
 #
 # Usage: run_springboard_tap.sh <udid> <out-dir> <action-id> <row-title>
 #
@@ -19,6 +20,9 @@
 #   QA_DERIVED   derived data for the test bundle  (<out-dir>/DerivedData-ui)
 #   QA_PASS      what this pass is called in the summary            (the id)
 #   QA_EXPECT_LABEL  substring one button of the open menu must carry, or FAIL
+#   QA_WARM      non-empty: tap an app that is already RUNNING (the test brings
+#                it up and backgrounds it) instead of cold-starting it
+#   QA_SETTLE_SECONDS  with QA_WARM, seconds in the foreground before Home  (60)
 #   QA_LEG       the CI leg's name, for the summary heading
 #
 # Exit 0 on PASS and on SKIPPED — the automation's own misses never fail a run —
@@ -39,7 +43,11 @@ PASS="${QA_PASS:-$ACTION_ID}"
 LEG="${QA_LEG:-}"
 
 mkdir -p "$OUT"
-echo "tapping '$ROW_TITLE' ($ACTION_ID) — marker: $MARKER"
+if [ -n "${QA_WARM:-}" ]; then
+  echo "tapping '$ROW_TITLE' ($ACTION_ID) on the RUNNING app — marker: $MARKER"
+else
+  echo "tapping '$ROW_TITLE' ($ACTION_ID) — marker: $MARKER"
+fi
 
 # xcodebuild forwards TEST_RUNNER_* from its own environment into the test
 # runner's, prefix stripped — that is how the test is configured.
@@ -52,6 +60,8 @@ export TEST_RUNNER_QA_MARKER="$MARKER"
 # Forwarded even when empty: xcodebuild only hands the runner TEST_RUNNER_* vars
 # it is itself given, and the test treats an empty value as "not checked".
 export TEST_RUNNER_QA_EXPECT_LABEL="${QA_EXPECT_LABEL:-}"
+export TEST_RUNNER_QA_WARM="${QA_WARM:-}"
+export TEST_RUNNER_QA_SETTLE_SECONDS="${QA_SETTLE_SECONDS:-}"
 
 set +e
 xcodebuild test \
