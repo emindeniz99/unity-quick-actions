@@ -100,11 +100,27 @@ ships it.
   Library cache hits its primary key on every Unity leg; what costs the
   minutes is the self-imposed `needs:` chain plus `max-parallel: 2`, the
   per-job GameCI image pull and activation, and the iOS simulator's first
-  boot behind GitHub's five-concurrent-macOS cap. Decided order, none of it
-  implemented yet: ARM64 simulator export (the testbeds still export x86_64
-  by omission), un-chain the Unity jobs, move the Xcode 27 canaries to the
-  cron, fold `ios-springboard` into `ios-simulator` with a pre-booted
-  simulator. Sources, numbers and the things ruled out (image cache,
+  boot behind GitHub's five-concurrent-macOS cap. **Un-chaining landed
+  2026-09-17 and did not move the wall clock**: runs 103 and 104 took 36m01s
+  and 46m37s, inside the chained 29–38 range. It fixed the Linux half, which
+  now finishes at 16 minutes with ten jobs running three minutes in, but the
+  macOS half owns the critical path — and that measurement found the real
+  lever: six xcode-27 macOS jobs (four canaries plus both `ios-crossrun` legs,
+  which are xcode-27-bound too) held slots on every PR while gating nothing,
+  one of them for 23 minutes. **They moved to the cron 2026-09-18 — and that did not
+  make it faster either.** Run 105: 41m27s with six macOS jobs, against 36m01s
+  and 46m37s with twelve. The measurement that ends this line of work: macOS
+  **runner queue wait** totalled 34 minutes over twelve jobs (run 103) and 80
+  minutes over six (run 105), while Linux queue wait was 13 minutes in both.
+  Wall clock is set by how long GitHub takes to hand out a macOS runner, which
+  no workflow shape controls. **Treat the remaining graph-level ideas as
+  closed** — folding `ios-springboard` into `ios-simulator` and pre-booting the
+  simulator would remove two more macOS jobs and, on this evidence, change
+  nothing measurable. What the two changes did buy is real but different: half
+  the macOS demand, a job graph whose every edge is a real artifact dependency,
+  and no permanently-red checks. ARM64 simulator export (the testbeds still
+  export x86_64 by omission) is the one item here that was never about the job
+  graph and still stands. Sources, numbers and the things ruled out (image cache,
   DerivedData, AVD snapshots, larger runners) are in
   [`docs~/ci-cost-and-caching-research-2026-09.md`](https://github.com/emindeniz99/unity-quick-actions/blob/main/docs~/ci-cost-and-caching-research-2026-09.md).
 - **Xcode 16.4 legs (`macos-15`) — keep, retarget or drop: decision deferred

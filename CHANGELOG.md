@@ -96,6 +96,35 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [0.7.0] - 2026-09-16
 
+- **The Xcode 27 experiment runs weekly instead of on every PR.** Six macOS
+  jobs existed only to test a toolchain no Unity line supports yet: the four
+  `xcode-27` canary legs (`continue-on-error`, never required) and both legs of
+  `ios-crossrun`, which are xcode-27-bound as well — one downloads the canary's
+  `.app`, the other runs on the `xcode-27` runner, so it could not stay behind
+  while they moved. Run 103 measured what they cost: the macOS half of the run
+  owns the critical path, its jobs enter in waves behind GitHub's
+  concurrent-macOS cap, and `ios springboard tap (unity6-xcode27)` alone held a
+  slot for 23 of the run's 35 minutes. They now run on the weekly cron and on
+  `workflow_dispatch`; a push or PR gets the core legs. The trade is stated
+  rather than hidden: an iOS-27 regression surfaces within a week instead of in
+  the same PR. Every per-leg comment moved with the legs — the conditional
+  matrices carry the same documentation the lists did.
+
+  **It did not make the pipeline faster, and the measurement says nothing will.**
+  Run 105 took 41m27s with six macOS jobs, against 36m01s and 46m37s with
+  twelve. What actually governs the wall clock is how long GitHub takes to hand
+  out a macOS runner: the total macOS queue wait was 34 minutes across twelve
+  jobs on run 103 and **80 minutes across six** on run 105, while the Linux
+  queue wait was 13 minutes in both. Halving the jobs did not halve the waiting,
+  and three runs of 36/46/41 minutes show variance that swamps any structural
+  change we can make. Two attempts at shortening this pipeline by reshaping the
+  job graph — un-chaining, then halving the macOS matrix — both came back inside
+  the noise, so the remaining graph-level ideas (folding `ios-springboard` into
+  `ios-simulator`, pre-booting the simulator) are not worth their risk either.
+  What this change is actually worth: half the macOS demand, six fewer jobs, and
+  — because the canaries were the only permanently-red checks — a run where a
+  red check means something again.
+
 ### Added
 
 - **The iOS SpringBoard test now also taps a shortcut nothing baked into
