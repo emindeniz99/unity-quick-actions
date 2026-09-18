@@ -46,6 +46,25 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **A sentinel watches whether any real iOS SDK starts competing for the
+  quick-action selectors.** `Examples~/Coexistence/` proves this package composes
+  with a swizzler shaped like the real ones, but a mock host cannot say whether a
+  real SDK has begun hooking
+  `application:performActionForShortcutItem:completionHandler:` itself. An audit
+  said none does — Firebase/GoogleUtilities, AppsFlyer, Branch, OneSignal,
+  Adjust, Singular and Braze all swizzle for URL opening, universal links and
+  remote notifications instead — and that answer was true of one version on one
+  day. `tools~/check_sdk_swizzlers.py` now re-reads GoogleUtilities'
+  `GULAppDelegateSwizzler.m` and `GULSceneDelegateSwizzler.m` at pinned tag
+  `8.1.0` on every CI run (the new `sdk-swizzler-sentinel` job — Linux, seconds,
+  no Unity), fails the day either file mentions a shortcut, and prints the
+  selectors each one *does* hook so a narrower change is visible too. It reads
+  upstream and vendors nothing; an unreachable network warns and passes, because
+  that is the automation missing, not a finding. Linking a real SDK into a CI
+  build was considered and rejected: the audit says there is nothing to catch
+  there, and `Examples~/Coexistence/README.md` now carries the citation for that
+  claim instead of leaving it as prose.
+
 - **CI taps a quick action on an app that is already running.** All three real
   SpringBoard taps this repo asserts — the static row, and since run 94 the
   runtime-added one — cold-start the app, so every id CI has ever watched arrive
