@@ -13,6 +13,37 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- **CI fans out instead of running in series.** The seven Unity jobs were
+  chained with `needs:` — `tests` → `android-build` → `ios-export` →
+  `ios-export-coex` → `tests-unity6-latest` → `android-shrink-verify` →
+  `gate-off` — so that exactly one editor ever activated at a time. The chain
+  cost 29–38 minutes of wall clock against 13 unchained, and runner minutes are
+  free on a public repo, so it bought nothing else. What it insured against has
+  never happened: across 30 runs no `game-ci` step has conclusion `failure`, and
+  run 25 activated eleven legs at once with every one logging
+  `Successfully returned ULF license` — and GameCI's own documentation says the
+  concurrency limit "is not an issue for free licenses", which is what a
+  Personal `.ulf` with no `UNITY_SERIAL` is. Every job now waits on the licence
+  gate alone, except `gate-off`, which waits on its **real** producers: it
+  downloads the demo APK from `android-build` and the Xcode project from
+  `ios-export`, so the licence gate alone would have raced them. `max-parallel`
+  stays at 2 so this is the only variable that moved; the workflow header
+  records how to put the chain back.
+
+  **Measured, and not what was predicted.** Run 103, the first unchained run,
+  took 36m01s — inside the chained 29–38 range, not the ~13 the old comment's
+  unchained figure suggested (that figure predates the macOS matrix growing to
+  ten jobs). What the un-chain did fix is the Linux half, which now finishes at
+  16 minutes with ten jobs running three minutes in; the macOS half runs to 35
+  and owns the critical path, entering in waves behind GitHub's concurrent-macOS
+  cap. The largest single cost turns out to be a canary that gates nothing —
+  `ios springboard tap (unity6-xcode27)`, 23 minutes of a macOS slot on every
+  PR. The chain still had to go (it constrained the Linux side for nothing, and
+  `gate-off` had no real dependencies at all), but the next change is the one
+  that moves wall clock.
+
 ### Added
 
 - **The demo shows a build-time placeholder, and CI gates on the resolved

@@ -232,9 +232,10 @@ APK of the Demo sample per Unity line on a licensed Unity (GameCI), and
 `android-smoke` feeds each one to this script on an emulator — API 30 for
 2021.3 and 2022.3, API 35 for unity6, whose development player dies at engine
 init under the older image's ARM translation. Those legs run on every code push
-and PR — free on a public repo, and gated only by the Unity-activation chain
-that keeps at most `UNITY_MAX_PARALLEL` editors live at once — plus a weekly
-cron that catches drift with no commit behind it.
+and PR — free on a public repo, and capped only by `UNITY_MAX_PARALLEL` legs
+per matrix (the job-to-job activation chain that used to serialise them came
+out on 2026-09-17) — plus a weekly cron that catches drift with no commit
+behind it.
 
 [`.github/workflows/device-ci.yml`](../../.github/workflows/device-ci.yml) is
 the older, standalone lane: it takes a URL to an already-built APK and runs

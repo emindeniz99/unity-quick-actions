@@ -1260,12 +1260,13 @@ smoke, and an iOS Simulator-SDK Xcode export per line, compiled unsigned and
 cold-launched on a macOS-runner simulator for 2022.3 and Unity 6 (2021.3
 exports only: its simulator support is x86_64-only) — run on the same events.
 Nothing is held back for a manual step, and a weekly cron still runs it to
-catch drift with no commit behind it. Runner minutes are free on a public repo;
-the Unity-activating jobs are chained so at most `UNITY_MAX_PARALLEL`
-(repository variable, default 2) editors are ever activated at once, which
-costs wall clock — 29 minutes on the first chained run and 38 on the latest
-measured one (the 2026-08-31 cron, shrink leg included), against 13
-unchained — and nothing else. Each Android APK is also read back with
+catch drift with no commit behind it. Runner minutes are free on a public repo,
+so the pipeline is tuned for wall clock alone. The Unity jobs used to be
+chained so that only one editor activated at a time, which cost 29–38 minutes
+against 13 unchained while insuring against an activation failure that never
+once occurred in 30 runs; since 2026-09-17 they fan out from the licence gate
+and only real artifact dependencies remain, with `UNITY_MAX_PARALLEL`
+(repository variable, default 2) still capping each matrix. Each Android APK is also read back with
 `aapt2`, which must
 find the baked static shortcuts, the resource-shrinker keep file and the
 trampoline `<activity>` inside it, a further 2022.3-only job

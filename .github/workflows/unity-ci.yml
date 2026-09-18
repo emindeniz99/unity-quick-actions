@@ -80,43 +80,69 @@ name: unity
 # Dependabot PR that is expected and the run stays green; on any other event
 # the gate FAILS, so a run with no editor behind it never reports green.
 #
-# Licence seats: at most UNITY_MAX_PARALLEL Unity activations run at once —
+# Licence seats: max-parallel caps each matrix at UNITY_MAX_PARALLEL legs —
 # repository variable, default 2 if unset, so the number is tunable from
 # Settings without a commit. (The `|| '2'` default is spelled out at each of
 # the four max-parallel lines — `strategy:` cannot read `env:` — and quoted in
 # README.md and tools~/device-smoke/README.md; change all six together.)
-# Two mechanisms together produce that number, and neither alone would:
-#   * the seven Unity jobs are chained with `needs:` (tests -> android-build ->
-#     ios-export -> ios-export-coex -> tests-unity6-latest ->
-#     android-shrink-verify -> gate-off), so exactly ONE of them is ever
-#     eligible. max-parallel is a matrix-only key — it cannot span job
-#     definitions — so without the chain the floor is seven.
-#   * max-parallel on each matrix caps that one job's legs.
-# The chain uses `!cancelled()` rather than the implicit success(), so a red
-# tests leg still lets the Android build run, exactly as before; the
-# no-secrets path still propagates as skipped.
 #
-# What this costs, measured rather than guessed: 29 minutes on run 31 (before
-# the shrink leg joined the chain) and 38 on run 35 for the whole matrix,
-# against 13.4 unchained. Runner minutes are free
-# on a public repo, so the price is wall clock only. To undo, delete the three
-# max-parallel lines and put every Unity job back on `needs: license` with the
-# plain gate.
+# Until 2026-09-17 a SECOND mechanism sat on top of it: the seven Unity jobs
+# were chained with `needs:` (tests -> android-build -> ios-export ->
+# ios-export-coex -> tests-unity6-latest -> android-shrink-verify -> gate-off)
+# so that exactly ONE of them was ever eligible and the whole workflow ran
+# essentially in series. That chain is gone. Each of those jobs now waits only
+# on the licence gate, except gate-off, which waits on its REAL producers —
+# it downloads quickactions-demo-apk-2022.3 from android-build and
+# ios-simulator-xcodeproj-2022.3 from ios-export, so pointing it at the gate
+# alone would race them and fail on a missing artifact.
 #
-# What the evidence says: no run of this workflow has EVER failed on Unity
-# activation. Across 30 runs, no game-ci step has conclusion "failure" — every
-# red is downstream of a successful activation. Run 25 activated all eleven
-# legs simultaneously and every one logged "Successfully returned ULF license".
-# GameCI hardcodes one machine-id into its Linux images, so parallel containers
-# present to Unity as the same machine, and it states the split in one
-# sentence: "This is not an issue for free licenses, but for paid licenses, you
-# will need to be mindful of starting too many parallel jobs as activation will
-# fail" (https://game.ci/docs/docker/docker-images/#concurrent-builds-on-windows-and-macos
+# Why it went, measured rather than guessed: the chain cost 29 minutes on run
+# 31 (before the shrink leg joined it) and 38 on run 35 for the whole matrix,
+# against 13.4 unchained — and runner minutes are free on a public repo, so it
+# was buying nothing but wall clock. What it was insuring against has never
+# happened: across 30 runs no game-ci step has conclusion "failure", every red
+# is downstream of a successful activation, and run 25 activated all eleven
+# legs simultaneously with every one logging "Successfully returned ULF
+# license". GameCI hardcodes one machine-id into its Linux images, so parallel
+# containers present to Unity as the same machine, and it states the split in
+# one sentence: "This is not an issue for free licenses, but for paid licenses,
+# you will need to be mindful of starting too many parallel jobs as activation
+# will fail"
+# (https://game.ci/docs/docker/docker-images/#concurrent-builds-on-windows-and-macos
 # — NOT the FAQ, which an earlier version of this comment cited; the FAQ does
 # not contain the word "seat"). This repo uses a Personal .ulf with no
 # UNITY_SERIAL, so the hard "two activations per key" limit that GameCI's own
-# CI hit (game-ci/unity-builder#516) does not bind these credentials.
-# The cap is therefore a deliberate margin, not a fix for an observed failure.
+# CI hit (game-ci/unity-builder#516) does not bind these credentials. The chain
+# was a deliberate margin, not a fix for an observed failure, and the margin
+# cost more than the risk it covered.
+#
+# max-parallel stays at 2 for now, deliberately: removing the chain is the one
+# variable this change moves, so an activation problem — if one ever appears —
+# can be attributed to it rather than to two changes at once. The ceiling is
+# now roughly eleven concurrent activations, which run 25 already survived.
+#
+# What it actually bought, measured on run 103 (the first unchained run):
+# 36m01s wall clock — INSIDE the chained 29–38 range, not the ~13 the old
+# comment's unchained figure predicted. That figure was measured before the
+# macOS matrix grew to ten jobs, and it no longer describes this workflow. The
+# run splits like this:
+#   * the Linux half finishes at 16 min, and ten jobs were running at once
+#     three minutes in — that part is what the un-chain fixed, and it is why
+#     the Linux side will not become the bottleneck as the macOS side shrinks;
+#   * the macOS half runs to 35 min and owns the critical path. Its jobs enter
+#     in waves (t=3, 6, 9, 11, 12, 18, 23) behind GitHub's concurrent-macOS
+#     cap, and the two longest are the springboard taps: unity6-xcode27 at
+#     12→35 and unity6 at 12→34.
+# The single biggest remaining cost is therefore a CANARY that gates nothing:
+# ios springboard tap (unity6-xcode27), 23 minutes, holding a macOS slot on
+# every PR. Four xcode-27 canary legs do that between them. Moving them to the
+# weekly cron is the next change, and this measurement is why.
+# Every Unity job on run 103 still logged "Successfully returned ULF license"
+# under full parallelism, which is the one thing the un-chain could have broken.
+#
+# To restore the old behaviour: put android-build, ios-export, ios-export-coex,
+# tests-unity6-latest, android-shrink-verify and gate-off back on
+# `needs: [license, <the previous job>]` in the order listed above.
 #
 # A transient "Unity exits -1 within seconds" is, per GameCI's troubleshooting
 # page, a concurrent-activation hiccup: re-run the job after ~30s, and never
@@ -297,7 +323,7 @@ jobs:
   # required checks, so a red here blocks nothing — it IS the early warning.
   tests-unity6-latest:
     name: tests (unity6-latest)
-    needs: [license, ios-export-coex]
+    needs: license
     if: ${{ !cancelled() && needs.license.outputs.available == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -488,7 +514,7 @@ jobs:
   #     clean builds on fresh runners.
   android-build:
     name: android build (${{ matrix.testbed.name }})
-    needs: [license, tests]
+    needs: license
     if: ${{ !cancelled() && needs.license.outputs.available == 'true' }}
     runs-on: ubuntu-latest
     # 90 minutes has covered every development-player leg with room to spare. The
@@ -1084,7 +1110,7 @@ jobs:
   # Unity 2022.3's bundle that run 25 disproved (see the JDK step below).
   android-shrink-verify:
     name: android shrink verify (2022.3)
-    needs: [license, tests-unity6-latest]
+    needs: license
     if: ${{ !cancelled() && needs.license.outputs.available == 'true' }}
     runs-on: ubuntu-latest
     # 45: with a warm Library cache the whole job takes about four minutes (run
@@ -1980,7 +2006,7 @@ jobs:
   # covered 2021.3 and 6.3 — this job turns "proven once" into "proven per push".
   gate-off:
     name: gate off (2022.3)
-    needs: [license, android-shrink-verify]
+    needs: [license, android-build, ios-export]
     if: ${{ !cancelled() && needs.license.outputs.available == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -2324,7 +2350,7 @@ jobs:
   # signing that way.
   ios-export:
     name: ios export (${{ matrix.testbed.name }})
-    needs: [license, android-build]
+    needs: license
     if: ${{ !cancelled() && needs.license.outputs.available == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
@@ -2493,7 +2519,7 @@ jobs:
   # runtime), so a coex leg there could assert nothing.
   ios-export-coex:
     name: ios export coex (${{ matrix.testbed.name }})
-    needs: [license, ios-export]
+    needs: license
     if: ${{ !cancelled() && needs.license.outputs.available == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
