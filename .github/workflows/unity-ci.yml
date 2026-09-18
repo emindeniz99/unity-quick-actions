@@ -2631,19 +2631,38 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target:
-          - { name: "2022.3", runner: macos-15, upload_app: true }
-          - { name: "unity6", runner: macos-latest }
-          # build_settings: extra KEY=VALUE pairs appended to this leg's
-          # xcodebuild only. The 2022.3 export carries IPHONEOS_DEPLOYMENT_TARGET
-          # 12.0 (Unity's documented floor for that line) and Xcode 27 refuses
-          # anything below 15.0, so this leg would never get past configure.
-          # Overriding on the command line leaves the shared export untouched,
-          # so the macos-15 legs keep proving the package compiles at a target
-          # below its own iOS 13 guards - and it mirrors what a developer
-          # shipping this 2022.3 project under Xcode 27 would have to do anyway.
-          - { name: "2022.3-xcode27", export: "2022.3", runner: xcode-27, canary: true, build_settings: "IPHONEOS_DEPLOYMENT_TARGET=15.0", upload_app: true }
-          - { name: "unity6-xcode27", export: "unity6", runner: xcode-27, canary: true }
+          # The xcode-27 legs below are CANARIES: continue-on-error, never
+          # required, testing a toolchain no Unity line supports yet. They are
+          # also the most expensive jobs in the workflow. Run 103 measured why
+          # that matters: the Linux half finishes at 16 min, the macOS half runs
+          # to 35 and owns the critical path, entering in waves behind GitHub's
+          # concurrent-macOS cap — and `ios springboard tap (unity6-xcode27)`
+          # alone held a slot for 23 of those minutes. Six xcode-27 macOS jobs
+          # did that between them, gating nothing.
+          #
+          # So they run on the weekly cron and on workflow_dispatch only, and a
+          # push or PR gets the core legs. An iOS-27 regression therefore shows
+          # up within a week rather than in the same PR, which is the trade.
+          #
+          # The parentheses are load-bearing: GitHub binds && tighter than ||,
+          # so `A || B && x || y` would parse as `A || (B && x) || y` and
+          # silently select the wrong list.
+          #
+          # Legs, in the order the JSON lists them:
+          #   2022.3          macos-15, uploads its built .app for ios-crossrun
+          #   unity6          macos-latest
+          #   2022.3-xcode27  CANARY. build_settings is extra KEY=VALUE pairs
+          #     appended to this leg's xcodebuild only. The 2022.3 export carries
+          #     IPHONEOS_DEPLOYMENT_TARGET 12.0 (Unity's documented floor for
+          #     that line) and Xcode 27 refuses anything below 15.0, so this leg
+          #     would never get past configure. Overriding on the command line
+          #     leaves the shared export untouched, so the macos-15 legs keep
+          #     proving the package compiles at a target below its own iOS 13
+          #     guards - and it mirrors what a developer shipping this 2022.3
+          #     project under Xcode 27 would have to do anyway.
+          #   unity6-xcode27  CANARY.
+          # Cron/dispatch gets every leg; a push or PR gets the core two.
+        target: ${{ fromJSON((github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && '[{"name":"2022.3","runner":"macos-15","upload_app":true},{"name":"unity6","runner":"macos-latest"},{"name":"2022.3-xcode27","export":"2022.3","runner":"xcode-27","canary":true,"build_settings":"IPHONEOS_DEPLOYMENT_TARGET=15.0","upload_app":true},{"name":"unity6-xcode27","export":"unity6","runner":"xcode-27","canary":true}]' || '[{"name":"2022.3","runner":"macos-15","upload_app":true},{"name":"unity6","runner":"macos-latest"}]') }}
     steps:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
@@ -2785,7 +2804,17 @@ jobs:
   ios-crossrun:
     name: ios cross-run (${{ matrix.target.name }})
     needs: ios-simulator
-    if: ${{ !cancelled() && needs.ios-simulator.result != 'skipped' }}
+    # Cron and workflow_dispatch only, with the xcode-27 canaries it depends on.
+    # BOTH legs of this job are xcode-27-bound: new-sdk-app-on-older-ios
+    # downloads ios-simulator-app-2022.3-xcode27, which a push or PR no longer
+    # produces, and old-sdk-app-on-newest-ios runs ON the xcode-27 runner. So it
+    # cannot stay behind while the canaries move — it would fail on a missing
+    # artifact. On run 103 its two legs ran 23->33 and 23->28 minutes, extending
+    # the macOS critical path for an experiment whose output is an ANSWER, not a
+    # pass/fail (both legs are continue-on-error by design).
+    if: >-
+      ${{ !cancelled() && needs.ios-simulator.result != 'skipped'
+          && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') }}
     runs-on: ${{ matrix.target.runner }}
     continue-on-error: true
     timeout-minutes: 30
@@ -2895,7 +2924,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target:
           # 2022.3 on the runner its simulator leg already uses (Xcode 16.4,
           # the app-delegate lifecycle); unity6 on `macos-26`, named rather
           # than aliased — Xcode 26.6 and the iOS 26.5 runtime today — because
@@ -2904,9 +2932,14 @@ jobs:
           # iOS 27 SDK is where Apple makes the scene lifecycle mandatory, and
           # no Unity line documents support for it yet — continue-on-error
           # keeps the run green, its own check still shows red, never required.
-          - { name: "2022.3", export: "2022.3", runner: macos-15 }
-          - { name: "unity6", export: "unity6", runner: macos-26 }
-          - { name: "unity6-xcode27", export: "unity6", runner: xcode-27, canary: true }
+          #
+          # The xcode-27 leg below is a CANARY — continue-on-error, never
+          # required — and one of the six xcode-27 macOS jobs that held slots on
+          # every PR while gating nothing (see ios-simulator's matrix for the
+          # run-103 measurement). It now runs on the weekly cron and on
+          # workflow_dispatch only. The parentheses are load-bearing: GitHub
+          # binds && tighter than ||.
+        target: ${{ fromJSON((github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && '[{"name":"2022.3","export":"2022.3","runner":"macos-15"},{"name":"unity6","export":"unity6","runner":"macos-26"},{"name":"unity6-xcode27","export":"unity6","runner":"xcode-27","canary":true}]' || '[{"name":"2022.3","export":"2022.3","runner":"macos-15"},{"name":"unity6","export":"unity6","runner":"macos-26"}]') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -3086,8 +3119,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target:
-          # `lifecycle` and `hooks` are EXPECTATIONS, not descriptions: Testbed2022 is
+        # `lifecycle` and `hooks` are EXPECTATIONS, not descriptions: Testbed2022 is
           # 2022.3.62f3, below the 2022.3.72f1 cut where Unity starts emitting a scene
           # manifest, and Testbed6 is 6000.3.21f1, above the 6000.3.8f1 cut. If a leg
           # goes red on these, the answer is which lifecycle CI actually exercises.
@@ -3100,31 +3132,18 @@ jobs:
           # file in UnityFramework both times), so the package prints "added" or
           # "wrapped" depending on the toolchain and composes either way — which is
           # what the chain and exactly-once checks assert.
-          - {
-              name: "2022.3-coex",
-              runner: macos-15,
-              lifecycle: "app-delegate",
-              hooks: "sceneConfig=absent manifest=no",
-            }
-          - {
-              name: "unity6-coex",
-              runner: macos-latest,
-              lifecycle: "scene",
-              hooks: "sceneConfig=added manifest=yes",
-            }
-          # Canary: the unity6-coex export, same expectations, compiled and run
-          # under Xcode 27 / iOS 27 — the SDK that makes the scene lifecycle
-          # mandatory, i.e. exactly the path this leg asserts. Keeps the run
-          # green but shows its own red X (continue-on-error above); see
-          # ios-simulator for the rationale.
-          - {
-              name: "unity6-coex-xcode27",
-              export: "unity6-coex",
-              runner: xcode-27,
-              lifecycle: "scene",
-              hooks: "sceneConfig=added manifest=yes",
-              canary: true,
-            }
+          #
+          # The canary leg is the unity6-coex export, same expectations,
+          # compiled and run under Xcode 27 / iOS 27 — the SDK that makes the
+          # scene lifecycle mandatory, i.e. exactly the path this leg asserts.
+          #
+          # The xcode-27 leg below is a CANARY — continue-on-error, never
+          # required — and one of the six xcode-27 macOS jobs that held slots on
+          # every PR while gating nothing (see ios-simulator's matrix for the
+          # run-103 measurement). It now runs on the weekly cron and on
+          # workflow_dispatch only. The parentheses are load-bearing: GitHub
+          # binds && tighter than ||.
+        target: ${{ fromJSON((github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && '[{"name":"2022.3-coex","runner":"macos-15","lifecycle":"app-delegate","hooks":"sceneConfig=absent manifest=no"},{"name":"unity6-coex","runner":"macos-latest","lifecycle":"scene","hooks":"sceneConfig=added manifest=yes"},{"name":"unity6-coex-xcode27","export":"unity6-coex","runner":"xcode-27","lifecycle":"scene","hooks":"sceneConfig=added manifest=yes","canary":true}]' || '[{"name":"2022.3-coex","runner":"macos-15","lifecycle":"app-delegate","hooks":"sceneConfig=absent manifest=no"},{"name":"unity6-coex","runner":"macos-latest","lifecycle":"scene","hooks":"sceneConfig=added manifest=yes"}]') }}
     steps:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:

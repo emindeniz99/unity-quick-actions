@@ -100,11 +100,17 @@ ships it.
   Library cache hits its primary key on every Unity leg; what costs the
   minutes is the self-imposed `needs:` chain plus `max-parallel: 2`, the
   per-job GameCI image pull and activation, and the iOS simulator's first
-  boot behind GitHub's five-concurrent-macOS cap. Decided order, none of it
-  implemented yet: ARM64 simulator export (the testbeds still export x86_64
-  by omission), un-chain the Unity jobs, move the Xcode 27 canaries to the
-  cron, fold `ios-springboard` into `ios-simulator` with a pre-booted
-  simulator. Sources, numbers and the things ruled out (image cache,
+  boot behind GitHub's five-concurrent-macOS cap. **Un-chaining landed
+  2026-09-17 and did not move the wall clock**: runs 103 and 104 took 36m01s
+  and 46m37s, inside the chained 29–38 range. It fixed the Linux half, which
+  now finishes at 16 minutes with ten jobs running three minutes in, but the
+  macOS half owns the critical path — and that measurement found the real
+  lever: six xcode-27 macOS jobs (four canaries plus both `ios-crossrun` legs,
+  which are xcode-27-bound too) held slots on every PR while gating nothing,
+  one of them for 23 minutes. **They moved to the cron 2026-09-18.** Still to
+  do: ARM64 simulator export (the testbeds still export x86_64 by omission),
+  and fold `ios-springboard` into `ios-simulator` with a pre-booted
+  simulator — that job is what the critical path reduces to next. Sources, numbers and the things ruled out (image cache,
   DerivedData, AVD snapshots, larger runners) are in
   [`docs~/ci-cost-and-caching-research-2026-09.md`](https://github.com/emindeniz99/unity-quick-actions/blob/main/docs~/ci-cost-and-caching-research-2026-09.md).
 - **Xcode 16.4 legs (`macos-15`) — keep, retarget or drop: decision deferred

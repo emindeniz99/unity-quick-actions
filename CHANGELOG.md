@@ -96,6 +96,20 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [0.7.0] - 2026-09-16
 
+- **The Xcode 27 experiment runs weekly instead of on every PR.** Six macOS
+  jobs existed only to test a toolchain no Unity line supports yet: the four
+  `xcode-27` canary legs (`continue-on-error`, never required) and both legs of
+  `ios-crossrun`, which are xcode-27-bound as well — one downloads the canary's
+  `.app`, the other runs on the `xcode-27` runner, so it could not stay behind
+  while they moved. Run 103 measured what they cost: the macOS half of the run
+  owns the critical path, its jobs enter in waves behind GitHub's
+  concurrent-macOS cap, and `ios springboard tap (unity6-xcode27)` alone held a
+  slot for 23 of the run's 35 minutes. They now run on the weekly cron and on
+  `workflow_dispatch`; a push or PR gets the core legs. The trade is stated
+  rather than hidden: an iOS-27 regression surfaces within a week instead of in
+  the same PR. Every per-leg comment moved with the legs — the conditional
+  matrices carry the same documentation the lists did.
+
 ### Added
 
 - **The iOS SpringBoard test now also taps a shortcut nothing baked into
