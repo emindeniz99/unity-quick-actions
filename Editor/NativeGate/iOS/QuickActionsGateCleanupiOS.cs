@@ -28,6 +28,12 @@ namespace EminDeniz99.QuickActions.Editor.NativeGate
         private const string ItemsKey = "UIApplicationShortcutItems";
         private const string UserInfoKey = "UIApplicationShortcutItemUserInfo";
         private const string MarkerKey = "com.emindeniz99.quickactions.managed";
+        // Must match Editor/iOS/QuickActionsBuildPostProcessoriOS.cs — the gated
+        // assembly that WRITES these, which does not compile when the define is off,
+        // so this one cannot share the constants with it. Pinned together by
+        // tools~/check_frozen_strings.py so the two copies cannot drift.
+        private const string IconsFolder = "QuickActionsIcons";
+        private const string IconManifestName = "quickactions_manifest.txt";
 
         public int callbackOrder => 95;
 
@@ -54,6 +60,7 @@ namespace EminDeniz99.QuickActions.Editor.NativeGate
 #else
             RemoveMacro(report.summary.outputPath);
             RemoveOurPlistEntries(report.summary.outputPath);
+            RemoveOurTemplateImages(report.summary.outputPath);
 #endif
         }
 
@@ -114,6 +121,111 @@ namespace EminDeniz99.QuickActions.Editor.NativeGate
                 new[] { "$(inherited)" }, new[] { "QUICKACTIONS_ENABLED=1" });
             project.WriteToFile(projectPath);
             Debug.Log("[QuickActions] Removed the QUICKACTIONS_ENABLED macro (gate is off).");
+        }
+
+        // Remove the template-image icons a PREVIOUS define-on build copied in, the
+        // PBX references that registered them, and the manifest that records them.
+        // Without this the gate is not inert on an Append build: the gated
+        // post-processor owns the only copy of this logic (SyncTemplateImagesCore),
+        // and its assembly does not even compile when the define is off — so nothing
+        // ran, and the images kept shipping in the app bundle of a build that has no
+        // quick actions at all. The Android side has asserted its equivalent (no
+        // package classes in the dex) since the source stripper landed.
+        //
+        // Ownership-scoped exactly like RemoveOurPlistEntries: the manifest lists the
+        // files WE copied, so a file a host dropped into the same folder is left
+        // alone — and the folder itself is removed only once it is empty. Kept
+        // OUTSIDE the #if, like EffectiveDefinesStillContainGate, so the stub harness
+        // type-checks and drives it in every config.
+        //
+        // Not covered by CI, and it cannot be as the workflow stands: the gate-off
+        // job exports both projects fresh ("Replace"), where this folder never
+        // existed to begin with, and the testbeds configure no IosTemplateImages —
+        // so the control such an assertion needs (the define-ON export carrying the
+        // folder) does not exist either, and a check would pass by vacuum. The bug
+        // this fixes only appears on an Append build over a directory a previous
+        // define-ON build wrote. .verify/EditorTests/IosGateOffIconCleanupTests.cs is
+        // the coverage; read it before changing the scope here.
+        internal static void RemoveOurTemplateImages(string outputPath)
+        {
+            var iconsDir = Path.Combine(outputPath, IconsFolder);
+            var manifestPath = Path.Combine(iconsDir, IconManifestName);
+            if (!File.Exists(manifestPath))
+                return; // no manifest = this build path never received icons of ours
+
+            string[] names;
+            try
+            {
+                names = File.ReadAllLines(manifestPath);
+            }
+            catch (IOException e)
+            {
+                Debug.LogWarning($"[QuickActions] Could not read the template-image manifest; " +
+                    $"icons from a previous enabled build may still ship: {e.Message}");
+                return;
+            }
+
+            // Unregister first, so a failure between the two leaves the pbxproj
+            // pointing at files that still exist rather than at files that do not.
+            // A missing project is not an error here: there is simply nothing to
+            // unregister, and the files below are still ours to delete.
+            var projectPath = PBXProject.GetPBXProjectPath(outputPath);
+            if (!string.IsNullOrEmpty(projectPath) && File.Exists(projectPath))
+            {
+                var project = new PBXProject();
+                project.ReadFromFile(projectPath);
+                var unregistered = 0;
+                foreach (var name in names)
+                {
+                    if (string.IsNullOrWhiteSpace(name))
+                        continue;
+                    var guid = project.FindFileGuidByProjectPath(IconsFolder + "/" + name.Trim());
+                    if (string.IsNullOrEmpty(guid))
+                        continue;
+                    project.RemoveFile(guid);
+                    unregistered++;
+                }
+                if (unregistered > 0)
+                    project.WriteToFile(projectPath);
+            }
+
+            var deleted = 0;
+            foreach (var name in names)
+            {
+                if (string.IsNullOrWhiteSpace(name))
+                    continue;
+                var path = Path.Combine(iconsDir, name.Trim());
+                try
+                {
+                    if (File.Exists(path))
+                    {
+                        File.Delete(path);
+                        deleted++;
+                    }
+                }
+                catch (IOException e)
+                {
+                    // One locked file must not abort the rest of the cleanup, and must
+                    // not fail a build whose only fault is a stale icon.
+                    Debug.LogWarning($"[QuickActions] Could not delete template image '{name}': {e.Message}");
+                }
+            }
+
+            try
+            {
+                File.Delete(manifestPath);
+                // Only when empty: anything still in there is not ours.
+                if (Directory.Exists(iconsDir) &&
+                    Directory.GetFileSystemEntries(iconsDir).Length == 0)
+                    Directory.Delete(iconsDir);
+            }
+            catch (IOException e)
+            {
+                Debug.LogWarning($"[QuickActions] Could not remove the template-image manifest: {e.Message}");
+            }
+
+            if (deleted > 0)
+                Debug.Log($"[QuickActions] Removed {deleted} static template image(s) from the Xcode project (gate is off).");
         }
 
         // Remove ONLY our marked entries so a host app's own shortcuts survive.

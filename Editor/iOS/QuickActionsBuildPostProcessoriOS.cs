@@ -136,6 +136,11 @@ namespace EminDeniz99.QuickActions.Editor
         // stubs are no-ops) — behavior needs a real Editor + Xcode build; see
         // ROADMAP "v0.3 feature validation".
         private const string IconsFolder = "QuickActionsIcons";
+        // Duplicated in Editor/NativeGate/iOS/QuickActionsGateCleanupiOS.cs, which
+        // must delete what this writes but cannot reference this assembly (it is
+        // compiled out when the define is off). tools~/check_frozen_strings.py pins
+        // both copies of both names.
+        private const string IconManifestName = "quickactions_manifest.txt";
 
         private static void SyncTemplateImages(string buildPath, QuickActionsSettings settings)
         {
@@ -162,7 +167,7 @@ namespace EminDeniz99.QuickActions.Editor
             }
 
             var iconsDir = Path.Combine(buildPath, IconsFolder);
-            var manifestPath = Path.Combine(iconsDir, "quickactions_manifest.txt");
+            var manifestPath = Path.Combine(iconsDir, IconManifestName);
 
             var proj = new PBXProject();
             proj.ReadFromFile(projPath);

@@ -43,6 +43,11 @@
     <!-- The ungated define-off stripper. Its Strip(path) sweep must remove the
          built-in icons and NOTHING a project owns; that is only testable here. -->
     <Compile Include="../Editor/NativeGate/QuickActionsTrampolineStripperAndroid.cs" />
+    <!-- The ungated iOS gate cleanup. Its define-off sweep must remove the
+         template images a previous define-ON build copied in and NOTHING a host
+         put beside them; the PBX half needs a real Xcode project, so only the
+         disk half is reachable here — which is the half that decides what ships. -->
+    <Compile Include="../Editor/NativeGate/iOS/QuickActionsGateCleanupiOS.cs" />
     <!-- The build-time placeholder/customize pipeline both platform bakers call.
          Compiled here for the same reason as the Android post-processor above:
          its behavior (escaping, precedence, per-locale interpolation) only

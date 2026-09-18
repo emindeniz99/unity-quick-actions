@@ -54,6 +54,20 @@ FROZEN: dict[str, list[str]] = {
         "Editor/iOS/QuickActionsBuildPostProcessoriOS.cs",
         "Editor/NativeGate/iOS/QuickActionsGateCleanupiOS.cs",
     ],
+    # The iOS template-image staging folder and the manifest naming what WE copied
+    # into it. Not device-persisted, but split across two assemblies that cannot
+    # reference each other: the gated post-processor writes them, and the ungated
+    # gate cleanup — which is what runs when the define is off — has to find the
+    # same two names to delete them again. Drift and a define-off build silently
+    # keeps shipping the icons of a build that has no quick actions.
+    "QuickActionsIcons": [
+        "Editor/iOS/QuickActionsBuildPostProcessoriOS.cs",
+        "Editor/NativeGate/iOS/QuickActionsGateCleanupiOS.cs",
+    ],
+    "quickactions_manifest.txt": [
+        "Editor/iOS/QuickActionsBuildPostProcessoriOS.cs",
+        "Editor/NativeGate/iOS/QuickActionsGateCleanupiOS.cs",
+    ],
     # The resolved ComponentName inside every pinned Android shortcut.
     "com.emindeniz99.quickactions.QuickActionsTrampolineActivity": [
         "Editor/Android/QuickActionsTrampolineInjectorAndroid.cs",

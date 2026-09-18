@@ -15,6 +15,31 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **A define-off iOS build no longer ships the template images of a define-on
+  one.** `QuickActionsGateCleanupiOS` removed the `QUICKACTIONS_ENABLED` macro and
+  the marked `Info.plist` entries, but nothing removed the `QuickActionsIcons/`
+  folder, the PBX file references that registered it in Copy Bundle Resources, or
+  the manifest recording what was copied — that logic lives only in
+  `SyncTemplateImagesCore`, inside the `QUICKACTIONS_ENABLED`-gated `Editor/iOS`
+  assembly, which does not compile when the define is off. On an **Append** build
+  over an Xcode project a previous enabled build wrote — the exact case this
+  file's header says it exists for — the icons kept shipping in a bundle with no
+  quick actions in it. The cleanup is ownership-scoped like the plist removal: it
+  deletes what our manifest names, leaves a file a host dropped beside them alone,
+  and removes the folder only once it is empty.
+
+  The folder and manifest names are now duplicated across two assemblies that
+  cannot reference each other (the gated one writes them, the ungated one has to
+  find them), so `tools~/check_frozen_strings.py` pins both copies — the same
+  mechanism that keeps the ownership marker in step across Java, Objective-C and
+  C#.
+
+  **CI does not assert this, and cannot as the workflow stands** — the `gate-off`
+  job exports both projects fresh (`Replace`), where the folder never existed, and
+  the testbeds configure no `IosTemplateImages`, so the control such a check needs
+  does not exist either and it would pass by vacuum. Five unit tests cover the
+  disk half instead, which is the half that decides what reaches the bundle.
+
 - **The icon note in Project Settings no longer clips.** `IconType`'s property
   drawer reserved the note's height by measuring it against the whole view width
   less 40 px, then drew it into the real property rect — which, for the
