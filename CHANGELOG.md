@@ -84,6 +84,23 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **Runtime bitmap icons are downscaled to the Android icon budget.**
+  `resolveIcon` handed whatever `AndroidBitmapFile` decoded to straight to
+  `Icon.createWithBitmap` / `createWithAdaptiveBitmap` — no dimension check.
+  The documented way to build one is `tex.EncodeToPNG()`, and a Unity
+  `Texture2D` is commonly 512 or 1024 px square, so the full bitmap crossed a
+  binder transaction on every publish and the launcher rescaled it afterwards
+  anyway. The bitmap is now measured against `getIconMaxWidth/Height` and, only
+  when it exceeds them, scaled down with the aspect ratio preserved. An
+  adaptive bitmap gets 1.5× that box — `1 + 2 *
+  AdaptiveIconDrawable.getExtraInsetFraction()`, the platform's own formula for
+  the mask inset — so a correctly authored safe zone survives the downscale.
+  Best-effort throughout: an unreadable budget (0), a missing `ShortcutManager`
+  or any throw leaves the bitmap untouched, because an oversized icon is still
+  a valid icon while a thrown exception would cost the whole write. Five new
+  Java smoke checks pin the ratio, the adaptive allowance, the in-budget
+  pass-through and the unreadable-budget case.
+
 - **A shortcut tap arrives as `Performed` on real Android hardware.** Every tap
   this package had ever observed was an emulator's or the iOS Simulator's. On
   2026-09-17 the owner long-pressed the demo icon on a Moto G Play 2024

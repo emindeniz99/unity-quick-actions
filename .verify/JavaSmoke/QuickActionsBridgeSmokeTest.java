@@ -12,6 +12,8 @@ import android.app.Activity;
 import android.content.Intent;
 import android.content.pm.ShortcutInfo;
 import android.content.pm.ShortcutManager;
+import android.graphics.BitmapFactory;
+import android.graphics.drawable.Icon;
 import android.os.Build;
 import android.os.PersistableBundle;
 
@@ -51,6 +53,7 @@ public final class QuickActionsBridgeSmokeTest {
         maxShortcutCountIsExposed();
         adaptiveAndPinDegradeBelowApi26();
         usageReportIsOwnershipGated();
+        bitmapIconsAreClampedToTheOsBudget();
 
         System.out.println("SMOKE: " + (failures == 0 ? "PASS" : "FAIL") + " (" + checks + " checks, " + failures + " failed)");
         if (failures != 0) System.exit(1);
@@ -526,6 +529,59 @@ public final class QuickActionsBridgeSmokeTest {
         if (!condition) {
             failures++;
             System.err.println("FAIL: " + what);
+        }
+    }
+
+    private static void bitmapIconsAreClampedToTheOsBudget() throws Exception {
+        // A Unity Texture2D encoded to PNG is commonly 512 or 1024 px square; the
+        // OS icon budget is far smaller, and the whole bitmap otherwise crosses a
+        // binder transaction on every publish. Clamp keeps the aspect ratio, and
+        // an adaptive bitmap gets the extra-inset allowance (1 + 2 * 0.25 = 1.5x).
+        ShortcutManager mgr = new ShortcutManager();
+        mgr.iconMaxWidth = 96;
+        mgr.iconMaxHeight = 96;
+        java.io.File png = java.io.File.createTempFile("qa_big", ".png");
+        try {
+            BitmapFactory.decodedWidth = 1024;
+            BitmapFactory.decodedHeight = 512; // non-square, to pin the aspect ratio
+            String json = "{\"items\":["
+                    + "{\"Id\":\"big\",\"Title\":\"T\",\"AndroidBitmapFile\":\"" + png.getAbsolutePath() + "\"},"
+                    + "{\"Id\":\"bigada\",\"Title\":\"T\",\"AndroidBitmapFile\":\"" + png.getAbsolutePath() + "\",\"AndroidBitmapAdaptive\":true}]}";
+            check(QuickActionsBridge.setShortcuts(activity(mgr), json) != null, "oversized-icon write lands");
+            Icon big = byId(mgr.dynamic, "big").icon;
+            check(big != null && big.width == 96 && big.height == 48,
+                    "1024x512 is downscaled to the 96x96 budget keeping the ratio: "
+                            + (big == null ? "no icon" : big.width + "x" + big.height));
+            Icon ada = byId(mgr.dynamic, "bigada").icon;
+            check(ada != null && ada.width == 144 && ada.height == 72,
+                    "an adaptive bitmap gets the 1.5x extra-inset allowance: "
+                            + (ada == null ? "no icon" : ada.width + "x" + ada.height));
+
+            // Already within budget: passed through untouched, no needless re-encode.
+            BitmapFactory.decodedWidth = 64;
+            BitmapFactory.decodedHeight = 64;
+            String small = "{\"items\":[{\"Id\":\"small\",\"Title\":\"T\",\"AndroidBitmapFile\":\""
+                    + png.getAbsolutePath() + "\"}]}";
+            check(QuickActionsBridge.setShortcuts(activity(mgr), small) != null, "in-budget write lands");
+            Icon kept = byId(mgr.dynamic, "small").icon;
+            check(kept != null && kept.width == 64 && kept.height == 64,
+                    "a bitmap inside the budget is not rescaled");
+
+            // A budget the OS can't report (0) must not scale anything to nothing.
+            mgr.iconMaxWidth = 0;
+            mgr.iconMaxHeight = 0;
+            BitmapFactory.decodedWidth = 1024;
+            BitmapFactory.decodedHeight = 1024;
+            String unknown = "{\"items\":[{\"Id\":\"unk\",\"Title\":\"T\",\"AndroidBitmapFile\":\""
+                    + png.getAbsolutePath() + "\"}]}";
+            check(QuickActionsBridge.setShortcuts(activity(mgr), unknown) != null, "unknown-budget write lands");
+            Icon raw = byId(mgr.dynamic, "unk").icon;
+            check(raw != null && raw.width == 1024 && raw.height == 1024,
+                    "an unreadable budget leaves the bitmap alone rather than shrinking it");
+        } finally {
+            BitmapFactory.decodedWidth = 1;
+            BitmapFactory.decodedHeight = 1;
+            png.delete();
         }
     }
 
