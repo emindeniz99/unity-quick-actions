@@ -45,7 +45,9 @@ def sections(text):
 # Files that tell a reader which version to install. release.yml cuts the tag
 # from the merge commit, so a pin bumped one commit later is wrong for everyone
 # who reads main in between — which is exactly what happened in the 0.4.6 cycle.
-PIN_FILES = ("README.md", "GETTING_STARTED.md", "CONTRIBUTING.md", "CLAUDE.md")
+# AGENTS.md ships in the package (package.json's files list) and carries the git
+# pin too; the 0.7.0 cut moved it by hand, unenforced, so it is listed here now.
+PIN_FILES = ("README.md", "GETTING_STARTED.md", "CONTRIBUTING.md", "CLAUDE.md", "AGENTS.md")
 GIT_PIN = re.compile(r"#v(\d+\.\d+\.\d+)")
 UPM_PIN = re.compile(r'"com\.emindeniz99\.quick-actions"\s*:\s*"(\d+\.\d+\.\d+)"')
 # The README's Status line names the version in prose; the 0.4.9 cut moved every
