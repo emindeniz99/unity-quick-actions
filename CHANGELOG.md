@@ -13,66 +13,118 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [0.8.0] - 2026-09-19
 
-### Fixed
-
-- **A define-off iOS build no longer ships the template images of a define-on
-  one.** `QuickActionsGateCleanupiOS` removed the `QUICKACTIONS_ENABLED` macro and
-  the marked `Info.plist` entries, but nothing removed the `QuickActionsIcons/`
-  folder, the PBX file references that registered it in Copy Bundle Resources, or
-  the manifest recording what was copied — that logic lives only in
-  `SyncTemplateImagesCore`, inside the `QUICKACTIONS_ENABLED`-gated `Editor/iOS`
-  assembly, which does not compile when the define is off. On an **Append** build
-  over an Xcode project a previous enabled build wrote — the exact case this
-  file's header says it exists for — the icons kept shipping in a bundle with no
-  quick actions in it. The cleanup is ownership-scoped like the plist removal: it
-  deletes what our manifest names, leaves a file a host dropped beside them alone,
-  and removes the folder only once it is empty.
-
-  The folder and manifest names are now duplicated across two assemblies that
-  cannot reference each other (the gated one writes them, the ungated one has to
-  find them), so `tools~/check_frozen_strings.py` pins both copies — the same
-  mechanism that keeps the ownership marker in step across Java, Objective-C and
-  C#.
-
-  **CI does not assert this, and cannot as the workflow stands** — the `gate-off`
-  job exports both projects fresh (`Replace`), where the folder never existed, and
-  the testbeds configure no `IosTemplateImages`, so the control such a check needs
-  does not exist either and it would pass by vacuum. Five unit tests cover the
-  disk half instead, which is the half that decides what reaches the bundle.
-
-- **The icon note in Project Settings no longer clips.** `IconType`'s property
-  drawer reserved the note's height by measuring it against the whole view width
-  less 40 px, then drew it into the real property rect — which, for the
-  `IconType` inside the static-shortcut list, is narrower by the foldout indent,
-  the drag handle and the list padding. Narrower wraps into *more* lines, so the
-  reserved height fell short and the last line was cut off: the opposite of the
-  error the code's own comment intended ("a line too many, never a clipped
-  one"). The drawer now remembers the width it actually drew at and measures the
-  next pass against that; the first pass uses a deliberately narrow fallback,
-  which over-reserves instead.
-
-- **Two documentation claims that the previous two changes left behind.**
-  `GETTING_STARTED.md` still told readers that no hardware tap had been
-  confirmed as `Performed` on either platform — the Moto G Play run on
-  2026-09-17 confirmed the Android one, and `CHANGELOG.md`, `CLAUDE.md`,
-  `README.md` and `PRODUCTION_READINESS.md` were all updated then while this file
-  was missed. `CONTRIBUTING.md` said `verify.sh` compiles the C# in **ten** build
-  configurations; there are eleven, which `.verify/README.md` and `CLAUDE.md`
-  already said.
-
-- **`EnsureLoaded` no longer states a guarantee the code does not make.** Its
-  documented return contract said a failed localization re-push "changes only the
-  rendered language, not which ids are installed". `Push` already documented the
-  opposite: it sends the whole set, and on Android the stale-removal phase runs
-  before the add that was refused, so a newly appeared manifest or pinned
-  collision can have dropped one of our ids on the device while the managed list
-  keeps claiming it. The behaviour is unchanged and still the right trade —
-  dropping `_loaded` there would turn every later read into an OS write, and
-  `AddList` relies on a true return meaning loaded — but the cost is now recorded
-  at both sites: `GetAll`/`IsAdded` can over-report one id until the next
-  successful push. No shortcut is lost either way.
-
 ### Added
+
+- **`QuickActions.IsRateLimitingActive` — why a write was refused.** A refused
+  `Add` / `AddList` / `Update` returned the same `false` for all three of its
+  causes: Android's background write throttle, an exhausted shortcut budget, and
+  an id another publisher owns. Only the first one clears by itself, and only
+  the log line said which had happened. The new read-only property surfaces
+  Android's `isRateLimitingActive`, so a game that writes its "continue playing"
+  shortcut on backgrounding can tell "retry once foregrounded" from "retrying
+  will never work". It is advisory: the flag is racy by nature — the OS can
+  apply or lift the throttle between the read and the next write — so nothing
+  in this package gates on it, and the write's own return value stays
+  authoritative. False on iOS (no throttle exists) and in the Editor, like
+  `MaxShortcutCount` is 0 there.
+
+- **The demo shows a build-time placeholder, and CI gates on the resolved
+  value.** `{version}` / `{build}` and friends landed in 0.4.6 with headless
+  tests only: no build CI produced, and no device or Simulator anyone ran, had
+  ever carried one, so what a resolved `v1.4.0 (37)` looks like on a real home
+  screen was unconfirmed. Every testbed now bakes `Continue`'s subtitle as
+  `Resume v{version} ({build})` and pins `bundleVersion 1.4.0` with
+  build number `37` on both platforms, so it resolves to the exact literal the
+  docs already cite. It rides an existing static rather than adding a fourth:
+  iOS shows at most four quick actions and the demo's three statics plus the
+  seeded runtime item already fill them.
+
+  Three checks read the resolved value back, so interpolation silently ceasing
+  to run turns a leg red instead of shipping the raw token — which on a launcher
+  looks like a label, not a bug. `ios-export` parses the exported `Info.plist`
+  (ubuntu, every push, all three Unity lines including 2021.3, which has no
+  Simulator coverage at all) and also rejects a stray `{` in *any* baked label;
+  `android-build` reads the string out of the APK resource table with `aapt2`,
+  on all four legs including the minified release one; and `ios-springboard`
+  now requires it among the labels of the menu SpringBoard actually opens, which
+  is the only one of the three that proves it *rendered*.
+
+  Run 99 also measured something worth knowing when you author Android labels: a
+  launcher draws **one** label per row and falls back to the short one when the
+  long one does not fit, so an over-long version subtitle does not truncate — it
+  *disappears*. With `Resume your save - v1.4.0 (37)` the emulator's popup drew
+  `Continue`, while its neighbours at 16 and 18 characters drew their subtitles.
+  The demo's subtitle is the shorter `Resume v{version} ({build})` for that
+  reason, and README's placeholders section now warns about it.
+
+  **Run 100 (2026-09-17) is the verdict on all of it.** The three checks passed
+  on every leg, and both platforms render the resolved value: the Android
+  emulator's popup drew `Resume v1.4.0 (37)` on 2021.3, 2022.3 and Unity 6, and
+  SpringBoard's own menu listed `Continue, Resume v1.4.0 (37)` on iOS 26.2 and
+  26.5, with both taps on each leg still passing. Emulator and Simulator only —
+  no handset and no iPhone has shown it.
+
+- **CI taps a quick action on an app that is already running.** Both real
+  SpringBoard taps this repo asserts — the static row, and since run 94 the
+  runtime-added one — cold-start the app, so every id CI has ever watched arrive
+  travelled the launch options. The warm path, a tap handed to a live process
+  through the lifecycle's own `performActionForShortcutItem`, was exercised only
+  by `ios-simulator-coex`'s synthetic sends, which prove what the package does
+  with a payload and never that UIKit would route one to it. `ios-springboard`
+  now runs a third pass per leg: `run_springboard_tap.sh` launches the app,
+  lets the Unity runtime boot, records the pid, and the XCUITest — in `QA_WARM`
+  mode — only sends it behind SpringBoard and taps, without terminating it.
+
+  **The pid is the evidence, and finding that out cost a run.** The first
+  attempt asked XCUITest whether the app had backgrounded. Run 109 answered
+  `.runningForeground` on *both* legs, fifteen seconds after the Home press,
+  with SpringBoard's own home screen up and covering the app — so its
+  `app.state` for an app reached by bundle id simply does not follow a Home
+  press, and both legs skipped with a message that read as if the app had died.
+  What the warm claim actually needs is "this is the same process", which only
+  `simctl` can see: the pass compares the pid before the launch-and-settle with
+  the pid after the tap. Unchanged means re-entered, not relaunched. A mismatch
+  warns and retracts the claim rather than failing the leg — as does XCUITest
+  reporting the process gone at tap time — because a tap on a dead app is the
+  cold pass, which two other passes already cover.
+
+  **What run 110 saw:** `PASS` on both supported legs — 2022.3.62f3 / iOS 18.6
+  (app-delegate lifecycle) and 6000.3.21f1 / iOS 26.5 (scene manifest) — with
+  `daily_reward` reaching `Performed` **1 second** after the tap, against the
+  35–54 s a cold launch takes, and the pid identical either side of it (28398
+  and 32706). All four rows were in the one menu SpringBoard opened, the
+  `Continue` row still reading its resolved `Resume v1.4.0 (37)`. Warm delivery
+  is now established on the Simulator; it remains unobserved on a device.
+
+- **The iOS coexistence probe pins queue order across several taps.** Taps
+  arriving back to back before C# drains were unasserted on every platform: the
+  probe sent one id at a time. It now sends `a`, `b`, `a` on one runloop turn
+  and requires the queue to hand back exactly that — which pins both properties
+  at once, FIFO order and no collapsing of a repeat (only a COLD source arms the
+  dedup marker, and it is spent by the time the probe runs). Each of the three
+  completion handlers must also run exactly once. `multi-id-queue-order` and
+  `multi-id-completion-each` join the PASS names the workflow requires by name,
+  and passed on their first run (109) on both coex legs, in the default launch
+  and in the shadowed-configuration one.
+
+- **A sentinel watches whether any real iOS SDK starts competing for the
+  quick-action selectors.** `Examples~/Coexistence/` proves this package composes
+  with a swizzler shaped like the real ones, but a mock host cannot say whether a
+  real SDK has begun hooking
+  `application:performActionForShortcutItem:completionHandler:` itself. An audit
+  said none does — Firebase/GoogleUtilities, AppsFlyer, Branch, OneSignal,
+  Adjust, Singular and Braze all swizzle for URL opening, universal links and
+  remote notifications instead — and that answer was true of one version on one
+  day. `tools~/check_sdk_swizzlers.py` now re-reads GoogleUtilities'
+  `GULAppDelegateSwizzler.m` and `GULSceneDelegateSwizzler.m` at pinned tag
+  `8.1.0` on every CI run (the new `sdk-swizzler-sentinel` job — Linux, seconds,
+  no Unity), fails the day either file mentions a shortcut, and prints the
+  selectors each one *does* hook so a narrower change is visible too. It reads
+  upstream and vendors nothing; an unreachable network warns and passes, because
+  that is the automation missing, not a finding. Linking a real SDK into a CI
+  build was considered and rejected: the audit says there is nothing to catch
+  there, and `Examples~/Coexistence/README.md` now carries the citation for that
+  claim instead of leaving it as prose.
 
 - **The Android string-resource escaper has tests.** `EscapeResValue` runs over
   every static shortcut's label on every build that configures one, and had no
@@ -153,119 +205,6 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   — because the canaries were the only permanently-red checks — a run where a
   red check means something again.
 
-### Added
-
-- **A sentinel watches whether any real iOS SDK starts competing for the
-  quick-action selectors.** `Examples~/Coexistence/` proves this package composes
-  with a swizzler shaped like the real ones, but a mock host cannot say whether a
-  real SDK has begun hooking
-  `application:performActionForShortcutItem:completionHandler:` itself. An audit
-  said none does — Firebase/GoogleUtilities, AppsFlyer, Branch, OneSignal,
-  Adjust, Singular and Braze all swizzle for URL opening, universal links and
-  remote notifications instead — and that answer was true of one version on one
-  day. `tools~/check_sdk_swizzlers.py` now re-reads GoogleUtilities'
-  `GULAppDelegateSwizzler.m` and `GULSceneDelegateSwizzler.m` at pinned tag
-  `8.1.0` on every CI run (the new `sdk-swizzler-sentinel` job — Linux, seconds,
-  no Unity), fails the day either file mentions a shortcut, and prints the
-  selectors each one *does* hook so a narrower change is visible too. It reads
-  upstream and vendors nothing; an unreachable network warns and passes, because
-  that is the automation missing, not a finding. Linking a real SDK into a CI
-  build was considered and rejected: the audit says there is nothing to catch
-  there, and `Examples~/Coexistence/README.md` now carries the citation for that
-  claim instead of leaving it as prose.
-
-- **CI taps a quick action on an app that is already running.** Both real
-  SpringBoard taps this repo asserts — the static row, and since run 94 the
-  runtime-added one — cold-start the app, so every id CI has ever watched arrive
-  travelled the launch options. The warm path, a tap handed to a live process
-  through the lifecycle's own `performActionForShortcutItem`, was exercised only
-  by `ios-simulator-coex`'s synthetic sends, which prove what the package does
-  with a payload and never that UIKit would route one to it. `ios-springboard`
-  now runs a third pass per leg: `run_springboard_tap.sh` launches the app,
-  lets the Unity runtime boot, records the pid, and the XCUITest — in `QA_WARM`
-  mode — only sends it behind SpringBoard and taps, without terminating it.
-
-  **The pid is the evidence, and finding that out cost a run.** The first
-  attempt asked XCUITest whether the app had backgrounded. Run 109 answered
-  `.runningForeground` on *both* legs, fifteen seconds after the Home press,
-  with SpringBoard's own home screen up and covering the app — so its
-  `app.state` for an app reached by bundle id simply does not follow a Home
-  press, and both legs skipped with a message that read as if the app had died.
-  What the warm claim actually needs is "this is the same process", which only
-  `simctl` can see: the pass compares the pid before the launch-and-settle with
-  the pid after the tap. Unchanged means re-entered, not relaunched. A mismatch
-  warns and retracts the claim rather than failing the leg — as does XCUITest
-  reporting the process gone at tap time — because a tap on a dead app is the
-  cold pass, which two other passes already cover.
-
-  **What run 110 saw:** `PASS` on both supported legs — 2022.3.62f3 / iOS 18.6
-  (app-delegate lifecycle) and 6000.3.21f1 / iOS 26.5 (scene manifest) — with
-  `daily_reward` reaching `Performed` **1 second** after the tap, against the
-  35–54 s a cold launch takes, and the pid identical either side of it (28398
-  and 32706). All four rows were in the one menu SpringBoard opened, the
-  `Continue` row still reading its resolved `Resume v1.4.0 (37)`. Warm delivery
-  is now established on the Simulator; it remains unobserved on a device.
-
-- **The iOS coexistence probe pins queue order across several taps.** Taps
-  arriving back to back before C# drains were unasserted on every platform: the
-  probe sent one id at a time. It now sends `a`, `b`, `a` on one runloop turn
-  and requires the queue to hand back exactly that — which pins both properties
-  at once, FIFO order and no collapsing of a repeat (only a COLD source arms the
-  dedup marker, and it is spent by the time the probe runs). Each of the three
-  completion handlers must also run exactly once. `multi-id-queue-order` and
-  `multi-id-completion-each` join the PASS names the workflow requires by name,
-  and passed on their first run (109) on both coex legs, in the default launch
-  and in the shadowed-configuration one.
-
-- **`QuickActions.IsRateLimitingActive` — why a write was refused.** A refused
-  `Add` / `AddList` / `Update` returned the same `false` for all three of its
-  causes: Android's background write throttle, an exhausted shortcut budget, and
-  an id another publisher owns. Only the first one clears by itself, and only
-  the log line said which had happened. The new read-only property surfaces
-  Android's `isRateLimitingActive`, so a game that writes its "continue playing"
-  shortcut on backgrounding can tell "retry once foregrounded" from "retrying
-  will never work". It is advisory: the flag is racy by nature — the OS can
-  apply or lift the throttle between the read and the next write — so nothing
-  in this package gates on it, and the write's own return value stays
-  authoritative. False on iOS (no throttle exists) and in the Editor, like
-  `MaxShortcutCount` is 0 there.
-
-- **The demo shows a build-time placeholder, and CI gates on the resolved
-  value.** `{version}` / `{build}` and friends landed in 0.4.6 with headless
-  tests only: no build CI produced, and no device or Simulator anyone ran, had
-  ever carried one, so what a resolved `v1.4.0 (37)` looks like on a real home
-  screen was unconfirmed. Every testbed now bakes `Continue`'s subtitle as
-  `Resume v{version} ({build})` and pins `bundleVersion 1.4.0` with
-  build number `37` on both platforms, so it resolves to the exact literal the
-  docs already cite. It rides an existing static rather than adding a fourth:
-  iOS shows at most four quick actions and the demo's three statics plus the
-  seeded runtime item already fill them.
-
-  Three checks read the resolved value back, so interpolation silently ceasing
-  to run turns a leg red instead of shipping the raw token — which on a launcher
-  looks like a label, not a bug. `ios-export` parses the exported `Info.plist`
-  (ubuntu, every push, all three Unity lines including 2021.3, which has no
-  Simulator coverage at all) and also rejects a stray `{` in *any* baked label;
-  `android-build` reads the string out of the APK resource table with `aapt2`,
-  on all four legs including the minified release one; and `ios-springboard`
-  now requires it among the labels of the menu SpringBoard actually opens, which
-  is the only one of the three that proves it *rendered*.
-
-  Run 99 also measured something worth knowing when you author Android labels: a
-  launcher draws **one** label per row and falls back to the short one when the
-  long one does not fit, so an over-long version subtitle does not truncate — it
-  *disappears*. With `Resume your save - v1.4.0 (37)` the emulator's popup drew
-  `Continue`, while its neighbours at 16 and 18 characters drew their subtitles.
-  The demo's subtitle is the shorter `Resume v{version} ({build})` for that
-  reason, and README's placeholders section now warns about it.
-
-  **Run 100 (2026-09-17) is the verdict on all of it.** The three checks passed
-  on every leg, and both platforms render the resolved value: the Android
-  emulator's popup drew `Resume v1.4.0 (37)` on 2021.3, 2022.3 and Unity 6, and
-  SpringBoard's own menu listed `Continue, Resume v1.4.0 (37)` on iOS 26.2 and
-  26.5, with both taps on each leg still passing. Emulator and Simulator only —
-  no handset and no iPhone has shown it.
-
 ### Fixed
 
 - **Runtime bitmap icons are downscaled to the Android icon budget.**
@@ -285,6 +224,54 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Java smoke checks pin the ratio, the adaptive allowance, the in-budget
   pass-through and the unreadable-budget case.
 
+- **A define-off iOS build no longer ships the template images of a define-on
+  one.** `QuickActionsGateCleanupiOS` removed the `QUICKACTIONS_ENABLED` macro and
+  the marked `Info.plist` entries, but nothing removed the `QuickActionsIcons/`
+  folder, the PBX file references that registered it in Copy Bundle Resources, or
+  the manifest recording what was copied — that logic lives only in
+  `SyncTemplateImagesCore`, inside the `QUICKACTIONS_ENABLED`-gated `Editor/iOS`
+  assembly, which does not compile when the define is off. On an **Append** build
+  over an Xcode project a previous enabled build wrote — the exact case this
+  file's header says it exists for — the icons kept shipping in a bundle with no
+  quick actions in it. The cleanup is ownership-scoped like the plist removal: it
+  deletes what our manifest names, leaves a file a host dropped beside them alone,
+  and removes the folder only once it is empty.
+
+  The folder and manifest names are now duplicated across two assemblies that
+  cannot reference each other (the gated one writes them, the ungated one has to
+  find them), so `tools~/check_frozen_strings.py` pins both copies — the same
+  mechanism that keeps the ownership marker in step across Java, Objective-C and
+  C#.
+
+  **CI does not assert this, and cannot as the workflow stands** — the `gate-off`
+  job exports both projects fresh (`Replace`), where the folder never existed, and
+  the testbeds configure no `IosTemplateImages`, so the control such a check needs
+  does not exist either and it would pass by vacuum. Five unit tests cover the
+  disk half instead, which is the half that decides what reaches the bundle.
+
+- **The icon note in Project Settings no longer clips.** `IconType`'s property
+  drawer reserved the note's height by measuring it against the whole view width
+  less 40 px, then drew it into the real property rect — which, for the
+  `IconType` inside the static-shortcut list, is narrower by the foldout indent,
+  the drag handle and the list padding. Narrower wraps into *more* lines, so the
+  reserved height fell short and the last line was cut off: the opposite of the
+  error the code's own comment intended ("a line too many, never a clipped
+  one"). The drawer now remembers the width it actually drew at and measures the
+  next pass against that; the first pass uses a deliberately narrow fallback,
+  which over-reserves instead.
+
+- **`EnsureLoaded` no longer states a guarantee the code does not make.** Its
+  documented return contract said a failed localization re-push "changes only the
+  rendered language, not which ids are installed". `Push` already documented the
+  opposite: it sends the whole set, and on Android the stale-removal phase runs
+  before the add that was refused, so a newly appeared manifest or pinned
+  collision can have dropped one of our ids on the device while the managed list
+  keeps claiming it. The behaviour is unchanged and still the right trade —
+  dropping `_loaded` there would turn every later read into an OS write, and
+  `AddList` relies on a true return meaning loaded — but the cost is now recorded
+  at both sites: `GetAll`/`IsAdded` can over-report one id until the next
+  successful push. No shortcut is lost either way.
+
 - **A shortcut tap arrives as `Performed` on real Android hardware.** Every tap
   this package had ever observed was an emulator's or the iOS Simulator's. On
   2026-09-17 the owner long-pressed the demo icon on a Moto G Play 2024
@@ -294,6 +281,15 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   not note whether the app had been force-stopped first, so **cold and warm
   delivery are still not distinguished on hardware**. No code changed; the docs
   that listed hardware tap delivery as unverified no longer do.
+
+- **Two documentation claims that the previous two changes left behind.**
+  `GETTING_STARTED.md` still told readers that no hardware tap had been
+  confirmed as `Performed` on either platform — the Moto G Play run on
+  2026-09-17 confirmed the Android one, and `CHANGELOG.md`, `CLAUDE.md`,
+  `README.md` and `PRODUCTION_READINESS.md` were all updated then while this file
+  was missed. `CONTRIBUTING.md` said `verify.sh` compiles the C# in **ten** build
+  configurations; there are eleven, which `.verify/README.md` and `CLAUDE.md`
+  already said.
 
 ## [0.7.0] - 2026-09-16
 
