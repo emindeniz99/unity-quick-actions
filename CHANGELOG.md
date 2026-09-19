@@ -115,6 +115,44 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `gate-off` had no real dependencies at all), but the next change is the one
   that moves wall clock.
 
+- **The Xcode 27 experiment runs weekly instead of on every PR.** Six macOS
+  jobs existed only to test a toolchain no Unity line supports yet: the four
+  `xcode-27` canary legs (`continue-on-error`, never required) and both legs of
+  `ios-crossrun`, which are xcode-27-bound as well — one downloads the canary's
+  `.app`, the other runs on the `xcode-27` runner, so it could not stay behind
+  while they moved. Run 103 measured what they cost: the macOS half of the run
+  owns the critical path, its jobs enter in waves behind GitHub's
+  concurrent-macOS cap, and `ios springboard tap (unity6-xcode27)` alone held a
+  slot for 23 of the run's 35 minutes. They now run on the weekly cron and on
+  `workflow_dispatch`; a push or PR gets the core legs. The trade is stated
+  rather than hidden: an iOS-27 regression surfaces within a week instead of in
+  the same PR. Every per-leg comment moved with the legs — the conditional
+  matrices carry the same documentation the lists did.
+
+  **What governs the wall clock is runner availability, not the job graph.**
+  Four runs: 36m01s and 46m37s with twelve macOS jobs, then 41m27s and 25m37s
+  with six. The cleanest measurement is the last pair — runs 105 and 106 ran the
+  *same* six-macOS-job workflow, one docs-only commit apart, and their total
+  macOS **runner queue wait** was 1h20m16s against **5m09s**: a sixteenfold
+  swing with nothing in the workflow changed. Linux queue wait stayed 13-15
+  minutes throughout. Two attempts at shortening this pipeline by reshaping the
+  job graph — un-chaining, then halving the macOS matrix — both came back inside
+  noise that large, so the remaining graph-level ideas (folding
+  `ios-springboard` into `ios-simulator`, pre-booting the simulator) are not
+  worth their risk either.
+
+  An earlier revision of this entry said flatly that the change "did not make
+  the pipeline faster", written when runs 103-105 were all there was. Run 106's
+  25m37s — the fastest recorded, and the only one under the chained 29-38 range
+  — does not support that as stated: six macOS jobs average 33 minutes against
+  twelve jobs' 41. Four points cannot separate that from the queue swing above,
+  so the claim is narrowed to the one the evidence carries: the job graph is not
+  the lever, and no total measured here settles what this change bought on its
+  own.
+  What this change is actually worth: half the macOS demand, six fewer jobs, and
+  — because the canaries were the only permanently-red checks — a run where a
+  red check means something again.
+
 ### Added
 
 - **A sentinel watches whether any real iOS SDK starts competing for the
@@ -243,7 +281,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   the mask inset — so a correctly authored safe zone survives the downscale.
   Best-effort throughout: an unreadable budget (0), a missing `ShortcutManager`
   or any throw leaves the bitmap untouched, because an oversized icon is still
-  a valid icon while a thrown exception would cost the whole write. Five new
+  a valid icon while a thrown exception would cost the whole write. Seven new
   Java smoke checks pin the ratio, the adaptive allowance, the in-budget
   pass-through and the unreadable-budget case.
 
@@ -258,44 +296,6 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   that listed hardware tap delivery as unverified no longer do.
 
 ## [0.7.0] - 2026-09-16
-
-- **The Xcode 27 experiment runs weekly instead of on every PR.** Six macOS
-  jobs existed only to test a toolchain no Unity line supports yet: the four
-  `xcode-27` canary legs (`continue-on-error`, never required) and both legs of
-  `ios-crossrun`, which are xcode-27-bound as well — one downloads the canary's
-  `.app`, the other runs on the `xcode-27` runner, so it could not stay behind
-  while they moved. Run 103 measured what they cost: the macOS half of the run
-  owns the critical path, its jobs enter in waves behind GitHub's
-  concurrent-macOS cap, and `ios springboard tap (unity6-xcode27)` alone held a
-  slot for 23 of the run's 35 minutes. They now run on the weekly cron and on
-  `workflow_dispatch`; a push or PR gets the core legs. The trade is stated
-  rather than hidden: an iOS-27 regression surfaces within a week instead of in
-  the same PR. Every per-leg comment moved with the legs — the conditional
-  matrices carry the same documentation the lists did.
-
-  **What governs the wall clock is runner availability, not the job graph.**
-  Four runs: 36m01s and 46m37s with twelve macOS jobs, then 41m27s and 25m37s
-  with six. The cleanest measurement is the last pair — runs 105 and 106 ran the
-  *same* six-macOS-job workflow, one docs-only commit apart, and their total
-  macOS **runner queue wait** was 1h20m16s against **5m09s**: a sixteenfold
-  swing with nothing in the workflow changed. Linux queue wait stayed 13-15
-  minutes throughout. Two attempts at shortening this pipeline by reshaping the
-  job graph — un-chaining, then halving the macOS matrix — both came back inside
-  noise that large, so the remaining graph-level ideas (folding
-  `ios-springboard` into `ios-simulator`, pre-booting the simulator) are not
-  worth their risk either.
-
-  An earlier revision of this entry said flatly that the change "did not make
-  the pipeline faster", written when runs 103-105 were all there was. Run 106's
-  25m37s — the fastest recorded, and the only one under the chained 29-38 range
-  — does not support that as stated: six macOS jobs average 33 minutes against
-  twelve jobs' 41. Four points cannot separate that from the queue swing above,
-  so the claim is narrowed to the one the evidence carries: the job graph is not
-  the lever, and no total measured here settles what this change bought on its
-  own.
-  What this change is actually worth: half the macOS demand, six fewer jobs, and
-  — because the canaries were the only permanently-red checks — a run where a
-  red check means something again.
 
 ### Added
 
