@@ -11,173 +11,9 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 > as its own section because each is a distinct, self-contained set of API
 > additions; read them as the package's development log.
 
-## [Unreleased]
-
-### Fixed
-
-- **A define-off iOS build no longer ships the template images of a define-on
-  one.** `QuickActionsGateCleanupiOS` removed the `QUICKACTIONS_ENABLED` macro and
-  the marked `Info.plist` entries, but nothing removed the `QuickActionsIcons/`
-  folder, the PBX file references that registered it in Copy Bundle Resources, or
-  the manifest recording what was copied — that logic lives only in
-  `SyncTemplateImagesCore`, inside the `QUICKACTIONS_ENABLED`-gated `Editor/iOS`
-  assembly, which does not compile when the define is off. On an **Append** build
-  over an Xcode project a previous enabled build wrote — the exact case this
-  file's header says it exists for — the icons kept shipping in a bundle with no
-  quick actions in it. The cleanup is ownership-scoped like the plist removal: it
-  deletes what our manifest names, leaves a file a host dropped beside them alone,
-  and removes the folder only once it is empty.
-
-  The folder and manifest names are now duplicated across two assemblies that
-  cannot reference each other (the gated one writes them, the ungated one has to
-  find them), so `tools~/check_frozen_strings.py` pins both copies — the same
-  mechanism that keeps the ownership marker in step across Java, Objective-C and
-  C#.
-
-  **CI does not assert this, and cannot as the workflow stands** — the `gate-off`
-  job exports both projects fresh (`Replace`), where the folder never existed, and
-  the testbeds configure no `IosTemplateImages`, so the control such a check needs
-  does not exist either and it would pass by vacuum. Five unit tests cover the
-  disk half instead, which is the half that decides what reaches the bundle.
-
-- **The icon note in Project Settings no longer clips.** `IconType`'s property
-  drawer reserved the note's height by measuring it against the whole view width
-  less 40 px, then drew it into the real property rect — which, for the
-  `IconType` inside the static-shortcut list, is narrower by the foldout indent,
-  the drag handle and the list padding. Narrower wraps into *more* lines, so the
-  reserved height fell short and the last line was cut off: the opposite of the
-  error the code's own comment intended ("a line too many, never a clipped
-  one"). The drawer now remembers the width it actually drew at and measures the
-  next pass against that; the first pass uses a deliberately narrow fallback,
-  which over-reserves instead.
-
-- **Two documentation claims that the previous two changes left behind.**
-  `GETTING_STARTED.md` still told readers that no hardware tap had been
-  confirmed as `Performed` on either platform — the Moto G Play run on
-  2026-09-17 confirmed the Android one, and `CHANGELOG.md`, `CLAUDE.md`,
-  `README.md` and `PRODUCTION_READINESS.md` were all updated then while this file
-  was missed. `CONTRIBUTING.md` said `verify.sh` compiles the C# in **ten** build
-  configurations; there are eleven, which `.verify/README.md` and `CLAUDE.md`
-  already said.
-
-- **`EnsureLoaded` no longer states a guarantee the code does not make.** Its
-  documented return contract said a failed localization re-push "changes only the
-  rendered language, not which ids are installed". `Push` already documented the
-  opposite: it sends the whole set, and on Android the stale-removal phase runs
-  before the add that was refused, so a newly appeared manifest or pinned
-  collision can have dropped one of our ids on the device while the managed list
-  keeps claiming it. The behaviour is unchanged and still the right trade —
-  dropping `_loaded` there would turn every later read into an OS write, and
-  `AddList` relies on a true return meaning loaded — but the cost is now recorded
-  at both sites: `GetAll`/`IsAdded` can over-report one id until the next
-  successful push. No shortcut is lost either way.
+## [0.8.0] - 2026-09-19
 
 ### Added
-
-- **The Android string-resource escaper has tests.** `EscapeResValue` runs over
-  every static shortcut's label on every build that configures one, and had no
-  coverage at all: XML metacharacters, Android's own span delimiters, a leading
-  `@`/`?`, edge whitespace and dropped control characters were each one edit away
-  from a regression nothing would catch until aapt2 failed a real Gradle build or
-  a device rendered a truncated label. Seven tests now pin the exact written form,
-  driven through `AppendLocalized` (the real emission path) rather than the
-  private escaper. All seven pass against the current implementation — a guard,
-  not a fix.
-
-### Changed
-
-- **CI fans out instead of running in series.** The seven Unity jobs were
-  chained with `needs:` — `tests` → `android-build` → `ios-export` →
-  `ios-export-coex` → `tests-unity6-latest` → `android-shrink-verify` →
-  `gate-off` — so that exactly one editor ever activated at a time. The chain
-  cost 29–38 minutes of wall clock against 13 unchained, and runner minutes are
-  free on a public repo, so it bought nothing else. What it insured against has
-  never happened: across 30 runs no `game-ci` step has conclusion `failure`, and
-  run 25 activated eleven legs at once with every one logging
-  `Successfully returned ULF license` — and GameCI's own documentation says the
-  concurrency limit "is not an issue for free licenses", which is what a
-  Personal `.ulf` with no `UNITY_SERIAL` is. Every job now waits on the licence
-  gate alone, except `gate-off`, which waits on its **real** producers: it
-  downloads the demo APK from `android-build` and the Xcode project from
-  `ios-export`, so the licence gate alone would have raced them. `max-parallel`
-  stays at 2 so this is the only variable that moved; the workflow header
-  records how to put the chain back.
-
-  **Measured, and not what was predicted.** Run 103, the first unchained run,
-  took 36m01s — inside the chained 29–38 range, not the ~13 the old comment's
-  unchained figure suggested (that figure predates the macOS matrix growing to
-  ten jobs). What the un-chain did fix is the Linux half, which now finishes at
-  16 minutes with ten jobs running three minutes in; the macOS half runs to 35
-  and owns the critical path, entering in waves behind GitHub's concurrent-macOS
-  cap. The largest single cost turns out to be a canary that gates nothing —
-  `ios springboard tap (unity6-xcode27)`, 23 minutes of a macOS slot on every
-  PR. The chain still had to go (it constrained the Linux side for nothing, and
-  `gate-off` had no real dependencies at all), but the next change is the one
-  that moves wall clock.
-
-### Added
-
-- **A sentinel watches whether any real iOS SDK starts competing for the
-  quick-action selectors.** `Examples~/Coexistence/` proves this package composes
-  with a swizzler shaped like the real ones, but a mock host cannot say whether a
-  real SDK has begun hooking
-  `application:performActionForShortcutItem:completionHandler:` itself. An audit
-  said none does — Firebase/GoogleUtilities, AppsFlyer, Branch, OneSignal,
-  Adjust, Singular and Braze all swizzle for URL opening, universal links and
-  remote notifications instead — and that answer was true of one version on one
-  day. `tools~/check_sdk_swizzlers.py` now re-reads GoogleUtilities'
-  `GULAppDelegateSwizzler.m` and `GULSceneDelegateSwizzler.m` at pinned tag
-  `8.1.0` on every CI run (the new `sdk-swizzler-sentinel` job — Linux, seconds,
-  no Unity), fails the day either file mentions a shortcut, and prints the
-  selectors each one *does* hook so a narrower change is visible too. It reads
-  upstream and vendors nothing; an unreachable network warns and passes, because
-  that is the automation missing, not a finding. Linking a real SDK into a CI
-  build was considered and rejected: the audit says there is nothing to catch
-  there, and `Examples~/Coexistence/README.md` now carries the citation for that
-  claim instead of leaving it as prose.
-
-- **CI taps a quick action on an app that is already running.** Both real
-  SpringBoard taps this repo asserts — the static row, and since run 94 the
-  runtime-added one — cold-start the app, so every id CI has ever watched arrive
-  travelled the launch options. The warm path, a tap handed to a live process
-  through the lifecycle's own `performActionForShortcutItem`, was exercised only
-  by `ios-simulator-coex`'s synthetic sends, which prove what the package does
-  with a payload and never that UIKit would route one to it. `ios-springboard`
-  now runs a third pass per leg: `run_springboard_tap.sh` launches the app,
-  lets the Unity runtime boot, records the pid, and the XCUITest — in `QA_WARM`
-  mode — only sends it behind SpringBoard and taps, without terminating it.
-
-  **The pid is the evidence, and finding that out cost a run.** The first
-  attempt asked XCUITest whether the app had backgrounded. Run 109 answered
-  `.runningForeground` on *both* legs, fifteen seconds after the Home press,
-  with SpringBoard's own home screen up and covering the app — so its
-  `app.state` for an app reached by bundle id simply does not follow a Home
-  press, and both legs skipped with a message that read as if the app had died.
-  What the warm claim actually needs is "this is the same process", which only
-  `simctl` can see: the pass compares the pid before the launch-and-settle with
-  the pid after the tap. Unchanged means re-entered, not relaunched. A mismatch
-  warns and retracts the claim rather than failing the leg — as does XCUITest
-  reporting the process gone at tap time — because a tap on a dead app is the
-  cold pass, which two other passes already cover.
-
-  **What run 110 saw:** `PASS` on both supported legs — 2022.3.62f3 / iOS 18.6
-  (app-delegate lifecycle) and 6000.3.21f1 / iOS 26.5 (scene manifest) — with
-  `daily_reward` reaching `Performed` **1 second** after the tap, against the
-  35–54 s a cold launch takes, and the pid identical either side of it (28398
-  and 32706). All four rows were in the one menu SpringBoard opened, the
-  `Continue` row still reading its resolved `Resume v1.4.0 (37)`. Warm delivery
-  is now established on the Simulator; it remains unobserved on a device.
-
-- **The iOS coexistence probe pins queue order across several taps.** Taps
-  arriving back to back before C# drains were unasserted on every platform: the
-  probe sent one id at a time. It now sends `a`, `b`, `a` on one runloop turn
-  and requires the queue to hand back exactly that — which pins both properties
-  at once, FIFO order and no collapsing of a repeat (only a COLD source arms the
-  dedup marker, and it is spent by the time the probe runs). Each of the three
-  completion handlers must also run exactly once. `multi-id-queue-order` and
-  `multi-id-completion-each` join the PASS names the workflow requires by name,
-  and passed on their first run (109) on both coex legs, in the default launch
-  and in the shadowed-configuration one.
 
 - **`QuickActions.IsRateLimitingActive` — why a write was refused.** A refused
   `Add` / `AddList` / `Update` returned the same `false` for all three of its
@@ -228,36 +64,108 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   26.5, with both taps on each leg still passing. Emulator and Simulator only —
   no handset and no iPhone has shown it.
 
-### Fixed
+- **CI taps a quick action on an app that is already running.** Both real
+  SpringBoard taps this repo asserts — the static row, and since run 94 the
+  runtime-added one — cold-start the app, so every id CI has ever watched arrive
+  travelled the launch options. The warm path, a tap handed to a live process
+  through the lifecycle's own `performActionForShortcutItem`, was exercised only
+  by `ios-simulator-coex`'s synthetic sends, which prove what the package does
+  with a payload and never that UIKit would route one to it. `ios-springboard`
+  now runs a third pass per leg: `run_springboard_tap.sh` launches the app,
+  lets the Unity runtime boot, records the pid, and the XCUITest — in `QA_WARM`
+  mode — only sends it behind SpringBoard and taps, without terminating it.
 
-- **Runtime bitmap icons are downscaled to the Android icon budget.**
-  `resolveIcon` handed whatever `AndroidBitmapFile` decoded to straight to
-  `Icon.createWithBitmap` / `createWithAdaptiveBitmap` — no dimension check.
-  The documented way to build one is `tex.EncodeToPNG()`, and a Unity
-  `Texture2D` is commonly 512 or 1024 px square, so the full bitmap crossed a
-  binder transaction on every publish and the launcher rescaled it afterwards
-  anyway. The bitmap is now measured against `getIconMaxWidth/Height` and, only
-  when it exceeds them, scaled down with the aspect ratio preserved. An
-  adaptive bitmap gets 1.5× that box — `1 + 2 *
-  AdaptiveIconDrawable.getExtraInsetFraction()`, the platform's own formula for
-  the mask inset — so a correctly authored safe zone survives the downscale.
-  Best-effort throughout: an unreadable budget (0), a missing `ShortcutManager`
-  or any throw leaves the bitmap untouched, because an oversized icon is still
-  a valid icon while a thrown exception would cost the whole write. Five new
-  Java smoke checks pin the ratio, the adaptive allowance, the in-budget
-  pass-through and the unreadable-budget case.
+  **The pid is the evidence, and finding that out cost a run.** The first
+  attempt asked XCUITest whether the app had backgrounded. Run 109 answered
+  `.runningForeground` on *both* legs, fifteen seconds after the Home press,
+  with SpringBoard's own home screen up and covering the app — so its
+  `app.state` for an app reached by bundle id simply does not follow a Home
+  press, and both legs skipped with a message that read as if the app had died.
+  What the warm claim actually needs is "this is the same process", which only
+  `simctl` can see: the pass compares the pid before the launch-and-settle with
+  the pid after the tap. Unchanged means re-entered, not relaunched. A mismatch
+  warns and retracts the claim rather than failing the leg — as does XCUITest
+  reporting the process gone at tap time — because a tap on a dead app is the
+  cold pass, which two other passes already cover.
 
-- **A shortcut tap arrives as `Performed` on real Android hardware.** Every tap
-  this package had ever observed was an emulator's or the iOS Simulator's. On
-  2026-09-17 the owner long-pressed the demo icon on a Moto G Play 2024
-  (Android 14, the `quickactions-demo-apk-2022.3` artifact) and tapped the
-  runtime-added `daily` row — "Claim today", the long label Android renders —
-  and the id reached `Performed`. Recorded with the limit it has: the run did
-  not note whether the app had been force-stopped first, so **cold and warm
-  delivery are still not distinguished on hardware**. No code changed; the docs
-  that listed hardware tap delivery as unverified no longer do.
+  **What run 110 saw:** `PASS` on both supported legs — 2022.3.62f3 / iOS 18.6
+  (app-delegate lifecycle) and 6000.3.21f1 / iOS 26.5 (scene manifest) — with
+  `daily_reward` reaching `Performed` **1 second** after the tap, against the
+  35–54 s a cold launch takes, and the pid identical either side of it (28398
+  and 32706). All four rows were in the one menu SpringBoard opened, the
+  `Continue` row still reading its resolved `Resume v1.4.0 (37)`. Warm delivery
+  is now established on the Simulator; it remains unobserved on a device.
 
-## [0.7.0] - 2026-09-16
+- **The iOS coexistence probe pins queue order across several taps.** Taps
+  arriving back to back before C# drains were unasserted on every platform: the
+  probe sent one id at a time. It now sends `a`, `b`, `a` on one runloop turn
+  and requires the queue to hand back exactly that — which pins both properties
+  at once, FIFO order and no collapsing of a repeat (only a COLD source arms the
+  dedup marker, and it is spent by the time the probe runs). Each of the three
+  completion handlers must also run exactly once. `multi-id-queue-order` and
+  `multi-id-completion-each` join the PASS names the workflow requires by name,
+  and passed on their first run (109) on both coex legs, in the default launch
+  and in the shadowed-configuration one.
+
+- **A sentinel watches whether any real iOS SDK starts competing for the
+  quick-action selectors.** `Examples~/Coexistence/` proves this package composes
+  with a swizzler shaped like the real ones, but a mock host cannot say whether a
+  real SDK has begun hooking
+  `application:performActionForShortcutItem:completionHandler:` itself. An audit
+  said none does — Firebase/GoogleUtilities, AppsFlyer, Branch, OneSignal,
+  Adjust, Singular and Braze all swizzle for URL opening, universal links and
+  remote notifications instead — and that answer was true of one version on one
+  day. `tools~/check_sdk_swizzlers.py` now re-reads GoogleUtilities'
+  `GULAppDelegateSwizzler.m` and `GULSceneDelegateSwizzler.m` at pinned tag
+  `8.1.0` on every CI run (the new `sdk-swizzler-sentinel` job — Linux, seconds,
+  no Unity), fails the day either file mentions a shortcut, and prints the
+  selectors each one *does* hook so a narrower change is visible too. It reads
+  upstream and vendors nothing; an unreachable network warns and passes, because
+  that is the automation missing, not a finding. Linking a real SDK into a CI
+  build was considered and rejected: the audit says there is nothing to catch
+  there, and `Examples~/Coexistence/README.md` now carries the citation for that
+  claim instead of leaving it as prose.
+
+- **The Android string-resource escaper has tests.** `EscapeResValue` runs over
+  every static shortcut's label on every build that configures one, and had no
+  coverage at all: XML metacharacters, Android's own span delimiters, a leading
+  `@`/`?`, edge whitespace and dropped control characters were each one edit away
+  from a regression nothing would catch until aapt2 failed a real Gradle build or
+  a device rendered a truncated label. Seven tests now pin the exact written form,
+  driven through `AppendLocalized` (the real emission path) rather than the
+  private escaper. All seven pass against the current implementation — a guard,
+  not a fix.
+
+### Changed
+
+- **CI fans out instead of running in series.** The seven Unity jobs were
+  chained with `needs:` — `tests` → `android-build` → `ios-export` →
+  `ios-export-coex` → `tests-unity6-latest` → `android-shrink-verify` →
+  `gate-off` — so that exactly one editor ever activated at a time. The chain
+  cost 29–38 minutes of wall clock against 13 unchained, and runner minutes are
+  free on a public repo, so it bought nothing else. What it insured against has
+  never happened: across 30 runs no `game-ci` step has conclusion `failure`, and
+  run 25 activated eleven legs at once with every one logging
+  `Successfully returned ULF license` — and GameCI's own documentation says the
+  concurrency limit "is not an issue for free licenses", which is what a
+  Personal `.ulf` with no `UNITY_SERIAL` is. Every job now waits on the licence
+  gate alone, except `gate-off`, which waits on its **real** producers: it
+  downloads the demo APK from `android-build` and the Xcode project from
+  `ios-export`, so the licence gate alone would have raced them. `max-parallel`
+  stays at 2 so this is the only variable that moved; the workflow header
+  records how to put the chain back.
+
+  **Measured, and not what was predicted.** Run 103, the first unchained run,
+  took 36m01s — inside the chained 29–38 range, not the ~13 the old comment's
+  unchained figure suggested (that figure predates the macOS matrix growing to
+  ten jobs). What the un-chain did fix is the Linux half, which now finishes at
+  16 minutes with ten jobs running three minutes in; the macOS half runs to 35
+  and owns the critical path, entering in waves behind GitHub's concurrent-macOS
+  cap. The largest single cost turns out to be a canary that gates nothing —
+  `ios springboard tap (unity6-xcode27)`, 23 minutes of a macOS slot on every
+  PR. The chain still had to go (it constrained the Linux side for nothing, and
+  `gate-off` had no real dependencies at all), but the next change is the one
+  that moves wall clock.
 
 - **The Xcode 27 experiment runs weekly instead of on every PR.** Six macOS
   jobs existed only to test a toolchain no Unity line supports yet: the four
@@ -296,6 +204,94 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   What this change is actually worth: half the macOS demand, six fewer jobs, and
   — because the canaries were the only permanently-red checks — a run where a
   red check means something again.
+
+### Fixed
+
+- **Runtime bitmap icons are downscaled to the Android icon budget.**
+  `resolveIcon` handed whatever `AndroidBitmapFile` decoded to straight to
+  `Icon.createWithBitmap` / `createWithAdaptiveBitmap` — no dimension check.
+  The documented way to build one is `tex.EncodeToPNG()`, and a Unity
+  `Texture2D` is commonly 512 or 1024 px square, so the full bitmap crossed a
+  binder transaction on every publish and the launcher rescaled it afterwards
+  anyway. The bitmap is now measured against `getIconMaxWidth/Height` and, only
+  when it exceeds them, scaled down with the aspect ratio preserved. An
+  adaptive bitmap gets 1.5× that box — `1 + 2 *
+  AdaptiveIconDrawable.getExtraInsetFraction()`, the platform's own formula for
+  the mask inset — so a correctly authored safe zone survives the downscale.
+  Best-effort throughout: an unreadable budget (0), a missing `ShortcutManager`
+  or any throw leaves the bitmap untouched, because an oversized icon is still
+  a valid icon while a thrown exception would cost the whole write. Seven new
+  Java smoke checks pin the ratio, the adaptive allowance, the in-budget
+  pass-through and the unreadable-budget case.
+
+- **A define-off iOS build no longer ships the template images of a define-on
+  one.** `QuickActionsGateCleanupiOS` removed the `QUICKACTIONS_ENABLED` macro and
+  the marked `Info.plist` entries, but nothing removed the `QuickActionsIcons/`
+  folder, the PBX file references that registered it in Copy Bundle Resources, or
+  the manifest recording what was copied — that logic lives only in
+  `SyncTemplateImagesCore`, inside the `QUICKACTIONS_ENABLED`-gated `Editor/iOS`
+  assembly, which does not compile when the define is off. On an **Append** build
+  over an Xcode project a previous enabled build wrote — the exact case this
+  file's header says it exists for — the icons kept shipping in a bundle with no
+  quick actions in it. The cleanup is ownership-scoped like the plist removal: it
+  deletes what our manifest names, leaves a file a host dropped beside them alone,
+  and removes the folder only once it is empty.
+
+  The folder and manifest names are now duplicated across two assemblies that
+  cannot reference each other (the gated one writes them, the ungated one has to
+  find them), so `tools~/check_frozen_strings.py` pins both copies — the same
+  mechanism that keeps the ownership marker in step across Java, Objective-C and
+  C#.
+
+  **CI does not assert this, and cannot as the workflow stands** — the `gate-off`
+  job exports both projects fresh (`Replace`), where the folder never existed, and
+  the testbeds configure no `IosTemplateImages`, so the control such a check needs
+  does not exist either and it would pass by vacuum. Five unit tests cover the
+  disk half instead, which is the half that decides what reaches the bundle.
+
+- **The icon note in Project Settings no longer clips.** `IconType`'s property
+  drawer reserved the note's height by measuring it against the whole view width
+  less 40 px, then drew it into the real property rect — which, for the
+  `IconType` inside the static-shortcut list, is narrower by the foldout indent,
+  the drag handle and the list padding. Narrower wraps into *more* lines, so the
+  reserved height fell short and the last line was cut off: the opposite of the
+  error the code's own comment intended ("a line too many, never a clipped
+  one"). The drawer now remembers the width it actually drew at and measures the
+  next pass against that; the first pass uses a deliberately narrow fallback,
+  which over-reserves instead.
+
+- **`EnsureLoaded` no longer states a guarantee the code does not make.** Its
+  documented return contract said a failed localization re-push "changes only the
+  rendered language, not which ids are installed". `Push` already documented the
+  opposite: it sends the whole set, and on Android the stale-removal phase runs
+  before the add that was refused, so a newly appeared manifest or pinned
+  collision can have dropped one of our ids on the device while the managed list
+  keeps claiming it. The behaviour is unchanged and still the right trade —
+  dropping `_loaded` there would turn every later read into an OS write, and
+  `AddList` relies on a true return meaning loaded — but the cost is now recorded
+  at both sites: `GetAll`/`IsAdded` can over-report one id until the next
+  successful push. No shortcut is lost either way.
+
+- **A shortcut tap arrives as `Performed` on real Android hardware.** Every tap
+  this package had ever observed was an emulator's or the iOS Simulator's. On
+  2026-09-17 the owner long-pressed the demo icon on a Moto G Play 2024
+  (Android 14, the `quickactions-demo-apk-2022.3` artifact) and tapped the
+  runtime-added `daily` row — "Claim today", the long label Android renders —
+  and the id reached `Performed`. Recorded with the limit it has: the run did
+  not note whether the app had been force-stopped first, so **cold and warm
+  delivery are still not distinguished on hardware**. No code changed; the docs
+  that listed hardware tap delivery as unverified no longer do.
+
+- **Two documentation claims that the previous two changes left behind.**
+  `GETTING_STARTED.md` still told readers that no hardware tap had been
+  confirmed as `Performed` on either platform — the Moto G Play run on
+  2026-09-17 confirmed the Android one, and `CHANGELOG.md`, `CLAUDE.md`,
+  `README.md` and `PRODUCTION_READINESS.md` were all updated then while this file
+  was missed. `CONTRIBUTING.md` said `verify.sh` compiles the C# in **ten** build
+  configurations; there are eleven, which `.verify/README.md` and `CLAUDE.md`
+  already said.
+
+## [0.7.0] - 2026-09-16
 
 ### Added
 
