@@ -80,13 +80,14 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
-- **The demo's on-screen log no longer smears into itself on a device.** The
-  sample scene had no camera: IMGUI draws over whatever the previous frame
-  left behind, and with nothing clearing the screen every new log line was
-  painted on top of the old ones, piling up with each tap. The scene now
-  carries a camera with a solid-colour clear. Found on a Moto G Play 2024
-  running the 2022.3 demo APK; CI's emulator smoke never looks at the screen,
-  so it could not have caught it.
+- **The demo scene gets a camera, the likely cause of its on-screen log
+  overlapping itself.** The sample scene had none, so nothing cleared the
+  screen between frames, and IMGUI draws each frame over whatever the last one
+  left; the log's lines were reported piling on top of each other after taps.
+  The scene now carries a camera with a solid-colour clear. The cause is
+  inferred from the scene, not reproduced, and the fix has not yet been
+  checked on a device or Simulator. CI never asserts on what the demo draws,
+  so it could not have caught this.
 
 - **`SetList` reports a refused add.** It cleared the set, called the `void`
   `AddList` and returned `true` regardless, so when the OS refused the add

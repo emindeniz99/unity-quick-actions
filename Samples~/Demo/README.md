@@ -23,5 +23,5 @@ rather than the on-screen log.
 
 The scene uses a single `QuickActionsDemo` MonoBehaviour with IMGUI, so no
 Canvas or EventSystem is required — only the camera the scene already has:
-IMGUI draws over the previous frame, and with no camera nothing clears it, so
-the on-screen log smears into itself on a device.
+IMGUI draws over the previous frame, and without a camera nothing clears the
+screen, so the on-screen log lines can pile up on each other.

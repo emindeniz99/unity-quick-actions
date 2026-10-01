@@ -16,9 +16,9 @@ namespace EminDeniz99.QuickActions.DemoSample
     /// Minimal on-screen demo for the Quick Actions package. Attach to a GameObject
     /// in a scene that has a camera (the sample scene does), build to a device,
     /// then long-press the app icon. Uses IMGUI so it needs no Canvas/EventSystem
-    /// setup — but it does need the camera: IMGUI draws over whatever the previous
-    /// frame left behind, and with no camera nothing clears it, so on a device the
-    /// log smears into itself.
+    /// setup — but it does want the camera: IMGUI draws over whatever the previous
+    /// frame left behind, and with no camera nothing clears the screen, so the
+    /// log's lines can pile up on each other.
     /// </summary>
     public sealed class QuickActionsDemo : MonoBehaviour
     {
