@@ -64,6 +64,10 @@ namespace EminDeniz99.QuickActions.Editor
                     if (unknownTokens != null)
                         EditorGUILayout.HelpBox(unknownTokens, MessageType.Warning);
 
+                    var runtimeOnly = ValidateRuntimeOnlyFields(settings);
+                    if (runtimeOnly != null)
+                        EditorGUILayout.HelpBox(runtimeOnly, MessageType.Warning);
+
                     EditorGUILayout.Space();
                     EditorGUILayout.LabelField(
                         "Titles and subtitles may use build-time placeholders: {version}, " +
@@ -148,6 +152,25 @@ namespace EminDeniz99.QuickActions.Editor
                 "} — the build leaves them as-is. Register custom ones with " +
                 "QuickActionsStaticBuild.RegisterPlaceholder (from an editor script), " +
                 "or double the brace ({{) for a literal one.";
+        }
+
+        /// <summary>
+        /// Returns a warning naming every static shortcut that sets Payload or
+        /// AndroidBitmapFile, else null. The inspector offers both (it is the shared
+        /// item type) but neither build post-processor bakes them.
+        /// </summary>
+        private static string ValidateRuntimeOnlyFields(QuickActionsSettings settings)
+        {
+            var ids = new List<string>();
+            foreach (var item in settings.StaticShortcuts)
+                if (item != null &&
+                    (!string.IsNullOrEmpty(item.Payload) || !string.IsNullOrEmpty(item.AndroidBitmapFile)))
+                    ids.Add(item.Id);
+            if (ids.Count == 0)
+                return null;
+            return "Payload / AndroidBitmapFile are ignored for static shortcuts (" +
+                string.Join(", ", ids) + ") — add those shortcuts at runtime with " +
+                "QuickActions.Add(...) instead.";
         }
 
         private static void CollectUnknown(List<LocalizedText> entries,
