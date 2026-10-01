@@ -522,7 +522,11 @@ public final class QuickActionsBridge {
         if (resId == 0 && builtIn != null) {
             resId = context.getResources().getIdentifier(builtIn, "drawable", context.getPackageName());
         }
-        return resId != 0 ? Icon.createWithResource(context, resId) : null;
+        if (resId == 0) {
+            android.util.Log.w("QuickActions", "Drawable not found, shortcut has no icon: " + drawable);
+            return null;
+        }
+        return Icon.createWithResource(context, resId);
     }
 
     /**
