@@ -555,14 +555,18 @@ namespace EminDeniz99.QuickActions
         /// already exist are skipped. If the current OS shortcuts can't be read, or
         /// the OS rejects the write, nothing is added (retry later).
         /// </summary>
-        public static void AddList(IList<QuickActionItem> items)
+        public static void AddList(IList<QuickActionItem> items) => TryAddList(items);
+
+        // AddList's body, returning false when nothing could be written (unreadable
+        // set, refused push) so SetList can report it; AddList itself stays void.
+        private static bool TryAddList(IList<QuickActionItem> items)
         {
             if (items == null)
                 throw new ArgumentNullException(nameof(items));
             if (!EnsureLoaded())
             {
                 Log("AddList deferred: could not read the current shortcuts; OS set left unchanged.");
-                return;
+                return false;
             }
 
             var added = new List<QuickActionItem>();
@@ -586,7 +590,7 @@ namespace EminDeniz99.QuickActions
                     _items.Remove(copy);
                 _loaded = false;
                 Log("AddList failed: the OS did not accept the update; nothing was added — retry later.");
-                return;
+                return false;
             }
             // The write landed but the OS may have dropped some ids (shared cap, or an
             // id another publisher owns); Push already pruned them from _items. Surface
@@ -594,6 +598,7 @@ namespace EminDeniz99.QuickActions
             foreach (var copy in added)
                 if (!_items.Contains(copy))
                     Log($"AddList: the OS dropped '{copy.Id}' (cap reached or id owned by another publisher).");
+            return true;
         }
 
         /// <summary>
@@ -614,8 +619,9 @@ namespace EminDeniz99.QuickActions
         /// </para>
         /// <para>
         /// Not atomic: between the clear and the add the app has no quick actions. If
-        /// the add then fails, the set is left <b>empty</b> rather than restored — the
-        /// clear already landed. Prefer <see cref="Update"/> for editing one item in
+        /// the OS then refuses the add, <c>SetList</c> also returns <c>false</c> — but
+        /// the clear already landed, so the set may be left <b>empty</b> rather than
+        /// restored; retry the call. Prefer <see cref="Update"/> for editing one item in
         /// place, which keeps its launcher rank.
         /// </para>
         /// </summary>
@@ -644,8 +650,7 @@ namespace EminDeniz99.QuickActions
                 return false;
             }
 
-            AddList(items);
-            return true;
+            return TryAddList(items);
         }
 
         /// <summary>Snapshot of the currently installed quick actions.</summary>

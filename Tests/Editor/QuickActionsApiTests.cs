@@ -155,6 +155,23 @@ namespace EminDeniz99.QuickActions.Tests
         }
 
         [Test]
+        public void SetList_WhenTheAddIsRefused_ReturnsFalseAndTheSetIsEmpty()
+        {
+            // The clear landed, the push did not: the device now has nothing, so a
+            // true here would tell the caller its new set is live when it is not.
+            var bridge = new TogglingWriteBridge();
+            QuickActions.OverrideBridgeForTesting(bridge);
+            try
+            {
+                Assert.IsTrue(QuickActions.Add(Item("a")));
+                bridge.FailWrites = true;
+                Assert.IsFalse(QuickActions.SetList(new List<QuickActionItem> { Item("b") }));
+                Assert.IsEmpty(QuickActions.GetAll());
+            }
+            finally { QuickActions.OverrideBridgeForTesting(null); }
+        }
+
+        [Test]
         public void SetList_WhenCurrentShortcutsCannotBeRead_ChangesNothing()
         {
             // Without the read there is no way to know what is live on the device, so
