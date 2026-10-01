@@ -43,6 +43,7 @@ namespace EminDeniz99.QuickActions.Tests
                 {
                     IosSystemImage = "gift.fill",
                     IosTemplateImage = "GiftTemplate",
+                    AndroidDrawable = "ic_gift",
                     AndroidBitmapFile = "/data/gift.png",
                     AndroidBitmapAdaptive = true,
                     Payload = "reward=daily",
@@ -53,6 +54,7 @@ namespace EminDeniz99.QuickActions.Tests
 
             StringAssert.Contains("\"IosSystemImage\":\"gift.fill\"", json);
             StringAssert.Contains("\"IosTemplateImage\":\"GiftTemplate\"", json);
+            StringAssert.Contains("\"AndroidDrawable\":\"ic_gift\"", json);
             StringAssert.Contains("\"AndroidBitmapFile\":\"/data/gift.png\"", json);
             StringAssert.Contains("\"AndroidBitmapAdaptive\":true", json);
             StringAssert.Contains("\"Payload\":\"reward=daily\"", json);
