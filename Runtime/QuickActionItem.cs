@@ -31,9 +31,10 @@ namespace EminDeniz99.QuickActions
         /// <summary>
         /// Per-locale replacements for <see cref="Title"/>. The entry matching
         /// <see cref="QuickActions.Locale"/> — exactly, else by language prefix
-        /// (<c>"pt-BR"</c> matches a <c>"pt"</c> entry), both case-insensitively —
-        /// is what the OS shows; with no match the base <see cref="Title"/> is
-        /// used. Leave it empty in a single-language app.
+        /// (<c>"pt-BR"</c> matches a <c>"pt"</c> entry; a bare <c>"pt"</c> also
+        /// matches the first <c>"pt-*"</c> entry), case-insensitively — is what
+        /// the OS shows; with no match the base <see cref="Title"/> is used.
+        /// Leave it empty in a single-language app.
         /// </summary>
         public List<LocalizedText> LocalizedTitles = new List<LocalizedText>();
 

@@ -53,7 +53,8 @@ namespace EminDeniz99.QuickActions.Internal
 
         /// <summary>
         /// Exact locale match (case-insensitive) beats a language-prefix match
-        /// (<c>"pt-BR"</c> resolves a <c>"pt"</c> entry) beats the base text.
+        /// (<c>"pt-BR"</c> resolves a <c>"pt"</c> entry; a bare <c>"pt"</c> resolves
+        /// the first <c>"pt-*"</c> entry) beats the base text.
         /// </summary>
         internal static string Resolve(List<LocalizedText> entries, string fallback, string locale)
         {
@@ -68,6 +69,14 @@ namespace EminDeniz99.QuickActions.Internal
                 var language = Find(entries, locale.Substring(0, separator));
                 if (language != null)
                     return language;
+            }
+            else
+            {
+                // A bare device language never equals an authored region tag, so take
+                // the first entry in that language.
+                var region = Find(entries, locale, regionTagged: true);
+                if (region != null)
+                    return region;
             }
             return fallback;
         }
@@ -208,7 +217,7 @@ namespace EminDeniz99.QuickActions.Internal
             }
         }
 
-        private static string Find(List<LocalizedText> entries, string locale)
+        private static string Find(List<LocalizedText> entries, string locale, bool regionTagged = false)
         {
             foreach (var entry in entries)
             {
@@ -216,7 +225,9 @@ namespace EminDeniz99.QuickActions.Internal
                 // blank label the OS refuses, so the base text is the honest answer.
                 if (entry == null || string.IsNullOrEmpty(entry.Locale) || string.IsNullOrEmpty(entry.Text))
                     continue;
-                if (string.Equals(entry.Locale, locale, StringComparison.OrdinalIgnoreCase))
+                if (regionTagged
+                        ? entry.Locale.StartsWith(locale + "-", StringComparison.OrdinalIgnoreCase)
+                        : string.Equals(entry.Locale, locale, StringComparison.OrdinalIgnoreCase))
                     return entry.Text;
             }
             return null;

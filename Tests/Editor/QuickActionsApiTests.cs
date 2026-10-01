@@ -1042,6 +1042,25 @@ namespace EminDeniz99.QuickActions.Tests
         }
 
         [Test]
+        public void Resolve_BareLanguage_MatchesFirstRegionTaggedEntry()
+        {
+            // WHY: the device default Locale is bare ("pt"), so an item authored only
+            // with "pt-BR" would otherwise show its base text on the devices it targets.
+            var item = new QuickActionItem("play", "Play");
+            item.LocalizedTitles.Add(new LocalizedText("pt-BR", "")); // no text to render
+            item.LocalizedTitles.Add(new LocalizedText("pt-BR", "Jogar"));
+            Assert.AreEqual("Jogar", QuickActionLocalization.ResolveTitle(item, "pt"), "pt finds a pt-BR entry");
+            Assert.AreEqual("Jogar", QuickActionLocalization.ResolveTitle(item, "PT"), "matching ignores case");
+            Assert.AreEqual("Play", QuickActionLocalization.ResolveTitle(item, "es"), "an unrelated language keeps the base text");
+
+            item.LocalizedTitles.Add(new LocalizedText("pt-PT", "A jogar"));
+            Assert.AreEqual("Jogar", QuickActionLocalization.ResolveTitle(item, "pt"), "the first region-tagged entry wins");
+
+            item.LocalizedTitles.Add(new LocalizedText("pt", "Jogar (pt)"));
+            Assert.AreEqual("Jogar (pt)", QuickActionLocalization.ResolveTitle(item, "pt"), "an exact entry beats a region-tagged one");
+        }
+
+        [Test]
         public void Push_SendsResolvedText_WhileTheManagedSetKeepsTheBase()
         {
             // WHY: a shortcut holds ONE label, so the natives must receive final text
