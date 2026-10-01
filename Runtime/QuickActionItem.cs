@@ -23,17 +23,19 @@ namespace EminDeniz99.QuickActions
         public string Title;
 
         /// <summary>
-        /// Secondary line under the title. Rendered on iOS; on Android it is used
-        /// as the shortcut's long label.
+        /// Secondary line under the title on iOS. On Android it is the shortcut's
+        /// long label, which the launcher shows in place of <see cref="Title"/> when
+        /// it is set — so localize subtitles too, not only titles.
         /// </summary>
         public string Subtitle;
 
         /// <summary>
         /// Per-locale replacements for <see cref="Title"/>. The entry matching
         /// <see cref="QuickActions.Locale"/> — exactly, else by language prefix
-        /// (<c>"pt-BR"</c> matches a <c>"pt"</c> entry), both case-insensitively —
-        /// is what the OS shows; with no match the base <see cref="Title"/> is
-        /// used. Leave it empty in a single-language app.
+        /// (<c>"pt-BR"</c> matches a <c>"pt"</c> entry; a bare <c>"pt"</c> also
+        /// matches the first <c>"pt-*"</c> entry), case-insensitively — is what
+        /// the OS shows; with no match the base <see cref="Title"/> is used.
+        /// Leave it empty in a single-language app.
         /// </summary>
         public List<LocalizedText> LocalizedTitles = new List<LocalizedText>();
 

@@ -29,9 +29,14 @@ namespace EminDeniz99.QuickActions
         // not a delivery single-point-of-failure in practice.
         private bool _ready;
 
+        // Set before OnDestroy when the app (or Play Mode) is ending. The message
+        // rather than Application.quitting: same timing, nothing to unsubscribe.
+        private bool _quitting;
+
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         private static void Bootstrap()
         {
+            QuickActions._mainThreadId = System.Threading.Thread.CurrentThread.ManagedThreadId;
             if (_instance != null)
                 return;
 
@@ -42,6 +47,19 @@ namespace EminDeniz99.QuickActions
         }
 
         private void Awake() => StartCoroutine(DispatchColdLaunch());
+
+        private void OnApplicationQuit() => _quitting = true;
+
+        private void OnDestroy()
+        {
+            // A host's scene-cleanup sweep can destroy this hidden object; without a
+            // replacement Performed would never fire again this session.
+            if (_instance != this)
+                return;
+            _instance = null;
+            if (!_quitting)
+                Bootstrap();
+        }
 
         private IEnumerator DispatchColdLaunch()
         {

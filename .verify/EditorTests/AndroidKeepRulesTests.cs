@@ -205,6 +205,41 @@ namespace EminDeniz99.QuickActions.Tests
                 "a re-run must not leave a second keep file behind");
         }
 
+        private string ProguardFile => Path.Combine(UnityLibrary, "proguard-unity.txt");
+
+        private const string ClassRule = "-keep class com.emindeniz99.quickactions.** { *; }";
+
+        [Test]
+        public void ClassKeepRule_IsWrittenOnceAndKeepsUnitysRules()
+        {
+            // The bridge is reached by name over JNI, so without this rule a
+            // minified build strips it. Unity owns proguard-unity.txt and an Append
+            // build re-runs this callback on it: add the rule, keep what is there,
+            // and never add it twice.
+            WriteManifest(launcher: true);
+            WriteFile(ProguardFile, "-keep class com.unity3d.player.** { *; }");
+
+            RunPostProcessor();
+            RunPostProcessor();
+
+            var text = File.ReadAllText(ProguardFile);
+            StringAssert.StartsWith("-keep class com.unity3d.player.** { *; }\n", text,
+                "Unity's own rules must be preserved, and ours must start on its own line");
+            Assert.AreEqual(text.IndexOf(ClassRule, StringComparison.Ordinal),
+                text.LastIndexOf(ClassRule, StringComparison.Ordinal), "the rule must not be duplicated");
+            StringAssert.Contains(ClassRule + "\n", text);
+        }
+
+        [Test]
+        public void ClassKeepRule_CreatesTheFileWhenAbsent()
+        {
+            WriteManifest(launcher: true);
+
+            RunPostProcessor();
+
+            Assert.AreEqual(ClassRule + "\n", File.ReadAllText(ProguardFile));
+        }
+
         [Test]
         public void KeepFile_SurvivesTheStaticShortcutCleanup()
         {

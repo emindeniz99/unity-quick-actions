@@ -11,6 +11,94 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 > as its own section because each is a distinct, self-contained set of API
 > additions; read them as the package's development log.
 
+## [Unreleased]
+
+### Added
+
+- **The R8 keep rule for the JNI bridge is written for you.** The C# side
+  reaches `QuickActionsBridge` by name, so a minified build (Player Settings ▸
+  Publishing Settings ▸ *Minify*) could strip the class and every call would
+  fail quietly; until now the README asked for a keep rule in a *Custom Proguard
+  File*. The Android post-processor now appends
+  `-keep class com.emindeniz99.quickactions.** { *; }` to
+  `unityLibrary/proguard-unity.txt` on every build with the define on — once,
+  an Append build does not duplicate it. Headless tests cover the line being
+  written; no minified build has yet run with the automatic rule alone, and
+  CI's `android smoke (2022.3-release)` leg still carries the same line in
+  `proguard-user.txt`, which is harmless.
+
+- **A call from another thread throws.** `QuickActions` has always been
+  documented main-thread-only with no synchronization; a worker-thread call
+  used to race the managed list and, on Android, reach JNI from a thread that
+  was never attached. Every member that touches the shortcut set or the OS now
+  throws `InvalidOperationException` naming the member when called off Unity's
+  main thread, which `QuickActionsRuntime` records at startup. Edit mode and
+  the headless harness are unaffected: no main thread is recorded there.
+
+- **Project Settings warns about runtime-only fields on a static shortcut.**
+  The inspector offers `Payload` and `AndroidBitmapFile` on every item because
+  the type is shared, but neither build post-processor bakes them. A static
+  shortcut that sets either now gets a warning box naming it, pointing at
+  `QuickActions.Add(...)` instead.
+
+- **Android logs an icon it cannot resolve.** When neither the project's
+  drawable nor the package's built-in exists for a name, the bridge used to
+  leave the shortcut silently iconless; it now writes one `Log.w` line (tag
+  `QuickActions`) naming the drawable.
+
+### Changed
+
+- **`Locale = null` restores the device default.** Assigning `null` used to
+  store the empty string — base text only — and nothing public could get back
+  to the device language once an app had picked one. The empty string keeps
+  that meaning; `null` now re-reads `Application.systemLanguage` and re-pushes
+  once if that differs.
+
+- **A bare device language matches its region-tagged entries.** The default
+  `Locale` is bare (`pt`), and resolution only ever fell back the other way
+  (`pt-BR` → a `pt` entry), so an item authored only with `pt-BR` showed its
+  base text on the very devices it targeted. A bare locale now takes the first
+  region-tagged entry in that language after the exact and prefix matches —
+  order the entries. Documented in the README's resolution order.
+
+- **The coexistence probe matches `PASS` names whole.** CI's `ios-simulator-coex`
+  leg checked required lines by substring, so `PASS cold-warm-dedup` was
+  satisfied by `PASS cold-warm-dedup-completion-once` and one of the two could
+  vanish unnoticed. A `PASS` name must now be followed by a space, a line end
+  or the end of the capture; the other required lines, partial strings of
+  `NSLog` output, stay substring matches. Verified locally only.
+
+- **Docs.** `Subtitle` is Android's long label, the line a launcher shows in
+  place of the title when it is set — localize subtitles too. A
+  `UnityAppController` subclass that overrides
+  `application:performActionForShortcutItem:completionHandler:` on the
+  manifest-less app-delegate lifecycle must call super, or every warm tap is
+  swallowed there. `PRODUCTION_READINESS.md`'s delivery rows now carry the
+  recorded evidence: the Simulator warm re-entry of run 110 and the Moto G Play
+  tap of 2026-09-17. The 2022.3 line's iOS toolchain decision is recorded:
+  build with Xcode 26, not 27, and plan the move to Unity 6 before April 2027.
+
+### Fixed
+
+- **`SetList` reports a refused add.** It cleared the set, called the `void`
+  `AddList` and returned `true` regardless, so when the OS refused the add
+  (Android's background throttle) the caller was told its new set was live
+  while the device had nothing. It now returns `false` in that case — the clear
+  already landed, so the set may be empty; retry.
+
+- **The hidden runtime object is recreated if a host destroys it.** A
+  scene-cleanup sweep that destroys every root object took the package's
+  `DontDestroyOnLoad` singleton with it, and `Performed` never fired again that
+  session. `OnDestroy` now re-bootstraps unless the app (or Play Mode) is
+  quitting. No harness test: the path runs through `Bootstrap`, which only Play
+  Mode can host.
+
+- **`applicationId = "x"` is read too.** The Android post-processor resolves the
+  shipping application id from `launcher/build.gradle` to target the
+  trampoline and fill `{bundleId}`; the regex accepted only the
+  `applicationId "x"` spelling, so the assignment form fell back to the Player
+  setting. Both spellings now match, and `applicationIdSuffix` still does not.
+
 ## [0.8.0] - 2026-09-19
 
 ### Added

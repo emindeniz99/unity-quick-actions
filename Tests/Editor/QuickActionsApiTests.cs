@@ -87,6 +87,30 @@ namespace EminDeniz99.QuickActions.Tests
         }
 
         [Test]
+        public void Add_FromAnotherThread_ThrowsOnceTheMainThreadIsKnown()
+        {
+            // WHY a throw: the facade is not synchronized, and a log from a worker
+            // thread is easy to miss while the list it raced is silently corrupted.
+            QuickActions._mainThreadId = System.Threading.Thread.CurrentThread.ManagedThreadId;
+            try
+            {
+                // A real Thread, not Task.Run: Wait() may inline a task on this thread.
+                System.Exception thrown = null;
+                var worker = new System.Threading.Thread(() =>
+                {
+                    try { QuickActions.Add(Item("a")); }
+                    catch (System.Exception e) { thrown = e; }
+                });
+                worker.Start();
+                worker.Join();
+                Assert.IsInstanceOf<System.InvalidOperationException>(thrown);
+                StringAssert.Contains("QuickActions.Add", thrown.Message);
+                Assert.IsTrue(QuickActions.Add(Item("a")), "the main thread itself is unaffected");
+            }
+            finally { QuickActions._mainThreadId = null; }
+        }
+
+        [Test]
         public void AddList_SkipsInvalidAndDuplicates()
         {
             QuickActions.Add(Item("a"));
@@ -150,6 +174,23 @@ namespace EminDeniz99.QuickActions.Tests
                 CollectionAssert.AreEqual(
                     new[] { "a" }, QuickActions.GetAll().ConvertAll(i => i.Id),
                     "the previous set must survive untouched — and b must NOT have been merged in");
+            }
+            finally { QuickActions.OverrideBridgeForTesting(null); }
+        }
+
+        [Test]
+        public void SetList_WhenTheAddIsRefused_ReturnsFalseAndTheSetIsEmpty()
+        {
+            // The clear landed, the push did not: the device now has nothing, so a
+            // true here would tell the caller its new set is live when it is not.
+            var bridge = new TogglingWriteBridge();
+            QuickActions.OverrideBridgeForTesting(bridge);
+            try
+            {
+                Assert.IsTrue(QuickActions.Add(Item("a")));
+                bridge.FailWrites = true;
+                Assert.IsFalse(QuickActions.SetList(new List<QuickActionItem> { Item("b") }));
+                Assert.IsEmpty(QuickActions.GetAll());
             }
             finally { QuickActions.OverrideBridgeForTesting(null); }
         }
@@ -1042,6 +1083,25 @@ namespace EminDeniz99.QuickActions.Tests
         }
 
         [Test]
+        public void Resolve_BareLanguage_MatchesFirstRegionTaggedEntry()
+        {
+            // WHY: the device default Locale is bare ("pt"), so an item authored only
+            // with "pt-BR" would otherwise show its base text on the devices it targets.
+            var item = new QuickActionItem("play", "Play");
+            item.LocalizedTitles.Add(new LocalizedText("pt-BR", "")); // no text to render
+            item.LocalizedTitles.Add(new LocalizedText("pt-BR", "Jogar"));
+            Assert.AreEqual("Jogar", QuickActionLocalization.ResolveTitle(item, "pt"), "pt finds a pt-BR entry");
+            Assert.AreEqual("Jogar", QuickActionLocalization.ResolveTitle(item, "PT"), "matching ignores case");
+            Assert.AreEqual("Play", QuickActionLocalization.ResolveTitle(item, "es"), "an unrelated language keeps the base text");
+
+            item.LocalizedTitles.Add(new LocalizedText("pt-PT", "A jogar"));
+            Assert.AreEqual("Jogar", QuickActionLocalization.ResolveTitle(item, "pt"), "the first region-tagged entry wins");
+
+            item.LocalizedTitles.Add(new LocalizedText("pt", "Jogar (pt)"));
+            Assert.AreEqual("Jogar (pt)", QuickActionLocalization.ResolveTitle(item, "pt"), "an exact entry beats a region-tagged one");
+        }
+
+        [Test]
         public void Push_SendsResolvedText_WhileTheManagedSetKeepsTheBase()
         {
             // WHY: a shortcut holds ONE label, so the natives must receive final text
@@ -1103,6 +1163,27 @@ namespace EminDeniz99.QuickActions.Tests
                 Assert.AreEqual(pushes + 2, fake.SetCount);
                 Assert.AreEqual("Play", fake.Shortcuts[0].Title,
                     "switching back resolves from the base text, not from the previous translation");
+            }
+            finally { QuickActions.OverrideBridgeForTesting(null); }
+        }
+
+        [Test]
+        public void Locale_SetToNull_RestoresTheDeviceDefault_AndRePushesOnce()
+        {
+            // WHY: null used to mean "base text only", so nothing public could get
+            // back to the device language once an app had picked one.
+            var device = QuickActionLocalization.FromSystemLanguage(Application.systemLanguage);
+            var fake = new FakeBridge();
+            QuickActions.OverrideBridgeForTesting(fake);
+            try
+            {
+                Assert.IsTrue(QuickActions.Add(Item("play", "Play")));
+                QuickActions.Locale = device == "fr" ? "de" : "fr";
+                var pushes = fake.SetCount;
+
+                QuickActions.Locale = null;
+                Assert.AreEqual(device, QuickActions.Locale);
+                Assert.AreEqual(pushes + 1, fake.SetCount, "back to the device language re-renders once");
             }
             finally { QuickActions.OverrideBridgeForTesting(null); }
         }

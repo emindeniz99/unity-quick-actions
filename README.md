@@ -523,6 +523,8 @@ assembly entirely.
 
 ### API
 
+Call every member from the main thread: in a player and in Play Mode, the members that touch the shortcut set or the OS throw `InvalidOperationException` from any other thread.
+
 | Member | Purpose |
 |--------|---------|
 | `bool IsPlatformSupported` | True on a supported device; false in-Editor **and on Android < 7.1 / API 25** (all calls are safe no-ops there — in-Editor, use the [Simulator](#test-in-the-editor--no-device-needed)). |
@@ -530,9 +532,9 @@ assembly entirely.
 | `event Action<string> Performed` | Tapped action id (main thread; includes cold launch). |
 | `string LastPerformed` | Id the app was last launched/resumed from, or null. |
 | `void ResetLastPerformed()` | Clear `LastPerformed`. |
-| `bool Add(QuickActionItem)` | Add one; false if invalid, id already added, or the OS set couldn't be read / the OS rejected the write (transient — retry later). A `null` item throws `ArgumentNullException` — the only way any call here throws. |
+| `bool Add(QuickActionItem)` | Add one; false if invalid, id already added, or the OS set couldn't be read / the OS rejected the write (transient — retry later). A `null` item throws `ArgumentNullException`. |
 | `void AddList(IList<QuickActionItem>)` | Add several in one OS update (same transient no-op cases as `Add`; a `null` list throws). |
-| `bool SetList(IList<QuickActionItem>)` | Make the set **exactly** this list, in one call — clear, then add. False, having changed **nothing**, when the OS set couldn't be read or the clear was refused (the previous set is still live; retry later). Not atomic: between the two steps there are no quick actions, and if the add then fails the set is left empty. Invalid/duplicate items are skipped and the OS may still drop ids to fit the budget, as with `AddList` — `GetAll()` is the authority. A `null` list throws. |
+| `bool SetList(IList<QuickActionItem>)` | Make the set **exactly** this list, in one call — clear, then add. False, having changed **nothing**, when the OS set couldn't be read or the clear was refused (the previous set is still live; retry later). Not atomic: between the two steps there are no quick actions. False can also mean the clear landed but the OS refused the add — the set may then be empty; retry. Invalid/duplicate items are skipped and the OS may still drop ids to fit the budget, as with `AddList` — `GetAll()` is the authority. A `null` list throws. |
 | `List<QuickActionItem> GetAll()` | Snapshot of the currently installed dynamic actions (OS-reconciled). |
 | `QuickActionItem GetById(string)` | Lookup by id. |
 | `bool Update(QuickActionItem)` | `null` throws `ArgumentNullException`. Replace the added action with the same `Id` **in place** — list position (launcher rank) preserved, one OS update, Android user-pinned copies refresh too. False when not added (use `Add`), invalid, the OS set couldn't be read, or the OS refused the write (all leave the previous item in place) — or when the OS **dropped** the pushed item (budget shrank; the shortcut is then gone, re-`Add` when there's room). |
@@ -544,13 +546,13 @@ assembly entirely.
 | `bool IsRateLimitingActive` | True while Android is throttling this app's shortcut writes — the reason an `Add`/`AddList`/`Update` can return false from a backgrounded game. It separates "retry once foregrounded" from "this will never work" (budget full, id owned elsewhere). Advisory and racy: nothing gates on it, the write's own return value stays authoritative. Always false on iOS (no throttle) and in-Editor. |
 | `bool RequestPin(string)` | Ask the launcher to pin an **added** action to the home screen. True = request *dispatched* (the user still confirms in launcher UI — the OS reports no outcome). |
 | `bool ReportUsed(string)` | Tell the launcher the user reached this action's feature **in-app** (Android `reportShortcutUsed`, improves ranking predictions). Call it for normal-UI usage only — **a shortcut tap already reports itself**: the trampoline fires this on every tap of a *dynamic or pinned* shortcut, so calling it again there double-reports. (A tap on a **static** shortcut is not reported: the native call's ownership check reads the dynamic and pinned sets only.) False on iOS/Editor (no analog), for a not-added id, or when the native call failed. |
-| `string Locale` | The locale labels resolve against (defaults to the device language via `Application.systemLanguage`). Set it from an in-app language picker — a **different** value re-pushes the current set so the launcher re-renders immediately. A device-language change while the app was closed is caught on next launch: the cold-start reconcile detects stale labels and refreshes them with one push. If the OS refuses that push (Android rate-limits writes while backgrounded), the managed list stays authoritative — only the on-screen labels are stale — and exactly **one** retry is attempted on the next list call; after that the labels are fixed by your next successful `Add`/`Update`/`Remove`, so read-only calls never turn into a stream of OS writes. |
+| `string Locale` | The locale labels resolve against (defaults to the device language via `Application.systemLanguage`). Set it from an in-app language picker — a **different** value re-pushes the current set so the launcher re-renders immediately. `null` returns to the device default; `""` means base text only. A device-language change while the app was closed is caught on next launch: the cold-start reconcile detects stale labels and refreshes them with one push. If the OS refuses that push (Android rate-limits writes while backgrounded), the managed list stays authoritative — only the on-screen labels are stale — and exactly **one** retry is attempted on the next list call; after that the labels are fixed by your next successful `Add`/`Update`/`Remove`, so read-only calls never turn into a stream of OS writes. |
 
 `QuickActionItem` fields:
 
 | Field | Purpose |
 |-------|---------|
-| `Id` (required, unique) / `Title` (required) / `Subtitle` | Labels. `Subtitle` renders under the title on iOS and as the Android long label. In **static** (baked) items both may embed build-time `{placeholders}` — see [Build-time placeholders](#build-time-placeholders--app-info-on-long-press). |
+| `Id` (required, unique) / `Title` (required) / `Subtitle` | Labels. `Subtitle` renders under the title on iOS; on Android it is the long label, which the launcher shows in place of `Title` when it is set — so localize subtitles too, not only titles. In **static** (baked) items both may embed build-time `{placeholders}` — see [Build-time placeholders](#build-time-placeholders--app-info-on-long-press). |
 | `Icon` (`IconType`) | Built-in glyph catalog (29 entries). iOS uses Apple's system icons — nothing to ship. Android resolves a drawable by name — your `ic_quickaction_<name>` first, then the package's own `ic_quickaction_builtin_<name>`: **four ship built in** (`Add`, `Compose`, `Favorite`, `Play`), the other 25 need a drawable **you add**. Without one the launcher shows a blank square. See [Android icons](#android-icons). |
 | `IosSystemImage` | SF Symbol name (`"star.fill"`, iOS 13+) — beats `IosTemplateImage` and `Icon`. Ignored on Android. |
 | `IosTemplateImage` | Template-image name shipped in the Xcode bundle (single-color, ~35×35 pt) — beats `Icon`. Ignored on Android. |
@@ -558,7 +560,7 @@ assembly entirely.
 | `AndroidBitmapAdaptive` | Install `AndroidBitmapFile` as an adaptive icon (API 26+, launcher-masked; supply safe-zone padding). The downscale target is 1.5× the plain one here, because an adaptive bitmap also carries the mask's inset. |
 | `AndroidDrawable` | Drawable resource name overriding the `Icon` lookup. Ignored on iOS. A name outside the `ic_quickaction_*` catalog **used only from a runtime `Add(...)`** needs your own keep rule under minification (a **static** item's name is baked as a real `@drawable` reference the shrinker follows) — see [Known limits](#known-limits--android-minification-r8proguard--resource-shrinking). |
 | `Payload` | App-defined string riding the shortcut (iOS `userInfo`, Android extras), restored across cold starts. Not pushed with the tap — read it via `GetById(id)?.Payload` from the id `Performed` reports (`GetById` is null for a **static**-shortcut tap or an id removed since: static items never join the runtime list and carry no payload). |
-| `LocalizedTitles` / `LocalizedSubtitles` | Per-locale label replacements (`LocalizedText { Locale, Text }` pairs). Resolution: exact locale match > language prefix (`"pt-BR"` matches a `"pt"` entry) > base `Title`/`Subtitle`, case-insensitive. The tables survive cold starts (they ride the ownership-marker payload), so labels re-resolve after a device-language change. Static (baked) shortcuts localize on **Android only** (`values-<qualifier>/` string resources); iOS static shortcuts render in their base language — see "Known limits". |
+| `LocalizedTitles` / `LocalizedSubtitles` | Per-locale label replacements (`LocalizedText { Locale, Text }` pairs). Resolution: exact locale match > language prefix (`"pt-BR"` matches a `"pt"` entry) > for a bare language such as the device default, the first region-tagged entry (`"pt"` matches `"pt-BR"`, so order your entries) > base `Title`/`Subtitle`, case-insensitive. The tables survive cold starts (they ride the ownership-marker payload), so labels re-resolve after a device-language change. Static (baked) shortcuts localize on **Android only** (`values-<qualifier>/` string resources); iOS static shortcuts render in their base language — see "Known limits". |
 
 ### Android icons
 
@@ -896,6 +898,12 @@ their tokens show raw there.
   off the normal path. **If you are on 2022.3 and must build under Xcode 27, the
   supported route is Unity 6** (`6000.0.68f1+` or `6000.3.8f1+`): both are in
   Hub's catalog, free on Personal, and inside their standard support window.
+  Until then a 2022.3 project ships through Xcode 26 (App Store Connect's floor
+  since 2026-04-28), and April 2027 — when the iOS 27 SDK becomes mandatory for
+  uploads — is the date by which it has to have moved: the `2022.3-xcode27`
+  canary is that failure, run weekly. CI compiles the 2022.3 export under
+  Xcode 16.4 (`macos-15`) and Xcode 27, not 26, so the toolchain a 2022.3 app
+  ships with today is one this repo does not exercise.
 - **Android** — `Plugins/Android/QuickActionsBridge.java` builds `ShortcutInfo`s
   whose intents target `QuickActionsTrampolineActivity`. The trampoline records
   the tapped id and brings the Unity activity forward.
@@ -1063,6 +1071,11 @@ having adopted the scene lifecycle even without a manifest (measured — UIKit
 called the CI mock host's override on the manifest-less 2022.3 export), while
 this package gates every scene hook on the manifest, so such an app gets the
 scene lifecycle and no scene hooks, and quick actions do nothing.
+A third rule covers the manifest-less app-delegate lifecycle: if you override
+`application:performActionForShortcutItem:completionHandler:`, call `[super …]`
+there too — our warm-tap handler is installed on `UnityAppController`, so an
+override that does not chain to it swallows every warm tap. (Under the scene
+manifest UIKit routes warm taps to `UnityScene` and never calls that selector.)
 
 **Two shapes are unsupported.** In **Unity as a Library** the host owns the
 `UIApplicationDelegate` and `UnityAppController` is reachable only through
@@ -1116,27 +1129,28 @@ unaffected.)
 ### Known limits — Android minification (R8/ProGuard + resource shrinking)
 
 **Code (R8/ProGuard).** The C# runtime reaches the Java helper `com.emindeniz99.quickactions.QuickActionsBridge`
-**by name** over JNI. If you build a **minified** dev/QA build (Player Settings ▸
-Publishing Settings ▸ *Minify*), R8 can rename or strip that non-manifest class, and
-the JNI lookup then fails so shortcuts silently don't get set. Enable *Publishing
-Settings ▸ Minify ▸ Custom Proguard File* (Unity creates
-`Assets/Plugins/Android/proguard-user.txt`; the file alone is not documented as
-enough) and add a keep rule to it:
+**by name** over JNI, so in a **minified** build (Player Settings ▸ Publishing
+Settings ▸ *Minify*) R8 would strip or rename that non-manifest class and the JNI
+lookup would fail, leaving shortcuts silently unset. The package now adds the keep
+rule for you: every Android build with the define on appends
 
 ```proguard
 -keep class com.emindeniz99.quickactions.** { *; }
 ```
 
-(The trampoline `<activity>` is kept automatically because it's declared in the
-manifest — only the JNI-only bridge needs this. Most dev builds don't enable
-minification, so this only matters if yours does.)
+to `unityLibrary/proguard-unity.txt` in the generated Gradle project (once — an
+Append build does not duplicate it). Headless tests cover that the line is written;
+no minified build has yet run with this automatic rule alone, so keeping the same
+line in a *Custom Proguard File* (`Assets/Plugins/Android/proguard-user.txt`) is
+harmless and is what the CI leg below exercises. (The trampoline `<activity>` is
+kept anyway because it's declared in the manifest.)
 
 CI's `android smoke (2022.3-release)` leg builds the 2022.3 testbed as a release
 player — Managed Stripping Level **High**, `minifyRelease` (R8) on, with that
 exact `proguard-user.txt` and nothing else — and then runs the emulator smoke on
 that APK. Its first run (2026-09-02) was green: R8 had renamed classes all
 around while `QuickActionsBridge` kept its name, and registering a shortcut and
-receiving a warm and a cold tap both worked — so the recipe as written above is
+receiving a warm and a cold tap both worked — so that `proguard-user.txt` recipe is
 what CI holds on every push, and stripping High needed no `link.xml`.
 
 **Resources (`shrinkResources`) — icons.** Icon drawables are reached *only*

@@ -2615,8 +2615,10 @@ jobs:
   # `continue-on-error` keeps a red one from failing the workflow RUN; the
   # job's own check still shows its red X (job-level continue-on-error changes
   # the run's conclusion, never the job's), so a `*-xcode27` name must never
-  # become a required check. The two original legs are untouched — what to do
-  # with them is a decision deferred to October 2026 (see
+  # become a required check. The two original legs stay — decided 2026-10-01:
+  # 2022.3 cannot adopt the scene lifecycle without the XLTS patch, so its
+  # Xcode 27 build is declared unsupported and macos-15 remains the leg that
+  # proves the export compiles (see
   # docs~/ios-toolchain-and-ui-test-research-2026-09.md).
   ios-simulator:
     name: ios simulator (${{ matrix.target.name }})
@@ -3292,13 +3294,20 @@ jobs:
               *"QA-COEX: DONE"*) ;;
               *) echo "::error::$label — the probe never finished"; fail_dump "$file"; exit 1 ;;
             esac
+            # A PASS name is matched whole — a substring would let
+            # "PASS cold-warm-dedup-completion-once" satisfy "PASS cold-warm-dedup" —
+            # so a space (category-load-ran appends " order=..."), a line end or the
+            # end of the capture must follow it. Other lines stay substring matches.
             for want in "$@"; do
-              case "$text" in
-                *"$want"*) ;;
-                *)
-                  echo "::error::$label — missing required line: $want"
-                  fail_dump "$file"; exit 1 ;;
+              found=
+              case "$want" in
+                "QA-COEX: PASS "*) case "$text" in *"$want"[$' \r\n']*|*"$want") found=1 ;; esac ;;
+                *)                 case "$text" in *"$want"*) found=1 ;; esac ;;
               esac
+              if [ -z "$found" ]; then
+                echo "::error::$label — missing required line: $want"
+                fail_dump "$file"; exit 1
+              fi
             done
             echo "$label — every required line present"
           }
