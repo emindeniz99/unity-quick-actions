@@ -23,8 +23,9 @@ namespace EminDeniz99.QuickActions
         public string Title;
 
         /// <summary>
-        /// Secondary line under the title. Rendered on iOS; on Android it is used
-        /// as the shortcut's long label.
+        /// Secondary line under the title on iOS. On Android it is the shortcut's
+        /// long label, which the launcher shows in place of <see cref="Title"/> when
+        /// it is set — so localize subtitles too, not only titles.
         /// </summary>
         public string Subtitle;
 

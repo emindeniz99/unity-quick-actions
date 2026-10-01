@@ -552,7 +552,7 @@ Call every member from the main thread: in a player and in Play Mode, the member
 
 | Field | Purpose |
 |-------|---------|
-| `Id` (required, unique) / `Title` (required) / `Subtitle` | Labels. `Subtitle` renders under the title on iOS and as the Android long label. In **static** (baked) items both may embed build-time `{placeholders}` — see [Build-time placeholders](#build-time-placeholders--app-info-on-long-press). |
+| `Id` (required, unique) / `Title` (required) / `Subtitle` | Labels. `Subtitle` renders under the title on iOS; on Android it is the long label, which the launcher shows in place of `Title` when it is set — so localize subtitles too, not only titles. In **static** (baked) items both may embed build-time `{placeholders}` — see [Build-time placeholders](#build-time-placeholders--app-info-on-long-press). |
 | `Icon` (`IconType`) | Built-in glyph catalog (29 entries). iOS uses Apple's system icons — nothing to ship. Android resolves a drawable by name — your `ic_quickaction_<name>` first, then the package's own `ic_quickaction_builtin_<name>`: **four ship built in** (`Add`, `Compose`, `Favorite`, `Play`), the other 25 need a drawable **you add**. Without one the launcher shows a blank square. See [Android icons](#android-icons). |
 | `IosSystemImage` | SF Symbol name (`"star.fill"`, iOS 13+) — beats `IosTemplateImage` and `Icon`. Ignored on Android. |
 | `IosTemplateImage` | Template-image name shipped in the Xcode bundle (single-color, ~35×35 pt) — beats `Icon`. Ignored on Android. |
