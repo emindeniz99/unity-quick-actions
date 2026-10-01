@@ -3292,13 +3292,20 @@ jobs:
               *"QA-COEX: DONE"*) ;;
               *) echo "::error::$label — the probe never finished"; fail_dump "$file"; exit 1 ;;
             esac
+            # A PASS name is matched whole — a substring would let
+            # "PASS cold-warm-dedup-completion-once" satisfy "PASS cold-warm-dedup" —
+            # so a space (category-load-ran appends " order=..."), a line end or the
+            # end of the capture must follow it. Other lines stay substring matches.
             for want in "$@"; do
-              case "$text" in
-                *"$want"*) ;;
-                *)
-                  echo "::error::$label — missing required line: $want"
-                  fail_dump "$file"; exit 1 ;;
+              found=
+              case "$want" in
+                "QA-COEX: PASS "*) case "$text" in *"$want"[$' \r\n']*|*"$want") found=1 ;; esac ;;
+                *)                 case "$text" in *"$want"*) found=1 ;; esac ;;
               esac
+              if [ -z "$found" ]; then
+                echo "::error::$label — missing required line: $want"
+                fail_dump "$file"; exit 1
+              fi
             done
             echo "$label — every required line present"
           }
