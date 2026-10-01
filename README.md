@@ -1065,6 +1065,11 @@ having adopted the scene lifecycle even without a manifest (measured — UIKit
 called the CI mock host's override on the manifest-less 2022.3 export), while
 this package gates every scene hook on the manifest, so such an app gets the
 scene lifecycle and no scene hooks, and quick actions do nothing.
+A third rule covers the manifest-less app-delegate lifecycle: if you override
+`application:performActionForShortcutItem:completionHandler:`, call `[super …]`
+there too — our warm-tap handler is installed on `UnityAppController`, so an
+override that does not chain to it swallows every warm tap. (Under the scene
+manifest UIKit routes warm taps to `UnityScene` and never calls that selector.)
 
 **Two shapes are unsupported.** In **Unity as a Library** the host owns the
 `UIApplicationDelegate` and `UnityAppController` is reachable only through
