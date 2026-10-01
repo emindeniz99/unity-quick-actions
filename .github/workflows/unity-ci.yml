@@ -2615,8 +2615,10 @@ jobs:
   # `continue-on-error` keeps a red one from failing the workflow RUN; the
   # job's own check still shows its red X (job-level continue-on-error changes
   # the run's conclusion, never the job's), so a `*-xcode27` name must never
-  # become a required check. The two original legs are untouched — what to do
-  # with them is a decision deferred to October 2026 (see
+  # become a required check. The two original legs stay — decided 2026-10-01:
+  # 2022.3 cannot adopt the scene lifecycle without the XLTS patch, so its
+  # Xcode 27 build is declared unsupported and macos-15 remains the leg that
+  # proves the export compiles (see
   # docs~/ios-toolchain-and-ui-test-research-2026-09.md).
   ios-simulator:
     name: ios simulator (${{ matrix.target.name }})

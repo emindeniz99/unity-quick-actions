@@ -898,6 +898,12 @@ their tokens show raw there.
   off the normal path. **If you are on 2022.3 and must build under Xcode 27, the
   supported route is Unity 6** (`6000.0.68f1+` or `6000.3.8f1+`): both are in
   Hub's catalog, free on Personal, and inside their standard support window.
+  Until then a 2022.3 project ships through Xcode 26 (App Store Connect's floor
+  since 2026-04-28), and April 2027 — when the iOS 27 SDK becomes mandatory for
+  uploads — is the date by which it has to have moved: the `2022.3-xcode27`
+  canary is that failure, run weekly. CI compiles the 2022.3 export under
+  Xcode 16.4 (`macos-15`) and Xcode 27, not 26, so the toolchain a 2022.3 app
+  ships with today is one this repo does not exercise.
 - **Android** — `Plugins/Android/QuickActionsBridge.java` builds `ShortcutInfo`s
   whose intents target `QuickActionsTrampolineActivity`. The trampoline records
   the tapped id and brings the Unity activity forward.
