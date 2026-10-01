@@ -1118,27 +1118,28 @@ unaffected.)
 ### Known limits — Android minification (R8/ProGuard + resource shrinking)
 
 **Code (R8/ProGuard).** The C# runtime reaches the Java helper `com.emindeniz99.quickactions.QuickActionsBridge`
-**by name** over JNI. If you build a **minified** dev/QA build (Player Settings ▸
-Publishing Settings ▸ *Minify*), R8 can rename or strip that non-manifest class, and
-the JNI lookup then fails so shortcuts silently don't get set. Enable *Publishing
-Settings ▸ Minify ▸ Custom Proguard File* (Unity creates
-`Assets/Plugins/Android/proguard-user.txt`; the file alone is not documented as
-enough) and add a keep rule to it:
+**by name** over JNI, so in a **minified** build (Player Settings ▸ Publishing
+Settings ▸ *Minify*) R8 would strip or rename that non-manifest class and the JNI
+lookup would fail, leaving shortcuts silently unset. The package now adds the keep
+rule for you: every Android build with the define on appends
 
 ```proguard
 -keep class com.emindeniz99.quickactions.** { *; }
 ```
 
-(The trampoline `<activity>` is kept automatically because it's declared in the
-manifest — only the JNI-only bridge needs this. Most dev builds don't enable
-minification, so this only matters if yours does.)
+to `unityLibrary/proguard-unity.txt` in the generated Gradle project (once — an
+Append build does not duplicate it). Headless tests cover that the line is written;
+no minified build has yet run with this automatic rule alone, so keeping the same
+line in a *Custom Proguard File* (`Assets/Plugins/Android/proguard-user.txt`) is
+harmless and is what the CI leg below exercises. (The trampoline `<activity>` is
+kept anyway because it's declared in the manifest.)
 
 CI's `android smoke (2022.3-release)` leg builds the 2022.3 testbed as a release
 player — Managed Stripping Level **High**, `minifyRelease` (R8) on, with that
 exact `proguard-user.txt` and nothing else — and then runs the emulator smoke on
 that APK. Its first run (2026-09-02) was green: R8 had renamed classes all
 around while `QuickActionsBridge` kept its name, and registering a shortcut and
-receiving a warm and a cold tap both worked — so the recipe as written above is
+receiving a warm and a cold tap both worked — so that `proguard-user.txt` recipe is
 what CI holds on every push, and stripping High needed no `link.xml`.
 
 **Resources (`shrinkResources`) — icons.** Icon drawables are reached *only*
