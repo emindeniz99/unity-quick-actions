@@ -1144,6 +1144,27 @@ namespace EminDeniz99.QuickActions.Tests
         }
 
         [Test]
+        public void Locale_SetToNull_RestoresTheDeviceDefault_AndRePushesOnce()
+        {
+            // WHY: null used to mean "base text only", so nothing public could get
+            // back to the device language once an app had picked one.
+            var device = QuickActionLocalization.FromSystemLanguage(Application.systemLanguage);
+            var fake = new FakeBridge();
+            QuickActions.OverrideBridgeForTesting(fake);
+            try
+            {
+                Assert.IsTrue(QuickActions.Add(Item("play", "Play")));
+                QuickActions.Locale = device == "fr" ? "de" : "fr";
+                var pushes = fake.SetCount;
+
+                QuickActions.Locale = null;
+                Assert.AreEqual(device, QuickActions.Locale);
+                Assert.AreEqual(pushes + 1, fake.SetCount, "back to the device language re-renders once");
+            }
+            finally { QuickActions.OverrideBridgeForTesting(null); }
+        }
+
+        [Test]
         public void Reconcile_RestoresBaseTextAndTables_AndRefreshesAStaleLanguageExactlyOnce()
         {
             // WHY (the feature's core promise): the app was killed, the user changed

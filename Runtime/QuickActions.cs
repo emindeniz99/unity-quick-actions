@@ -185,7 +185,8 @@ namespace EminDeniz99.QuickActions
         /// <see cref="QuickActionItem.LocalizedSubtitles"/> — a BCP-47-ish tag
         /// ("fr", "pt-BR"). Defaults to the device language
         /// (<see cref="Application.systemLanguage"/> mapped to an ISO code;
-        /// languages outside the mapping answer "en").
+        /// languages outside the mapping answer "en"). Assigning <c>null</c>
+        /// returns to that device default; the empty string means "base text only".
         ///
         /// Assign it when the app has its own language picker: a <b>different</b>
         /// value re-pushes the installed shortcuts immediately, so their labels
@@ -203,7 +204,7 @@ namespace EminDeniz99.QuickActions
             get => _locale ??= QuickActionLocalization.FromSystemLanguage(Application.systemLanguage);
             set
             {
-                var next = value ?? string.Empty;
+                var next = value ?? QuickActionLocalization.FromSystemLanguage(Application.systemLanguage);
                 if (string.Equals(Locale, next, StringComparison.OrdinalIgnoreCase))
                     return; // no observable difference — don't spend an OS write on it
                 _locale = next;
