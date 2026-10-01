@@ -523,6 +523,8 @@ assembly entirely.
 
 ### API
 
+Call every member from the main thread: in a player and in Play Mode, the members that touch the shortcut set or the OS throw `InvalidOperationException` from any other thread.
+
 | Member | Purpose |
 |--------|---------|
 | `bool IsPlatformSupported` | True on a supported device; false in-Editor **and on Android < 7.1 / API 25** (all calls are safe no-ops there — in-Editor, use the [Simulator](#test-in-the-editor--no-device-needed)). |
@@ -530,7 +532,7 @@ assembly entirely.
 | `event Action<string> Performed` | Tapped action id (main thread; includes cold launch). |
 | `string LastPerformed` | Id the app was last launched/resumed from, or null. |
 | `void ResetLastPerformed()` | Clear `LastPerformed`. |
-| `bool Add(QuickActionItem)` | Add one; false if invalid, id already added, or the OS set couldn't be read / the OS rejected the write (transient — retry later). A `null` item throws `ArgumentNullException` — the only way any call here throws. |
+| `bool Add(QuickActionItem)` | Add one; false if invalid, id already added, or the OS set couldn't be read / the OS rejected the write (transient — retry later). A `null` item throws `ArgumentNullException`. |
 | `void AddList(IList<QuickActionItem>)` | Add several in one OS update (same transient no-op cases as `Add`; a `null` list throws). |
 | `bool SetList(IList<QuickActionItem>)` | Make the set **exactly** this list, in one call — clear, then add. False, having changed **nothing**, when the OS set couldn't be read or the clear was refused (the previous set is still live; retry later). Not atomic: between the two steps there are no quick actions. False can also mean the clear landed but the OS refused the add — the set may then be empty; retry. Invalid/duplicate items are skipped and the OS may still drop ids to fit the budget, as with `AddList` — `GetAll()` is the authority. A `null` list throws. |
 | `List<QuickActionItem> GetAll()` | Snapshot of the currently installed dynamic actions (OS-reconciled). |

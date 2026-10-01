@@ -87,6 +87,30 @@ namespace EminDeniz99.QuickActions.Tests
         }
 
         [Test]
+        public void Add_FromAnotherThread_ThrowsOnceTheMainThreadIsKnown()
+        {
+            // WHY a throw: the facade is not synchronized, and a log from a worker
+            // thread is easy to miss while the list it raced is silently corrupted.
+            QuickActions._mainThreadId = System.Threading.Thread.CurrentThread.ManagedThreadId;
+            try
+            {
+                // A real Thread, not Task.Run: Wait() may inline a task on this thread.
+                System.Exception thrown = null;
+                var worker = new System.Threading.Thread(() =>
+                {
+                    try { QuickActions.Add(Item("a")); }
+                    catch (System.Exception e) { thrown = e; }
+                });
+                worker.Start();
+                worker.Join();
+                Assert.IsInstanceOf<System.InvalidOperationException>(thrown);
+                StringAssert.Contains("QuickActions.Add", thrown.Message);
+                Assert.IsTrue(QuickActions.Add(Item("a")), "the main thread itself is unaffected");
+            }
+            finally { QuickActions._mainThreadId = null; }
+        }
+
+        [Test]
         public void AddList_SkipsInvalidAndDuplicates()
         {
             QuickActions.Add(Item("a"));

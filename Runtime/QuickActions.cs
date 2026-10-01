@@ -17,7 +17,8 @@ namespace EminDeniz99.QuickActions
     /// (poll it at startup for cold launches).
     ///
     /// This is a process-wide singleton (one shortcut set per app). Call its API
-    /// from the <b>main thread</b> only (it is not internally synchronized). On
+    /// from the <b>main thread</b> only (it is not internally synchronized; at
+    /// runtime a call from another thread throws <see cref="InvalidOperationException"/>). On
     /// first access the in-memory list is reconciled with the <b>dynamic</b>
     /// shortcuts the OS already has (from a previous session), so
     /// <see cref="GetAll"/> / <see cref="IsAdded"/> stay accurate across launches;
@@ -49,6 +50,10 @@ namespace EminDeniz99.QuickActions
         private static bool _refreshRetryArmed;
 
         private static IQuickActionsBridge Bridge => _bridge ??= QuickActionsBridgeFactory.Create();
+
+        // Unity's main thread, captured by QuickActionsRuntime.Bootstrap. Null in
+        // edit mode and the dotnet harness, where RequireMainThread checks nothing.
+        internal static int? _mainThreadId;
 
         /// <summary>
         /// On first list access, seed the in-memory set from the <b>dynamic</b>
@@ -201,9 +206,14 @@ namespace EminDeniz99.QuickActions
         /// </summary>
         public static string Locale
         {
-            get => _locale ??= QuickActionLocalization.FromSystemLanguage(Application.systemLanguage);
+            get
+            {
+                RequireMainThread(nameof(Locale));
+                return _locale ??= QuickActionLocalization.FromSystemLanguage(Application.systemLanguage);
+            }
             set
             {
+                RequireMainThread(nameof(Locale));
                 var next = value ?? QuickActionLocalization.FromSystemLanguage(Application.systemLanguage);
                 if (string.Equals(Locale, next, StringComparison.OrdinalIgnoreCase))
                     return; // no observable difference — don't spend an OS write on it
@@ -244,7 +254,14 @@ namespace EminDeniz99.QuickActions
         }
 
         /// <summary>True on a device that supports quick actions; false in-Editor.</summary>
-        public static bool IsPlatformSupported => Bridge.IsPlatformSupported;
+        public static bool IsPlatformSupported
+        {
+            get
+            {
+                RequireMainThread(nameof(IsPlatformSupported));
+                return Bridge.IsPlatformSupported;
+            }
+        }
 
         /// <summary>
         /// How many shortcuts the OS accepts/shows for this app. Android:
@@ -258,14 +275,28 @@ namespace EminDeniz99.QuickActions
         /// published outside this API — so fewer slots may actually be free for
         /// your dynamic items. 0 in the Editor / on unsupported platforms.
         /// </summary>
-        public static int MaxShortcutCount => Bridge.MaxShortcutCount;
+        public static int MaxShortcutCount
+        {
+            get
+            {
+                RequireMainThread(nameof(MaxShortcutCount));
+                return Bridge.MaxShortcutCount;
+            }
+        }
 
         /// <summary>
         /// True when the launcher can pin shortcuts to the home screen
         /// (Android 8.0+ with a compatible launcher). Always false on iOS (no
         /// pinned-shortcut concept) and in the Editor.
         /// </summary>
-        public static bool IsPinSupported => Bridge.IsPinSupported;
+        public static bool IsPinSupported
+        {
+            get
+            {
+                RequireMainThread(nameof(IsPinSupported));
+                return Bridge.IsPinSupported;
+            }
+        }
 
         /// <summary>
         /// True while Android is rate-limiting this app's shortcut writes — the
@@ -280,7 +311,14 @@ namespace EminDeniz99.QuickActions
         /// iOS (no throttle exists) and in the Editor.
         /// </para>
         /// </summary>
-        public static bool IsRateLimitingActive => Bridge.IsRateLimitingActive;
+        public static bool IsRateLimitingActive
+        {
+            get
+            {
+                RequireMainThread(nameof(IsRateLimitingActive));
+                return Bridge.IsRateLimitingActive;
+            }
+        }
 
         /// <summary>
         /// Ask the launcher to pin the added quick action with this id to the home
@@ -292,6 +330,7 @@ namespace EminDeniz99.QuickActions
         /// </summary>
         public static bool RequestPin(string id)
         {
+            RequireMainThread(nameof(RequestPin));
             if (string.IsNullOrEmpty(id))
                 return false;
             if (!IsAdded(id))
@@ -320,6 +359,7 @@ namespace EminDeniz99.QuickActions
         /// </summary>
         public static bool ReportUsed(string id)
         {
+            RequireMainThread(nameof(ReportUsed));
             if (string.IsNullOrEmpty(id))
                 return false;
             if (!IsAdded(id))
@@ -347,6 +387,7 @@ namespace EminDeniz99.QuickActions
         {
             get
             {
+                RequireMainThread(nameof(LastPerformed));
 #if UNITY_EDITOR
                 // The in-Editor Simulator records simulated taps here (there is no
                 // native bridge in the Editor), so LastPerformed is realistic too.
@@ -370,6 +411,7 @@ namespace EminDeniz99.QuickActions
         /// <summary>Clear the persisted <see cref="LastPerformed"/> id.</summary>
         public static void ResetLastPerformed()
         {
+            RequireMainThread(nameof(ResetLastPerformed));
 #if UNITY_EDITOR
             _editorSimulatedLastPerformed = null;
 #endif
@@ -501,6 +543,7 @@ namespace EminDeniz99.QuickActions
         /// <exception cref="ArgumentNullException">The item is null.</exception>
         public static bool Add(QuickActionItem item)
         {
+            RequireMainThread(nameof(Add));
             if (item == null)
                 throw new ArgumentNullException(nameof(item));
             if (!EnsureLoaded())
@@ -556,7 +599,11 @@ namespace EminDeniz99.QuickActions
         /// already exist are skipped. If the current OS shortcuts can't be read, or
         /// the OS rejects the write, nothing is added (retry later).
         /// </summary>
-        public static void AddList(IList<QuickActionItem> items) => TryAddList(items);
+        public static void AddList(IList<QuickActionItem> items)
+        {
+            RequireMainThread(nameof(AddList));
+            TryAddList(items);
+        }
 
         // AddList's body, returning false when nothing could be written (unreadable
         // set, refused push) so SetList can report it; AddList itself stays void.
@@ -629,6 +676,7 @@ namespace EminDeniz99.QuickActions
         /// <exception cref="ArgumentNullException">The list is null.</exception>
         public static bool SetList(IList<QuickActionItem> items)
         {
+            RequireMainThread(nameof(SetList));
             if (items == null)
                 throw new ArgumentNullException(nameof(items));
 
@@ -657,6 +705,7 @@ namespace EminDeniz99.QuickActions
         /// <summary>Snapshot of the currently installed quick actions.</summary>
         public static List<QuickActionItem> GetAll()
         {
+            RequireMainThread(nameof(GetAll));
             EnsureLoaded();
             // Return copies so a caller mutating the results can't change internal state.
             return _items.ConvertAll(a => a.Copy());
@@ -665,6 +714,7 @@ namespace EminDeniz99.QuickActions
         /// <summary>The added action with this id, or null.</summary>
         public static QuickActionItem GetById(string id)
         {
+            RequireMainThread(nameof(GetById));
             if (string.IsNullOrEmpty(id))
                 return null;
             EnsureLoaded();
@@ -699,6 +749,7 @@ namespace EminDeniz99.QuickActions
         /// <exception cref="ArgumentNullException">The item is null.</exception>
         public static bool Update(QuickActionItem item)
         {
+            RequireMainThread(nameof(Update));
             if (item == null)
                 throw new ArgumentNullException(nameof(item));
             if (!EnsureLoaded())
@@ -759,6 +810,7 @@ namespace EminDeniz99.QuickActions
         /// </summary>
         public static bool RemoveById(string id)
         {
+            RequireMainThread(nameof(RemoveById));
             if (string.IsNullOrEmpty(id))
                 return false;
             if (!EnsureLoaded())
@@ -793,6 +845,7 @@ namespace EminDeniz99.QuickActions
         /// </summary>
         public static void RemoveAll()
         {
+            RequireMainThread(nameof(RemoveAll));
             // Clear the OS first; only drop our in-memory state if the removal actually
             // landed. If the native remove fails (throws, or reports false on a locked
             // profile), keep the list so we don't falsely mark ourselves empty while the
@@ -814,6 +867,7 @@ namespace EminDeniz99.QuickActions
         /// <summary>True if an action with this id is added.</summary>
         public static bool IsAdded(string id)
         {
+            RequireMainThread(nameof(IsAdded));
             if (string.IsNullOrEmpty(id))
                 return false;
             EnsureLoaded();
@@ -919,6 +973,14 @@ namespace EminDeniz99.QuickActions
                 if (it != null) keep.Add(it.Id);
             _items.RemoveAll(it => !keep.Contains(it.Id));
             return true;
+        }
+
+        // A throw, not a log: Unity's own API throws off the main thread too, and a
+        // throw fails on the developer's machine the first time instead of being missed.
+        private static void RequireMainThread(string api)
+        {
+            if (_mainThreadId.HasValue && _mainThreadId.Value != System.Threading.Thread.CurrentThread.ManagedThreadId)
+                throw new InvalidOperationException($"QuickActions.{api} must be called from the main thread.");
         }
 
         private static void Log(string message)

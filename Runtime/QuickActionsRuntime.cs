@@ -32,6 +32,7 @@ namespace EminDeniz99.QuickActions
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         private static void Bootstrap()
         {
+            QuickActions._mainThreadId = System.Threading.Thread.CurrentThread.ManagedThreadId;
             if (_instance != null)
                 return;
 
