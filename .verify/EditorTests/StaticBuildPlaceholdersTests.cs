@@ -120,6 +120,20 @@ namespace EminDeniz99.QuickActions.Tests
         }
 
         [Test]
+        public void ApplicationId_IsReadFromEitherGradleSpelling()
+        {
+            // The Android post-processor overrides {bundleId} (and the trampoline's
+            // package) with launcher/build.gradle's applicationId, which Groovy
+            // accepts with or without '='; Unity's own template uses the first.
+            Assert.AreEqual("com.real.app",
+                QuickActionsBuildPostProcessorAndroid.ParseApplicationId("    applicationId 'com.real.app'\n"));
+            Assert.AreEqual("com.real.app",
+                QuickActionsBuildPostProcessorAndroid.ParseApplicationId("    applicationId = \"com.real.app\"\n"));
+            Assert.IsNull(QuickActionsBuildPostProcessorAndroid.ParseApplicationId(
+                "    applicationIdSuffix \".dev\"\n"), "a suffix is not the id");
+        }
+
+        [Test]
         public void KnownPlaceholders_CoversBuiltinsAndCustoms_ForValidation()
         {
             // The settings-page validator flags only names NEITHER built-in NOR

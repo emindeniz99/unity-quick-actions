@@ -231,10 +231,9 @@ namespace EminDeniz99.QuickActions.Editor
                 var gradle = Path.GetFullPath(Path.Combine(unityLibraryPath, "..", "launcher", "build.gradle"));
                 if (File.Exists(gradle))
                 {
-                    var m = System.Text.RegularExpressions.Regex.Match(
-                        File.ReadAllText(gradle), @"applicationId\s+['""]([^'""]+)['""]");
-                    if (m.Success)
-                        return m.Groups[1].Value;
+                    var id = ParseApplicationId(File.ReadAllText(gradle));
+                    if (id != null)
+                        return id;
                 }
             }
             catch
@@ -242,6 +241,15 @@ namespace EminDeniz99.QuickActions.Editor
                 // fall through to the Player setting
             }
             return PlayerSettings.applicationIdentifier;
+        }
+
+        // Both Gradle spellings, `applicationId "x"` and `applicationId = "x"`; null
+        // when neither is present (`applicationIdSuffix` is not a match).
+        internal static string ParseApplicationId(string gradleText)
+        {
+            var m = System.Text.RegularExpressions.Regex.Match(
+                gradleText, @"applicationId\s*=?\s*['""]([^'""]+)['""]");
+            return m.Success ? m.Groups[1].Value : null;
         }
 
         private static bool HasLauncherActivity(string manifestPath)
