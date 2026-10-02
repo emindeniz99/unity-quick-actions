@@ -812,10 +812,9 @@ void _QuickActions_SetShortcuts(const char *json) {
             // Every unmarked item is preserved — a host app's / other plugin's live
             // shortcut, even one whose `type` collides with an id we're writing. On a
             // collision the id then renders twice, the honest result of two publishers
-            // claiming one id; we never adopt or drop an item we didn't mark. (This is
-            // the first release, so there is no pre-marker build of this package whose
-            // unmarked leftovers would need migrating — the static plist path in
-            // QuickActionsBuildPostProcessoriOS makes the same call.)
+            // claiming one id; we never adopt or drop an item we didn't mark. (No release
+            // predates the marker, so there are no unmarked leftovers to migrate; the
+            // static plist path in QuickActionsBuildPostProcessoriOS makes the same call.)
             [merged addObject:item];
         }
         [merged addObjectsFromArray:ours];
