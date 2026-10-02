@@ -17,9 +17,9 @@ name: unity
 # did, which is the one thing the plain simulator leg (process still alive)
 # cannot see. A third iOS job, `ios-springboard`, drives SpringBoard itself
 # with an unsigned XCUITest bundle (`tools~/ios-ui`): long-press the icon, tap
-# a quick action, read the id back from the app — twice per leg, once on a row
-# Info.plist baked in and once on a row QuickActions.Add published while the app
-# ran. One further Android leg,
+# a quick action, read the id back from the app — three passes per leg: a row
+# Info.plist baked in, a row QuickActions.Add published while the app ran, and
+# a warm re-entry into an app that is already running. One further Android leg,
 # `android-shrink-verify`, exports the
 # Gradle project on 2022.3 and runs the resource shrinker's own task
 # (`:launcher:shrinkReleaseRes`, never assembleRelease), reading the stripped
@@ -31,7 +31,9 @@ name: unity
 # `android-build-profile` builds Testbed6 with the define only in an active
 # Build Profile, README's Unity 6 setup, and requires the package in that APK.
 #
-# EVERY leg runs on every code push and PR — the EditMode tests (three pinned
+# Every leg runs on every code push and PR, except the xcode-27 canary legs
+# and `ios-crossrun`, which run on the weekly cron and workflow_dispatch only
+# (see `ios-simulator`'s matrix comment) — the EditMode tests (three pinned
 # testbed legs plus a unity6-latest canary that resolves the newest Unity 6
 # GameCI image at run time and upgrade-opens Testbed6 with it) and the
 # build-heavy ones alike: Android IL2CPP, the emulator smoke, the iOS export
@@ -135,10 +137,11 @@ name: unity
 #     in waves (t=3, 6, 9, 11, 12, 18, 23) behind GitHub's concurrent-macOS
 #     cap, and the two longest are the springboard taps: unity6-xcode27 at
 #     12→35 and unity6 at 12→34.
-# The single biggest remaining cost is therefore a CANARY that gates nothing:
+# The single biggest remaining cost was therefore a CANARY that gates nothing:
 # ios springboard tap (unity6-xcode27), 23 minutes, holding a macOS slot on
-# every PR. Four xcode-27 canary legs do that between them. Moving them to the
-# weekly cron is the next change, and this measurement is why.
+# every PR. Four xcode-27 canary legs did that between them. Moving them to the
+# weekly cron was the next change, and this measurement is why; it is done,
+# see `ios-simulator`'s matrix comment.
 # Every Unity job on run 103 still logged "Successfully returned ULF license"
 # under full parallelism, which is the one thing the un-chain could have broken.
 #
@@ -1360,9 +1363,9 @@ jobs:
           print("----- end -----")
           PY
       # The toolchain the export actually expects, supplied rather than hoped
-      # for. Gradle 7.2 is the version Unity 2022.3 bundles (the export ships
-      # no wrapper to say so itself); sha256 is the published value from
-      # services.gradle.org/distributions/gradle-7.2-bin.zip.sha256. NDK r23b
+      # for. The Gradle version is the one the export's wrapper properties name
+      # (derived from its AGP coordinate when they are absent); its sha256 is
+      # fetched at run time from services.gradle.org. NDK r23b
       # (23.1.7779620) is what Unity 2022.3 compiles IL2CPP with, and the
       # export's BuildIl2CppTask needs a real NDK at gradle time.
       - name: Pin the toolchain the export expects (Gradle from the export, NDK r23b)
@@ -1549,9 +1552,9 @@ jobs:
           echo "--- local.properties ---"
           cat local.properties
           # Prefer a wrapper if the export ever ships one; otherwise use the
-          # pinned Gradle 7.2 — NEVER the runner's system gradle, whose major
-          # version drifts (9.x today, which cannot load AGP 7.1.2; the first
-          # run died exactly there).
+          # Gradle the pin step downloaded (PINNED_GRADLE) — NEVER the runner's
+          # system gradle, whose major version drifts (9.x today, which cannot
+          # load the export's AGP; the first run died exactly there).
           if [ -f ./gradlew ]; then
             chmod +x ./gradlew
             GRADLE_CMD=./gradlew
