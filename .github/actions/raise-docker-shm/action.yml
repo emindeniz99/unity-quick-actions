@@ -1,0 +1,34 @@
+name: Raise Docker's default shared memory
+description: >-
+  Raise the Docker daemon's default /dev/shm to 2g so a containerised Unity
+  6000.6+ editor can start.
+runs:
+  using: composite
+  steps:
+    # Unity 6000.6's editor asks for 1 GB of /dev/shm at start-up (its asset
+    # database's UDS client: "Requested 1073741824 bytes, but only 67108864
+    # available … run the container with --shm-size=1025M") and aborts without
+    # it; Docker's default is 64 MB and GameCI's actions pass no --shm-size, so
+    # the daemon's default is raised instead. Merged into the runner's existing
+    # daemon.json rather than overwriting it (the image ships cgroup settings
+    # there). Same step in every job that runs an editor in a container — the
+    # unity6-latest canary was the first to hit it (run 37, 2026-09-01), and
+    # the pinned legs will the day a testbed moves to 6.6+.
+    - shell: bash
+      run: |
+        set -euo pipefail
+        python3 - <<'PY'
+        import json
+        import os
+
+        path = "/etc/docker/daemon.json"
+        cfg = json.load(open(path)) if os.path.exists(path) else {}
+        cfg["default-shm-size"] = "2g"
+        with open("daemon.json.new", "w") as f:
+            json.dump(cfg, f, indent=2)
+        print(json.dumps(cfg, indent=2))
+        PY
+        sudo mv daemon.json.new /etc/docker/daemon.json
+        sudo systemctl restart docker
+        docker info --format '{{.Name}}: docker restarted, default shm raised' \
+          || { echo "docker did not come back after the restart"; exit 1; }

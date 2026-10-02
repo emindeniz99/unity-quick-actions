@@ -172,6 +172,7 @@ on:
       - "tools~/device-smoke/**"
       - "tools~/ios-ui/**"
       - ".github/workflows/unity-ci.yml"
+      - ".github/actions/**"
   pull_request:
     paths:
       - "Runtime/**"
@@ -184,6 +185,7 @@ on:
       - "tools~/device-smoke/**"
       - "tools~/ios-ui/**"
       - ".github/workflows/unity-ci.yml"
+      - ".github/actions/**"
 
 permissions:
   contents: read
@@ -262,33 +264,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      # Unity 6000.6's editor asks for 1 GB of /dev/shm at start-up (its asset
-      # database's UDS client: "Requested 1073741824 bytes, but only 67108864
-      # available … run the container with --shm-size=1025M") and aborts without
-      # it; Docker's default is 64 MB and GameCI's actions pass no --shm-size, so
-      # the daemon's default is raised instead. Merged into the runner's existing
-      # daemon.json rather than overwriting it (the image ships cgroup settings
-      # there). Same step in every job that runs an editor in a container — the
-      # unity6-latest canary was the first to hit it (run 37, 2026-09-01), and
-      # the pinned legs will the day a testbed moves to 6.6+.
       - name: Give Unity's container the shared memory 6000.6+ needs
-        run: |
-          set -euo pipefail
-          python3 - <<'PY'
-          import json
-          import os
-
-          path = "/etc/docker/daemon.json"
-          cfg = json.load(open(path)) if os.path.exists(path) else {}
-          cfg["default-shm-size"] = "2g"
-          with open("daemon.json.new", "w") as f:
-              json.dump(cfg, f, indent=2)
-          print(json.dumps(cfg, indent=2))
-          PY
-          sudo mv daemon.json.new /etc/docker/daemon.json
-          sudo systemctl restart docker
-          docker info --format '{{.Name}}: docker restarted, default shm raised' \
-            || { echo "docker did not come back after the restart"; exit 1; }
+        uses: ./.github/actions/raise-docker-shm
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ matrix.testbed.path }}/Library
@@ -403,33 +380,8 @@ jobs:
           print("resolved Unity %s" % best, file=sys.stderr)
           print("version=%s" % best)
           PY
-      # Unity 6000.6's editor asks for 1 GB of /dev/shm at start-up (its asset
-      # database's UDS client: "Requested 1073741824 bytes, but only 67108864
-      # available … run the container with --shm-size=1025M") and aborts without
-      # it; Docker's default is 64 MB and GameCI's actions pass no --shm-size, so
-      # the daemon's default is raised instead. Merged into the runner's existing
-      # daemon.json rather than overwriting it (the image ships cgroup settings
-      # there). Same step in every job that runs an editor in a container — the
-      # unity6-latest canary was the first to hit it (run 37, 2026-09-01), and
-      # the pinned legs will the day a testbed moves to 6.6+.
       - name: Give Unity's container the shared memory 6000.6+ needs
-        run: |
-          set -euo pipefail
-          python3 - <<'PY'
-          import json
-          import os
-
-          path = "/etc/docker/daemon.json"
-          cfg = json.load(open(path)) if os.path.exists(path) else {}
-          cfg["default-shm-size"] = "2g"
-          with open("daemon.json.new", "w") as f:
-              json.dump(cfg, f, indent=2)
-          print(json.dumps(cfg, indent=2))
-          PY
-          sudo mv daemon.json.new /etc/docker/daemon.json
-          sudo systemctl restart docker
-          docker info --format '{{.Name}}: docker restarted, default shm raised' \
-            || { echo "docker did not come back after the restart"; exit 1; }
+        uses: ./.github/actions/raise-docker-shm
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: Examples~/Testbed6/Library
@@ -596,33 +548,8 @@ jobs:
         run: |
           mkdir -p "$TESTBED/Assets/Samples/QuickActionsDemo"
           cp -R Samples~/Demo/. "$TESTBED/Assets/Samples/QuickActionsDemo/"
-      # Unity 6000.6's editor asks for 1 GB of /dev/shm at start-up (its asset
-      # database's UDS client: "Requested 1073741824 bytes, but only 67108864
-      # available … run the container with --shm-size=1025M") and aborts without
-      # it; Docker's default is 64 MB and GameCI's actions pass no --shm-size, so
-      # the daemon's default is raised instead. Merged into the runner's existing
-      # daemon.json rather than overwriting it (the image ships cgroup settings
-      # there). Same step in every job that runs an editor in a container — the
-      # unity6-latest canary was the first to hit it (run 37, 2026-09-01), and
-      # the pinned legs will the day a testbed moves to 6.6+.
       - name: Give Unity's container the shared memory 6000.6+ needs
-        run: |
-          set -euo pipefail
-          python3 - <<'PY'
-          import json
-          import os
-
-          path = "/etc/docker/daemon.json"
-          cfg = json.load(open(path)) if os.path.exists(path) else {}
-          cfg["default-shm-size"] = "2g"
-          with open("daemon.json.new", "w") as f:
-              json.dump(cfg, f, indent=2)
-          print(json.dumps(cfg, indent=2))
-          PY
-          sudo mv daemon.json.new /etc/docker/daemon.json
-          sudo systemctl restart docker
-          docker info --format '{{.Name}}: docker restarted, default shm raised' \
-            || { echo "docker did not come back after the restart"; exit 1; }
+        uses: ./.github/actions/raise-docker-shm
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ matrix.testbed.path }}/Library
@@ -1143,33 +1070,8 @@ jobs:
         run: |
           mkdir -p "$TESTBED/Assets/Samples/QuickActionsDemo"
           cp -R Samples~/Demo/. "$TESTBED/Assets/Samples/QuickActionsDemo/"
-      # Unity 6000.6's editor asks for 1 GB of /dev/shm at start-up (its asset
-      # database's UDS client: "Requested 1073741824 bytes, but only 67108864
-      # available … run the container with --shm-size=1025M") and aborts without
-      # it; Docker's default is 64 MB and GameCI's actions pass no --shm-size, so
-      # the daemon's default is raised instead. Merged into the runner's existing
-      # daemon.json rather than overwriting it (the image ships cgroup settings
-      # there). Same step in every job that runs an editor in a container — the
-      # unity6-latest canary was the first to hit it (run 37, 2026-09-01), and
-      # the pinned legs will the day a testbed moves to 6.6+.
       - name: Give Unity's container the shared memory 6000.6+ needs
-        run: |
-          set -euo pipefail
-          python3 - <<'PY'
-          import json
-          import os
-
-          path = "/etc/docker/daemon.json"
-          cfg = json.load(open(path)) if os.path.exists(path) else {}
-          cfg["default-shm-size"] = "2g"
-          with open("daemon.json.new", "w") as f:
-              json.dump(cfg, f, indent=2)
-          print(json.dumps(cfg, indent=2))
-          PY
-          sudo mv daemon.json.new /etc/docker/daemon.json
-          sudo systemctl restart docker
-          docker info --format '{{.Name}}: docker restarted, default shm raised' \
-            || { echo "docker did not come back after the restart"; exit 1; }
+        uses: ./.github/actions/raise-docker-shm
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: Examples~/Testbed2022/Library
@@ -2036,33 +1938,8 @@ jobs:
         run: |
           mkdir -p "$TESTBED/Assets/Samples/QuickActionsDemo"
           cp -R Samples~/Demo/. "$TESTBED/Assets/Samples/QuickActionsDemo/"
-      # Unity 6000.6's editor asks for 1 GB of /dev/shm at start-up (its asset
-      # database's UDS client: "Requested 1073741824 bytes, but only 67108864
-      # available … run the container with --shm-size=1025M") and aborts without
-      # it; Docker's default is 64 MB and GameCI's actions pass no --shm-size, so
-      # the daemon's default is raised instead. Merged into the runner's existing
-      # daemon.json rather than overwriting it (the image ships cgroup settings
-      # there). Same step in every job that runs an editor in a container — the
-      # unity6-latest canary was the first to hit it (run 37, 2026-09-01), and
-      # the pinned legs will the day a testbed moves to 6.6+.
       - name: Give Unity's container the shared memory 6000.6+ needs
-        run: |
-          set -euo pipefail
-          python3 - <<'PY'
-          import json
-          import os
-
-          path = "/etc/docker/daemon.json"
-          cfg = json.load(open(path)) if os.path.exists(path) else {}
-          cfg["default-shm-size"] = "2g"
-          with open("daemon.json.new", "w") as f:
-              json.dump(cfg, f, indent=2)
-          print(json.dumps(cfg, indent=2))
-          PY
-          sudo mv daemon.json.new /etc/docker/daemon.json
-          sudo systemctl restart docker
-          docker info --format '{{.Name}}: docker restarted, default shm raised' \
-            || { echo "docker did not come back after the restart"; exit 1; }
+        uses: ./.github/actions/raise-docker-shm
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: Examples~/Testbed2022/Library
@@ -2382,25 +2259,8 @@ jobs:
         run: |
           mkdir -p "$TESTBED/Assets/Samples/QuickActionsDemo"
           cp -R Samples~/Demo/. "$TESTBED/Assets/Samples/QuickActionsDemo/"
-      # Same step, same reason, as in android-build.
       - name: Give Unity's container the shared memory 6000.6+ needs
-        run: |
-          set -euo pipefail
-          python3 - <<'PY'
-          import json
-          import os
-
-          path = "/etc/docker/daemon.json"
-          cfg = json.load(open(path)) if os.path.exists(path) else {}
-          cfg["default-shm-size"] = "2g"
-          with open("daemon.json.new", "w") as f:
-              json.dump(cfg, f, indent=2)
-          print(json.dumps(cfg, indent=2))
-          PY
-          sudo mv daemon.json.new /etc/docker/daemon.json
-          sudo systemctl restart docker
-          docker info --format '{{.Name}}: docker restarted, default shm raised' \
-            || { echo "docker did not come back after the restart"; exit 1; }
+        uses: ./.github/actions/raise-docker-shm
       # android-build's unity6 cache, restored but never saved: this job leaves an
       # active Build Profile in Library whose asset is not committed.
       - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -2507,33 +2367,8 @@ jobs:
         run: |
           mkdir -p "$TESTBED/Assets/Samples/QuickActionsDemo"
           cp -R Samples~/Demo/. "$TESTBED/Assets/Samples/QuickActionsDemo/"
-      # Unity 6000.6's editor asks for 1 GB of /dev/shm at start-up (its asset
-      # database's UDS client: "Requested 1073741824 bytes, but only 67108864
-      # available … run the container with --shm-size=1025M") and aborts without
-      # it; Docker's default is 64 MB and GameCI's actions pass no --shm-size, so
-      # the daemon's default is raised instead. Merged into the runner's existing
-      # daemon.json rather than overwriting it (the image ships cgroup settings
-      # there). Same step in every job that runs an editor in a container — the
-      # unity6-latest canary was the first to hit it (run 37, 2026-09-01), and
-      # the pinned legs will the day a testbed moves to 6.6+.
       - name: Give Unity's container the shared memory 6000.6+ needs
-        run: |
-          set -euo pipefail
-          python3 - <<'PY'
-          import json
-          import os
-
-          path = "/etc/docker/daemon.json"
-          cfg = json.load(open(path)) if os.path.exists(path) else {}
-          cfg["default-shm-size"] = "2g"
-          with open("daemon.json.new", "w") as f:
-              json.dump(cfg, f, indent=2)
-          print(json.dumps(cfg, indent=2))
-          PY
-          sudo mv daemon.json.new /etc/docker/daemon.json
-          sudo systemctl restart docker
-          docker info --format '{{.Name}}: docker restarted, default shm raised' \
-            || { echo "docker did not come back after the restart"; exit 1; }
+        uses: ./.github/actions/raise-docker-shm
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ matrix.testbed.path }}/Library
@@ -2683,25 +2518,8 @@ jobs:
           mkdir -p "$TESTBED/Assets/Plugins/iOS"
           cp -R Examples~/Coexistence/iOS/. "$TESTBED/Assets/Plugins/iOS/"
           ls -la "$TESTBED/Assets/Plugins/iOS"
-      # Same shared-memory raise as every other containerised editor job.
       - name: Give Unity's container the shared memory 6000.6+ needs
-        run: |
-          set -euo pipefail
-          python3 - <<'PY'
-          import json
-          import os
-
-          path = "/etc/docker/daemon.json"
-          cfg = json.load(open(path)) if os.path.exists(path) else {}
-          cfg["default-shm-size"] = "2g"
-          with open("daemon.json.new", "w") as f:
-              json.dump(cfg, f, indent=2)
-          print(json.dumps(cfg, indent=2))
-          PY
-          sudo mv daemon.json.new /etc/docker/daemon.json
-          sudo systemctl restart docker
-          docker info --format '{{.Name}}: docker restarted, default shm raised' \
-            || { echo "docker did not come back after the restart"; exit 1; }
+        uses: ./.github/actions/raise-docker-shm
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ matrix.testbed.path }}/Library
