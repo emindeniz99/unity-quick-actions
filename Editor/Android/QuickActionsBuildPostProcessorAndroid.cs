@@ -448,15 +448,12 @@ namespace EminDeniz99.QuickActions.Editor
             strings.AppendLine("<?xml version=\"1.0\" encoding=\"utf-8\"?>");
             strings.AppendLine("<resources>");
 
-            var seen = new HashSet<string>();
+            var filter = new QuickActionsBakeFilter();
             var index = 0;
             foreach (var item in items)
             {
-                if (item == null || string.IsNullOrEmpty(item.Id) || string.IsNullOrEmpty(item.Title))
-                    continue;
-
-                if (!seen.Add(item.Id))
-                    continue; // skip genuine duplicate ids
+                if (!filter.Accepts(item))
+                    continue; // no id/title, or a duplicate id (same rule as iOS)
 
                 // Resource names are index-based so they are unique regardless of
                 // how the (raw) id is spelled; the shortcutId/action keep the raw id.

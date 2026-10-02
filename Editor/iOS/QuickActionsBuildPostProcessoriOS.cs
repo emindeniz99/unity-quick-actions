@@ -77,14 +77,12 @@ namespace EminDeniz99.QuickActions.Editor
             var items = QuickActionsPlistShortcuts.GetOrCreateArray(plist);
             items.values.RemoveAll(QuickActionsPlistShortcuts.IsOurs);
 
-            var seen = new HashSet<string>();
+            var filter = new QuickActionsBakeFilter();
             var count = 0;
             foreach (var item in shortcuts)
             {
-                if (item == null || string.IsNullOrEmpty(item.Id) || string.IsNullOrEmpty(item.Title))
-                    continue;
-                if (!seen.Add(item.Id))
-                    continue; // skip duplicate ids (parity with the Android post-processor)
+                if (!filter.Accepts(item))
+                    continue; // no id/title, or a duplicate id (same rule as Android)
 
                 var dict = items.AddDict();
                 dict.SetString("UIApplicationShortcutItemType", item.Id);
