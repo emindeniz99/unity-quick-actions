@@ -2567,9 +2567,9 @@ jobs:
   # ld_classic under Xcode 15+ was never measured here.
   # 2022.3 gets macos-15 (Xcode 16.4 default); Unity 6 gets the
   # current macos-latest (Xcode 26). The two `-xcode27` legs compile the SAME
-  # exports on GitHub's public-preview `xcode-27` image — Xcode 27.0 GA
-  # (27A266a) is the default in image 20260921.0210.1 (runner-images README);
-  # read the `xcodebuild -version` line in a leg's log for the build a result
+  # exports on GitHub's public-preview `xcode-27` image — its runner-images
+  # README lists Xcode 27.0 GA (27A266a) as the default; read the
+  # `xcodebuild -version` line in a leg's log for the build a result
   # came from — with the iOS 27 SDK that App Store uploads must use from April
   # 2027, and that no Unity line documents support for yet. They are canaries:
   # `continue-on-error` keeps a red one from failing the workflow RUN; the
