@@ -14,6 +14,7 @@ using System.IO;
 using System.Xml;
 using UnityEditor.Android;
 using UnityEngine;
+using static EminDeniz99.QuickActions.Editor.QuickActionsBuildPostProcessorAndroid;
 
 namespace EminDeniz99.QuickActions.Editor
 {
@@ -62,13 +63,6 @@ namespace EminDeniz99.QuickActions.Editor
             application.AppendChild(activity);
             doc.Save(manifestPath);
             Debug.Log("[QuickActions] Injected the trampoline <activity> into the unityLibrary manifest.");
-        }
-
-        private static void SetAndroidAttr(XmlDocument doc, XmlElement element, string name, string value)
-        {
-            var attr = doc.CreateAttribute("android", name, AndroidNs);
-            attr.Value = value;
-            element.SetAttributeNode(attr);
         }
     }
 }

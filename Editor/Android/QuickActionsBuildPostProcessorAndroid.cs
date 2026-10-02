@@ -706,7 +706,7 @@ namespace EminDeniz99.QuickActions.Editor
             return carried > 0;
         }
 
-        private static void SetAndroidAttr(XmlDocument doc, XmlElement element, string name, string value)
+        internal static void SetAndroidAttr(XmlDocument doc, XmlElement element, string name, string value)
         {
             var attr = doc.CreateAttribute("android", name, AndroidNs);
             attr.Value = value;
