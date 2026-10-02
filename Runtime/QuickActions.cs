@@ -421,7 +421,7 @@ namespace EminDeniz99.QuickActions
         // Set so LastPerformed reflects a simulated tap (no native bridge in-Editor).
         internal static string _editorSimulatedLastPerformed;
 
-        // Cold-launch queue: drained by the real ConsumeNextPending path above, so a
+        // Cold-launch queue: drained by the real ConsumeNextPending path below, so a
         // simulated cold launch goes through QuickActionsRuntime exactly like the
         // native pending queue does on a device.
         private static readonly Queue<string> _editorPending = new Queue<string>();
