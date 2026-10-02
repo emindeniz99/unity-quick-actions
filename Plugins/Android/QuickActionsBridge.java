@@ -123,7 +123,7 @@ public final class QuickActionsBridge {
                     if (item == null) continue;
                     // Rank = position among the shortcuts we keep, so the launcher
                     // preserves insertion-order priority (it sorts by rank, not by the
-                    // order passed to setDynamicShortcuts).
+                    // order passed to addDynamicShortcuts).
                     ShortcutInfo shortcut = buildShortcut(activity, item, shortcuts.size());
                     if (shortcut != null) shortcuts.add(shortcut);
                 }
@@ -135,13 +135,13 @@ public final class QuickActionsBridge {
 
         List<String> reEnableForUndo = null; // set once pins are re-enabled, for the catch path
         // The OS cap covers manifest (static) + dynamic shortcuts combined, so
-        // leave room for any static ones; otherwise setDynamicShortcuts throws.
-        // getManifestShortcuts/setDynamicShortcuts can throw IllegalStateException
+        // leave room for any static ones; otherwise addDynamicShortcuts throws.
+        // getManifestShortcuts/addDynamicShortcuts can throw IllegalStateException
         // (e.g. user locked) — keep it all inside the guard so nothing crosses JNI.
         try {
             List<ShortcutInfo> manifest = manager.getManifestShortcuts();
-            // Drop ids that collide with a manifest (static) shortcut. setDynamic
-            // Shortcuts throws IllegalArgumentException on such a collision, which
+            // Drop ids that collide with a manifest (static) shortcut.
+            // addDynamicShortcuts throws IllegalArgumentException on such a collision, which
             // would otherwise discard the ENTIRE dynamic set, not just the offender.
             if (manifest != null && !manifest.isEmpty()) {
                 java.util.HashSet<String> manifestIds = new java.util.HashSet<>();
@@ -268,7 +268,7 @@ public final class QuickActionsBridge {
             }
             return appliedIdsJson(shortcuts);
         } catch (RuntimeException e) {
-            android.util.Log.w("QuickActions", "setDynamicShortcuts failed", e);
+            android.util.Log.w("QuickActions", "dynamic shortcut write failed", e);
             undoReEnable(manager, reEnableForUndo);
             return null;
         }
