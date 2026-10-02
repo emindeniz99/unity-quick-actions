@@ -69,7 +69,9 @@ namespace UnityEngine
     public static class Debug
     {
         public static void Log(object message) { }
-        public static void LogWarning(object message) { }
+        // Recorded so harness tests can assert a warning was (or was not) logged.
+        public static readonly System.Collections.Generic.List<string> Warnings = new System.Collections.Generic.List<string>();
+        public static void LogWarning(object message) => Warnings.Add(message?.ToString());
         public static void LogError(object message) { }
         public static void LogException(System.Exception exception) { }
     }

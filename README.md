@@ -349,7 +349,9 @@ which is the gate in the previous paragraph, on hardware rather than in a diff.
 Two caveats: GitHub artifacts need a signed-in GitHub account (they are not
 anonymous downloads, even on a public repo) and they expire after 14 days, and
 these are debug-signed test builds — install them on a device you are happy to
-sideload onto.
+sideload onto. When the `unity` run on a release commit is green, CI also
+attaches its 2022.3 and unity6 APKs to that [release](https://github.com/emindeniz99/unity-quick-actions/releases)
+(no login, no expiry) — the same development builds of the Demo sample, not release-signed.
 
 ## Dev-only — excluding it completely from production builds
 
@@ -403,7 +405,11 @@ Constraints only work for managed code, **not** native plugins):
    symbols are **additive** on top of Player Settings — they can *add* a symbol but
    [cannot *remove*](https://docs.unity3d.com/6000.1/Documentation/Manual/custom-scripting-symbols.html)
    one inherited from Player Settings — so defining it only in the dev profile means
-   prod profiles (which don't add it) build **without** it. ⚠️ Do **not** put it in
+   prod profiles (which don't add it) build **without** it. CI builds this shape:
+   the `android-build-profile` job in [`unity-ci.yml`](https://github.com/emindeniz99/unity-quick-actions/blob/main/.github/workflows/unity-ci.yml)
+   removes the define from the Unity 6 testbed's Android Player Settings, supplies
+   it only through an active Build Profile, and fails unless the APK still carries
+   the trampoline `<activity>` and the `QuickActionsBridge` class. ⚠️ Do **not** put it in
    the shared Player Settings and expect a prod Build Profile that merely *omits* it
    to drop it: the symbol is inherited additively and stays on, leaving the gate
    active in the prod build. If it is in Player Settings you must **delete it there**
@@ -716,8 +722,14 @@ cap — see [Known limits](#known-limits--the-os-shortcut-cap) and
   package copied are ever touched.
 - **Android** — written to `res/xml/quickactions_shortcuts.xml` (with generated
   string resources), and the `android.app.shortcuts` meta-data is injected into
-  the launcher activity. Each static intent targets the trampoline and encodes
-  its `Id` in the intent action (XML shortcuts can't carry extras).
+  every MAIN/LAUNCHER `<activity>` and `<activity-alias>`, enabled or not, so
+  whichever alias an icon-switching app enables carries them (manifest-tested
+  only; no device run across a switch, and only the module that holds the first
+  launcher component is patched). Dynamic shortcuts stay bound to the launcher
+  component that was enabled when they were added, and Android drops them when
+  it is disabled (read from AOSP, not observed), so re-`Add` them at startup. Each
+  static intent targets the trampoline and encodes its `Id` in the intent
+  action (XML shortcuts can't carry extras).
 
 Taps are delivered through the same `Performed` / `LastPerformed` path as dynamic
 shortcuts. Static and dynamic shortcuts coexist; iOS shows up to four total

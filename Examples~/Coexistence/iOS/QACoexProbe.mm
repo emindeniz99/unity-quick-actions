@@ -13,6 +13,75 @@
 
 static void QACoexProbeAttempt(int attempt);
 
+// Stand-in for UISceneConnectionOptions, which UIKit gives no way to build. The
+// package's cold scene hook reads only -shortcutItem from it.
+@interface QACoexConnectionOptions : NSObject
+@property (nonatomic, strong) UIApplicationShortcutItem *shortcutItem;
+@end
+
+@implementation QACoexConnectionOptions
+@end
+
+// Unity's own scene:willConnectToSession:options: must run once per real connection
+// and is never handed the stand-in, so a stub sits between it and the package: real
+// connections pass through, a stand-in stops here.
+static void (*gQACoexUnityWillConnect)(id, SEL, id, id, id) = NULL;
+static BOOL gQACoexSceneStubLoaded = NO;
+
+static void QACoexSceneWillConnect(id self, SEL _cmd, id scene, id session, id options) {
+    if ([options isKindOfClass:[QACoexConnectionOptions class]]) return;
+    if (gQACoexUnityWillConnect != NULL) {
+        gQACoexUnityWillConnect(self, _cmd, scene, session, options);
+    }
+}
+
+// Never called: only its IMP matters, standing in for a host that wraps the warm selector.
+static void QACoexForeignWarm(id self, SEL _cmd, id windowScene, id item, void (^handler)(BOOL)) {
+    if (handler != nil) handler(NO);
+}
+
+// From +load, so the package (which learns UnityScene at scene-configuration time, after
+// every +load) captures the stub and chains to it — the Singular shape the package
+// README describes.
+@interface QACoexSceneStub : NSObject
+@end
+
+@implementation QACoexSceneStub
++ (void)load {
+    Class unityScene = NSClassFromString(@"UnityScene");
+    if (unityScene == Nil) return;
+    Method willConnect =
+        class_getInstanceMethod(unityScene, @selector(scene:willConnectToSession:options:));
+    if (willConnect != NULL) {
+        gQACoexUnityWillConnect = (void (*)(id, SEL, id, id, id))
+            method_setImplementation(willConnect, (IMP)QACoexSceneWillConnect);
+    }
+    gQACoexSceneStubLoaded = YES;
+}
+@end
+
+// Sends a synthetic COLD connection carrying `item` to the scene's delegate. Only to an
+// exact UnityScene, whose cold selector bottoms out in the stub above; NO otherwise.
+static BOOL QACoexSendSceneCold(id scene, UIApplicationShortcutItem *item) {
+    if (@available(iOS 13.0, *)) {
+        UIScene *connected = (UIScene *)scene;
+        id<UISceneDelegate> delegate = connected.delegate;
+        SEL sel = @selector(scene:willConnectToSession:options:);
+        if (!gQACoexSceneStubLoaded || delegate == nil ||
+            object_getClass(delegate) != NSClassFromString(@"UnityScene") ||
+            ![delegate respondsToSelector:sel]) {
+            return NO;
+        }
+        QACoexConnectionOptions *options = [[QACoexConnectionOptions alloc] init];
+        options.shortcutItem = item;
+        [delegate scene:connected
+            willConnectToSession:connected.session
+                         options:(UISceneConnectionOptions *)options];
+        return YES;
+    }
+    return NO;
+}
+
 // The connected window scene to drive, or nil. Prefers a foreground-active one.
 static id QACoexActiveWindowScene(void) {
     if (@available(iOS 13.0, *)) {
@@ -181,6 +250,50 @@ static void QACoexRunChecks(void) {
                 [NSString stringWithFormat:@"sent=%d completions=%d", (int)unmarkedSent,
                                            unmarkedCompletions]);
     QACoexDrain();
+
+    // A COLD scene launch carrying an UNMARKED item. Both launches bind to UnityScene, so
+    // the owner is confirmed and the package is terminal for the warm selector: queued
+    // once; a warm redelivery before activation collapses into it; and with the warm
+    // selector wrapped by someone else it is not queued at all.
+    if (sceneLifecycle) {
+        UIApplicationShortcutItem *coldItem = QACoexMakeItem(@"qa_ci_unmarked_cold", NO);
+        BOOL coldSent = QACoexSendSceneCold(windowScene, coldItem);
+        NSString *coldGot = coldSent ? QACoexConsume() : nil;
+        NSString *coldAgain = coldSent ? QACoexConsume() : nil;
+        QACoexCheck(coldSent && [coldGot isEqualToString:@"qa_ci_unmarked_cold"] &&
+                        coldAgain == nil,
+                    @"scene-unmarked-cold-queued-once",
+                    [NSString stringWithFormat:@"sent=%d queue handed back %@ then %@",
+                                               (int)coldSent, coldGot ?: @"(nothing)",
+                                               coldAgain ?: @"(nothing)"]);
+
+        __block int redeliveryCompletions = 0;
+        BOOL redeliverySent = coldSent && QACoexSendWarm(windowScene, coldItem, ^(BOOL ok) {
+            redeliveryCompletions++;
+        });
+        NSString *redeliveryGot = redeliverySent ? QACoexConsume() : nil;
+        QACoexCheck(redeliverySent && redeliveryGot == nil && redeliveryCompletions == 1,
+                    @"scene-unmarked-cold-warm-dedup",
+                    [NSString stringWithFormat:@"sent=%d the redelivery queued %@, completions=%d",
+                                               (int)redeliverySent, redeliveryGot ?: @"(nothing)",
+                                               redeliveryCompletions]);
+        QACoexDrain();
+
+        Method warm = class_getInstanceMethod(NSClassFromString(@"UnityScene"),
+            @selector(windowScene:performActionForShortcutItem:completionHandler:));
+        BOOL wrappedSent = NO;
+        if (warm != NULL) {
+            IMP installed = method_setImplementation(warm, (IMP)QACoexForeignWarm);
+            wrappedSent = QACoexSendSceneCold(windowScene,
+                                              QACoexMakeItem(@"qa_ci_unmarked_wrapped", NO));
+            method_setImplementation(warm, installed);
+        }
+        NSString *wrappedGot = wrappedSent ? QACoexConsume() : nil;
+        QACoexCheck(wrappedSent && wrappedGot == nil, @"scene-unmarked-cold-wrapped-not-queued",
+                    [NSString stringWithFormat:@"sent=%d queue handed back %@", (int)wrappedSent,
+                                               wrappedGot ?: @"(nothing)"]);
+        QACoexDrain();
+    }
 
     NSLog(@"QA-COEX: DONE");
 }

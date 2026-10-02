@@ -21,7 +21,7 @@ namespace EminDeniz99.QuickActions.Editor
     /// <c>{placeholder}</c> interpolation) — into the generated Gradle project:
     /// writes <c>res/xml/quickactions_shortcuts.xml</c> (+ the required string
     /// resources) and injects the <c>android.app.shortcuts</c> meta-data into
-    /// the launcher activity.
+    /// every launcher component.
     ///
     /// Static shortcut intents target <see cref="QuickActionsTrampolineActivity"/>
     /// and encode the action id in the intent action (XML shortcut intents cannot
@@ -171,8 +171,9 @@ namespace EminDeniz99.QuickActions.Editor
                 Debug.Log("[QuickActions] Cleared stale static-shortcut output (no static shortcuts configured).");
         }
 
-        // Removes the android.app.shortcuts meta-data from the launcher activity.
-        // Returns true if anything was removed. Shared shape with the ungated stripper.
+        // Removes our android.app.shortcuts meta-data from every component that
+        // carries it. Returns true if anything was removed. Shared shape with the
+        // ungated stripper.
         internal static bool RemoveShortcutsMetaData(string manifestPath)
         {
             if (!File.Exists(manifestPath))
@@ -256,14 +257,15 @@ namespace EminDeniz99.QuickActions.Editor
         {
             var doc = new XmlDocument();
             doc.Load(manifestPath);
-            return FindLauncherActivity(doc) != null;
+            return FindLauncherComponents(doc).Count > 0;
         }
 
-        private static XmlElement FindLauncherActivity(XmlDocument doc)
+        // Every MAIN/LAUNCHER <activity> and <activity-alias>, enabled or not. An app
+        // that switches its icon keeps one alias enabled at a time, and the launcher
+        // reads static shortcuts from the component it shows, so each one needs them.
+        private static List<XmlElement> FindLauncherComponents(XmlDocument doc)
         {
-            // The MAIN/LAUNCHER entry can be a plain <activity> OR an <activity-alias>
-            // (aliases can own the launcher filter + meta-data). Search both, so a
-            // manifest that exposes its launcher via an alias isn't skipped.
+            var found = new List<XmlElement>();
             foreach (var tag in new[] { "activity", "activity-alias" })
             {
                 foreach (XmlElement component in doc.GetElementsByTagName(tag))
@@ -277,11 +279,14 @@ namespace EminDeniz99.QuickActions.Editor
                         foreach (XmlElement category in filter.GetElementsByTagName("category"))
                             hasLauncher |= category.GetAttribute("name", AndroidNs) == "android.intent.category.LAUNCHER";
                         if (hasMain && hasLauncher)
-                            return component;
+                        {
+                            found.Add(component);
+                            break;
+                        }
                     }
                 }
             }
-            return null;
+            return found;
         }
 
         private const string ToolsNs = "http://schemas.android.com/tools";
@@ -637,62 +642,68 @@ namespace EminDeniz99.QuickActions.Editor
             return true;
         }
 
-        // Returns true when our shortcuts meta-data is present after the call (freshly
-        // injected or already ours); false when the launcher already declares a DIFFERENT
-        // android.app.shortcuts resource, in which case we warn instead of silently
-        // shipping none (Android allows only one shortcuts resource per activity).
+        // Puts our shortcuts meta-data on every launcher component. Returns true when
+        // at least one carries it after the call (freshly injected or already ours). A
+        // component that already declares a DIFFERENT android.app.shortcuts resource
+        // is left to its owner with a warning (Android allows only one shortcuts
+        // resource per activity).
         private static bool InjectMetaData(string manifestPath)
         {
             var doc = new XmlDocument();
             doc.Load(manifestPath);
 
-            var activity = FindLauncherActivity(doc);
-            if (activity == null)
-                return false;
-
-            // Scan the launcher's android.app.shortcuts meta-data: ours (our resource)
-            // and/or a host's (a different resource). Collect both before mutating so we
-            // can resolve an Append-build state that has BOTH.
-            XmlElement ours = null;
-            XmlElement host = null;
-            foreach (XmlElement meta in activity.GetElementsByTagName("meta-data"))
+            var carried = 0;
+            var changed = false;
+            foreach (var component in FindLauncherComponents(doc))
             {
-                if (meta.GetAttribute("name", AndroidNs) != "android.app.shortcuts")
-                    continue;
-                if (meta.GetAttribute("resource", AndroidNs) == "@xml/" + ShortcutsResource)
-                    ours = meta;
-                else
-                    host = meta;
-            }
-
-            if (host != null)
-            {
-                // A host app / another plugin owns the single shortcuts slot. Drop any
-                // stale meta-data WE injected on a prior build first, so the manifest
-                // isn't left with two android.app.shortcuts resources (invalid — Android
-                // allows one per activity), then warn rather than silently ship none.
-                if (ours != null)
+                // Scan this component's android.app.shortcuts meta-data: ours (our
+                // resource) and/or a host's (a different resource). Collect both before
+                // mutating so we can resolve an Append-build state that has BOTH.
+                XmlElement ours = null;
+                XmlElement host = null;
+                foreach (XmlElement meta in component.GetElementsByTagName("meta-data"))
                 {
-                    ours.ParentNode.RemoveChild(ours);
-                    doc.Save(manifestPath);
+                    if (meta.GetAttribute("name", AndroidNs) != "android.app.shortcuts")
+                        continue;
+                    if (meta.GetAttribute("resource", AndroidNs) == "@xml/" + ShortcutsResource)
+                        ours = meta;
+                    else
+                        host = meta;
                 }
-                Debug.LogWarning(
-                    $"[QuickActions] The launcher activity already declares android.app.shortcuts " +
-                    $"(resource={host.GetAttribute("resource", AndroidNs)}); the configured static shortcuts were NOT injected " +
-                    $"(Android allows only one shortcuts resource per activity). Merge them into " +
-                    $"that resource manually, or register them at runtime with QuickActions.Add(...).");
-                return false;
+
+                if (host != null)
+                {
+                    // A host app / another plugin owns this component's single shortcuts
+                    // slot. Drop any stale meta-data WE injected on a prior build first,
+                    // so it isn't left with two android.app.shortcuts resources, then
+                    // warn rather than silently ship none from this component.
+                    if (ours != null)
+                    {
+                        ours.ParentNode.RemoveChild(ours);
+                        changed = true;
+                    }
+                    Debug.LogWarning(
+                        $"[QuickActions] The launcher component {component.GetAttribute("name", AndroidNs)} already " +
+                        $"declares android.app.shortcuts (resource={host.GetAttribute("resource", AndroidNs)}); the " +
+                        "configured static shortcuts were NOT injected into it (Android allows only one shortcuts " +
+                        "resource per activity). Merge them into that resource manually, or register them at " +
+                        "runtime with QuickActions.Add(...).");
+                    continue;
+                }
+
+                if (ours == null) // not injected yet; an Append re-run finds ours and adds nothing
+                {
+                    var element = doc.CreateElement("meta-data");
+                    SetAndroidAttr(doc, element, "name", "android.app.shortcuts");
+                    SetAndroidAttr(doc, element, "resource", "@xml/" + ShortcutsResource);
+                    component.AppendChild(element);
+                    changed = true;
+                }
+                carried++;
             }
-
-            if (ours != null)
-                return true; // already ours — idempotent (Append re-runs)
-
-            var element = doc.CreateElement("meta-data");
-            SetAndroidAttr(doc, element, "name", "android.app.shortcuts");
-            SetAndroidAttr(doc, element, "resource", "@xml/" + ShortcutsResource);
-            activity.AppendChild(element);
-            doc.Save(manifestPath);
-            return true;
+            if (changed)
+                doc.Save(manifestPath);
+            return carried > 0;
         }
 
         private static void SetAndroidAttr(XmlDocument doc, XmlElement element, string name, string value)

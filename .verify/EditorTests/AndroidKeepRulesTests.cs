@@ -71,7 +71,7 @@ namespace EminDeniz99.QuickActions.Tests
         private string ManifestPath =>
             Path.Combine(UnityLibrary, "src", "main", "AndroidManifest.xml");
 
-        // The manifest shape FindLauncherActivity looks for: an <activity> whose
+        // The manifest shape FindLauncherComponents looks for: an <activity> whose
         // <intent-filter> carries BOTH action MAIN and category LAUNCHER. `launcher:
         // false` writes the same file minus that filter — a real shape too (a library
         // module manifest), and the one that makes the post-processor bail out early.
