@@ -69,15 +69,11 @@ namespace EminDeniz99.QuickActions
             yield return null;
             _ready = true;
             PollPendingGuarded();
-            // Safety net for the warm path. The two callbacks below are how a
-            // resume normally drains the queue, but they are not universal:
-            // Unity 6's GameActivity completed a trampoline round-trip on the
-            // API 35 emulator with the native pause/resume pair collapsed a
-            // millisecond apart and NEITHER C# callback firing, stranding the
-            // tapped id in the queue until the next real focus change. A slow
-            // beat guarantees delivery no matter which lifecycle events the
-            // activity implementation emits; when the queue is empty each tick
-            // is a single cheap native read.
+            // Safety net for the warm path. OnApplicationFocus/OnApplicationPause
+            // normally drain a resume, but Unity 6's GameActivity can complete a
+            // trampoline round-trip with neither callback reaching scripting, which
+            // strands the tapped id. A slow beat delivers regardless; an empty queue
+            // costs one cheap native read per tick.
             var beat = new WaitForSecondsRealtime(0.25f);
             while (true)
             {
