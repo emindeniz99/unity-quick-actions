@@ -81,9 +81,12 @@ the run to finish — read its result — then push.
   in the foreground 0 s after the tap so it did not cold-start there; the cause
   is NOT established. Still never on a device. Say exactly that; do not describe
   device behaviour as verified. (Android has no
-  simulator equivalent; the 2021.3 line cannot do a Simulator run at all —
-  Unity ships an x86_64-only simulator runtime there.) **Physical hardware is
-  partly covered**: Android runs on a Moto G Play 2024 / Android 14 confirmed
+  simulator equivalent. The 2021.3 line has never had a Simulator run: Unity
+  ships only an x86_64 simulator runtime there. x86_64-only 2022.3 and Unity 6
+  exports did run on the macOS 15 and 26 runners' simulators — runs 77/78 — and
+  the iOS 27 simulator refuses them, so "untried", not "impossible".)
+  **Physical hardware is partly covered**: Android runs on a Moto G Play 2024 /
+  Android 14 confirmed
   static shortcuts on a cold install, runtime `Add`, the static/dynamic
   id-collision rule, and — 2026-09-17 — a tap on the runtime-added `daily` row
   arriving as `Performed`. That tap did not record whether the app had been

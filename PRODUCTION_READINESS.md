@@ -187,12 +187,14 @@ says "6.3" for work dated later than 2026-07-17, the Editor was `6000.3.21f1`.
   **minimum**; anything newer belongs behind a `UNITY_x_OR_NEWER` gate and is
   verified in a real Editor, not in the harness.
 
-  **The 2021.3 Simulator cannot be tested on Apple silicon — Unity's limit,
-  not the package's.** Unity 2021.3's iOS support ships a simulator runtime for
-  **x86_64 only** (`baselib-amd64.a`; every arm64 library in that install is a
-  device build, and nothing in it is named `*sim*`). Apple silicon cannot run an
-  x86_64 app on a modern iOS Simulator runtime, so the 2021.3 player is
-  uninstallable there. For contrast, Unity 6.3 ships `libiPhone-lib-sim-arm64`,
+  **The 2021.3 Simulator has not been tried.** Unity 2021.3's iOS support ships
+  a simulator runtime for **x86_64 only** (`baselib-amd64.a`; every arm64
+  library in that install is a device build, and nothing in it is named
+  `*sim*`). That alone does not rule it out on Apple silicon: CI's 2022.3 and
+  Unity 6 Simulator apps were x86_64-only until 2026-09-16, and run 78 passed
+  with them on the iOS 18.6 and 26.5 simulators of the arm64 macOS 15 and 26
+  runners. The iOS 27 simulator does refuse an x86_64-only app (run 76).
+  Whether a 2021.3 player installs and runs there is unknown. For contrast, Unity 6.3 ships `libiPhone-lib-sim-arm64`,
   `-sim-x64` and `-sim-x64arm64`, which is why the Simulator run described above
   was possible on that line (Unity added arm64 Simulator support in Unity 6 and
   has said it will not backport it to 2021 LTS; 2022.3 does ship arm64 simulator

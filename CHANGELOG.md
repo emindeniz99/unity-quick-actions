@@ -114,6 +114,11 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   recorded evidence: the Simulator warm re-entry of run 110 and the Moto G Play
   tap of 2026-09-17. The 2022.3 line's iOS toolchain decision is recorded:
   build with Xcode 26, not 27, and plan the move to Unity 6 before April 2027.
+  A Simulator run on 2021.3 is described as untried, not impossible: Unity
+  ships only an x86_64 simulator runtime there, but CI's x86_64-only 2022.3
+  and Unity 6 apps ran on the macOS 15 and 26 runners' simulators, and only
+  the iOS 27 simulator refuses one. Whether 2021.3 needs `-ld_classic` under
+  Xcode 15+ is marked unverified.
 
 ### Fixed
 
