@@ -6,6 +6,12 @@
       "source": "local",
       "dependencies": {}
     },
+    "com.quickactions.testbedtools": {
+      "version": "file:../../TestbedTools",
+      "depth": 0,
+      "source": "local",
+      "dependencies": {}
+    },
     "com.unity.collab-proxy": {
       "version": "2.12.4",
       "depth": 0,
