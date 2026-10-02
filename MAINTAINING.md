@@ -100,8 +100,8 @@ replaced by the static harness. The Editor pass is closed on 2021.3, 2022.3 and
 6.3; what is still open is the physical-hardware work below — see
 `PRODUCTION_READINESS.md` for the record of what has been executed. (Quick
 actions *do* work on the iOS Simulator, which is where the 6.3 runtime pass was
-done; the 2021.3 line cannot be run there at all, because Unity ships an
-x86_64-only simulator runtime on 2021 LTS.)
+done; no Simulator run has been tried on the 2021.3 line, where Unity ships
+only an x86_64 simulator runtime.)
 
 **Editor pass, per claimed Unity line**
 

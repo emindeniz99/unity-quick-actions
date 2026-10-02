@@ -40,10 +40,11 @@ no Apple hardware.
   build with no trace of it, and an Xcode compile of the generated project.
   Note that `2021.3.45f2` is the newest build of that line a Personal/Pro
   licence can run — later patches are Extended LTS and need Industry or
-  Enterprise. The iOS Simulator route is *not* available on 2021.3: Unity ships
-  an x86_64-only simulator runtime there, which Apple silicon cannot execute,
-  and arm64 Simulator support was added in Unity 6 and will not be backported.
-  2022.3 does ship arm64 simulator libraries.
+  Enterprise. No iOS Simulator run has been tried on 2021.3: Unity ships only
+  an x86_64 simulator runtime there, and arm64 Simulator support was added in
+  Unity 6 and will not be backported. x86_64-only Simulator apps from 2022.3
+  and Unity 6 did run on Apple silicon CI runners (iOS 18.6 and 26.5), but the
+  iOS 27 simulator refuses them. 2022.3 does ship arm64 simulator libraries.
 - **Physical-device validation is partial.** On Android it has happened
   (Moto G Play 2024 / Android 14): static shortcuts appeared on a long-press of
   a cold, never-opened install, runtime `Add` published more, a static/dynamic
@@ -167,10 +168,11 @@ This is the loop to use while writing your routing code; do the real device pass
 5. Same checks as Android steps 6–9 (add shortcuts, long-press the icon, tap, cold-launch).
 
 No iPhone? An **iOS Simulator** destination works for all of these checks (no
-signing team needed) — it is how the 6.3 run was verified. On Apple silicon this
-needs arm64 simulator libraries, which Unity 6 ships (and 2022.3 ships too,
-though no Simulator run has been completed on that line yet); 2021.3 ships an
-x86_64-only simulator runtime and cannot do it at all.
+signing team needed) — it is how the 6.3 run was verified, and CI runs it on
+2022.3 and Unity 6, both of which ship arm64 simulator libraries. 2021.3 ships
+only an x86_64 simulator runtime. The iOS 27 simulator refuses such an app, but
+CI's x86_64-only apps ran on the iOS 18.6 and 26.5 simulators, and no Simulator
+run has been tried on that line.
 
 ### B3. Prove the dev-only gate (the "zero in production" promise)
 Make a **production** build with the define **removed**:
