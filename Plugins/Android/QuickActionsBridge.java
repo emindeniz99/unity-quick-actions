@@ -395,8 +395,7 @@ public final class QuickActionsBridge {
                 // The labels above are what the launcher SHOWS (resolved at the last
                 // push); this blob is what lets the managed layer recover the base
                 // text + per-locale tables and notice the two disagree. Empty for an
-                // item that was never localized, whose read-back is then byte-for-byte
-                // what it was before this key existed.
+                // item without localization (the key is then absent from its extras).
                 o.put("L10n", extras.getString(EXTRA_L10N, ""));
                 items.put(o);
             }
@@ -446,8 +445,8 @@ public final class QuickActionsBridge {
             // the C# side reads it back via GetById (reconciled from the extras).
             intent.putExtra(EXTRA_PAYLOAD, payload);
         }
-        // Localization blob: stored only (never parsed here) and only when the item
-        // has one, so an unlocalized shortcut's extras are unchanged by this feature.
+        // Localization blob: stored only (never parsed here) and written only when
+        // the item has one: an unlocalized shortcut carries no L10n extra.
         if (!l10n.isEmpty()) extras.putString(EXTRA_L10N, l10n);
 
         ShortcutInfo.Builder builder = new ShortcutInfo.Builder(activity, id)
