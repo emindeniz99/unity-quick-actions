@@ -140,21 +140,6 @@ public final class QuickActionsBridge {
         // (e.g. user locked) — keep it all inside the guard so nothing crosses JNI.
         try {
             List<ShortcutInfo> manifest = manager.getManifestShortcuts();
-            // Drop ids that collide with a manifest (static) shortcut.
-            // addDynamicShortcuts throws IllegalArgumentException on such a collision, which
-            // would otherwise discard the ENTIRE dynamic set, not just the offender.
-            if (manifest != null && !manifest.isEmpty()) {
-                java.util.HashSet<String> manifestIds = new java.util.HashSet<>();
-                for (ShortcutInfo s : manifest) manifestIds.add(s.getId());
-                java.util.Iterator<ShortcutInfo> it = shortcuts.iterator();
-                while (it.hasNext()) {
-                    if (manifestIds.contains(it.next().getId())) {
-                        it.remove();
-                        android.util.Log.w("QuickActions",
-                                "Dropped a dynamic shortcut whose id collides with a static/manifest shortcut");
-                    }
-                }
-            }
 
             // Partition the CURRENT dynamic set into ours (marked) vs another
             // publisher's (unmarked — the host app's own shortcuts). Everything
@@ -185,17 +170,21 @@ public final class QuickActionsBridge {
                     else pinnedOurs.put(s.getId(), s);
                 }
             }
+            // A manifest (static) id is foreign too: the collision would make
+            // addDynamicShortcuts throw IllegalArgumentException and discard the
+            // ENTIRE dynamic set, not just the offender.
+            if (manifest != null) for (ShortcutInfo s : manifest) foreignIds.add(s.getId());
 
             // Drop our items whose id collides with a HOST dynamic or pinned
-            // shortcut: addDynamicShortcuts updates same-id entries IN PLACE, which
+            // shortcut (addDynamicShortcuts updates same-id entries IN PLACE, which
             // would silently hijack the host's shortcut — the exact failure this
-            // marker-scoping exists to prevent.
+            // marker-scoping exists to prevent) or with a manifest one (above).
             java.util.Iterator<ShortcutInfo> ours = shortcuts.iterator();
             while (ours.hasNext()) {
                 if (foreignIds.contains(ours.next().getId())) {
                     ours.remove();
                     android.util.Log.w("QuickActions",
-                            "Dropped a dynamic shortcut whose id collides with another publisher's dynamic or pinned shortcut");
+                            "Dropped a dynamic shortcut whose id collides with a static, host-dynamic or pinned shortcut");
                 }
             }
 
