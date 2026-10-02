@@ -120,10 +120,11 @@ ships it.
   simulator would remove two more macOS jobs and, on this evidence, change
   nothing measurable. What the two changes did buy is real but different: half
   the macOS demand, a job graph whose every edge is a real artifact dependency,
-  and no permanently-red checks. ARM64 simulator export (the testbeds still
-  export x86_64 by omission) is the one item here that was never about the job
-  graph and still stands. Sources, numbers and the things ruled out (image cache,
-  DerivedData, AVD snapshots, larger runners) are in
+  and no permanently-red checks. ARM64 simulator export (Testbed2022 and
+  Testbed6 exported x86_64 by omission until 2026-09-16) was the one item here
+  that was never about the job graph; it is done. Sources, numbers and the
+  things ruled out (image cache, DerivedData, AVD snapshots, larger runners)
+  are in
   [`docs~/ci-cost-and-caching-research-2026-09.md`](https://github.com/emindeniz99/unity-quick-actions/blob/main/docs~/ci-cost-and-caching-research-2026-09.md).
 - **Xcode 16.4 legs (`macos-15`) — kept; decided 2026-10-01.** Since 2026-04-28
   App Store Connect accepts only builds made with Xcode 26+ and the iOS 26 SDK,
