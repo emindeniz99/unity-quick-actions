@@ -50,7 +50,7 @@ public final class QuickActionsBridgeSmokeTest {
         trampolineSurvivesAHostileExtrasBundle();
         bitmapIconIsChosenAndFallsBackWhenUndecodable();
         builtInIconYieldsToTheProjectsOwn();
-        payloadRoundTripsThroughExtrasAndIntent();
+        payloadRoundTripsThroughExtras();
         localizationBlobRoundTripsThroughExtras();
         pinRequestIsOwnershipGated();
         maxShortcutCountIsExposed();
@@ -473,15 +473,15 @@ public final class QuickActionsBridgeSmokeTest {
         }
     }
 
-    private static void payloadRoundTripsThroughExtrasAndIntent() throws Exception {
+    private static void payloadRoundTripsThroughExtras() throws Exception {
         ShortcutManager mgr = new ShortcutManager();
         String json = "{\"items\":[{\"Id\":\"p1\",\"Title\":\"T\",\"Payload\":\"level=7\"}]}";
         check(QuickActionsBridge.setShortcuts(activity(mgr), json) != null, "payload write lands");
         ShortcutInfo p1 = byId(mgr.dynamic, "p1");
         check("level=7".equals(p1.getExtras().getString(QuickActionsBridge.EXTRA_PAYLOAD, "?")),
                 "payload persisted in the marker extras");
-        check("level=7".equals(p1.getIntent().getStringExtra(QuickActionsBridge.EXTRA_PAYLOAD)),
-                "payload rides the launch intent (readable by a host-side receiver)");
+        check(p1.getIntent().getStringExtra(QuickActionsBridge.EXTRA_PAYLOAD) == null,
+                "payload is not copied into the launch intent");
         // Cold-start reconcile must hand the payload back to C# (GetById contract).
         JSONArray items = new JSONObject(QuickActionsBridge.getShortcutsJson(activity(mgr))).optJSONArray("items");
         check("level=7".equals(items.optJSONObject(0).optString("Payload", "?")),

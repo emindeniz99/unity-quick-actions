@@ -48,8 +48,8 @@ public final class QuickActionsBridge {
     static final String EXTRA_ICON_DRAWABLE = "com.emindeniz99.quickactions.drawable";
     static final String EXTRA_ICON_BITMAP = "com.emindeniz99.quickactions.bitmap";
     static final String EXTRA_ICON_BITMAP_ADAPTIVE = "com.emindeniz99.quickactions.bitmap_adaptive";
-    // App-defined payload string riding the marker extras (and the launch intent),
-    // restored by the cold-start reconcile like the icon identity above.
+    // App-defined payload string riding the marker extras, restored by the
+    // cold-start reconcile like the icon identity above.
     static final String EXTRA_PAYLOAD = "com.emindeniz99.quickactions.payload";
 
     // Per-locale titles/subtitles, encoded by the managed layer into ONE opaque
@@ -450,12 +450,9 @@ public final class QuickActionsBridge {
             extras.putString(EXTRA_ICON_BITMAP, iconBitmap);
             if (iconBitmapAdaptive) extras.putBoolean(EXTRA_ICON_BITMAP_ADAPTIVE, true);
         }
-        if (!payload.isEmpty()) {
-            extras.putString(EXTRA_PAYLOAD, payload);
-            // Also ride the launch intent so a host-side receiver could read it;
-            // the C# side reads it back via GetById (reconciled from the extras).
-            intent.putExtra(EXTRA_PAYLOAD, payload);
-        }
+        // Extras only: the intent targets our trampoline, which reads just the id,
+        // and C# reads the payload back via GetById (reconciled from the extras).
+        if (!payload.isEmpty()) extras.putString(EXTRA_PAYLOAD, payload);
         // Localization blob: stored only (never parsed here) and written only when
         // the item has one: an unlocalized shortcut carries no L10n extra.
         if (!l10n.isEmpty()) extras.putString(EXTRA_L10N, l10n);
