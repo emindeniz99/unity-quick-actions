@@ -53,7 +53,11 @@ upload by hand.
    that the `.unitypackage` is attached, because the install docs point
    downloaders there. (`v0.4.0`, cut 2026-08-07, is the first one.) The
    `.unitypackage` is a build output — `dist~/` is gitignored and the artifact
-   is never committed.
+   is never committed. Once the merge commit's `unity` run is green,
+   [`release-apks.yml`](./.github/workflows/release-apks.yml) adds the 2022.3
+   and unity6 demo APKs (development builds, not release-signed). To backfill a
+   tag while its `unity` run's artifacts last (14 days):
+   `gh workflow run release-apks.yml -f tag=v<version>`.
 
 **Manual fallback**, still fully supported: push a tag by hand
 (`git tag v<version> && git push origin v<version>`) and the tag-triggered

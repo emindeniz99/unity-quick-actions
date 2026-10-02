@@ -1,0 +1,101 @@
+name: release apks
+
+# Attaches the demo APKs to the GitHub Release, where a phone can download them
+# without a GitHub login (Actions artifacts need one, and expire after 14 days).
+# release.yml publishes the release without waiting for the `unity` run on the
+# same push, so this waits for that run instead: when it ends green on a commit
+# its release tag points at, the 2022.3 and unity6 demo APKs are uploaded. Any
+# other push to main is not a release and stops at the first step.
+# workflow_dispatch backfills an existing tag from the newest green `unity` run
+# at its commit, while that run's artifacts last.
+
+on:
+  workflow_run:
+    workflows: [unity]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing release tag, e.g. v0.8.0"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  attach:
+    # Never in a fork. Only push runs: a fork PR from a branch named main also
+    # matches `branches`, and the weekly cron on an unchanged main would
+    # replace a release's APKs with a rebuild.
+    if: >-
+      github.repository == 'emindeniz99/unity-quick-actions' &&
+      (github.event_name == 'workflow_dispatch' ||
+       (github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.event == 'push'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write # upload the release assets
+      actions: read # download the unity run's artifacts
+    steps:
+      # Event payload and dispatch input reach the shell through env only.
+      - id: target
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
+          INPUT_TAG: ${{ inputs.tag }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT" = workflow_dispatch ]; then
+            TAG="$INPUT_TAG"
+            SHA="$(gh api "repos/$REPO/commits/refs/tags/$TAG" --jq .sha)"
+            RUN_ID="$(gh api "repos/$REPO/actions/workflows/unity-ci.yml/runs?head_sha=$SHA&status=success&per_page=1" \
+              --jq '.workflow_runs[0].id // empty')"
+            if [ -z "$RUN_ID" ]; then
+              echo "::error::No green unity run at $TAG ($SHA)."
+              exit 1
+            fi
+          else
+            VERSION="$(gh api "repos/$REPO/contents/package.json?ref=$SHA" --jq .content | base64 -d | jq -r .version)"
+            TAG="v$VERSION"
+            if [ "$(gh api "repos/$REPO/commits/refs/tags/$TAG" --jq .sha 2>/dev/null)" != "$SHA" ]; then
+              echo "::notice::$TAG does not point at $SHA, so this is not a release commit; nothing to attach."
+              exit 0
+            fi
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
+
+      - if: steps.target.outputs.tag != ''
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: quickactions-demo-apk-2022.3
+          path: apk-2022.3
+          run-id: ${{ steps.target.outputs.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - if: steps.target.outputs.tag != ''
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: quickactions-demo-apk-unity6
+          path: apk-unity6
+          run-id: ${{ steps.target.outputs.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      # unity-ci.yml uploads each as Builds/QuickActionsDemo-phone.apk.
+      - if: steps.target.outputs.tag != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ steps.target.outputs.tag }}
+        run: |
+          set -euo pipefail
+          mv apk-2022.3/QuickActionsDemo-phone.apk QuickActionsDemo-unity2022.3.apk
+          mv apk-unity6/QuickActionsDemo-phone.apk QuickActionsDemo-unity6.apk
+          gh release upload "$TAG" QuickActionsDemo-unity2022.3.apk QuickActionsDemo-unity6.apk \
+            --repo "$REPO" --clobber
+          echo "::notice::Attached the demo APKs to $TAG."

@@ -349,7 +349,9 @@ which is the gate in the previous paragraph, on hardware rather than in a diff.
 Two caveats: GitHub artifacts need a signed-in GitHub account (they are not
 anonymous downloads, even on a public repo) and they expire after 14 days, and
 these are debug-signed test builds — install them on a device you are happy to
-sideload onto.
+sideload onto. When the `unity` run on a release commit is green, CI also
+attaches its 2022.3 and unity6 APKs to that [release](https://github.com/emindeniz99/unity-quick-actions/releases)
+(no login, no expiry) — the same development builds of the Demo sample, not release-signed.
 
 ## Dev-only — excluding it completely from production builds
 
