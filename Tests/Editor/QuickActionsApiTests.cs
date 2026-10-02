@@ -333,6 +333,30 @@ namespace EminDeniz99.QuickActions.Tests
         }
 
         [Test]
+        public void FailedWrite_RemoveById_ReportsWhatTheDeviceHolds()
+        {
+            // A refused write can still have removed the id on Android, so
+            // RemoveById answers from a read of the device, not from the refusal.
+            var bridge = new TogglingWriteBridge();
+            QuickActions.OverrideBridgeForTesting(bridge);
+            try
+            {
+                QuickActions.AddList(new List<QuickActionItem> { Item("a"), Item("b"), Item("c") });
+                bridge.FailWrites = true;
+
+                // Plain refusal: the device still shows "a", so it is kept.
+                Assert.IsFalse(QuickActions.RemoveById("a"));
+                CollectionAssert.AreEqual(new[] { "a", "b", "c" }, QuickActions.GetAll().ConvertAll(i => i.Id));
+
+                // Partial apply: "b" was removed before the add was refused.
+                bridge.FailedWriteRemovesStale = true;
+                Assert.IsTrue(QuickActions.RemoveById("b"));
+                CollectionAssert.AreEqual(new[] { "a", "c" }, QuickActions.GetAll().ConvertAll(i => i.Id));
+            }
+            finally { QuickActions.OverrideBridgeForTesting(null); }
+        }
+
+        [Test]
         public void FailedWrite_AddListAddsNothing()
         {
             var bridge = new FailingSetShortcutsBridge("os1");
@@ -1759,6 +1783,8 @@ namespace EminDeniz99.QuickActions.Tests
         {
             public readonly List<QuickActionItem> Os = new List<QuickActionItem>();
             public bool FailWrites;
+            // Android: stale ids are removed before the add that gets refused.
+            public bool FailedWriteRemovesStale;
             public bool FailReads;
             public int SetCount;
             public bool IsPlatformSupported => true;
@@ -1770,6 +1796,12 @@ namespace EminDeniz99.QuickActions.Tests
             public IList<QuickActionItem> SetShortcuts(IList<QuickActionItem> items)
             {
                 SetCount++;
+                if (FailWrites && FailedWriteRemovesStale)
+                {
+                    var kept = new HashSet<string>();
+                    foreach (var item in items) kept.Add(item.Id);
+                    Os.RemoveAll(o => !kept.Contains(o.Id));
+                }
                 if (FailWrites) return null;
                 Os.Clear();
                 Os.AddRange(items);

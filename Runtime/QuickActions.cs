@@ -806,7 +806,8 @@ namespace EminDeniz99.QuickActions
         /// <summary>
         /// Remove the quick action with this id. Returns true if one was removed;
         /// false when there is no such id, the current OS shortcuts could not be
-        /// read, or the OS rejected the update (the action is kept — retry later).
+        /// read, or the OS rejected the update and still shows the action (it is
+        /// kept — retry later).
         /// </summary>
         public static bool RemoveById(string id)
         {
@@ -832,6 +833,13 @@ namespace EminDeniz99.QuickActions
                 // failure (see Add — same partial-landing contract).
                 _items.Insert(index, removed);
                 _loaded = false;
+                // Android removes stale ids before the add a rate limit can refuse,
+                // so the id may already be gone: reconcile now and trust the read.
+                if (EnsureLoaded() && !_items.Any(a => a.Id == id))
+                {
+                    Log($"Removed quick action '{id}' (the OS refused the rest of the update).");
+                    return true;
+                }
                 Log($"RemoveById failed: the OS did not accept the update for '{id}'; retry later.");
                 return false;
             }
