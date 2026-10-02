@@ -44,37 +44,15 @@ using EminDeniz99.QuickActions.Editor.NativeGate;
 namespace EminDeniz99.QuickActions.Tests
 {
     [TestFixture]
-    public class AndroidBuiltInIconsTests
+    public class AndroidBuiltInIconsTests : GradleProjectFixture
     {
-        private const string AndroidNs = "http://schemas.android.com/apk/res/android";
         private const string BuiltInPrefix = "ic_quickaction_builtin_";
 
-        private string _root;
-
-        [SetUp]
-        public void CreateProject()
-        {
-            QuickActionsStaticBuild.ResetForTests();
-            _root = Path.Combine(Path.GetTempPath(), "qa-icons-" + Guid.NewGuid().ToString("N"));
-            Directory.CreateDirectory(UnityLibrary);
-        }
+        public AndroidBuiltInIconsTests() : base("qa-icons-") { }
 
         [TearDown]
-        public void RemoveProject()
-        {
-            QuickActionsStaticBuild.ResetForTests();
+        public void ClearWriteOverride() =>
             QuickActionsBuildPostProcessorAndroid.WriteBuiltInIconsOverrideForTests = null;
-            try
-            {
-                if (Directory.Exists(_root))
-                    Directory.Delete(_root, true);
-            }
-            catch (IOException)
-            {
-            }
-        }
-
-        private string UnityLibrary => Path.Combine(_root, "unityLibrary");
 
         private string ResDir => Path.Combine(UnityLibrary, "src", "main", "res");
 
@@ -133,33 +111,6 @@ namespace EminDeniz99.QuickActions.Tests
 
         private string ShortcutsFile => Path.Combine(ResDir, "xml", "quickactions_shortcuts.xml");
 
-        private string ManifestPath => Path.Combine(UnityLibrary, "src", "main", "AndroidManifest.xml");
-
-        private void WriteManifest(bool launcher)
-        {
-            Directory.CreateDirectory(Path.GetDirectoryName(ManifestPath));
-            var filter = launcher
-                ? "      <intent-filter>\n" +
-                  "        <action android:name=\"android.intent.action.MAIN\" />\n" +
-                  "        <category android:name=\"android.intent.category.LAUNCHER\" />\n" +
-                  "      </intent-filter>\n"
-                : "";
-            File.WriteAllText(ManifestPath,
-                "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
-                "<manifest xmlns:android=\"http://schemas.android.com/apk/res/android\"\n" +
-                "    package=\"com.example.app\">\n" +
-                "  <application>\n" +
-                "    <activity android:name=\"com.unity3d.player.UnityPlayerActivity\">\n" +
-                filter +
-                "    </activity>\n" +
-                "  </application>\n" +
-                "</manifest>\n");
-        }
-
-        private void RunPostProcessor() =>
-            new QuickActionsBuildPostProcessorAndroid()
-                .OnPostGenerateGradleAndroidProject(UnityLibrary);
-
         private static void WriteFile(string path, byte[] contents)
         {
             Directory.CreateDirectory(Path.GetDirectoryName(path));
@@ -173,7 +124,7 @@ namespace EminDeniz99.QuickActions.Tests
             Path.Combine(UnityLibrary, module, "src", "main", "res", qualifier, fileName);
 
         private string LauncherDrawable(string qualifier, string fileName) =>
-            Path.Combine(_root, "launcher", "src", "main", "res", qualifier, fileName);
+            Path.Combine(Launcher, "src", "main", "res", qualifier, fileName);
 
         private static readonly byte[] UserBytes = Encoding.ASCII.GetBytes("the project's own art");
 

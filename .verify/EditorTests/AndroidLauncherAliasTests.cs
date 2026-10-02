@@ -6,7 +6,6 @@
 // reads static shortcuts from the component it shows, so our
 // android.app.shortcuts meta-data must sit on every launcher component, enabled
 // or not, or the shortcuts disappear after a switch.
-using System;
 using System.IO;
 using System.Linq;
 using System.Xml;
@@ -18,9 +17,8 @@ using EminDeniz99.QuickActions.Editor.NativeGate;
 namespace EminDeniz99.QuickActions.Tests
 {
     [TestFixture]
-    public class AndroidLauncherAliasTests
+    public class AndroidLauncherAliasTests : GradleProjectFixture
     {
-        private const string AndroidNs = "http://schemas.android.com/apk/res/android";
         private const string Ours = "@xml/quickactions_shortcuts";
         private const string Host = "@xml/host_shortcuts";
 
@@ -29,52 +27,17 @@ namespace EminDeniz99.QuickActions.Tests
         private const string AliasGold = "com.example.app.IconGold";
         private const string ShareAlias = "com.example.app.ShareAlias";
 
-        private string _root;
+        public AndroidLauncherAliasTests() : base("qa-alias-") { }
 
+        // The collision test counts warnings, and the log is process-global.
         [SetUp]
-        public void CreateProject()
-        {
-            QuickActionsStaticBuild.ResetForTests();
-            UnityEngine.Debug.Warnings.Clear();
-            _root = Path.Combine(Path.GetTempPath(), "qa-alias-" + Guid.NewGuid().ToString("N"));
-            Directory.CreateDirectory(UnityLibrary);
-        }
-
-        [TearDown]
-        public void RemoveProject()
-        {
-            QuickActionsStaticBuild.ResetForTests();
-            try
-            {
-                if (Directory.Exists(_root))
-                    Directory.Delete(_root, true);
-            }
-            catch (IOException)
-            {
-            }
-        }
-
-        private string UnityLibrary => Path.Combine(_root, "unityLibrary");
-
-        private string ManifestPath => Path.Combine(UnityLibrary, "src", "main", "AndroidManifest.xml");
-
-        private const string LauncherFilter =
-            "      <intent-filter>\n" +
-            "        <action android:name=\"android.intent.action.MAIN\" />\n" +
-            "        <category android:name=\"android.intent.category.LAUNCHER\" />\n" +
-            "      </intent-filter>\n";
+        public void ClearWarnings() => UnityEngine.Debug.Warnings.Clear();
 
         // A launcher <activity>, two launcher aliases (the second disabled, as an
         // icon switcher ships it), and one non-launcher alias that must stay untouched.
         // hostOnGold puts a host's own android.app.shortcuts on the disabled alias.
-        private void WriteManifest(bool hostOnGold = false)
-        {
-            Directory.CreateDirectory(Path.GetDirectoryName(ManifestPath));
-            File.WriteAllText(ManifestPath,
-                "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
-                "<manifest xmlns:android=\"" + AndroidNs + "\"\n" +
-                "    package=\"com.example.app\">\n" +
-                "  <application>\n" +
+        private void WriteAliasManifest(bool hostOnGold = false) =>
+            WriteManifest(
                 "    <activity android:name=\"" + Activity + "\">\n" +
                 LauncherFilter +
                 "    </activity>\n" +
@@ -95,16 +58,10 @@ namespace EminDeniz99.QuickActions.Tests
                 "        <action android:name=\"android.intent.action.SEND\" />\n" +
                 "        <category android:name=\"android.intent.category.DEFAULT\" />\n" +
                 "      </intent-filter>\n" +
-                "    </activity-alias>\n" +
-                "  </application>\n" +
-                "</manifest>\n");
-        }
+                "    </activity-alias>\n");
 
         private static void AddStaticShortcut() =>
             QuickActionsStaticBuild.Customize += ctx => ctx.Shortcuts.Add(new QuickActionItem("x", "X"));
-
-        private void RunPostProcessor() =>
-            new QuickActionsBuildPostProcessorAndroid().OnPostGenerateGradleAndroidProject(UnityLibrary);
 
         // The android.app.shortcuts resources declared directly on one component.
         private string[] ShortcutsMeta(string component)
@@ -122,7 +79,7 @@ namespace EminDeniz99.QuickActions.Tests
         [Test]
         public void EveryLauncherComponent_GetsOurMetaDataOnce()
         {
-            WriteManifest();
+            WriteAliasManifest();
             AddStaticShortcut();
 
             RunPostProcessor();
@@ -139,7 +96,7 @@ namespace EminDeniz99.QuickActions.Tests
         [Test]
         public void Cleanup_RemovesOursFromEveryLauncherComponent()
         {
-            WriteManifest();
+            WriteAliasManifest();
             AddStaticShortcut();
             RunPostProcessor();
             foreach (var component in new[] { Activity, AliasDefault, AliasGold })
@@ -163,7 +120,7 @@ namespace EminDeniz99.QuickActions.Tests
         [Test]
         public void HostDeclarationOnOneAlias_IsLeftAloneAndOthersStillGetOurs()
         {
-            WriteManifest(hostOnGold: true);
+            WriteAliasManifest(hostOnGold: true);
             AddStaticShortcut();
 
             RunPostProcessor();
