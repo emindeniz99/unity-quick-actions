@@ -33,8 +33,13 @@ namespace UnityEditor
         // to exercise the interpolation engine.
         public static string bundleVersion => "1.2.3";
         public static string productName => "Example App";
-        public static string GetScriptingDefineSymbols(UnityEditor.Build.NamedBuildTarget target) => string.Empty;
-        public static void SetScriptingDefineSymbols(UnityEditor.Build.NamedBuildTarget target, string defines) { }
+        // Kept per target, empty until set, so a test can show which target a
+        // define check reads. A test that sets one clears it again.
+        private static readonly Dictionary<string, string> ScriptingDefines = new Dictionary<string, string>();
+        public static string GetScriptingDefineSymbols(UnityEditor.Build.NamedBuildTarget target) =>
+            ScriptingDefines.TryGetValue(target.TargetName ?? string.Empty, out var defines) ? defines : string.Empty;
+        public static void SetScriptingDefineSymbols(UnityEditor.Build.NamedBuildTarget target, string defines) =>
+            ScriptingDefines[target.TargetName ?? string.Empty] = defines ?? string.Empty;
 
         // Mirrors the real nested settings classes (2021.3 API).
         public static class iOS
@@ -89,9 +94,13 @@ namespace UnityEditor.Build
 {
     public struct NamedBuildTarget
     {
-        public static readonly NamedBuildTarget Standalone = default;
-        public static readonly NamedBuildTarget Android = default;
-        public static readonly NamedBuildTarget iOS = default;
+        public static readonly NamedBuildTarget Standalone = new NamedBuildTarget("Standalone");
+        public static readonly NamedBuildTarget Android = new NamedBuildTarget("Android");
+        public static readonly NamedBuildTarget iOS = new NamedBuildTarget("iOS");
+
+        private NamedBuildTarget(string targetName) { TargetName = targetName; }
+
+        public string TargetName { get; }
     }
 
     // Thrown by the ungated gate cleanups when the define was flipped without a
