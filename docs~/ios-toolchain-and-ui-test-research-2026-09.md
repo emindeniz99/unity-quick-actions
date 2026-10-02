@@ -166,8 +166,10 @@ by the refuters is stated in its corrected form.
   "Enterprise LTS expired February 2026" per the same Build Automation
   notice. No Unity statement about 2021.3 + Xcode 26 exists **[unverified]**.
   Whether its IL2CPP output needs `-ld_classic` under Xcode 15+ is
-  **[unverified]**: no run or commit in this repo records it. Xcode 27 removes
-  `-ld_classic`, so if it is needed, that line's ceiling is Xcode 26.x. CI
+  **[unverified]**: the repo only asserts it (commit df5fbfc and a comment in
+  `unity-ci.yml`'s `ios-simulator` job), and no run or log measures it. Xcode
+  27 removes `-ld_classic`, so if it is needed, that line's ceiling is Xcode
+  26.x. CI
   exports it and never compiles it on the Simulator; unchanged.
 
 ### Unity 6

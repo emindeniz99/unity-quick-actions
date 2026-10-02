@@ -147,9 +147,9 @@ plugins](#coexisting-with-other-native-ios-plugins). The same run has not been
 tried on 2021.3: Unity ships only an x86_64 simulator runtime for that line
 (Unity added arm64 Simulator support in Unity 6 and stated it will not be
 backported to 2021 LTS). CI's 2022.3 and Unity 6 Simulator apps were
-x86_64-only too until 2026-09-16, and they ran on the iOS 18.6 and 26.5
-simulators of GitHub's Apple silicon runners; the iOS 27 simulator refuses
-such an app.
+x86_64-only too until the ARM64 switch on 2026-09-16, and they ran on the iOS
+18.6 and 26.5 simulators of GitHub's Apple silicon runners; the iOS 27
+simulator refuses such an app.
 
 **Partly verified on a physical device (Android).** On a Moto G Play 2024
 (Android 14), a sideloaded build from `Examples~/Testbed2021` showed the baked

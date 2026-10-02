@@ -170,8 +170,9 @@ This is the loop to use while writing your routing code; do the real device pass
 No iPhone? An **iOS Simulator** destination works for all of these checks (no
 signing team needed) — it is how the 6.3 run was verified, and CI runs it on
 2022.3 and Unity 6, both of which ship arm64 simulator libraries. 2021.3 ships
-only an x86_64 simulator runtime: the iOS 27 simulator refuses such an app, and
-no Simulator run has been tried on that line.
+only an x86_64 simulator runtime. The iOS 27 simulator refuses such an app, but
+CI's x86_64-only apps ran on the iOS 18.6 and 26.5 simulators, and no Simulator
+run has been tried on that line.
 
 ### B3. Prove the dev-only gate (the "zero in production" promise)
 Make a **production** build with the define **removed**:

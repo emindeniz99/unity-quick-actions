@@ -191,16 +191,19 @@ says "6.3" for work dated later than 2026-07-17, the Editor was `6000.3.21f1`.
   a simulator runtime for **x86_64 only** (`baselib-amd64.a`; every arm64
   library in that install is a device build, and nothing in it is named
   `*sim*`). That alone does not rule it out on Apple silicon: CI's 2022.3 and
-  Unity 6 Simulator apps were x86_64-only until 2026-09-16, and run 78 passed
-  with them on the iOS 18.6 and 26.5 simulators of the arm64 macOS 15 and 26
-  runners. The iOS 27 simulator does refuse an x86_64-only app (run 76).
-  Whether a 2021.3 player installs and runs there is unknown. For contrast, Unity 6.3 ships `libiPhone-lib-sim-arm64`,
-  `-sim-x64` and `-sim-x64arm64`, which is why the Simulator run described above
-  was possible on that line (Unity added arm64 Simulator support in Unity 6 and
-  has said it will not backport it to 2021 LTS; 2022.3 does ship arm64 simulator
-  libraries). The 2021.3 runtime path is therefore covered by the
-  device gate, not by the Simulator; its build-time path (post-processor,
-  Info.plist, Xcode compile of the plugin) IS verified above.
+  Unity 6 Simulator apps were x86_64-only until the ARM64 switch on
+  2026-09-16. In run 77, SpringBoard's tap cold-started them on the iOS 18.6
+  and 26.5 simulators of the arm64 macOS 15 and 26 runners, and run 78 passed
+  on the same legs. The iOS 27 simulator does refuse an x86_64-only app (run
+  76). Whether a 2021.3 player installs and runs there is unknown. For
+  contrast, Unity 6.3 ships `libiPhone-lib-sim-arm64`, `-sim-x64` and
+  `-sim-x64arm64`, so a native arm64 Simulator app is possible on that line,
+  where the Simulator run described above was done (Unity added arm64
+  Simulator support in Unity 6 and has said it will not backport it to 2021
+  LTS; 2022.3 does ship arm64 simulator libraries). So far the 2021.3 runtime
+  path is covered by the device gate, not by a Simulator run; its build-time
+  path (post-processor, Info.plist, Xcode compile of the plugin) IS verified
+  above.
 
   **Licensing note for anyone reproducing this:** `2021.3.45f2` is the newest
   2021.3 build a Personal/Pro licence can run. Later patches (`.46f1` onward,
