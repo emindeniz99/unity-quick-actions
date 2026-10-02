@@ -167,8 +167,17 @@ namespace UnityEditor.iOS.Xcode
 
     public abstract class PlistElement
     {
-        // Mirrors UnityEditor.iOS.Xcode.PlistElement accessors used when reading a plist.
-        public bool AsBoolean() => false;
+        // Mirrors UnityEditor.iOS.Xcode.PlistElement accessors used when reading a
+        // plist. Reads PlistElementBoolean.value, as the real accessor does, so the
+        // ownership tests can tell a marked entry from an unmarked one.
+        public bool AsBoolean() => ((PlistElementBoolean)this).value;
+    }
+
+    // Mirrors UnityEditor.iOS.Xcode.PlistElementBoolean.
+    public class PlistElementBoolean : PlistElement
+    {
+        public bool value;
+        public PlistElementBoolean(bool v) { value = v; }
     }
 
     public class PlistElementDict : PlistElement
