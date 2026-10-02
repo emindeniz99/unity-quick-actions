@@ -357,18 +357,33 @@ static id (*gQAOrigSceneConfiguration)(id, SEL, id, id, id) = NULL;
 // once, on the main thread, before any hook it gates can fire.
 static BOOL gQASceneOwnerUnconfirmed = NO;
 
+API_AVAILABLE(ios(13.0))
+static void QAScenePerformActionForShortcutItem(id self, SEL _cmd, UIWindowScene *windowScene,
+                                                UIApplicationShortcutItem *shortcutItem,
+                                                void (^completionHandler)(BOOL));
+
 // COLD tap under the scene lifecycle: the item rides in the connection options
 // instead of launchOptions.
 API_AVAILABLE(ios(13.0))
 static void QASceneWillConnect(id self, SEL _cmd, UIScene *scene, UISceneSession *session,
                                UISceneConnectionOptions *connectionOptions) {
     UIApplicationShortcutItem *item = connectionOptions.shortcutItem;
-    if (QAIsOurShortcut(item)) {
+    BOOL record = QAIsOurShortcut(item);
+    if (!record && item != nil && gQAOrigScenePerformAction == NULL && !gQASceneOwnerUnconfirmed) {
+        // Unmarked: UIKit hands a launch item here, not to the warm hook, so adopt it
+        // under the warm hook's own rule — we are terminal for the warm selector and the
+        // owner is confirmed — or a hand-written Info.plist shortcut is lost cold.
+        Method current = class_getInstanceMethod(object_getClass(self),
+            @selector(windowScene:performActionForShortcutItem:completionHandler:));
+        record = current != NULL &&
+                 method_getImplementation(current) == (IMP)QAScenePerformActionForShortcutItem;
+    }
+    if (record) {
         // Record BEFORE chaining: the host's willConnect is what builds the window and
         // starts Unity, so the queue must already hold the tap when C# first drains it.
-        // Only OURS — a host's own shortcut stays with the host's implementation.
-        // If iOS also reports this tap through the warm hook below, the cold marker
-        // collapses the pair into the single Performed event the user actually caused.
+        // The options are chained unchanged, so a host's own handling still sees the item.
+        // If iOS also reports this tap through the warm hook below, the cold marker (keyed
+        // on the id, marked or not) collapses the pair into one Performed event.
         QAStorePerformedCold(item.type);
     }
     // When there was no original we added this selector; UIKit's own scene setup does
@@ -544,7 +559,7 @@ static BOOL QAClassDescendsFrom(Class cls, Class ancestor) {
 // connects; when it has none (a host-authored manifest on a trampoline that predates
 // UnityScene) bind to the first declared class, as before, but record the owner as
 // unconfirmed, which turns OFF the unmarked best-effort adoption in
-// QAScenePerformActionForShortcutItem.
+// QAScenePerformActionForShortcutItem and QASceneWillConnect.
 API_AVAILABLE(ios(13.0))
 static void QAInstallSceneHooksScoped(Class declared, const char *via) {
     if (declared == Nil) return;

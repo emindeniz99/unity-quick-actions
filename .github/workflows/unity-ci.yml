@@ -3340,6 +3340,9 @@ jobs:
               "QA-COEX: PASS scene-delegate-is-unityscene"
               "QA-COEX: PASS scene-config-delegate-class"
               "QA-COEX: PASS scene-warm-hook-installed"
+              "QA-COEX: PASS scene-unmarked-cold-queued-once"
+              "QA-COEX: PASS scene-unmarked-cold-warm-dedup"
+              "QA-COEX: PASS scene-unmarked-cold-wrapped-not-queued"
             )
           fi
 
