@@ -14,21 +14,11 @@
 // a side. It only depends on UNITY_ANDROID.
 //
 // It also deletes the package's two plugin .java SOURCES before Gradle compiles
-// them, which is what keeps them out of a define-off APK. UNITY has no mechanism
-// for that — PluginImporter's defineConstraints is a managed-plugin feature and
-// does not gate a loose native source — and the wording here used to take that
-// for "it cannot be done". It can. Run 93 of the CI workflow printed where they
-// land:
-//
-//   unityLibrary/src/main/java/com/emindeniz99/quickactions/QuickActionsBridge.java
-//   unityLibrary/src/main/java/com/emindeniz99/quickactions/QuickActionsTrampolineActivity.java
-//
-// staged at 20:34:12, this callback invoked on that same unityLibrary root at
-// 20:34:23 — before Gradle reads the source set. It is the root the res/xml,
-// res/values and res/raw deletions below already reach. Until 0.7.0 both classes
-// shipped as dead, unreachable bytecode (~20 KB) in every define-off build; the
-// define-off CI job counted them (4 dex references either way) instead of gating
-// them, and now requires zero.
+// them, which keeps both classes out of classes.dex in a define-off build.
+// PluginImporter's defineConstraints cannot gate a loose native source, but Unity
+// stages these under <module>/src/main/java/<package as directories> before this
+// callback runs and before Gradle reads the source set, so deleting that directory
+// is enough. CI's define-off job asserts zero dex references to the package.
 //
 // Scoped to the package DIRECTORY, never to a source root: only
 // src/main/java/com/emindeniz99/quickactions goes, so no host or third-party
@@ -198,8 +188,8 @@ namespace EminDeniz99.QuickActions.Editor.NativeGate
 
         // Same contract as SafeDelete, for the one directory this gate owns. Best
         // effort on purpose: a build must not fail because a file was locked, and
-        // the worst case of a failure here is the pre-0.7.0 behaviour — the dead
-        // classes ship — which CI's define-off job reports.
+        // the worst case of a failure here is that the unreachable classes ship,
+        // which CI's define-off job reports.
         private static void SafeDeleteDirectory(string directoryPath)
         {
             if (!Directory.Exists(directoryPath))
