@@ -42,26 +42,17 @@ name: unity
 # build-heavy ones alike: Android IL2CPP, the emulator smoke, the iOS export
 # and its macOS compile, the shrink experiment.
 #
-# The heavy legs used to be dispatch/cron-only, on a "split by cost" rationale
-# that measurement disproved: run 25 ran the whole matrix — 17 jobs, macOS
-# included — in 13.4 minutes of wall clock, and GitHub billed 0 ms for all of
-# it, because runner minutes on a public repo are free. What that gating
-# actually bought was a manual step between writing a change and learning
-# whether it works — which is how a test that passes headlessly and fails in a
-# real Editor reached main.
-#
-# That 13.4 minutes was measured BEFORE the licence cap below. Chained, run 31
-# took 29 minutes without the shrink leg, and the 2026-08-31 cron (run 35) took
-# 38 for the whole matrix, shrink leg included. The argument is unchanged —
-# free minutes, no manual step — but the number is, so do not quote 13 minutes.
+# The heavy legs once ran on dispatch/cron only; that "split by cost" rationale
+# did not survive measurement — runner minutes on a public repo are free, and
+# the gating cost a manual step between writing a change and learning whether
+# it works. The wall-clock figures have moved since; see docs~/ci-history.md
+# before quoting one.
 #
 # Docs-only changes still trigger nothing (paths filter below), so the bill for
 # a README edit stays zero legs. The weekly cron remains, and is not redundant:
 # it catches drift with no commit behind it — a new Unity patch the canary
 # picks up, a changed base image, an expired credential.
-# (Its first real catch, run 37 on 2026-09-01: 6000.6.0f1's editor aborts in a
-# container with Docker's 64 MB /dev/shm — see the shared-memory step in each
-# Unity job.)
+# (Its first real catch is recorded in docs~/ci-history.md.)
 #
 # Public repo: GitHub-hosted runners, macOS included, are free.
 #
@@ -93,64 +84,22 @@ name: unity
 # the four max-parallel lines — `strategy:` cannot read `env:` — and quoted in
 # README.md and tools~/device-smoke/README.md; change all six together.)
 #
-# Until 2026-09-17 a SECOND mechanism sat on top of it: the seven Unity jobs
-# were chained with `needs:` (tests -> android-build -> ios-export ->
-# ios-export-coex -> tests-unity6-latest -> android-shrink-verify -> gate-off)
-# so that exactly ONE of them was ever eligible and the whole workflow ran
-# essentially in series. That chain is gone. Each of those jobs now waits only
-# on the licence gate, except gate-off, which waits on its REAL producers —
-# it downloads quickactions-demo-apk-2022.3 from android-build and
+# No `needs:` chain: each Unity job waits only on the licence gate, except
+# gate-off, which waits on its REAL producers (it downloads
+# quickactions-demo-apk-2022.3 from android-build and
 # ios-simulator-xcodeproj-2022.3 from ios-export, so pointing it at the gate
-# alone would race them and fail on a missing artifact.
+# alone would race them and fail on a missing artifact). Until 2026-09-17 the
+# seven Unity jobs were chained so that exactly ONE was ever eligible; that
+# bought nothing but wall clock, because runner minutes on a public repo are
+# free, and it was a deliberate margin rather than a fix for an observed
+# activation failure.
 #
-# Why it went, measured rather than guessed: the chain cost 29 minutes on run
-# 31 (before the shrink leg joined it) and 38 on run 35 for the whole matrix,
-# against 13.4 unchained — and runner minutes are free on a public repo, so it
-# was buying nothing but wall clock. What it was insuring against has never
-# happened: across 30 runs no game-ci step has conclusion "failure", every red
-# is downstream of a successful activation, and run 25 activated all eleven
-# legs simultaneously with every one logging "Successfully returned ULF
-# license". GameCI hardcodes one machine-id into its Linux images, so parallel
-# containers present to Unity as the same machine, and it states the split in
-# one sentence: "This is not an issue for free licenses, but for paid licenses,
-# you will need to be mindful of starting too many parallel jobs as activation
-# will fail"
-# (https://game.ci/docs/docker/docker-images/#concurrent-builds-on-windows-and-macos
-# — NOT the FAQ, which an earlier version of this comment cited; the FAQ does
-# not contain the word "seat"). This repo uses a Personal .ulf with no
-# UNITY_SERIAL, so the hard "two activations per key" limit that GameCI's own
-# CI hit (game-ci/unity-builder#516) does not bind these credentials. The chain
-# was a deliberate margin, not a fix for an observed failure, and the margin
-# cost more than the risk it covered.
+# max-parallel stays at 2 for now, deliberately: removing the chain was the one
+# variable that change moved, so an activation problem — if one ever appears —
+# can be attributed to it rather than to two changes at once.
 #
-# max-parallel stays at 2 for now, deliberately: removing the chain is the one
-# variable this change moves, so an activation problem — if one ever appears —
-# can be attributed to it rather than to two changes at once. The ceiling is
-# now roughly eleven concurrent activations, which run 25 already survived.
-#
-# What it actually bought, measured on run 103 (the first unchained run):
-# 36m01s wall clock — INSIDE the chained 29–38 range, not the ~13 the old
-# comment's unchained figure predicted. That figure was measured before the
-# macOS matrix grew to ten jobs, and it no longer describes this workflow. The
-# run splits like this:
-#   * the Linux half finishes at 16 min, and ten jobs were running at once
-#     three minutes in — that part is what the un-chain fixed, and it is why
-#     the Linux side will not become the bottleneck as the macOS side shrinks;
-#   * the macOS half runs to 35 min and owns the critical path. Its jobs enter
-#     in waves (t=3, 6, 9, 11, 12, 18, 23) behind GitHub's concurrent-macOS
-#     cap, and the two longest are the springboard taps: unity6-xcode27 at
-#     12→35 and unity6 at 12→34.
-# The single biggest remaining cost was therefore a CANARY that gates nothing:
-# ios springboard tap (unity6-xcode27), 23 minutes, holding a macOS slot on
-# every PR. Four xcode-27 canary legs did that between them. Moving them to the
-# weekly cron was the next change, and this measurement is why; it is done,
-# see `ios-simulator`'s matrix comment.
-# Every Unity job on run 103 still logged "Successfully returned ULF license"
-# under full parallelism, which is the one thing the un-chain could have broken.
-#
-# To restore the old behaviour: put android-build, ios-export, ios-export-coex,
-# tests-unity6-latest, android-shrink-verify and gate-off back on
-# `needs: [license, <the previous job>]` in the order listed above.
+# The measurements (runs 31, 35 and 103), GameCI's wording on parallel
+# activations and the recipe for putting the chain back: docs~/ci-history.md.
 #
 # A transient "Unity exits -1 within seconds" is, per GameCI's troubleshooting
 # page, a concurrent-activation hiccup: re-run the job after ~30s, and never
@@ -1043,18 +992,15 @@ jobs:
   # it per line would buy nothing. It builds the resource shrinker's own Gradle
   # task rather than a whole APK — assembleRelease drags in the release IL2CPP
   # native build, which overran a two-hour ceiling twice (runs 30 and 31) and
-  # produces nothing this experiment reads. Every step fails LOUDLY and prints what it could not parse
-  # instead of skipping. The job's first run (2026-08-21) validated its own
-  # design the hard way, exactly where the header had warned: export, chown,
-  # probe-planting and the minify flip all worked, and the build then died
-  # because the export ships NO gradlew and the runner's system Gradle (9.x)
-  # cannot load the AGP 7.1.2 the export pins (org.gradle.util.GUtil is gone
-  # in Gradle 9). The job now supplies JDK 17 and NDK r23b, downloads the
+  # produces nothing this experiment reads. Every step fails LOUDLY and prints
+  # what it could not parse instead of skipping.
+  #
+  # The export ships NO gradlew and the runner's system Gradle (9.x) cannot load
+  # the AGP it pins, so the job supplies JDK 17 and NDK r23b, downloads the
   # Gradle the export's own wrapper properties name (checksum-verified against
   # Gradle's published one) and re-points the docker-image paths the export
-  # hardcodes, instead of trusting the runner image's drift — the "JDK 11,
-  # Gradle 7.2" an earlier version of this comment promised was a guess about
-  # Unity 2022.3's bundle that run 25 disproved (see the JDK step below).
+  # hardcodes, instead of trusting the runner image's drift. How the first run
+  # showed that: docs~/ci-history.md.
   android-shrink-verify:
     name: android shrink verify (2022.3)
     needs: license

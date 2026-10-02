@@ -894,19 +894,13 @@ PY
   w="${wh%% *}"
   h="${wh##* }"
   x=$((w / 2))
-  # Start on the WORKSPACE first, not the bottom edge. The first four attempts
-  # began at 90% of the height, and the dumps of both images put that point on
-  # a search box: the Pixel launcher's hotseat search bar on API 35 (y 535–598
-  # of 640) and the collapsed all-apps search box on API 30 (574–630). A drag
-  # that begins on a search widget is the widget's to keep, and API 30 opened
-  # its drawer on one run in five while API 35 never moved. 65% is above the
-  # hotseat and the page indicator on both dumps (API 35: 441–465 / 465+;
-  # API 30: 475–499 / 499+) and below the smartspace card at the top.
-  # The 65% start opened the API 35 drawer on its first run (PR #19 run 64) and
-  # the API 30 one not at all, while the 90% start had opened API 30's once —
-  # the drag that starts on the collapsed all-apps box is the one that image
-  # answers. So both, in that order: the workspace first, the bottom edge
-  # second, each followed by a fresh search.
+  # Start on the WORKSPACE first (65% of the height), not the bottom edge: a
+  # drag that begins on a search widget is the widget's to keep, and 90% landed
+  # on one in the dumps of both emulator images (the hotseat search bar on API
+  # 35, the collapsed all-apps search box on API 30). 65% is above the hotseat
+  # and below the smartspace card on both. So both, in that order: the
+  # workspace first, the bottom edge second, each followed by a fresh search.
+  # The measured pixel ranges and the runs behind them: docs~/ci-history.md.
   y_from=$((h * 13 / 20))
   y_to=$((h / 5))
   echo "capture: display ${w}x${h} — swiping up at x=$x, y $y_from -> $y_to to open the app drawer"
