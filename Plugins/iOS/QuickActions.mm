@@ -58,7 +58,7 @@ static void QARunOnMain(dispatch_block_t block) {
 // only for this process run (a cold launch sets it before Unity reads it), so a
 // later normal launch never reports a stale shortcut.
 static NSString *gQALastPerformed = nil;
-// Queue of action ids awaiting delivery to the C# Performed event (cold launch).
+// Queue of action ids awaiting delivery to the C# Performed event (cold and warm taps).
 static NSMutableArray<NSString *> *gQAPending = nil;
 // Consume-once marker holding the id a COLD source already queued this launch
 // (didFinishLaunchingWithOptions or scene:willConnectToSession:). The same tap can
@@ -856,8 +856,9 @@ char *_QuickActions_ConsumePendingPerformed(void) {
 }
 
 // Builds {"items":[...]} from the OS's current *dynamic* shortcut items (static
-// Info.plist items are not surfaced by shortcutItems). Icons can't be read back,
-// so Icon is reported as 0 (None). Must run on the main thread (UIApplication).
+// Info.plist items are not surfaced by shortcutItems). Icon, symbol, template, payload
+// and L10n come back from our userInfo, since the OS cannot read icons back. Must run
+// on the main thread (UIApplication).
 static char *QABuildShortcutsJson(void) {
     NSArray<UIApplicationShortcutItem *> *items = [UIApplication sharedApplication].shortcutItems;
     NSMutableArray *out = [NSMutableArray array];
