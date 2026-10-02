@@ -131,28 +131,35 @@ namespace EminDeniz99.QuickActions
                 // true so the push can't re-enter the load, and the push writes the
                 // current locale's text, so the next load finds nothing stale.
                 Log($"Localization refresh: {stale} quick action(s) still rendered in another locale; re-pushing for '{Locale}'.");
-                if (!Push())
-                {
-                    // The OS refused it (rate-limited, locked profile…). Keep _loaded
-                    // true and arm one retry instead of re-reading forever (see
-                    // _refreshRetryArmed) — dropping _loaded here would make every
-                    // later read a write, and EnsureLoaded's own contract is that a
-                    // true return means _loaded is true (AddList relies on it).
-                    //
-                    // The cost, stated rather than hidden: this is NOT quite "only the
-                    // rendered language is wrong". Push sends the whole set, so on
-                    // Android a refused write can still have applied its stale-removal
-                    // phase first (see Push) — a newly appeared manifest/pinned
-                    // collision can already have dropped one of our ids on the device
-                    // while _items keeps claiming it. GetAll/IsAdded can therefore
-                    // over-report that one id until the next successful push or
-                    // reconcile. Narrower than the read-amplification it buys, and no
-                    // shortcut is lost either way.
-                    _refreshRetryArmed = true;
-                    Log("Localization refresh failed: the OS did not accept the update; the shortcuts still show the previous locale (one retry armed).");
-                }
+                // A refused push leaves _loaded true: EnsureLoaded's own contract is
+                // that a true return means _loaded is true (AddList relies on it).
+                PushRelabel("Localization refresh");
             }
             return true;
+        }
+
+        /// <summary>
+        /// Push the installed set so its labels re-render in the current locale.
+        ///
+        /// If the OS refuses it (rate-limited, locked profile…), <c>_loaded</c>
+        /// stays true and one retry is armed instead of re-reading forever (see
+        /// <c>_refreshRetryArmed</c>) — dropping <c>_loaded</c> here would make
+        /// every later read a write.
+        ///
+        /// The cost, stated rather than hidden: this is NOT quite "only the
+        /// rendered language is wrong". Push sends the whole set, so on Android a
+        /// refused write can still have applied its stale-removal phase first (see
+        /// Push) — a newly appeared manifest/pinned collision can already have
+        /// dropped one of our ids on the device while <c>_items</c> keeps claiming
+        /// it. GetAll/IsAdded can therefore over-report that one id until the next
+        /// successful push or reconcile. Narrower than the read-amplification it
+        /// buys, and no shortcut is lost either way.
+        /// </summary>
+        private static void PushRelabel(string what)
+        {
+            if (Push()) return;
+            _refreshRetryArmed = true;
+            Log($"{what} failed: the OS did not accept the update; the shortcuts still show the previous locale (one retry armed).");
         }
 
         /// <summary>
@@ -238,18 +245,7 @@ namespace EminDeniz99.QuickActions
                 if (!alreadyLoaded || _items.Count == 0)
                     return; // the reconcile above already re-rendered whatever needed it
                 Log($"Locale set to '{next}'; re-pushing {_items.Count} quick action(s).");
-                if (!Push())
-                {
-                    // The OS refused the re-render (rate-limited, locked profile…):
-                    // the device still shows the previous locale's labels. Arm the same
-                    // single retry a refused reconcile refresh arms, rather than
-                    // dropping _loaded and making every later read a write — with the
-                    // same caveat recorded at that site: a refused write can still have
-                    // applied its stale-removal phase on Android, so _items may
-                    // over-report one id until the next successful push.
-                    _refreshRetryArmed = true;
-                    Log("Locale change failed: the OS did not accept the update; the shortcuts still show the previous locale (one retry armed).");
-                }
+                PushRelabel("Locale change");
             }
         }
 
