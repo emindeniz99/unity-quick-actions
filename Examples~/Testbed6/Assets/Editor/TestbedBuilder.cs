@@ -228,10 +228,21 @@ public static class TestbedBuilder
     }
 #endif
 
-    private static void BuildPhone(string relativeOutput, bool development = true)
+    // The same development player with x86_64 as its ONLY ABI, for CI's API 25
+    // emulator leg. Every other smoke leg runs its ARM APK on an x86_64 image
+    // under that image's ARM translation; the API 25 google_apis image has none,
+    // so Android 7.1, the package's documented floor, needs a native build.
+    // Same output path as BuildAndroidPhone, for the reason
+    // BuildAndroidPhoneRelease gives: its own CI job instance, so every step
+    // after the build keeps the file name it already knows.
+    public static void BuildAndroidPhoneX86_64() =>
+        BuildPhone("Builds/QuickActionsDemo-phone.apk", architectures: AndroidArchitecture.X86_64);
+
+    private static void BuildPhone(string relativeOutput, bool development = true,
+        AndroidArchitecture architectures = AndroidArchitecture.ARMv7 | AndroidArchitecture.ARM64)
     {
         PlayerSettings.SetScriptingBackend(UnityEditor.Build.NamedBuildTarget.Android, ScriptingImplementation.IL2CPP);
-        PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARMv7 | AndroidArchitecture.ARM64;
+        PlayerSettings.Android.targetArchitectures = architectures;
         EditorUserBuildSettings.buildAppBundle = false;   // .apk, never .aab
         Build(BuildTarget.Android, relativeOutput, development: development);
     }

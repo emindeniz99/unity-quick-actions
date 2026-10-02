@@ -220,7 +220,7 @@ launcher label to search for — `QuickActionsDemo`, the testbeds' `productName`
 `CAPTURE_TIMEOUT` (60s per adb call),
 `CAPTURE_PRESS_MS`.
 
-CI turns it on for all three `android-smoke` legs and uploads
+CI turns it on for every `android-smoke` leg and uploads
 `longpress-<leg>` as a workflow artifact (`continue-on-error`, `if: always()`).
 
 ### Local run
@@ -248,7 +248,9 @@ init under the older image's ARM translation. Those legs run on every code push
 and PR — free on a public repo, and capped only by `UNITY_MAX_PARALLEL` legs
 per matrix (the job-to-job activation chain that used to serialise them came
 out on 2026-09-17) — plus a weekly cron that catches drift with no commit
-behind it.
+behind it. A `2022.3-api25` leg runs it on API 25 (7.1, the package's floor)
+against a native x86_64 build, as a canary (`continue-on-error`) until it has
+run green.
 
 [`.github/workflows/device-ci.yml`](../../.github/workflows/device-ci.yml) is
 the older, standalone lane: it takes a URL to an already-built APK and runs
