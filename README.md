@@ -718,8 +718,14 @@ cap — see [Known limits](#known-limits--the-os-shortcut-cap) and
   package copied are ever touched.
 - **Android** — written to `res/xml/quickactions_shortcuts.xml` (with generated
   string resources), and the `android.app.shortcuts` meta-data is injected into
-  the launcher activity. Each static intent targets the trampoline and encodes
-  its `Id` in the intent action (XML shortcuts can't carry extras).
+  every MAIN/LAUNCHER `<activity>` and `<activity-alias>`, enabled or not, so
+  whichever alias an icon-switching app enables carries them (manifest-tested
+  only; no device run across a switch, and only the module that holds the first
+  launcher component is patched). Dynamic shortcuts stay bound to the launcher
+  component that was enabled when they were added, and Android drops them when
+  it is disabled (read from AOSP, not observed), so re-`Add` them at startup. Each
+  static intent targets the trampoline and encodes its `Id` in the intent
+  action (XML shortcuts can't carry extras).
 
 Taps are delivered through the same `Performed` / `LastPerformed` path as dynamic
 shortcuts. Static and dynamic shortcuts coexist; iOS shows up to four total
