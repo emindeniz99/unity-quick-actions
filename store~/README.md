@@ -20,9 +20,10 @@ Regenerate with `python3 tools~/gen_store_images.py`.
 | `device-android-dynamic.jpg` | 440×680 | **Real capture** — Android after a runtime `Add` (README) |
 
 The three `device-*.jpg` files are genuine captures (`device-ios.jpg` from the
-iOS Simulator, not an iPhone; the commit that added it, `ac51427`, says so),
-cropped to the icon and menu, saved as JPEG: these are photographic (gradient wallpapers), where q75 is
-~5× smaller than PNG at the same visible quality (680 KB → 140 KB, measured).
+iOS Simulator, not an iPhone; the commit that added it, `65f802d`, says so),
+cropped to the icon and menu, saved as JPEG: these are photographic (gradient
+wallpapers), where q75 is ~5× smaller than PNG at the same visible quality
+(680 KB → 140 KB, measured).
 The root README references them by absolute `raw.githubusercontent.com` URL,
 because that README is also rendered as the package's front page on OpenUPM,
 where relative paths are unreliable.
