@@ -46,6 +46,34 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   leave the shortcut silently iconless; it now writes one `Log.w` line (tag
   `QuickActions`) naming the drawable.
 
+- **Each GitHub Release carries the demo APKs.** The Demo sample's APKs were
+  Actions artifacts only: they need a GitHub login and expire after 14 days, so
+  a phone could not fetch them. A new `release-apks` workflow follows the
+  `unity` run of a release commit and, when it is green, attaches its 2022.3
+  and Unity 6 APKs to that release. They are development builds of the Demo
+  sample, not release-signed. A `tag` dispatch input backfills a release while
+  its run's artifacts last. The workflow has not run on GitHub yet; its first
+  real test is the next release, or a dispatch for `v0.8.0`.
+
+- **CI builds the Unity 6 Build Profile shape the README recommends.** The
+  README tells Unity 6 users to keep `QUICKACTIONS_ENABLED` in a dev Build
+  Profile rather than the shared Player Settings, but every CI build set it in
+  Player Settings. The new `android-build-profile` job builds Testbed6 with the
+  define only in an active Build Profile and requires the trampoline in the
+  manifest and the bridge class in the dex. Creating the profile uses one
+  reflective call into Unity's internal `BuildProfile.CreateInstance`, because
+  Unity 6.0–6.3 expose no public factory; that is testbed code, not package
+  code. The `Enable` menu's doc now says it writes the shared Player Settings.
+
+- **iOS diagnostics for the SpringBoard taps.** When the app's home holds a
+  flag file that only the CI harness creates, each of the four native entry
+  hooks logs the hook name, the item type, whether the package's marker
+  matched, and the userInfo keys. The harness captures those lines for every
+  pass. Without the flag the cost is one file-existence check per hook call.
+  The goal is the weekly iOS 27 canary, where a runtime-added row reaches the
+  foreground but never `Performed`; its next run should tell the hypotheses
+  apart.
+
 ### Changed
 
 - **`Locale = null` restores the device default.** Assigning `null` used to
@@ -79,6 +107,40 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   build with Xcode 26, not 27, and plan the move to Unity 6 before April 2027.
 
 ### Fixed
+
+- **`RemoveById` reports a removal Android already applied.** Android's write
+  removes stale dynamic ids before the rate-limitable add. When the add was
+  refused in the background, `RemoveById` returned `false` for an id the
+  device had already dropped, and a retry then also returned `false`. On a
+  refused write it now re-reads the OS set once and returns `true` when the id
+  is gone. iOS writes atomically and never reaches this path. Tested with a
+  fake bridge that reproduces the partial write, not on a device.
+
+- **On the iOS scene lifecycle, a hand-written shortcut's cold tap is
+  delivered.** Shortcuts the package did not create, for example written into
+  `Info.plist` by hand, were adopted on a warm tap but dropped on a cold launch
+  under the UIScene lifecycle (Unity 6), because UIKit hands the launch item
+  only to `scene:willConnectToSession:options:`. That hook now adopts them under
+  the same rule as the warm hook: the package is the only handler and the scene
+  delegate is Unity's own. The coexistence probe checks it with synthetic
+  sends; no SpringBoard tap of such an item has run.
+
+- **Static shortcuts are injected into every launcher alias.** The Android
+  post-processor put the `android.app.shortcuts` meta-data only on the first
+  MAIN/LAUNCHER component, so a game that switches its icon with
+  `<activity-alias>` lost its static shortcuts once another alias was enabled.
+  Every MAIN/LAUNCHER `<activity>` and `<activity-alias>`, enabled or not, now
+  carries it; a host's own declaration on a component is left alone and
+  warned about, per component. Manifest-tested only. Dynamic shortcuts remain
+  bound to the component enabled when they were added (documented).
+
+- **The Android smoke taps fire the intents the OS stores.** Both synthetic
+  taps sent a hand-built `VIEW` + `ACTION_ID` intent for two static ids, so
+  the trampoline's action-suffix decode and the flags Android adds to a static
+  shortcut's intent were never exercised, and no dynamic-only id was tapped.
+  The warm tap now sends `new_game`'s baked intent and the cold tap the
+  dynamic-only `daily`'s. The PR's emulator legs are the first run of these
+  shapes.
 
 - **The demo scene gets a camera, the likely cause of its on-screen log
   overlapping itself.** The sample scene had none, so nothing cleared the
