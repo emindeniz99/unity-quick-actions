@@ -25,11 +25,13 @@ fi
 
 # Names below must match the package byte-for-byte — a typo here would make this
 # script pass or fail for reasons that have nothing to do with the package:
-#   Plugins/Android/QuickActionsBridge.java   EXTRA_ACTION_ID
+#   Plugins/Android/QuickActionsBridge.java   EXTRA_ACTION_ID, ACTION_PREFIX
+#   Editor/Android/QuickActionsBuildPostProcessorAndroid.cs   ActionPrefix
 #   Editor/Android/QuickActionsTrampolineInjectorAndroid.cs   TrampolineClass
 #   Samples~/Demo/QuickActionsDemo.cs         AutotestExtra + the Catalog ids
 TRAMPOLINE="com.emindeniz99.quickactions.QuickActionsTrampolineActivity"
 EXTRA_ACTION_ID="com.emindeniz99.quickactions.ACTION_ID"
+ACTION_PREFIX="com.emindeniz99.quickactions.PERFORM."
 AUTOTEST_EXTRA="com.emindeniz99.quickactions.AUTOTEST"
 SHORTCUT_IDS="new_game continue daily"
 # The subset of SHORTCUT_IDS that must carry an ICON RESOURCE once registered:
@@ -39,13 +41,23 @@ SHORTCUT_IDS="new_game continue daily"
 # static item with no icon at all. This is the one observation that turns "the
 # drawable is in the APK" into "the lookup resolved it on an Android runtime".
 ICON_SHORTCUT_IDS="${ICON_SHORTCUT_IDS:-new_game daily}"
+# Each synthetic tap fires the intent ShortcutManager stores for its kind of
+# shortcut, field for field. `am start` adds FLAG_ACTIVITY_NEW_TASK, the same
+# flag LauncherApps.startShortcut adds when a launcher fires one.
+#   static, TAP_ID: the <intent> QuickActionsBuildPostProcessorAndroid.cs bakes
+#     into res/xml — explicit component, action ACTION_PREFIX + id, no extras.
+#     The platform's ShortcutParser then adds NEW_TASK | CLEAR_TASK |
+#     TASK_ON_HOME.
+#   dynamic, COLD_TAP_ID: the intent QuickActionsBridge.java buildShortcut()
+#     sets — explicit component, action VIEW, the ACTION_ID string extra, no
+#     flags. daily is the demo's one dynamic-only id.
 TAP_ID="new_game"
 # The cold step taps a DIFFERENT registered id on purpose: its assertion reads
 # the whole `logcat -d` buffer, and `logcat -c` is known to under-clear on
 # emulators while still exiting 0 (issuetracker.google.com/issues/175488702),
 # which the `|| fail` on the clear cannot detect. Reusing TAP_ID would let the
 # warm tap's line satisfy the cold assertion on its first poll.
-COLD_TAP_ID="continue"
+COLD_TAP_ID="daily"
 
 # Every wait is bounded: a smoke run that hangs in CI tells you less than one
 # that fails. Overridable for slow emulators/first boots.
@@ -357,16 +369,21 @@ $block" ;;
   esac
 done
 
-step "6/8 simulate a WARM tap on '$TAP_ID' (app already running)"
-# A launcher tap is an intent at the exported trampoline, so starting it directly
-# is the same thing the launcher does. It also exercises the REGISTERED-id path
-# that the trampoline's spoof gate deliberately allows: an id that is not a live
-# shortcut of ours is dropped there on purpose, so a green run here means the
-# gate let a genuine tap through rather than that the gate is absent.
+step "6/8 simulate a WARM tap on the static '$TAP_ID' (app already running)"
+# A launcher tap is the stored intent sent at the exported trampoline, so
+# starting that intent directly is the same thing the launcher does (see TAP_ID
+# at the top for its shape). The id travels in the action, so this is the
+# trampoline's action-suffix decode, and CLEAR_TASK lands on a live app: the
+# trampoline's empty taskAffinity should confine it to the trampoline's own
+# task, and step 7 shows whether the id still arrives. It also exercises the
+# REGISTERED-id path that the trampoline's spoof gate deliberately allows: an
+# id that is not a live shortcut of ours is dropped there on purpose, so a
+# green run here means the gate let a genuine tap through rather than that the
+# gate is absent.
 adb_ logcat -c >/dev/null 2>&1 || fail "could not clear logcat before the tap."
 if ! out="$(adb_ shell am start -n "$APP_ID/$TRAMPOLINE" \
-    -a android.intent.action.VIEW \
-    --es "$EXTRA_ACTION_ID" "$TAP_ID" 2>&1 | tr -d '\r')"; then
+    -a "$ACTION_PREFIX$TAP_ID" \
+    --activity-clear-task --activity-task-on-home 2>&1 | tr -d '\r')"; then
   fail "adb could not start the trampoline $APP_ID/$TRAMPOLINE:
 $out"
 fi
@@ -374,7 +391,7 @@ case "$out" in
   *Error*|*Exception*) fail "am start reported an error for the trampoline (is the <activity> in the manifest? it is stripped without QUICKACTIONS_ENABLED):
 $out" ;;
 esac
-echo "started $APP_ID/$TRAMPOLINE with $EXTRA_ACTION_ID=$TAP_ID"
+echo "started $APP_ID/$TRAMPOLINE with the static intent, action $ACTION_PREFIX$TAP_ID"
 
 step "7/8 assert the warm tap arrived as Performed"
 if ! poll "$LOG_ATTEMPTS" performed_logged "$TAP_ID"; then
@@ -387,7 +404,7 @@ $(adb_ logcat -d 2>/dev/null | tr -d '\r' | grep -i quickactions | tail -n 20 ||
 fi
 echo "warm tap on '$TAP_ID' came back as Performed"
 
-step "8/8 simulate a COLD tap on '$COLD_TAP_ID' (app force-stopped first)"
+step "8/8 simulate a COLD tap on the dynamic '$COLD_TAP_ID' (app force-stopped first)"
 # The other half of delivery. Step 6 tapped into a LIVE process, so the id only
 # had to survive a resume (OnApplicationPause/Focus). A launcher tap on a quit
 # app instead STARTS the process: the id rides the launch intent and has to
@@ -447,16 +464,18 @@ if ! poll "$half" performed_logged "$COLD_TAP_ID"; then
 fi
 if ! performed_logged "$COLD_TAP_ID" && ! poll "$((COLD_LOG_ATTEMPTS - half))" performed_logged "$COLD_TAP_ID"; then
   fail "no \"Performed quick action '$COLD_TAP_ID'\" in logcat within $((COLD_LOG_ATTEMPTS * POLL_INTERVAL))s of the COLD tap.
-The equivalent tap passed in step 7 against a running app, so the trampoline and
-its ownership gate are fine: what failed is the launch path — the id did not
-survive the process start, or it was consumed before the game subscribed. (If
-the device is simply slow, raise COLD_LOG_ATTEMPTS.)
+Step 7's static tap reached the game through the same trampoline, so what is
+left is this dynamic shortcut's path: the id did not survive the process start,
+it was consumed before the game subscribed, or the gate dropped it (a dynamic id
+must carry the package's managed marker — look for \"Ignored a trampoline intent
+for an unknown shortcut id\" below). (If the device is simply slow, raise
+COLD_LOG_ATTEMPTS.)
 $(app_diagnostics)
 QuickActions lines seen since the cold tap:
 $(adb_ logcat -d 2>/dev/null | tr -d '\r' | grep -i quickactions | tail -n 20 || true)"
 fi
 
-printf '\nPASS: %s on API %s — %s registered with ShortcutManager; a WARM tap on '\''%s'\'' and a COLD (force-stopped) tap on '\''%s'\'' both came back as Performed.\n' \
+printf '\nPASS: %s on API %s — %s registered with ShortcutManager; a WARM tap on the static '\''%s'\'' and a COLD (force-stopped) tap on the dynamic '\''%s'\'' both came back as Performed.\n' \
   "$APP_ID" "$API_LEVEL" "$SHORTCUT_IDS" "$TAP_ID" "$COLD_TAP_ID"
 
 # ---------------------------------------------------------------------------
@@ -592,10 +611,11 @@ CAPTURE_TITLES="${CAPTURE_TITLES:-$default_titles}"
 # The row the capture TAPS once the sheet is up, as "<id>|<title>|<subtitle>":
 # the id is what has to reach logcat, the two label forms are what the launcher
 # may have drawn (same rule as CAPTURE_TITLES — whichever fits the popup). The
-# dynamic `daily` on purpose: it is the one id the SYNTHETIC taps never use
-# (step 6 taps new_game, step 8 continue), so a "Performed quick action
-# 'daily'" line cannot be a leftover from them, cleared logcat or not.
-default_tap="daily|Daily Reward|Claim today"
+# static `continue` on purpose: no SYNTHETIC tap uses it (step 6 taps new_game,
+# step 8 daily), so a "Performed quick action 'continue'" line cannot be a
+# leftover from them, cleared logcat or not. daily_reward is unused too, but its
+# subtitle starts with daily's, so the row search could land on the wrong row.
+default_tap="continue|Continue|Resume v1.4.0 (37)"
 CAPTURE_TAP="${CAPTURE_TAP:-$default_tap}"
 # A launcher tap starts the app from cold (the capture force-stops it first),
 # so it gets the cold budget, not the warm one.

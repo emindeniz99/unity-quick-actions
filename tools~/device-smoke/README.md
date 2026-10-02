@@ -44,18 +44,25 @@ tools~/device-smoke/android_device_smoke.sh <apk> <application-id> [adb-serial]
 5. Polls `adb shell dumpsys shortcut` until `new_game`, `continue` and `daily`
    appear **in this application id's section** (another app's shortcut with the
    same id does not count).
-6. Clears logcat and starts the exported trampoline directly:
+6. Clears logcat and fires the intent ShortcutManager stores for the **static**
+   `new_game` straight at the exported trampoline:
    `am start -n <app-id>/com.emindeniz99.quickactions.QuickActionsTrampolineActivity
-   -a android.intent.action.VIEW --es com.emindeniz99.quickactions.ACTION_ID new_game`.
-   That is the same intent the launcher sends for a tap. The app is still
-   running at this point, so this is the **warm** path.
+   -a com.emindeniz99.quickactions.PERFORM.new_game --activity-clear-task
+   --activity-task-on-home` — the action and component
+   `QuickActionsBuildPostProcessorAndroid.cs` bakes into `res/xml`, no extras,
+   and the flags the platform adds to every static shortcut (`am start`, like
+   the launcher, adds `NEW_TASK`). The app is still running at this point, so
+   this is the **warm** path.
 7. Polls logcat for the package's own line
    `[QuickActions] Performed quick action 'new_game'.` (the demo turns
    `LoggingEnable` on in `Awake`).
 8. `am force-stop`s the app, **proves the process is gone** (polls `pidof`
    empty — force-stop's exit status says nothing, and a still-alive app would
-   silently turn this into a second warm tap), clears logcat and sends the same
-   intent shape **for a second registered id** (`continue`) — the assertion
+   silently turn this into a second warm tap), clears logcat and fires the
+   intent stored for the **dynamic-only** `daily` — the one
+   `QuickActionsBridge.java` builds: same component,
+   `-a android.intent.action.VIEW --es com.emindeniz99.quickactions.ACTION_ID daily`.
+   A different id from step 6 on purpose: the assertion
    deliberately matches text that cannot pre-exist in the buffer, because
    `logcat -c` can under-clear on emulators while exiting 0. Nothing of ours is
    running at this point, so the trampoline has to start the process and the id
@@ -101,15 +108,19 @@ OS accepts, and that a tap intent for one of them is turned into a `Performed`
 event inside the game — **twice**: once into a running process
 (`OnApplicationFocus`/`OnApplicationPause`, the warm resume) and once into an
 app that was force-stopped first, where the tap starts the process and the id
-has to reach the game through the launch intent. Because the id it taps is a
-live registered shortcut, it also exercises the path the trampoline's spoof gate
-deliberately **allows** (`isKnownShortcut`). Step 5 also requires the registered
+has to reach the game through the launch intent. The warm tap is a static
+shortcut's intent and the cold one a dynamic shortcut's, so both ways the
+trampoline reads an id (the action suffix, the extra) are fired. Because each id
+it taps is a live registered shortcut, it also exercises the path the
+trampoline's spoof gate deliberately **allows** (`isKnownShortcut`), once for a
+static id and once for a dynamic one. Step 5 also requires the registered
 `new_game` (static, `Icon = Add`) and `daily` (runtime `Add`, `IconType.Favorite`)
 entries to carry a resolved icon resource in `dumpsys shortcut` — the one place
 the by-name drawable lookup (yours first, then the package's built-in) is
 observed on an Android runtime. `ICON_SHORTCUT_IDS` overrides that list.
 
-The cold step has run green on the CI emulator legs for all three Unity lines
+The cold step — in its earlier form, the static `continue` sent in the dynamic
+intent's shape — has run green on the CI emulator legs for all three Unity lines
 (2021.3 and 2022.3 on the API 30 image, Unity 6 on API 35) — the `android-smoke`
 job in [`unity-ci.yml`](../../.github/workflows/unity-ci.yml). It has never run
 against physical hardware, so a cold launcher tap on a real device remains
@@ -121,9 +132,10 @@ It does **not** prove:
   that needs human eyes on a home screen, which is what the opt-in capture
   below *photographs* without asserting anything about it;
 * that a real **launcher tap** on a quit app behaves like the `am start` the
-  script sends — the eight asserted steps use the intent the launcher builds,
-  not the launcher. The capture below now taps a row of the real popup when it
-  managed to open one, and *that* tap is asserted when it lands (see step 7);
+  script sends — the eight asserted steps fire a copy of the intent
+  ShortcutManager stores, from the shell, not from the launcher. The capture
+  below now taps a row of the real popup when it managed to open one, and
+  *that* tap is asserted when it lands (see step 7);
   but whether the launcher opens its drawer at all is the emulator's business,
   so this is proven opportunistically, never on demand, and never on hardware;
 * that an **unregistered** id is *rejected* by the trampoline (the negative half
@@ -173,11 +185,12 @@ the picture, not the line.
 
 With the sheet up, the capture force-stops the app, clears logcat, re-reads the
 hierarchy, **taps the row** named by `CAPTURE_TAP` (`<id>|<title>|<subtitle>`,
-default `daily|Daily Reward|Claim today`) and waits for
+default `continue|Continue|Resume v1.4.0 (37)`, a static row) and waits for
 `Performed quick action '<id>'`. That is the launcher's own intent, starting a
 dead process — the one delivery path the eight asserted steps cannot reach,
-because they build the intent themselves. The id is deliberately the one the
-synthetic taps never use, so the line cannot be a leftover.
+because they send their copy of the intent themselves. The id is deliberately
+one the synthetic taps never use (they tap `new_game` and `daily`), so the line
+cannot be a leftover.
 
 It records exactly one verdict in `launcher-tap.txt`, and only the middle one is
 the package's:
