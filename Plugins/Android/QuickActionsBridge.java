@@ -692,7 +692,7 @@ public final class QuickActionsBridge {
     // ---- queried by C# ----
 
     public static synchronized String consumePendingPerformed() {
-        return sPending.isEmpty() ? null : sPending.pollFirst();
+        return sPending.pollFirst();
     }
 
     public static synchronized String getLastPerformed() {
