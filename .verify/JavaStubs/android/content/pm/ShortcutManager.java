@@ -36,7 +36,6 @@ public class ShortcutManager {
   public void removeDynamicShortcuts(List<String> ids){
     dynamic.removeIf(s -> ids.contains(s.getId()));
   }
-  public void removeAllDynamicShortcuts(){ dynamic.clear(); }
   public void disableShortcuts(java.util.List<String> ids){
     // AOSP: removes matching dynamic entries and greys out pinned copies.
     dynamic.removeIf(s -> ids.contains(s.getId()));

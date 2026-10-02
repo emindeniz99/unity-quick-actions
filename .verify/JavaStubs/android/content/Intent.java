@@ -2,8 +2,6 @@ package android.content;
 import java.util.HashMap;
 public class Intent {
   public static final String ACTION_VIEW="android.intent.action.VIEW";
-  public static final int FLAG_ACTIVITY_REORDER_TO_FRONT=1;
-  public static final int FLAG_ACTIVITY_NEW_TASK=2;
   // Field-backed so the .verify smoke test can drive the trampoline.
   private String action; private final HashMap<String,String> extras = new HashMap<>();
   // Smoke-test hook: when set, getStringExtra throws it — the shape of a Bundle
@@ -15,5 +13,4 @@ public class Intent {
   public Intent putExtra(String k,String v){extras.put(k,v); return this;}
   public String getStringExtra(String k){ if (failGetStringExtra != null) throw failGetStringExtra; return extras.get(k);}
   public String getAction(){return action;}
-  public Intent addFlags(int f){return this;}
 }

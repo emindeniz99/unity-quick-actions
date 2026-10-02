@@ -77,7 +77,6 @@ namespace UnityEditor
     // Object.DestroyImmediate(editor) is valid; mirror that here.
     public class Editor : UnityEngine.Object
     {
-        public static Editor CreateEditor(UnityEngine.Object obj) => new Editor();
         public static void CreateCachedEditor(UnityEngine.Object obj, Type editorType, ref Editor previousEditor)
         {
             previousEditor ??= new Editor();
@@ -160,10 +159,7 @@ namespace UnityEditor.iOS.Xcode
     public abstract class PlistElement
     {
         // Mirrors UnityEditor.iOS.Xcode.PlistElement accessors used when reading a plist.
-        public string AsString() => string.Empty;
         public bool AsBoolean() => false;
-        public PlistElementDict AsDict() => new PlistElementDict();
-        public PlistElementArray AsArray() => new PlistElementArray();
     }
 
     public class PlistElementDict : PlistElement
@@ -177,7 +173,6 @@ namespace UnityEditor.iOS.Xcode
         public PlistElementDict CreateDict(string key) => new PlistElementDict();
         public void SetString(string key, string value) { }
         public void SetBoolean(string key, bool value) { }
-        public void SetInteger(string key, int value) { }
     }
 
     public class PlistElementArray : PlistElement
@@ -185,6 +180,5 @@ namespace UnityEditor.iOS.Xcode
         // Mirrors UnityEditor.iOS.Xcode.PlistElementArray.values (used to merge entries).
         public List<PlistElement> values = new List<PlistElement>();
         public PlistElementDict AddDict() => new PlistElementDict();
-        public void AddString(string value) { }
     }
 }
