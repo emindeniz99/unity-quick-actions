@@ -74,6 +74,15 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   foreground but never `Performed`; its next run should tell the hypotheses
   apart.
 
+- **CI runs the Android 7.1 floor, as a canary.** The package's documented
+  Android floor is 7.1 (API 25), but every emulator leg ran API 30 or 35, so
+  the code's one API branch (no pinning and no adaptive bitmaps below 8.0, the
+  legacy built-in icon vector) had never executed. A new `2022.3-x86_64` build
+  leg produces a native x86_64 APK, because the API 25 image cannot translate
+  ARM, and a `2022.3-api25` smoke leg runs the emulator smoke on it. Both are
+  `continue-on-error` until they have been green; nothing claims API 25 is
+  verified before then.
+
 ### Changed
 
 - **`Locale = null` restores the device default.** Assigning `null` used to
