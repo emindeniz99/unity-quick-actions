@@ -78,15 +78,15 @@ static void QAEnsureState(void) {
     });
 }
 
-// Records the tapped action: stores it as "last" and, when `queue` is YES,
-// enqueues it for the single C# poll channel. Reached through the cold/warm wrappers
-// below, which both pass YES; `copy` pins the (possibly autoreleased) type string.
-static void QAStorePerformed(NSString *type, BOOL queue) {
+// Records the tapped action: stores it as "last" and enqueues it for the single C# poll
+// channel. Reached through the cold/warm wrappers below; `copy` pins the (possibly
+// autoreleased) type string.
+static void QAStorePerformed(NSString *type) {
     if (type.length == 0) return;
     QAEnsureState();
     @synchronized (gQALock) {
         gQALastPerformed = [type copy];
-        if (queue) [gQAPending addObject:[type copy]];
+        [gQAPending addObject:[type copy]];
     }
 }
 
@@ -99,7 +99,7 @@ static void QAStorePerformedCold(NSString *type) {
     QAEnsureState();
     @synchronized (gQALock) {
         gQAColdDeliveredId = [type copy];
-        QAStorePerformed(type, YES);
+        QAStorePerformed(type);
     }
 }
 
@@ -115,7 +115,7 @@ static void QAStorePerformedWarm(NSString *type) {
             gQAColdDeliveredId = nil;
             return;
         }
-        QAStorePerformed(type, YES);
+        QAStorePerformed(type);
     }
 }
 
