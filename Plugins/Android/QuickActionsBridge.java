@@ -136,10 +136,10 @@ public final class QuickActionsBridge {
         List<String> reEnableForUndo = null; // set once pins are re-enabled, for the catch path
         // The OS cap covers manifest (static) + dynamic shortcuts combined, so
         // leave room for any static ones; otherwise addDynamicShortcuts throws.
-        // getManifestShortcuts/addDynamicShortcuts can throw IllegalStateException
+        // getDynamicShortcuts/addDynamicShortcuts can throw IllegalStateException
         // (e.g. user locked) — keep it all inside the guard so nothing crosses JNI.
         try {
-            List<ShortcutInfo> manifest = manager.getManifestShortcuts();
+            List<ShortcutInfo> manifest = manifestShortcutsOrNone(manager);
 
             // Partition the CURRENT dynamic set into ours (marked) vs another
             // publisher's (unmarked — the host app's own shortcuts). Everything
@@ -173,7 +173,7 @@ public final class QuickActionsBridge {
             // A manifest (static) id is foreign too: the collision would make
             // addDynamicShortcuts throw IllegalArgumentException and discard the
             // ENTIRE dynamic set, not just the offender.
-            if (manifest != null) for (ShortcutInfo s : manifest) foreignIds.add(s.getId());
+            for (ShortcutInfo s : manifest) foreignIds.add(s.getId());
 
             // Drop our items whose id collides with a HOST dynamic or pinned
             // shortcut (addDynamicShortcuts updates same-id entries IN PLACE, which
@@ -194,8 +194,7 @@ public final class QuickActionsBridge {
             // (Edge case: a host that declares manifest shortcuts on OTHER main
             // activities would over-count here and under-fill the dynamic budget —
             // negligible for the single-activity apps this targets.)
-            int budget = manager.getMaxShortcutCountPerActivity()
-                    - (manifest == null ? 0 : manifest.size()) - hostIds.size();
+            int budget = maxShortcutCountOrUnbounded(manager) - manifest.size() - hostIds.size();
             if (budget < 0) budget = 0;
             if (shortcuts.size() > budget) {
                 android.util.Log.w("QuickActions", "Trimmed dynamic shortcuts to fit the OS cap: kept "
@@ -260,6 +259,31 @@ public final class QuickActionsBridge {
             android.util.Log.w("QuickActions", "dynamic shortcut write failed", e);
             undoReEnable(manager, reEnableForUndo);
             return null;
+        }
+    }
+
+    // The manifest only feeds the collision drop and the budget, so an unreadable
+    // one counts as none instead of failing the whole write. A real collision or
+    // overflow then makes the OS refuse the add, which reports null as before.
+    private static List<ShortcutInfo> manifestShortcutsOrNone(ShortcutManager manager) {
+        try {
+            List<ShortcutInfo> manifest = manager.getManifestShortcuts();
+            if (manifest != null) return manifest;
+        } catch (RuntimeException e) {
+            android.util.Log.w("QuickActions", "Could not read manifest shortcuts; treating them as none", e);
+        }
+        return new ArrayList<>();
+    }
+
+    // An unreadable cap means no trim: the OS refuses an oversized add (null, so
+    // the managed layer keeps its list), where trimming to a guessed cap would
+    // report the dropped ids as refused and the managed layer would prune them.
+    private static int maxShortcutCountOrUnbounded(ShortcutManager manager) {
+        try {
+            return manager.getMaxShortcutCountPerActivity();
+        } catch (RuntimeException e) {
+            android.util.Log.w("QuickActions", "Could not read the shortcut cap; writing untrimmed", e);
+            return Integer.MAX_VALUE;
         }
     }
 
