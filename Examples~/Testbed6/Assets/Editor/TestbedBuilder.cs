@@ -3,10 +3,8 @@ using System.IO;
 using UnityEditor;
 using UnityEditor.Build.Reporting;
 using UnityEngine;
-#if UNITY_6000_0_OR_NEWER
 using System.Reflection;
 using UnityEditor.Build.Profile;
-#endif
 
 // Build entry points for the unity CLI (`unity build --execute-method ...`).
 // Unity has no built-in command-line build, so every CI build needs one of these.
@@ -171,7 +169,6 @@ public static class TestbedBuilder
     // comparison and both are uploaded as their own artifacts.
     public static void BuildAndroidPhoneSecond() => BuildPhone("Builds/QuickActionsDemo-phone-2.apk");
 
-#if UNITY_6000_0_OR_NEWER
     // README's Unity 6 setup: QUICKACTIONS_ENABLED only in a dev Build Profile,
     // never in the shared Player Settings. Step 1 of 2 clears the define from
     // Player Settings and creates that profile; step 2 runs in a new editor
@@ -226,7 +223,6 @@ public static class TestbedBuilder
         }
         BuildPhone("Builds/DevProfile-phone.apk");
     }
-#endif
 
     // The same development player with x86_64 as its ONLY ABI, for CI's API 25
     // emulator leg. Every other smoke leg runs its ARM APK on an x86_64 image
