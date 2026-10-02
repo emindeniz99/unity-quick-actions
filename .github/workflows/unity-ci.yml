@@ -2491,8 +2491,8 @@ jobs:
   # of. Sources live in Examples~/Coexistence/iOS (invisible to Unity, never
   # shipped, each file wrapped in #if QUICKACTIONS_ENABLED) and are copied into the
   # testbed here, exactly the way the Demo sample is imported. 2021.3 is absent on
-  # purpose: it is exported but never compiled on macOS (x86_64-only simulator
-  # runtime), so a coex leg there could assert nothing.
+  # purpose: it is exported but never compiled on macOS (never tried), so a coex
+  # leg there has no built app to assert on.
   ios-export-coex:
     name: ios export coex (${{ matrix.testbed.name }})
     needs: license
@@ -2559,11 +2559,13 @@ jobs:
   # (CODE_SIGNING_ALLOWED=NO), then boot a simulator, install the .app and
   # launch it, asserting the process is still alive afterwards (`simctl
   # launch` exiting 0 only means the spawn was accepted). 2021.3 is exported
-  # above but deliberately NOT compiled here: that line's simulator support is
-  # x86_64-only (see README "Status") while current macOS runners ship
-  # arm64-only iOS 26 runtimes, and its IL2CPP output needs ld_classic
-  # workarounds under Xcode 15+ — a red job there would say nothing about the
-  # package. 2022.3 gets macos-15 (Xcode 16.4 default); Unity 6 gets the
+  # above but deliberately NOT compiled here: nobody has tried it. Unity ships
+  # only an x86_64 simulator runtime for that line; x86_64-only 2022.3 and
+  # Unity 6 exports ran on the macos-15 and macos-26 arm64 runners (runs 77
+  # and 78, before the exports moved to arm64), and the iOS 27 simulator
+  # refuses x86_64-only apps (run 76). Whether its IL2CPP output needs
+  # ld_classic under Xcode 15+ was never measured here.
+  # 2022.3 gets macos-15 (Xcode 16.4 default); Unity 6 gets the
   # current macos-latest (Xcode 26). The two `-xcode27` legs compile the SAME
   # exports on GitHub's public-preview `xcode-27` image — Xcode 27.0 GA
   # (27A266a) is the default in image 20260921.0210.1 (runner-images README);
