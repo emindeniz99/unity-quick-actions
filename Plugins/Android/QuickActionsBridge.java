@@ -656,13 +656,14 @@ public final class QuickActionsBridge {
      * Report in-app usage of OUR shortcut with this id to the launcher's ranking
      * predictor ({@code reportShortcutUsed}). Ownership-gated like every other
      * call here — a host app's shortcut id is refused. Returns true when the
-     * signal was sent. Never throws across JNI.
+     * signal was sent. Never throws: the trampoline calls it on every tap
+     * without a guard of its own.
      */
     public static boolean reportShortcutUsed(Activity activity, String id) {
         if (activity == null || id == null || id.isEmpty() || Build.VERSION.SDK_INT < 25) return false;
-        ShortcutManager manager = activity.getSystemService(ShortcutManager.class);
-        if (manager == null) return false;
         try {
+            ShortcutManager manager = activity.getSystemService(ShortcutManager.class);
+            if (manager == null) return false;
             for (ShortcutInfo s : manager.getDynamicShortcuts()) {
                 if (isOurShortcut(s) && id.equals(s.getId())) {
                     manager.reportShortcutUsed(id);

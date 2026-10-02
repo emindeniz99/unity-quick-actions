@@ -76,13 +76,10 @@ public final class QuickActionsTrampolineActivity extends Activity {
             // static ids too, because recording the tap must work for them.
             //
             // Never let the usage report affect delivery: Performed is the
-            // contract, ranking is a nicety, and the call is not on Android's
-            // worker-thread-warned list, so it stays inline next to recordPerformed.
-            try {
-                QuickActionsBridge.reportShortcutUsed(this, actionId);
-            } catch (RuntimeException e) {
-                android.util.Log.w("QuickActions", "reportShortcutUsed on tap failed", e);
-            }
+            // contract, ranking is a nicety. reportShortcutUsed never throws and
+            // is not on Android's worker-thread-warned list, so it stays inline
+            // next to recordPerformed with no guard of its own.
+            QuickActionsBridge.reportShortcutUsed(this, actionId);
         } else if (actionId != null) {
             android.util.Log.w("QuickActions", "Ignored a trampoline intent for an unknown shortcut id");
         }

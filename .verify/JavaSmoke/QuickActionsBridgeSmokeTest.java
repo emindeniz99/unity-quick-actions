@@ -56,6 +56,7 @@ public final class QuickActionsBridgeSmokeTest {
         maxShortcutCountIsExposed();
         adaptiveAndPinDegradeBelowApi26();
         usageReportIsOwnershipGated();
+        usageReportNeverThrowsIntoTheTrampoline();
         bitmapIconsAreClampedToTheOsBudget();
         rateLimitFlagIsExposed();
 
@@ -604,6 +605,41 @@ public final class QuickActionsBridgeSmokeTest {
         Build.VERSION.SDK_INT = 24;
         check(!QuickActionsBridge.reportShortcutUsed(activity(mgr), "mine"), "below API 25 reports false");
         Build.VERSION.SDK_INT = prev;
+    }
+
+    private static void usageReportNeverThrowsIntoTheTrampoline() throws Exception {
+        // The trampoline calls reportShortcutUsed on every tap with no guard of
+        // its own, so the bridge must contain every failure — the service lookup
+        // included — or a tap would crash the game's process.
+        ShortcutManager mgr = new ShortcutManager();
+        mgr.dynamic.add(ours("a", 0));
+        Activity broken = activity(mgr);
+        broken.failGetSystemService = new IllegalStateException("system service lookup stand-in");
+        boolean threw = false;
+        boolean sent = true;
+        try {
+            sent = QuickActionsBridge.reportShortcutUsed(broken, "a");
+        } catch (RuntimeException e) {
+            threw = true;
+        }
+        check(!threw, "a throwing getSystemService does not escape reportShortcutUsed");
+        check(!sent, "…and the signal is reported as not sent");
+
+        // A tap whose usage report throws is still delivered.
+        mgr.throwOnUsageReport = true;
+        QuickActionsTrampolineActivity t = new QuickActionsTrampolineActivity();
+        t.testSystemService = mgr;
+        java.lang.reflect.Method handle = QuickActionsTrampolineActivity.class.getDeclaredMethod("handleIntent", Intent.class);
+        handle.setAccessible(true);
+        threw = false;
+        try {
+            handle.invoke(t, new Intent().putExtra(QuickActionsBridge.EXTRA_ACTION_ID, "a"));
+        } catch (java.lang.reflect.InvocationTargetException e) {
+            threw = true;
+        }
+        check(!threw, "a throwing usage report does not escape the trampoline");
+        check("a".equals(QuickActionsBridge.consumePendingPerformed()), "…and the tap is still recorded");
+        QuickActionsBridge.resetLastPerformed();
     }
 
     // ---- helpers ----
