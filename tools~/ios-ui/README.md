@@ -19,10 +19,11 @@ Apple account** anywhere.
 | `gen_project.rb` | regenerates the project with the `xcodeproj` gem; only needed when the target's shape changes, never on CI |
 
 The test taps **one** row per run, named by `QA_ACTION_ID` / `QA_ROW_TITLE`, so
-CI runs it twice per leg through `run_springboard_tap.sh`: once for
-`daily_reward`, which the settings asset baked into `Info.plist`, and once for
+CI runs it three times per leg through `run_springboard_tap.sh`: once for
+`daily_reward`, which the settings asset baked into `Info.plist`, once for
 `runtime_add`, which nothing baked anywhere — see [Tapping a runtime-added
-row](#tapping-a-runtime-added-row).
+row](#tapping-a-runtime-added-row) — and once more for `daily_reward` as a warm
+re-entry into an app that is already running.
 
 ## What the test does
 

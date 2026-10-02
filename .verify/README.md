@@ -7,7 +7,7 @@ Unity (the leading `.` means Unity ignores it) and never ships in a build.
 Run everything:
 
 ```bash
-tools~/verify.sh        # gen_meta + C# compile (x10) + unit tests + Java compile + smoke
+tools~/verify.sh        # gen_meta + C# compile (x11) + unit tests + Java compile + smoke
                         # + frozen strings + release-notes coherence + built-in icons
 tools~/setup.sh         # one-time: install dotnet + JDK if missing
 ```

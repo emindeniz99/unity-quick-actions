@@ -23,12 +23,12 @@ except ImportError:
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, "store~")
 ICONS = os.path.join(OUT, "example-shortcut-icons")
-# Candidates, most-preferred first. DejaVu is the intended look and is what the
-# devcontainer ships; the macOS entries exist because this art gets regenerated
-# on a laptop at least as often as in CI, and Pillow's bitmap fallback produces
-# images too coarse to upload. A silent quality regression is worse than a loud
-# missing-font error, so `f()` warns once per family and never renders bitmap
-# text into a key image without saying so.
+# Candidates, most-preferred first. DejaVu is the intended look; the macOS
+# entries exist because this art gets regenerated on a laptop at least as often
+# as in CI, and Pillow's bitmap fallback produces images too coarse to upload.
+# A silent quality regression is worse than a loud missing-font error, so
+# `f()` warns once per family and never renders bitmap text into a key image
+# without saying so.
 FONT = [
     "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
     "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",

@@ -4,8 +4,8 @@
 !.env.example
 
 # The .unitypackage is a BUILD OUTPUT, not a source file: CI rebuilds it
-# reproducibly with tools/pack_unitypackage.py and attaches it to the GitHub
-# Release. Run tools/release.sh to produce one locally.
+# reproducibly with tools~/pack_unitypackage.py and attaches it to the GitHub
+# Release. Run tools~/release.sh to produce one locally.
 dist~/
 
 # Unity leaves these in any project that consumes this package; they must never
