@@ -178,6 +178,14 @@ static void QADiagLog(const char *hook, UIApplicationShortcutItem *item) {
           QAIsOurShortcut(item) ? "yes" : "no", [item.userInfo.allKeys componentsJoinedByString:@","]);
 }
 
+// True when `sel` still resolves to `ours` on self's class, i.e. no host plugin has
+// swizzled on top of us since we installed. Callers pair it with their own
+// gQAOrig* == NULL test.
+static BOOL QAStillOurs(id self, SEL sel, IMP ours) {
+    Method current = class_getInstanceMethod(object_getClass(self), sel);
+    return current != NULL && method_getImplementation(current) == ours;
+}
+
 // Builds UIApplicationShortcutItems from
 // {"items":[{Id,Title,Subtitle,Icon,IosSystemImage,IosTemplateImage,Payload,L10n}]}.
 // Title/Subtitle arrive already resolved for the active locale (see kQAL10nKey).
@@ -307,12 +315,9 @@ static void QAPerformActionForShortcutItem(id self, SEL _cmd, UIApplication *app
     // and chaining down with the same completionHandler). In that wrapped state
     // the host owns routing and completion — treating ourselves as terminal would
     // steal its taps into our queue and double-invoke the completion handler.
-    BOOL terminal = NO;
-    if (gQAOrigPerformAction == NULL) {
-        Method current = class_getInstanceMethod(object_getClass(self),
-            @selector(application:performActionForShortcutItem:completionHandler:));
-        terminal = current != NULL && method_getImplementation(current) == (IMP)QAPerformActionForShortcutItem;
-    }
+    BOOL terminal = gQAOrigPerformAction == NULL &&
+        QAStillOurs(self, @selector(application:performActionForShortcutItem:completionHandler:),
+                    (IMP)QAPerformActionForShortcutItem);
     QADiagLog("app performAction", shortcutItem);
     if (QAIsOurShortcut(shortcutItem)) {
         // Enqueue for the single C# poll channel. This runs before
@@ -370,43 +375,6 @@ static id (*gQAOrigSceneConfiguration)(id, SEL, id, id, id) = NULL;
 // once, on the main thread, before any hook it gates can fire.
 static BOOL gQASceneOwnerUnconfirmed = NO;
 
-API_AVAILABLE(ios(13.0))
-static void QAScenePerformActionForShortcutItem(id self, SEL _cmd, UIWindowScene *windowScene,
-                                                UIApplicationShortcutItem *shortcutItem,
-                                                void (^completionHandler)(BOOL));
-
-// COLD tap under the scene lifecycle: the item rides in the connection options
-// instead of launchOptions.
-API_AVAILABLE(ios(13.0))
-static void QASceneWillConnect(id self, SEL _cmd, UIScene *scene, UISceneSession *session,
-                               UISceneConnectionOptions *connectionOptions) {
-    UIApplicationShortcutItem *item = connectionOptions.shortcutItem;
-    QADiagLog("scene willConnect", item);
-    BOOL record = QAIsOurShortcut(item);
-    if (!record && item != nil && gQAOrigScenePerformAction == NULL && !gQASceneOwnerUnconfirmed) {
-        // Unmarked: UIKit hands a launch item here, not to the warm hook, so adopt it
-        // under the warm hook's own rule — we are terminal for the warm selector and the
-        // owner is confirmed — or a hand-written Info.plist shortcut is lost cold.
-        Method current = class_getInstanceMethod(object_getClass(self),
-            @selector(windowScene:performActionForShortcutItem:completionHandler:));
-        record = current != NULL &&
-                 method_getImplementation(current) == (IMP)QAScenePerformActionForShortcutItem;
-    }
-    if (record) {
-        // Record BEFORE chaining: the host's willConnect is what builds the window and
-        // starts Unity, so the queue must already hold the tap when C# first drains it.
-        // The options are chained unchanged, so a host's own handling still sees the item.
-        // If iOS also reports this tap through the warm hook below, the cold marker (keyed
-        // on the id, marked or not) collapses the pair into one Performed event.
-        QAStorePerformedCold(item.type);
-    }
-    // When there was no original we added this selector; UIKit's own scene setup does
-    // not depend on the delegate implementing it, so adding it changes nothing.
-    if (gQAOrigSceneWillConnect != NULL) {
-        gQAOrigSceneWillConnect(self, _cmd, scene, session, connectionOptions);
-    }
-}
-
 // WARM tap under the scene lifecycle — the scene-delegate twin of
 // QAPerformActionForShortcutItem, with the same terminal/chaining rules.
 API_AVAILABLE(ios(13.0))
@@ -417,13 +385,9 @@ static void QAScenePerformActionForShortcutItem(id self, SEL _cmd, UIWindowScene
     // gQAOrigScenePerformAction == NULL only says the class implemented nothing when we
     // installed; a host plugin may have swizzled ON TOP of us since and now owns both
     // the routing and the completion handler.
-    BOOL terminal = NO;
-    if (gQAOrigScenePerformAction == NULL) {
-        Method current = class_getInstanceMethod(object_getClass(self),
-            @selector(windowScene:performActionForShortcutItem:completionHandler:));
-        terminal = current != NULL &&
-                   method_getImplementation(current) == (IMP)QAScenePerformActionForShortcutItem;
-    }
+    BOOL terminal = gQAOrigScenePerformAction == NULL &&
+        QAStillOurs(self, @selector(windowScene:performActionForShortcutItem:completionHandler:),
+                    (IMP)QAScenePerformActionForShortcutItem);
     BOOL adopted = NO;
     QADiagLog("scene performAction", shortcutItem);
     if (QAIsOurShortcut(shortcutItem)) {
@@ -453,6 +417,36 @@ static void QAScenePerformActionForShortcutItem(id self, SEL _cmd, UIWindowScene
         gQAOrigScenePerformAction(self, _cmd, windowScene, shortcutItem, completionHandler);
     } else if (terminal && completionHandler != nil) {
         completionHandler(adopted);
+    }
+}
+
+// COLD tap under the scene lifecycle: the item rides in the connection options
+// instead of launchOptions.
+API_AVAILABLE(ios(13.0))
+static void QASceneWillConnect(id self, SEL _cmd, UIScene *scene, UISceneSession *session,
+                               UISceneConnectionOptions *connectionOptions) {
+    UIApplicationShortcutItem *item = connectionOptions.shortcutItem;
+    QADiagLog("scene willConnect", item);
+    BOOL record = QAIsOurShortcut(item);
+    if (!record && item != nil && gQAOrigScenePerformAction == NULL && !gQASceneOwnerUnconfirmed) {
+        // Unmarked: UIKit hands a launch item here, not to the warm hook, so adopt it
+        // under the warm hook's own rule — we are terminal for the warm selector and the
+        // owner is confirmed — or a hand-written Info.plist shortcut is lost cold.
+        record = QAStillOurs(self, @selector(windowScene:performActionForShortcutItem:completionHandler:),
+                             (IMP)QAScenePerformActionForShortcutItem);
+    }
+    if (record) {
+        // Record BEFORE chaining: the host's willConnect is what builds the window and
+        // starts Unity, so the queue must already hold the tap when C# first drains it.
+        // The options are chained unchanged, so a host's own handling still sees the item.
+        // If iOS also reports this tap through the warm hook above, the cold marker (keyed
+        // on the id, marked or not) collapses the pair into one Performed event.
+        QAStorePerformedCold(item.type);
+    }
+    // When there was no original we added this selector; UIKit's own scene setup does
+    // not depend on the delegate implementing it, so adding it changes nothing.
+    if (gQAOrigSceneWillConnect != NULL) {
+        gQAOrigSceneWillConnect(self, _cmd, scene, session, connectionOptions);
     }
 }
 
