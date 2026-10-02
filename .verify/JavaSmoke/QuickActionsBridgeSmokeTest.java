@@ -35,6 +35,7 @@ public final class QuickActionsBridgeSmokeTest {
         hostAndManifestCollisionsAreDropped();
         budgetSubtractsManifestAndHost();
         removeAllIsMarkerScoped();
+        removeAllKeepsItsErrorResults();
         readBackIsMarkerScopedAndRankOrdered();
         readBackNullVsEmpty();
         rateLimitReportsNull();
@@ -116,6 +117,36 @@ public final class QuickActionsBridgeSmokeTest {
         check(ok, "removeAll reports success");
         check(containsSame(mgr.dynamic, host), "removeAll keeps the host's shortcut");
         check(!hasId(mgr.dynamic, "mine"), "removeAll removes our marked shortcut");
+    }
+
+    private static void removeAllKeepsItsErrorResults() {
+        // No ShortcutManager: nothing of ours can exist, so the clear succeeded.
+        check(QuickActionsBridge.removeAll(activity(null)), "removeAll without a ShortcutManager reports success");
+
+        // The manifest and the cap only shape what a write ADDS; an empty set
+        // needs neither, so failing reads of them must not stop the clear.
+        ShortcutManager mgr = new ShortcutManager();
+        ShortcutInfo host = host("h1");
+        ShortcutInfo ourPin = ours("pin", 0);
+        mgr.dynamic.add(host);
+        mgr.dynamic.add(ours("mine", 0));
+        mgr.pinned.add(ourPin);
+        mgr.throwOnManifestRead = true;
+        mgr.throwOnMaxCountRead = true;
+        android.util.Log.warnings.clear();
+        check(QuickActionsBridge.removeAll(activity(mgr)), "removeAll succeeds with the manifest and cap unreadable");
+        check(android.util.Log.warnings.isEmpty(), "…without reading either: " + android.util.Log.warnings);
+        check(!hasId(mgr.dynamic, "mine"), "…and still removes our dynamic entry");
+        check(!ourPin.isEnabled(), "…and still disables our pinned copy");
+        check(containsSame(mgr.dynamic, host), "…and keeps the host's");
+
+        // A read the clear cannot do without still reports failure, so the
+        // managed layer keeps its list instead of marking itself empty.
+        ShortcutManager locked = new ShortcutManager();
+        locked.dynamic.add(ours("kept", 0));
+        locked.throwOnDynamicRead = true;
+        check(!QuickActionsBridge.removeAll(activity(locked)), "removeAll reports failure when the dynamic set is unreadable");
+        check(hasId(locked.dynamic, "kept"), "…and removed nothing");
     }
 
     private static void readBackIsMarkerScopedAndRankOrdered() throws Exception {

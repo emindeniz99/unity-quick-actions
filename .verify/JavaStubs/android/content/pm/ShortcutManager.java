@@ -15,6 +15,7 @@ public class ShortcutManager {
   // the smoke test can pin which reads a write survives and which fail it.
   public boolean throwOnManifestRead = false;
   public boolean throwOnMaxCountRead = false;
+  public boolean throwOnDynamicRead = false;
   public int getMaxShortcutCountPerActivity(){
     if (throwOnMaxCountRead) throw new IllegalStateException("user is locked");
     return maxShortcutCountPerActivity;
@@ -67,7 +68,10 @@ public class ShortcutManager {
     if (throwOnManifestRead) throw new IllegalStateException("user is locked");
     return new ArrayList<>(manifest);
   }
-  public List<ShortcutInfo> getDynamicShortcuts(){return new ArrayList<>(dynamic);}
+  public List<ShortcutInfo> getDynamicShortcuts(){
+    if (throwOnDynamicRead) throw new IllegalStateException("user is locked");
+    return new ArrayList<>(dynamic);
+  }
   public List<ShortcutInfo> getPinnedShortcuts(){return new ArrayList<>(pinned);}
   // Usage-report surface: AOSP just forwards the id to the launcher's ranker —
   // but can throw IllegalStateException (locked user), so the smoke test can

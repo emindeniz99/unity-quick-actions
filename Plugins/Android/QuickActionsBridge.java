@@ -133,13 +133,24 @@ public final class QuickActionsBridge {
             return null;
         }
 
+        List<ShortcutInfo> applied = replaceOurShortcuts(manager, shortcuts);
+        return applied == null ? null : appliedIdsJson(applied);
+    }
+
+    // The one write path behind setShortcuts and removeAll (an empty set): makes
+    // our marked subset exactly `shortcuts`, trimmed to the OS cap. Returns the
+    // list it applied, or null when the write did not fully land.
+    private static List<ShortcutInfo> replaceOurShortcuts(ShortcutManager manager, List<ShortcutInfo> shortcuts) {
         List<String> reEnableForUndo = null; // set once pins are re-enabled, for the catch path
         // The OS cap covers manifest (static) + dynamic shortcuts combined, so
         // leave room for any static ones; otherwise addDynamicShortcuts throws.
         // getDynamicShortcuts/addDynamicShortcuts can throw IllegalStateException
         // (e.g. user locked) — keep it all inside the guard so nothing crosses JNI.
         try {
-            List<ShortcutInfo> manifest = manifestShortcutsOrNone(manager);
+            // An empty set (removeAll) can neither collide nor overflow, so it
+            // skips the manifest and cap reads.
+            List<ShortcutInfo> manifest = shortcuts.isEmpty()
+                    ? new ArrayList<ShortcutInfo>() : manifestShortcutsOrNone(manager);
 
             // Partition the CURRENT dynamic set into ours (marked) vs another
             // publisher's (unmarked — the host app's own shortcuts). Everything
@@ -194,7 +205,8 @@ public final class QuickActionsBridge {
             // (Edge case: a host that declares manifest shortcuts on OTHER main
             // activities would over-count here and under-fill the dynamic budget —
             // negligible for the single-activity apps this targets.)
-            int budget = maxShortcutCountOrUnbounded(manager) - manifest.size() - hostIds.size();
+            int budget = shortcuts.isEmpty() ? 0
+                    : maxShortcutCountOrUnbounded(manager) - manifest.size() - hostIds.size();
             if (budget < 0) budget = 0;
             if (shortcuts.size() > budget) {
                 android.util.Log.w("QuickActions", "Trimmed dynamic shortcuts to fit the OS cap: kept "
@@ -254,7 +266,7 @@ public final class QuickActionsBridge {
                 undoReEnable(manager, reEnable);
                 return null;
             }
-            return appliedIdsJson(shortcuts);
+            return shortcuts;
         } catch (RuntimeException e) {
             android.util.Log.w("QuickActions", "dynamic shortcut write failed", e);
             undoReEnable(manager, reEnableForUndo);
@@ -328,38 +340,13 @@ public final class QuickActionsBridge {
      * now clear (including when there is nothing to remove), false when the
      * removal failed (e.g. IllegalStateException on a locked profile) so the
      * managed layer can keep its list instead of falsely marking itself empty.
+     * Runs setShortcuts' write path with an empty set.
      */
     public static boolean removeAll(Activity activity) {
         if (activity == null || Build.VERSION.SDK_INT < 25) return true; // nothing to remove
         ShortcutManager manager = activity.getSystemService(ShortcutManager.class);
-        if (manager == null) return true;
-        try {
-            List<String> ours = new ArrayList<>();
-            List<ShortcutInfo> dynamic = manager.getDynamicShortcuts();
-            if (dynamic != null) {
-                for (ShortcutInfo s : dynamic) {
-                    if (isOurShortcut(s)) ours.add(s.getId());
-                }
-            }
-            if (!ours.isEmpty()) manager.removeDynamicShortcuts(ours);
-            // User-pinned copies of OUR shortcuts survive the dynamic removal as
-            // live launcher icons — disable them so "remove all" doesn't leave
-            // tappable ghosts (the launcher greys them out; only ours, a host's
-            // pinned shortcuts are untouched, and ours are never immutable).
-            List<String> pinnedOurs = new ArrayList<>();
-            List<ShortcutInfo> pinned = manager.getPinnedShortcuts();
-            if (pinned != null) {
-                for (ShortcutInfo s : pinned) {
-                    if (isOurShortcut(s) && s.isEnabled()) pinnedOurs.add(s.getId());
-                }
-            }
-            if (!pinnedOurs.isEmpty()) manager.disableShortcuts(pinnedOurs);
-            return true;
-        } catch (RuntimeException e) {
-            // e.g. IllegalStateException on a locked profile — never cross JNI.
-            android.util.Log.w("QuickActions", "removeAll failed", e);
-            return false;
-        }
+        if (manager == null) return true; // nothing of ours can exist
+        return replaceOurShortcuts(manager, new ArrayList<ShortcutInfo>()) != null;
     }
 
     /**
