@@ -1,6 +1,7 @@
 using UnityEditor;
 using UnityEditor.Build;
 using UnityEngine;
+using static EminDeniz99.QuickActions.Editor.Core.QuickActionsDefineGate;
 
 namespace EminDeniz99.QuickActions.Editor.Bootstrap
 {
@@ -29,7 +30,6 @@ namespace EminDeniz99.QuickActions.Editor.Bootstrap
     /// </summary>
     internal static class QuickActionsEnableMenu
     {
-        private const string Define = "QUICKACTIONS_ENABLED";
         private const string MenuPath = "Window/Quick Actions/Enable Quick Actions";
 
         // The three targets the package supports. Standalone is included because
@@ -101,20 +101,6 @@ namespace EminDeniz99.QuickActions.Editor.Bootstrap
                     missing.Add(TargetNames[i]);
             }
             return missing;
-        }
-
-        // Exact token match. A substring test would be fooled by an unrelated
-        // define that merely contains this one as a prefix or suffix.
-        private static bool HasDefine(string symbols)
-        {
-            if (string.IsNullOrEmpty(symbols))
-                return false;
-            foreach (var token in symbols.Split(';'))
-            {
-                if (token.Trim() == Define)
-                    return true;
-            }
-            return false;
         }
     }
 }

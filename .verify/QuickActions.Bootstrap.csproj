@@ -2,7 +2,9 @@
   <!-- Compiles the UNGATED bootstrap (Editor/Bootstrap) with QUICKACTIONS_ENABLED
        ABSENT and no platform define. This is the assembly that must exist when the
        package is switched off, so it may not reference any gated type — that is
-       exactly what this config catches. -->
+       exactly what this config catches. Editor/Core rides along: Bootstrap
+       references it, and it is ungated with no platform constraint as well, so
+       this is also the config that proves the core compiles with nothing set. -->
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <LangVersion>9.0</LangVersion>
@@ -17,5 +19,6 @@
   <ItemGroup>
     <Compile Include="Stubs/**/*.cs" />
     <Compile Include="../Editor/Bootstrap/**/*.cs" />
+    <Compile Include="../Editor/Core/**/*.cs" />
   </ItemGroup>
 </Project>

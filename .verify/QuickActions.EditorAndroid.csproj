@@ -1,7 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!-- Mirrors the Editor.Android asmdef in isolation: compiles the Android
        post-processor with ONLY UNITY_ANDROID defined and WITHOUT the iOS
-       post-processor present. -->
+       post-processor present. The Android stripper (Editor/NativeGate) and
+       Editor/Core are out too: they are separate assemblies Editor.Android does
+       not reference, so a use of either from here must fail this config. -->
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <LangVersion>9.0</LangVersion>
@@ -16,6 +18,6 @@
   <ItemGroup>
     <Compile Include="Stubs/**/*.cs" />
     <Compile Include="../Runtime/**/*.cs" />
-    <Compile Include="../Editor/**/*.cs" Exclude="../Editor/Bootstrap/**/*.cs;../Editor/iOS/**/*.cs;../Editor/NativeGate/iOS/**/*.cs" />
+    <Compile Include="../Editor/**/*.cs" Exclude="../Editor/Bootstrap/**/*.cs;../Editor/iOS/**/*.cs;../Editor/NativeGate/**/*.cs;../Editor/Core/**/*.cs" />
   </ItemGroup>
 </Project>

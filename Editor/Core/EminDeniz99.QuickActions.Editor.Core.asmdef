@@ -1,9 +1,7 @@
 {
-    "name": "EminDeniz99.QuickActions.Editor.Bootstrap",
-    "rootNamespace": "EminDeniz99.QuickActions.Editor.Bootstrap",
-    "references": [
-        "EminDeniz99.QuickActions.Editor.Core"
-    ],
+    "name": "EminDeniz99.QuickActions.Editor.Core",
+    "rootNamespace": "EminDeniz99.QuickActions.Editor.Core",
+    "references": [],
     "includePlatforms": [
         "Editor"
     ],
@@ -11,7 +9,7 @@
     "allowUnsafeCode": false,
     "overrideReferences": true,
     "precompiledReferences": [],
-    "autoReferenced": true,
+    "autoReferenced": false,
     "defineConstraints": [],
     "versionDefines": [],
     "noEngineReferences": false

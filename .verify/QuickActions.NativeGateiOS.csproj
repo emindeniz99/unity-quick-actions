@@ -2,7 +2,8 @@
   <!-- Mirrors the ungated Editor.NativeGate.iOS asmdef in isolation: compiles the
        iOS gate cleanup with UNITY_IOS but WITHOUT QUICKACTIONS_ENABLED (it must run
        when the define is off), so accidental gating or Android coupling is caught.
-       Extension-DLL resolution is Unity-only — the stubs stand in here. -->
+       Extension-DLL resolution is Unity-only — the stubs stand in here. Editor/Core
+       is the one assembly it references (also ungated). -->
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <LangVersion>9.0</LangVersion>
@@ -17,5 +18,6 @@
   <ItemGroup>
     <Compile Include="Stubs/**/*.cs" />
     <Compile Include="../Editor/NativeGate/iOS/**/*.cs" />
+    <Compile Include="../Editor/Core/**/*.cs" />
   </ItemGroup>
 </Project>

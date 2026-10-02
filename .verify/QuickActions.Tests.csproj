@@ -48,6 +48,8 @@
          put beside them; the PBX half needs a real Xcode project, so only the
          disk half is reachable here — which is the half that decides what ships. -->
     <Compile Include="../Editor/NativeGate/iOS/QuickActionsGateCleanupiOS.cs" />
+    <!-- The define rules both gate assemblies above call into. -->
+    <Compile Include="../Editor/Core/QuickActionsDefineGate.cs" />
     <!-- The build-time placeholder/customize pipeline both platform bakers call.
          Compiled here for the same reason as the Android post-processor above:
          its behavior (escaping, precedence, per-locale interpolation) only
