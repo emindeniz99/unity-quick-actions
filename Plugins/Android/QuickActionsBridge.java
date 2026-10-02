@@ -386,23 +386,18 @@ public final class QuickActionsBridge {
                 // Icon identity comes from our extras (see EXTRA_ICON_*): the OS
                 // can't read icons back, and reporting 0 here would make the next
                 // push strip the launcher-visible icons of reconciled shortcuts.
-                PersistableBundle extras = s.getExtras();
-                o.put("Icon", extras == null ? 0 : extras.getInt(EXTRA_ICON_TYPE, 0));
-                String drawable = extras == null ? null : extras.getString(EXTRA_ICON_DRAWABLE, "");
-                o.put("AndroidDrawable", drawable == null ? "" : drawable);
-                String bitmap = extras == null ? null : extras.getString(EXTRA_ICON_BITMAP, "");
-                o.put("AndroidBitmapFile", bitmap == null ? "" : bitmap);
-                o.put("AndroidBitmapAdaptive",
-                        extras != null && extras.getBoolean(EXTRA_ICON_BITMAP_ADAPTIVE, false));
-                String payload = extras == null ? null : extras.getString(EXTRA_PAYLOAD, "");
-                o.put("Payload", payload == null ? "" : payload);
+                PersistableBundle extras = s.getExtras(); // non-null: isOurShortcut required it
+                o.put("Icon", extras.getInt(EXTRA_ICON_TYPE, 0));
+                o.put("AndroidDrawable", extras.getString(EXTRA_ICON_DRAWABLE, ""));
+                o.put("AndroidBitmapFile", extras.getString(EXTRA_ICON_BITMAP, ""));
+                o.put("AndroidBitmapAdaptive", extras.getBoolean(EXTRA_ICON_BITMAP_ADAPTIVE, false));
+                o.put("Payload", extras.getString(EXTRA_PAYLOAD, ""));
                 // The labels above are what the launcher SHOWS (resolved at the last
                 // push); this blob is what lets the managed layer recover the base
                 // text + per-locale tables and notice the two disagree. Empty for an
                 // item that was never localized, whose read-back is then byte-for-byte
                 // what it was before this key existed.
-                String l10n = extras == null ? null : extras.getString(EXTRA_L10N, "");
-                o.put("L10n", l10n == null ? "" : l10n);
+                o.put("L10n", extras.getString(EXTRA_L10N, ""));
                 items.put(o);
             }
             JSONObject root = new JSONObject();
