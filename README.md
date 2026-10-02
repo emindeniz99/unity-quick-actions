@@ -12,8 +12,8 @@ platforms' own public APIs — Apple's `UIApplicationShortcutItem` and Android's
 
 | iOS | Android |
 |:---:|:---:|
-| ![Long-pressing the app icon on iOS shows New Game, Continue and Daily Reward with SF Symbol icons](https://raw.githubusercontent.com/emindeniz99/unity-quick-actions/main/store~/device-ios.jpg) | ![The same three shortcuts on an Android home screen](https://raw.githubusercontent.com/emindeniz99/unity-quick-actions/main/store~/device-android.jpg) |
-| iPhone (iOS 26.5) | Moto G Play 2024 (Android 14) |
+| ![Long-pressing the app icon in the iOS Simulator shows New Game, Continue and Daily Reward with SF Symbol icons](https://raw.githubusercontent.com/emindeniz99/unity-quick-actions/main/store~/device-ios.jpg) | ![The same three shortcuts on an Android home screen](https://raw.githubusercontent.com/emindeniz99/unity-quick-actions/main/store~/device-android.jpg) |
+| iOS Simulator (iOS 26.5) | Moto G Play 2024 (Android 14) |
 
 The demo's three shortcuts, from the same C# code on both platforms. Note the
 platform difference the screenshots make obvious: **iOS renders `Title` and

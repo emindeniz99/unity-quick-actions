@@ -1,7 +1,7 @@
 name: CI
 
 # Unity asset verified WITHOUT Unity: tools~/verify.sh generates .meta files,
-# compiles the C# against UnityEngine/UnityEditor stubs (10 configs), runs the
+# compiles the C# against UnityEngine/UnityEditor stubs (11 configs), runs the
 # NUnit suite via `dotnet test`, compiles the Android plugin against Android SDK
 # stubs, and checks the frozen device strings, the release-notes coherence and
 # the generated Android icons. The iOS .mm and on-device behaviour still
@@ -36,7 +36,7 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
-      - name: Verify (7 checks — meta, 10 C# configs, unit tests, Android plugin, frozen strings, release notes, built-in icons)
+      - name: Verify (7 checks — meta, 11 C# configs, unit tests, Android plugin, frozen strings, release notes, built-in icons)
         run: tools~/verify.sh
       - name: Pack .unitypackage (reproducible, no Unity needed)
         run: python3 tools~/pack_unitypackage.py
@@ -120,7 +120,7 @@ jobs:
       # `gh` is preinstalled on the runner, so this needs no third-party action.
       # The tag reaches the shell through env, never an inline ${{ }} expansion.
       # Works whether or not the Release already exists: created from the UI
-      # first, or created here from the tag with generated notes.
+      # first, or created here from the tag with the curated CHANGELOG notes.
       - name: Attach the .unitypackage to the release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

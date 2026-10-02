@@ -4,7 +4,7 @@
 
 The package is opt-in behind the `QUICKACTIONS_ENABLED` scripting define: without it nothing of it compiles and a build carries no trace of it. Forgetting that define is the most common integration failure — set it first. Quick actions cannot be observed in the Unity Editor; verify on a device, the iOS Simulator, or an Android emulator.
 
-Install: UPM Git URL `https://github.com/emindeniz99/unity-quick-actions.git#v0.6.0`, OpenUPM (`com.emindeniz99.quick-actions`), the `.unitypackage` attached to each release, or by vendoring the source as an embedded package.
+Install: UPM Git URL `https://github.com/emindeniz99/unity-quick-actions.git#v0.8.0`, OpenUPM (`com.emindeniz99.quick-actions`), the `.unitypackage` attached to each release, or by vendoring the source as an embedded package.
 
 ## Start here
 

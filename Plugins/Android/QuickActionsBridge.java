@@ -123,7 +123,7 @@ public final class QuickActionsBridge {
                     if (item == null) continue;
                     // Rank = position among the shortcuts we keep, so the launcher
                     // preserves insertion-order priority (it sorts by rank, not by the
-                    // order passed to setDynamicShortcuts).
+                    // order passed to addDynamicShortcuts).
                     ShortcutInfo shortcut = buildShortcut(activity, item, shortcuts.size());
                     if (shortcut != null) shortcuts.add(shortcut);
                 }
@@ -135,26 +135,11 @@ public final class QuickActionsBridge {
 
         List<String> reEnableForUndo = null; // set once pins are re-enabled, for the catch path
         // The OS cap covers manifest (static) + dynamic shortcuts combined, so
-        // leave room for any static ones; otherwise setDynamicShortcuts throws.
-        // getManifestShortcuts/setDynamicShortcuts can throw IllegalStateException
+        // leave room for any static ones; otherwise addDynamicShortcuts throws.
+        // getManifestShortcuts/addDynamicShortcuts can throw IllegalStateException
         // (e.g. user locked) — keep it all inside the guard so nothing crosses JNI.
         try {
             List<ShortcutInfo> manifest = manager.getManifestShortcuts();
-            // Drop ids that collide with a manifest (static) shortcut. setDynamic
-            // Shortcuts throws IllegalArgumentException on such a collision, which
-            // would otherwise discard the ENTIRE dynamic set, not just the offender.
-            if (manifest != null && !manifest.isEmpty()) {
-                java.util.HashSet<String> manifestIds = new java.util.HashSet<>();
-                for (ShortcutInfo s : manifest) manifestIds.add(s.getId());
-                java.util.Iterator<ShortcutInfo> it = shortcuts.iterator();
-                while (it.hasNext()) {
-                    if (manifestIds.contains(it.next().getId())) {
-                        it.remove();
-                        android.util.Log.w("QuickActions",
-                                "Dropped a dynamic shortcut whose id collides with a static/manifest shortcut");
-                    }
-                }
-            }
 
             // Partition the CURRENT dynamic set into ours (marked) vs another
             // publisher's (unmarked — the host app's own shortcuts). Everything
@@ -185,17 +170,21 @@ public final class QuickActionsBridge {
                     else pinnedOurs.put(s.getId(), s);
                 }
             }
+            // A manifest (static) id is foreign too: the collision would make
+            // addDynamicShortcuts throw IllegalArgumentException and discard the
+            // ENTIRE dynamic set, not just the offender.
+            if (manifest != null) for (ShortcutInfo s : manifest) foreignIds.add(s.getId());
 
             // Drop our items whose id collides with a HOST dynamic or pinned
-            // shortcut: addDynamicShortcuts updates same-id entries IN PLACE, which
+            // shortcut (addDynamicShortcuts updates same-id entries IN PLACE, which
             // would silently hijack the host's shortcut — the exact failure this
-            // marker-scoping exists to prevent.
+            // marker-scoping exists to prevent) or with a manifest one (above).
             java.util.Iterator<ShortcutInfo> ours = shortcuts.iterator();
             while (ours.hasNext()) {
                 if (foreignIds.contains(ours.next().getId())) {
                     ours.remove();
                     android.util.Log.w("QuickActions",
-                            "Dropped a dynamic shortcut whose id collides with another publisher's dynamic or pinned shortcut");
+                            "Dropped a dynamic shortcut whose id collides with a static, host-dynamic or pinned shortcut");
                 }
             }
 
@@ -268,7 +257,7 @@ public final class QuickActionsBridge {
             }
             return appliedIdsJson(shortcuts);
         } catch (RuntimeException e) {
-            android.util.Log.w("QuickActions", "setDynamicShortcuts failed", e);
+            android.util.Log.w("QuickActions", "dynamic shortcut write failed", e);
             undoReEnable(manager, reEnableForUndo);
             return null;
         }
@@ -397,23 +386,17 @@ public final class QuickActionsBridge {
                 // Icon identity comes from our extras (see EXTRA_ICON_*): the OS
                 // can't read icons back, and reporting 0 here would make the next
                 // push strip the launcher-visible icons of reconciled shortcuts.
-                PersistableBundle extras = s.getExtras();
-                o.put("Icon", extras == null ? 0 : extras.getInt(EXTRA_ICON_TYPE, 0));
-                String drawable = extras == null ? null : extras.getString(EXTRA_ICON_DRAWABLE, "");
-                o.put("AndroidDrawable", drawable == null ? "" : drawable);
-                String bitmap = extras == null ? null : extras.getString(EXTRA_ICON_BITMAP, "");
-                o.put("AndroidBitmapFile", bitmap == null ? "" : bitmap);
-                o.put("AndroidBitmapAdaptive",
-                        extras != null && extras.getBoolean(EXTRA_ICON_BITMAP_ADAPTIVE, false));
-                String payload = extras == null ? null : extras.getString(EXTRA_PAYLOAD, "");
-                o.put("Payload", payload == null ? "" : payload);
+                PersistableBundle extras = s.getExtras(); // non-null: isOurShortcut required it
+                o.put("Icon", extras.getInt(EXTRA_ICON_TYPE, 0));
+                o.put("AndroidDrawable", extras.getString(EXTRA_ICON_DRAWABLE, ""));
+                o.put("AndroidBitmapFile", extras.getString(EXTRA_ICON_BITMAP, ""));
+                o.put("AndroidBitmapAdaptive", extras.getBoolean(EXTRA_ICON_BITMAP_ADAPTIVE, false));
+                o.put("Payload", extras.getString(EXTRA_PAYLOAD, ""));
                 // The labels above are what the launcher SHOWS (resolved at the last
                 // push); this blob is what lets the managed layer recover the base
                 // text + per-locale tables and notice the two disagree. Empty for an
-                // item that was never localized, whose read-back is then byte-for-byte
-                // what it was before this key existed.
-                String l10n = extras == null ? null : extras.getString(EXTRA_L10N, "");
-                o.put("L10n", l10n == null ? "" : l10n);
+                // item without localization (the key is then absent from its extras).
+                o.put("L10n", extras.getString(EXTRA_L10N, ""));
                 items.put(o);
             }
             JSONObject root = new JSONObject();
@@ -462,8 +445,8 @@ public final class QuickActionsBridge {
             // the C# side reads it back via GetById (reconciled from the extras).
             intent.putExtra(EXTRA_PAYLOAD, payload);
         }
-        // Localization blob: stored only (never parsed here) and only when the item
-        // has one, so an unlocalized shortcut's extras are unchanged by this feature.
+        // Localization blob: stored only (never parsed here) and written only when
+        // the item has one: an unlocalized shortcut carries no L10n extra.
         if (!l10n.isEmpty()) extras.putString(EXTRA_L10N, l10n);
 
         ShortcutInfo.Builder builder = new ShortcutInfo.Builder(activity, id)
@@ -708,7 +691,7 @@ public final class QuickActionsBridge {
     // ---- queried by C# ----
 
     public static synchronized String consumePendingPerformed() {
-        return sPending.isEmpty() ? null : sPending.pollFirst();
+        return sPending.pollFirst();
     }
 
     public static synchronized String getLastPerformed() {

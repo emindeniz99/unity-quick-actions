@@ -10,7 +10,6 @@ namespace UnityEngine
         public string name;
         public HideFlags hideFlags;
         public static void DontDestroyOnLoad(Object target) { }
-        public static void Destroy(Object obj) { }
         public static void DestroyImmediate(Object obj) { }
     }
 
@@ -25,8 +24,6 @@ namespace UnityEngine
     public class MonoBehaviour : Behaviour
     {
         public Coroutine StartCoroutine(System.Collections.IEnumerator routine) => new Coroutine();
-        public void StopCoroutine(Coroutine routine) { }
-        public void StopAllCoroutines() { }
     }
 
     public class GameObject : Object
@@ -72,7 +69,6 @@ namespace UnityEngine
         // Recorded so harness tests can assert a warning was (or was not) logged.
         public static readonly System.Collections.Generic.List<string> Warnings = new System.Collections.Generic.List<string>();
         public static void LogWarning(object message) => Warnings.Add(message?.ToString());
-        public static void LogError(object message) { }
         public static void LogException(System.Exception exception) { }
     }
 
@@ -172,7 +168,6 @@ namespace UnityEngine
         public static void Label(string text, params GUILayoutOption[] options) { }
         public static void Space(float pixels) { }
         public static GUILayoutOption Height(float value) => new GUILayoutOption();
-        public static GUILayoutOption Width(float value) => new GUILayoutOption();
 
         public sealed class AreaScope : IDisposable
         {
@@ -194,14 +189,6 @@ namespace UnityEngine
     {
         public static ScriptableObject CreateInstance(Type type) => (ScriptableObject)Activator.CreateInstance(type);
         public static T CreateInstance<T>() where T : ScriptableObject => Activator.CreateInstance<T>();
-    }
-
-    [AttributeUsage(AttributeTargets.Class)]
-    public sealed class CreateAssetMenuAttribute : Attribute
-    {
-        public string fileName;
-        public string menuName;
-        public int order;
     }
 
     public sealed class AndroidJavaClass : IDisposable
@@ -248,9 +235,7 @@ namespace UnityEngine.TestTools
     /// </summary>
     public static class LogAssert
     {
-        public static bool ignoreFailingMessages { get; set; }
         public static void Expect(LogType type, string message) { }
         public static void Expect(LogType type, System.Text.RegularExpressions.Regex message) { }
-        public static void NoUnexpectedReceived() { }
     }
 }

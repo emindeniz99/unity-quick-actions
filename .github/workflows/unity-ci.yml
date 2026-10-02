@@ -10,6 +10,9 @@ name: unity
 # keep file and trampoline really are in each, all fed into the adb device
 # smoke, and an iOS Simulator-SDK Xcode export per testbed with an unsigned
 # xcodebuild compile on macOS for the lines whose simulator support allows it.
+# Android also has a native x86_64 canary pair: `2022.3-x86_64` (android-build)
+# feeding `2022.3-api25` (android-smoke, API 25, the package's documented
+# floor), both continue-on-error until they have run green.
 # A second iOS pair, `ios-export-coex` / `ios-simulator-coex`, re-exports two
 # of those testbeds with a mock HOST stacked on the package — an app-controller
 # subclass, a category `+load` swizzle and a GoogleUtilities-style isa proxy
@@ -17,9 +20,9 @@ name: unity
 # did, which is the one thing the plain simulator leg (process still alive)
 # cannot see. A third iOS job, `ios-springboard`, drives SpringBoard itself
 # with an unsigned XCUITest bundle (`tools~/ios-ui`): long-press the icon, tap
-# a quick action, read the id back from the app — twice per leg, once on a row
-# Info.plist baked in and once on a row QuickActions.Add published while the app
-# ran. One further Android leg,
+# a quick action, read the id back from the app — three passes per leg: a row
+# Info.plist baked in, a row QuickActions.Add published while the app ran, and
+# a warm re-entry into an app that is already running. One further Android leg,
 # `android-shrink-verify`, exports the
 # Gradle project on 2022.3 and runs the resource shrinker's own task
 # (`:launcher:shrinkReleaseRes`, never assembleRelease), reading the stripped
@@ -31,7 +34,9 @@ name: unity
 # `android-build-profile` builds Testbed6 with the define only in an active
 # Build Profile, README's Unity 6 setup, and requires the package in that APK.
 #
-# EVERY leg runs on every code push and PR — the EditMode tests (three pinned
+# Every leg runs on every code push and PR, except the xcode-27 canary legs
+# and `ios-crossrun`, which run on the weekly cron and workflow_dispatch only
+# (see `ios-simulator`'s matrix comment) — the EditMode tests (three pinned
 # testbed legs plus a unity6-latest canary that resolves the newest Unity 6
 # GameCI image at run time and upgrade-opens Testbed6 with it) and the
 # build-heavy ones alike: Android IL2CPP, the emulator smoke, the iOS export
@@ -135,10 +140,11 @@ name: unity
 #     in waves (t=3, 6, 9, 11, 12, 18, 23) behind GitHub's concurrent-macOS
 #     cap, and the two longest are the springboard taps: unity6-xcode27 at
 #     12→35 and unity6 at 12→34.
-# The single biggest remaining cost is therefore a CANARY that gates nothing:
+# The single biggest remaining cost was therefore a CANARY that gates nothing:
 # ios springboard tap (unity6-xcode27), 23 minutes, holding a macOS slot on
-# every PR. Four xcode-27 canary legs do that between them. Moving them to the
-# weekly cron is the next change, and this measurement is why.
+# every PR. Four xcode-27 canary legs did that between them. Moving them to the
+# weekly cron was the next change, and this measurement is why; it is done,
+# see `ios-simulator`'s matrix comment.
 # Every Unity job on run 103 still logged "Successfully returned ULF license"
 # under full parallelism, which is the one thing the un-chain could have broken.
 #
@@ -172,6 +178,7 @@ on:
       - "tools~/device-smoke/**"
       - "tools~/ios-ui/**"
       - ".github/workflows/unity-ci.yml"
+      - ".github/actions/**"
   pull_request:
     paths:
       - "Runtime/**"
@@ -184,6 +191,7 @@ on:
       - "tools~/device-smoke/**"
       - "tools~/ios-ui/**"
       - ".github/workflows/unity-ci.yml"
+      - ".github/actions/**"
 
 permissions:
   contents: read
@@ -262,33 +270,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      # Unity 6000.6's editor asks for 1 GB of /dev/shm at start-up (its asset
-      # database's UDS client: "Requested 1073741824 bytes, but only 67108864
-      # available … run the container with --shm-size=1025M") and aborts without
-      # it; Docker's default is 64 MB and GameCI's actions pass no --shm-size, so
-      # the daemon's default is raised instead. Merged into the runner's existing
-      # daemon.json rather than overwriting it (the image ships cgroup settings
-      # there). Same step in every job that runs an editor in a container — the
-      # unity6-latest canary was the first to hit it (run 37, 2026-09-01), and
-      # the pinned legs will the day a testbed moves to 6.6+.
       - name: Give Unity's container the shared memory 6000.6+ needs
-        run: |
-          set -euo pipefail
-          python3 - <<'PY'
-          import json
-          import os
-
-          path = "/etc/docker/daemon.json"
-          cfg = json.load(open(path)) if os.path.exists(path) else {}
-          cfg["default-shm-size"] = "2g"
-          with open("daemon.json.new", "w") as f:
-              json.dump(cfg, f, indent=2)
-          print(json.dumps(cfg, indent=2))
-          PY
-          sudo mv daemon.json.new /etc/docker/daemon.json
-          sudo systemctl restart docker
-          docker info --format '{{.Name}}: docker restarted, default shm raised' \
-            || { echo "docker did not come back after the restart"; exit 1; }
+        uses: ./.github/actions/raise-docker-shm
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ matrix.testbed.path }}/Library
@@ -403,33 +386,8 @@ jobs:
           print("resolved Unity %s" % best, file=sys.stderr)
           print("version=%s" % best)
           PY
-      # Unity 6000.6's editor asks for 1 GB of /dev/shm at start-up (its asset
-      # database's UDS client: "Requested 1073741824 bytes, but only 67108864
-      # available … run the container with --shm-size=1025M") and aborts without
-      # it; Docker's default is 64 MB and GameCI's actions pass no --shm-size, so
-      # the daemon's default is raised instead. Merged into the runner's existing
-      # daemon.json rather than overwriting it (the image ships cgroup settings
-      # there). Same step in every job that runs an editor in a container — the
-      # unity6-latest canary was the first to hit it (run 37, 2026-09-01), and
-      # the pinned legs will the day a testbed moves to 6.6+.
       - name: Give Unity's container the shared memory 6000.6+ needs
-        run: |
-          set -euo pipefail
-          python3 - <<'PY'
-          import json
-          import os
-
-          path = "/etc/docker/daemon.json"
-          cfg = json.load(open(path)) if os.path.exists(path) else {}
-          cfg["default-shm-size"] = "2g"
-          with open("daemon.json.new", "w") as f:
-              json.dump(cfg, f, indent=2)
-          print(json.dumps(cfg, indent=2))
-          PY
-          sudo mv daemon.json.new /etc/docker/daemon.json
-          sudo systemctl restart docker
-          docker info --format '{{.Name}}: docker restarted, default shm raised' \
-            || { echo "docker did not come back after the restart"; exit 1; }
+        uses: ./.github/actions/raise-docker-shm
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: Examples~/Testbed6/Library
@@ -596,33 +554,8 @@ jobs:
         run: |
           mkdir -p "$TESTBED/Assets/Samples/QuickActionsDemo"
           cp -R Samples~/Demo/. "$TESTBED/Assets/Samples/QuickActionsDemo/"
-      # Unity 6000.6's editor asks for 1 GB of /dev/shm at start-up (its asset
-      # database's UDS client: "Requested 1073741824 bytes, but only 67108864
-      # available … run the container with --shm-size=1025M") and aborts without
-      # it; Docker's default is 64 MB and GameCI's actions pass no --shm-size, so
-      # the daemon's default is raised instead. Merged into the runner's existing
-      # daemon.json rather than overwriting it (the image ships cgroup settings
-      # there). Same step in every job that runs an editor in a container — the
-      # unity6-latest canary was the first to hit it (run 37, 2026-09-01), and
-      # the pinned legs will the day a testbed moves to 6.6+.
       - name: Give Unity's container the shared memory 6000.6+ needs
-        run: |
-          set -euo pipefail
-          python3 - <<'PY'
-          import json
-          import os
-
-          path = "/etc/docker/daemon.json"
-          cfg = json.load(open(path)) if os.path.exists(path) else {}
-          cfg["default-shm-size"] = "2g"
-          with open("daemon.json.new", "w") as f:
-              json.dump(cfg, f, indent=2)
-          print(json.dumps(cfg, indent=2))
-          PY
-          sudo mv daemon.json.new /etc/docker/daemon.json
-          sudo systemctl restart docker
-          docker info --format '{{.Name}}: docker restarted, default shm raised' \
-            || { echo "docker did not come back after the restart"; exit 1; }
+        uses: ./.github/actions/raise-docker-shm
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ matrix.testbed.path }}/Library
@@ -1143,33 +1076,8 @@ jobs:
         run: |
           mkdir -p "$TESTBED/Assets/Samples/QuickActionsDemo"
           cp -R Samples~/Demo/. "$TESTBED/Assets/Samples/QuickActionsDemo/"
-      # Unity 6000.6's editor asks for 1 GB of /dev/shm at start-up (its asset
-      # database's UDS client: "Requested 1073741824 bytes, but only 67108864
-      # available … run the container with --shm-size=1025M") and aborts without
-      # it; Docker's default is 64 MB and GameCI's actions pass no --shm-size, so
-      # the daemon's default is raised instead. Merged into the runner's existing
-      # daemon.json rather than overwriting it (the image ships cgroup settings
-      # there). Same step in every job that runs an editor in a container — the
-      # unity6-latest canary was the first to hit it (run 37, 2026-09-01), and
-      # the pinned legs will the day a testbed moves to 6.6+.
       - name: Give Unity's container the shared memory 6000.6+ needs
-        run: |
-          set -euo pipefail
-          python3 - <<'PY'
-          import json
-          import os
-
-          path = "/etc/docker/daemon.json"
-          cfg = json.load(open(path)) if os.path.exists(path) else {}
-          cfg["default-shm-size"] = "2g"
-          with open("daemon.json.new", "w") as f:
-              json.dump(cfg, f, indent=2)
-          print(json.dumps(cfg, indent=2))
-          PY
-          sudo mv daemon.json.new /etc/docker/daemon.json
-          sudo systemctl restart docker
-          docker info --format '{{.Name}}: docker restarted, default shm raised' \
-            || { echo "docker did not come back after the restart"; exit 1; }
+        uses: ./.github/actions/raise-docker-shm
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: Examples~/Testbed2022/Library
@@ -1458,9 +1366,9 @@ jobs:
           print("----- end -----")
           PY
       # The toolchain the export actually expects, supplied rather than hoped
-      # for. Gradle 7.2 is the version Unity 2022.3 bundles (the export ships
-      # no wrapper to say so itself); sha256 is the published value from
-      # services.gradle.org/distributions/gradle-7.2-bin.zip.sha256. NDK r23b
+      # for. The Gradle version is the one the export's wrapper properties name
+      # (derived from its AGP coordinate when they are absent); its sha256 is
+      # fetched at run time from services.gradle.org. NDK r23b
       # (23.1.7779620) is what Unity 2022.3 compiles IL2CPP with, and the
       # export's BuildIl2CppTask needs a real NDK at gradle time.
       - name: Pin the toolchain the export expects (Gradle from the export, NDK r23b)
@@ -1647,9 +1555,9 @@ jobs:
           echo "--- local.properties ---"
           cat local.properties
           # Prefer a wrapper if the export ever ships one; otherwise use the
-          # pinned Gradle 7.2 — NEVER the runner's system gradle, whose major
-          # version drifts (9.x today, which cannot load AGP 7.1.2; the first
-          # run died exactly there).
+          # Gradle the pin step downloaded (PINNED_GRADLE) — NEVER the runner's
+          # system gradle, whose major version drifts (9.x today, which cannot
+          # load the export's AGP; the first run died exactly there).
           if [ -f ./gradlew ]; then
             chmod +x ./gradlew
             GRADLE_CMD=./gradlew
@@ -2036,33 +1944,8 @@ jobs:
         run: |
           mkdir -p "$TESTBED/Assets/Samples/QuickActionsDemo"
           cp -R Samples~/Demo/. "$TESTBED/Assets/Samples/QuickActionsDemo/"
-      # Unity 6000.6's editor asks for 1 GB of /dev/shm at start-up (its asset
-      # database's UDS client: "Requested 1073741824 bytes, but only 67108864
-      # available … run the container with --shm-size=1025M") and aborts without
-      # it; Docker's default is 64 MB and GameCI's actions pass no --shm-size, so
-      # the daemon's default is raised instead. Merged into the runner's existing
-      # daemon.json rather than overwriting it (the image ships cgroup settings
-      # there). Same step in every job that runs an editor in a container — the
-      # unity6-latest canary was the first to hit it (run 37, 2026-09-01), and
-      # the pinned legs will the day a testbed moves to 6.6+.
       - name: Give Unity's container the shared memory 6000.6+ needs
-        run: |
-          set -euo pipefail
-          python3 - <<'PY'
-          import json
-          import os
-
-          path = "/etc/docker/daemon.json"
-          cfg = json.load(open(path)) if os.path.exists(path) else {}
-          cfg["default-shm-size"] = "2g"
-          with open("daemon.json.new", "w") as f:
-              json.dump(cfg, f, indent=2)
-          print(json.dumps(cfg, indent=2))
-          PY
-          sudo mv daemon.json.new /etc/docker/daemon.json
-          sudo systemctl restart docker
-          docker info --format '{{.Name}}: docker restarted, default shm raised' \
-            || { echo "docker did not come back after the restart"; exit 1; }
+        uses: ./.github/actions/raise-docker-shm
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: Examples~/Testbed2022/Library
@@ -2382,25 +2265,8 @@ jobs:
         run: |
           mkdir -p "$TESTBED/Assets/Samples/QuickActionsDemo"
           cp -R Samples~/Demo/. "$TESTBED/Assets/Samples/QuickActionsDemo/"
-      # Same step, same reason, as in android-build.
       - name: Give Unity's container the shared memory 6000.6+ needs
-        run: |
-          set -euo pipefail
-          python3 - <<'PY'
-          import json
-          import os
-
-          path = "/etc/docker/daemon.json"
-          cfg = json.load(open(path)) if os.path.exists(path) else {}
-          cfg["default-shm-size"] = "2g"
-          with open("daemon.json.new", "w") as f:
-              json.dump(cfg, f, indent=2)
-          print(json.dumps(cfg, indent=2))
-          PY
-          sudo mv daemon.json.new /etc/docker/daemon.json
-          sudo systemctl restart docker
-          docker info --format '{{.Name}}: docker restarted, default shm raised' \
-            || { echo "docker did not come back after the restart"; exit 1; }
+        uses: ./.github/actions/raise-docker-shm
       # android-build's unity6 cache, restored but never saved: this job leaves an
       # active Build Profile in Library whose asset is not committed.
       - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -2507,33 +2373,8 @@ jobs:
         run: |
           mkdir -p "$TESTBED/Assets/Samples/QuickActionsDemo"
           cp -R Samples~/Demo/. "$TESTBED/Assets/Samples/QuickActionsDemo/"
-      # Unity 6000.6's editor asks for 1 GB of /dev/shm at start-up (its asset
-      # database's UDS client: "Requested 1073741824 bytes, but only 67108864
-      # available … run the container with --shm-size=1025M") and aborts without
-      # it; Docker's default is 64 MB and GameCI's actions pass no --shm-size, so
-      # the daemon's default is raised instead. Merged into the runner's existing
-      # daemon.json rather than overwriting it (the image ships cgroup settings
-      # there). Same step in every job that runs an editor in a container — the
-      # unity6-latest canary was the first to hit it (run 37, 2026-09-01), and
-      # the pinned legs will the day a testbed moves to 6.6+.
       - name: Give Unity's container the shared memory 6000.6+ needs
-        run: |
-          set -euo pipefail
-          python3 - <<'PY'
-          import json
-          import os
-
-          path = "/etc/docker/daemon.json"
-          cfg = json.load(open(path)) if os.path.exists(path) else {}
-          cfg["default-shm-size"] = "2g"
-          with open("daemon.json.new", "w") as f:
-              json.dump(cfg, f, indent=2)
-          print(json.dumps(cfg, indent=2))
-          PY
-          sudo mv daemon.json.new /etc/docker/daemon.json
-          sudo systemctl restart docker
-          docker info --format '{{.Name}}: docker restarted, default shm raised' \
-            || { echo "docker did not come back after the restart"; exit 1; }
+        uses: ./.github/actions/raise-docker-shm
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ matrix.testbed.path }}/Library
@@ -2650,8 +2491,8 @@ jobs:
   # of. Sources live in Examples~/Coexistence/iOS (invisible to Unity, never
   # shipped, each file wrapped in #if QUICKACTIONS_ENABLED) and are copied into the
   # testbed here, exactly the way the Demo sample is imported. 2021.3 is absent on
-  # purpose: it is exported but never compiled on macOS (x86_64-only simulator
-  # runtime), so a coex leg there could assert nothing.
+  # purpose: it is exported but never compiled on macOS (never tried), so a coex
+  # leg there has no built app to assert on.
   ios-export-coex:
     name: ios export coex (${{ matrix.testbed.name }})
     needs: license
@@ -2683,25 +2524,8 @@ jobs:
           mkdir -p "$TESTBED/Assets/Plugins/iOS"
           cp -R Examples~/Coexistence/iOS/. "$TESTBED/Assets/Plugins/iOS/"
           ls -la "$TESTBED/Assets/Plugins/iOS"
-      # Same shared-memory raise as every other containerised editor job.
       - name: Give Unity's container the shared memory 6000.6+ needs
-        run: |
-          set -euo pipefail
-          python3 - <<'PY'
-          import json
-          import os
-
-          path = "/etc/docker/daemon.json"
-          cfg = json.load(open(path)) if os.path.exists(path) else {}
-          cfg["default-shm-size"] = "2g"
-          with open("daemon.json.new", "w") as f:
-              json.dump(cfg, f, indent=2)
-          print(json.dumps(cfg, indent=2))
-          PY
-          sudo mv daemon.json.new /etc/docker/daemon.json
-          sudo systemctl restart docker
-          docker info --format '{{.Name}}: docker restarted, default shm raised' \
-            || { echo "docker did not come back after the restart"; exit 1; }
+        uses: ./.github/actions/raise-docker-shm
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ matrix.testbed.path }}/Library
@@ -2735,18 +2559,19 @@ jobs:
   # (CODE_SIGNING_ALLOWED=NO), then boot a simulator, install the .app and
   # launch it, asserting the process is still alive afterwards (`simctl
   # launch` exiting 0 only means the spawn was accepted). 2021.3 is exported
-  # above but deliberately NOT compiled here: that line's simulator support is
-  # x86_64-only (see README "Status") while current macOS runners ship
-  # arm64-only iOS 26 runtimes, and its IL2CPP output needs ld_classic
-  # workarounds under Xcode 15+ — a red job there would say nothing about the
-  # package. 2022.3 gets macos-15 (Xcode 16.4 default); Unity 6 gets the
+  # above but deliberately NOT compiled here: nobody has tried it. Unity ships
+  # only an x86_64 simulator runtime for that line; x86_64-only 2022.3 and
+  # Unity 6 exports ran on the macos-15 and macos-26 arm64 runners (runs 77
+  # and 78, before the exports moved to arm64), and the iOS 27 simulator
+  # refuses x86_64-only apps (run 76). Whether its IL2CPP output needs
+  # ld_classic under Xcode 15+ was never measured here.
+  # 2022.3 gets macos-15 (Xcode 16.4 default); Unity 6 gets the
   # current macos-latest (Xcode 26). The two `-xcode27` legs compile the SAME
-  # exports on GitHub's public-preview `xcode-27` image — Xcode 27.0 beta 6
-  # (27A5252f) today; Apple's GA 27A266a of 2026-09-14 is still awaiting
-  # deployment there (actions/runner-images#14709), so read the
-  # `xcodebuild -version` line in a leg's log for the build a result came from
-  # — with the iOS 27 SDK that App Store uploads must use from April 2027, and
-  # that no Unity line documents support for yet. They are canaries:
+  # exports on GitHub's public-preview `xcode-27` image — its runner-images
+  # README lists Xcode 27.0 GA (27A266a) as the default; read the
+  # `xcodebuild -version` line in a leg's log for the build a result
+  # came from — with the iOS 27 SDK that App Store uploads must use from April
+  # 2027, and that no Unity line documents support for yet. They are canaries:
   # `continue-on-error` keeps a red one from failing the workflow RUN; the
   # job's own check still shows its red X (job-level continue-on-error changes
   # the run's conclusion, never the job's), so a `*-xcode27` name must never
@@ -2934,10 +2759,11 @@ jobs:
   # explanation is refuted and the cause is somewhere else entirely.
   #
   # Two limits, stated up front. The newest runtime here comes from the xcode-27
-  # PREVIEW image, which is a seed build of both macOS and Xcode, so this
-  # isolates the SDK variable but proves nothing about released iOS 27. And both
-  # legs are continue-on-error on purpose: the ANSWER is the output, not a pass,
-  # and neither outcome should turn a PR red.
+  # PREVIEW image, and whether its macOS and simulator runtime are release or
+  # seed builds is not verified, so this isolates the SDK variable, but nothing
+  # here shows the result holds for released iOS 27. And both legs are
+  # continue-on-error on purpose: the ANSWER is the output, not a pass, and
+  # neither outcome should turn a PR red.
   ios-crossrun:
     name: ios cross-run (${{ matrix.target.name }})
     needs: ios-simulator

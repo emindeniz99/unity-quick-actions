@@ -58,7 +58,7 @@ static void QARunOnMain(dispatch_block_t block) {
 // only for this process run (a cold launch sets it before Unity reads it), so a
 // later normal launch never reports a stale shortcut.
 static NSString *gQALastPerformed = nil;
-// Queue of action ids awaiting delivery to the C# Performed event (cold launch).
+// Queue of action ids awaiting delivery to the C# Performed event (cold and warm taps).
 static NSMutableArray<NSString *> *gQAPending = nil;
 // Consume-once marker holding the id a COLD source already queued this launch
 // (didFinishLaunchingWithOptions or scene:willConnectToSession:). The same tap can
@@ -78,15 +78,15 @@ static void QAEnsureState(void) {
     });
 }
 
-// Records the tapped action: stores it as "last" and, when `queue` is YES,
-// enqueues it for the single C# poll channel. Reached through the cold/warm wrappers
-// below, which both pass YES; `copy` pins the (possibly autoreleased) type string.
-static void QAStorePerformed(NSString *type, BOOL queue) {
+// Records the tapped action: stores it as "last" and enqueues it for the single C# poll
+// channel. Reached through the cold/warm wrappers below; `copy` pins the (possibly
+// autoreleased) type string.
+static void QAStorePerformed(NSString *type) {
     if (type.length == 0) return;
     QAEnsureState();
     @synchronized (gQALock) {
         gQALastPerformed = [type copy];
-        if (queue) [gQAPending addObject:[type copy]];
+        [gQAPending addObject:[type copy]];
     }
 }
 
@@ -99,7 +99,7 @@ static void QAStorePerformedCold(NSString *type) {
     QAEnsureState();
     @synchronized (gQALock) {
         gQAColdDeliveredId = [type copy];
-        QAStorePerformed(type, YES);
+        QAStorePerformed(type);
     }
 }
 
@@ -115,7 +115,7 @@ static void QAStorePerformedWarm(NSString *type) {
             gQAColdDeliveredId = nil;
             return;
         }
-        QAStorePerformed(type, YES);
+        QAStorePerformed(type);
     }
 }
 
@@ -176,6 +176,14 @@ static void QADiagLog(const char *hook, UIApplicationShortcutItem *item) {
     if (![item isKindOfClass:[UIApplicationShortcutItem class]]) item = nil;
     NSLog(@"[QuickActions] diag %s type='%@' ours=%s userInfo=%@", hook, item.type,
           QAIsOurShortcut(item) ? "yes" : "no", [item.userInfo.allKeys componentsJoinedByString:@","]);
+}
+
+// True when `sel` still resolves to `ours` on self's class, i.e. no host plugin has
+// swizzled on top of us since we installed. Callers pair it with their own
+// gQAOrig* == NULL test.
+static BOOL QAStillOurs(id self, SEL sel, IMP ours) {
+    Method current = class_getInstanceMethod(object_getClass(self), sel);
+    return current != NULL && method_getImplementation(current) == ours;
 }
 
 // Builds UIApplicationShortcutItems from
@@ -251,6 +259,22 @@ static NSArray<UIApplicationShortcutItem *> *QABuildItems(NSString *json) {
 
 #pragma mark - UnityAppController hooks (installed via the ObjC runtime)
 
+// Installs `hook` for `sel` on `cls` and returns the IMP that class_getInstanceMethod
+// found there before (an inherited one counts), or NULL when there was none. A method
+// that exists is REPLACED, keeping its type encoding; otherwise `hook` is ADDED with
+// `typesIfAdded`, and NULL there means "do not add". The return value, not
+// class_replaceMethod's own (NULL for an inherited method), is the original to chain to.
+static IMP QAInstallHook(Class cls, SEL sel, IMP hook, const char *typesIfAdded) {
+    Method existing = class_getInstanceMethod(cls, sel);
+    if (existing == NULL) {
+        if (typesIfAdded != NULL) class_addMethod(cls, sel, hook, typesIfAdded);
+        return NULL;
+    }
+    IMP original = method_getImplementation(existing);
+    class_replaceMethod(cls, sel, hook, method_getTypeEncoding(existing));
+    return original;
+}
+
 static BOOL (*gQAOrigDidFinishLaunching)(id, SEL, UIApplication *, NSDictionary *) = NULL;
 
 static BOOL QADidFinishLaunching(id self, SEL _cmd, UIApplication *application, NSDictionary *launchOptions) {
@@ -307,12 +331,9 @@ static void QAPerformActionForShortcutItem(id self, SEL _cmd, UIApplication *app
     // and chaining down with the same completionHandler). In that wrapped state
     // the host owns routing and completion — treating ourselves as terminal would
     // steal its taps into our queue and double-invoke the completion handler.
-    BOOL terminal = NO;
-    if (gQAOrigPerformAction == NULL) {
-        Method current = class_getInstanceMethod(object_getClass(self),
-            @selector(application:performActionForShortcutItem:completionHandler:));
-        terminal = current != NULL && method_getImplementation(current) == (IMP)QAPerformActionForShortcutItem;
-    }
+    BOOL terminal = gQAOrigPerformAction == NULL &&
+        QAStillOurs(self, @selector(application:performActionForShortcutItem:completionHandler:),
+                    (IMP)QAPerformActionForShortcutItem);
     QADiagLog("app performAction", shortcutItem);
     if (QAIsOurShortcut(shortcutItem)) {
         // Enqueue for the single C# poll channel. This runs before
@@ -370,43 +391,6 @@ static id (*gQAOrigSceneConfiguration)(id, SEL, id, id, id) = NULL;
 // once, on the main thread, before any hook it gates can fire.
 static BOOL gQASceneOwnerUnconfirmed = NO;
 
-API_AVAILABLE(ios(13.0))
-static void QAScenePerformActionForShortcutItem(id self, SEL _cmd, UIWindowScene *windowScene,
-                                                UIApplicationShortcutItem *shortcutItem,
-                                                void (^completionHandler)(BOOL));
-
-// COLD tap under the scene lifecycle: the item rides in the connection options
-// instead of launchOptions.
-API_AVAILABLE(ios(13.0))
-static void QASceneWillConnect(id self, SEL _cmd, UIScene *scene, UISceneSession *session,
-                               UISceneConnectionOptions *connectionOptions) {
-    UIApplicationShortcutItem *item = connectionOptions.shortcutItem;
-    QADiagLog("scene willConnect", item);
-    BOOL record = QAIsOurShortcut(item);
-    if (!record && item != nil && gQAOrigScenePerformAction == NULL && !gQASceneOwnerUnconfirmed) {
-        // Unmarked: UIKit hands a launch item here, not to the warm hook, so adopt it
-        // under the warm hook's own rule — we are terminal for the warm selector and the
-        // owner is confirmed — or a hand-written Info.plist shortcut is lost cold.
-        Method current = class_getInstanceMethod(object_getClass(self),
-            @selector(windowScene:performActionForShortcutItem:completionHandler:));
-        record = current != NULL &&
-                 method_getImplementation(current) == (IMP)QAScenePerformActionForShortcutItem;
-    }
-    if (record) {
-        // Record BEFORE chaining: the host's willConnect is what builds the window and
-        // starts Unity, so the queue must already hold the tap when C# first drains it.
-        // The options are chained unchanged, so a host's own handling still sees the item.
-        // If iOS also reports this tap through the warm hook below, the cold marker (keyed
-        // on the id, marked or not) collapses the pair into one Performed event.
-        QAStorePerformedCold(item.type);
-    }
-    // When there was no original we added this selector; UIKit's own scene setup does
-    // not depend on the delegate implementing it, so adding it changes nothing.
-    if (gQAOrigSceneWillConnect != NULL) {
-        gQAOrigSceneWillConnect(self, _cmd, scene, session, connectionOptions);
-    }
-}
-
 // WARM tap under the scene lifecycle — the scene-delegate twin of
 // QAPerformActionForShortcutItem, with the same terminal/chaining rules.
 API_AVAILABLE(ios(13.0))
@@ -417,13 +401,9 @@ static void QAScenePerformActionForShortcutItem(id self, SEL _cmd, UIWindowScene
     // gQAOrigScenePerformAction == NULL only says the class implemented nothing when we
     // installed; a host plugin may have swizzled ON TOP of us since and now owns both
     // the routing and the completion handler.
-    BOOL terminal = NO;
-    if (gQAOrigScenePerformAction == NULL) {
-        Method current = class_getInstanceMethod(object_getClass(self),
-            @selector(windowScene:performActionForShortcutItem:completionHandler:));
-        terminal = current != NULL &&
-                   method_getImplementation(current) == (IMP)QAScenePerformActionForShortcutItem;
-    }
+    BOOL terminal = gQAOrigScenePerformAction == NULL &&
+        QAStillOurs(self, @selector(windowScene:performActionForShortcutItem:completionHandler:),
+                    (IMP)QAScenePerformActionForShortcutItem);
     BOOL adopted = NO;
     QADiagLog("scene performAction", shortcutItem);
     if (QAIsOurShortcut(shortcutItem)) {
@@ -456,6 +436,36 @@ static void QAScenePerformActionForShortcutItem(id self, SEL _cmd, UIWindowScene
     }
 }
 
+// COLD tap under the scene lifecycle: the item rides in the connection options
+// instead of launchOptions.
+API_AVAILABLE(ios(13.0))
+static void QASceneWillConnect(id self, SEL _cmd, UIScene *scene, UISceneSession *session,
+                               UISceneConnectionOptions *connectionOptions) {
+    UIApplicationShortcutItem *item = connectionOptions.shortcutItem;
+    QADiagLog("scene willConnect", item);
+    BOOL record = QAIsOurShortcut(item);
+    if (!record && item != nil && gQAOrigScenePerformAction == NULL && !gQASceneOwnerUnconfirmed) {
+        // Unmarked: UIKit hands a launch item here, not to the warm hook, so adopt it
+        // under the warm hook's own rule — we are terminal for the warm selector and the
+        // owner is confirmed — or a hand-written Info.plist shortcut is lost cold.
+        record = QAStillOurs(self, @selector(windowScene:performActionForShortcutItem:completionHandler:),
+                             (IMP)QAScenePerformActionForShortcutItem);
+    }
+    if (record) {
+        // Record BEFORE chaining: the host's willConnect is what builds the window and
+        // starts Unity, so the queue must already hold the tap when C# first drains it.
+        // The options are chained unchanged, so a host's own handling still sees the item.
+        // If iOS also reports this tap through the warm hook above, the cold marker (keyed
+        // on the id, marked or not) collapses the pair into one Performed event.
+        QAStorePerformedCold(item.type);
+    }
+    // When there was no original we added this selector; UIKit's own scene setup does
+    // not depend on the delegate implementing it, so adding it changes nothing.
+    if (gQAOrigSceneWillConnect != NULL) {
+        gQAOrigSceneWillConnect(self, _cmd, scene, session, connectionOptions);
+    }
+}
+
 // Installs the two scene hooks on the class the host named as its scene delegate.
 // Runs at most once: installing twice would capture OUR OWN IMP as the "original" and
 // recurse forever on the next tap. A nil class (the host's configuration doesn't name
@@ -475,31 +485,16 @@ static BOOL QAInstallSceneHooks(Class delegateClass, const char *via) {
 
     // Cold: scene:willConnectToSession:options: (the Apple scene template implements
     // it; preserve and chain to it when present, add it when not).
-    SEL willConnectSel = @selector(scene:willConnectToSession:options:);
-    Method willConnect = class_getInstanceMethod(delegateClass, willConnectSel);
-    if (willConnect != NULL) {
-        gQAOrigSceneWillConnect =
-            (void (*)(id, SEL, id, id, id))method_getImplementation(willConnect);
-        class_replaceMethod(delegateClass, willConnectSel, (IMP)QASceneWillConnect,
-                            method_getTypeEncoding(willConnect));
-    } else {
-        class_addMethod(delegateClass, willConnectSel, (IMP)QASceneWillConnect, "v@:@@@");
-    }
+    gQAOrigSceneWillConnect = (void (*)(id, SEL, id, id, id))QAInstallHook(
+        delegateClass, @selector(scene:willConnectToSession:options:), (IMP)QASceneWillConnect,
+        "v@:@@@");
 
     // Warm: windowScene:performActionForShortcutItem:completionHandler: (normally
     // absent, so we add it and become terminal; if the host already routes quick
     // actions here we preserve its IMP and it keeps owning the completion handler).
-    SEL performSel = @selector(windowScene:performActionForShortcutItem:completionHandler:);
-    Method perform = class_getInstanceMethod(delegateClass, performSel);
-    if (perform != NULL) {
-        gQAOrigScenePerformAction =
-            (void (*)(id, SEL, id, id, void (^)(BOOL)))method_getImplementation(perform);
-        class_replaceMethod(delegateClass, performSel, (IMP)QAScenePerformActionForShortcutItem,
-                            method_getTypeEncoding(perform));
-    } else {
-        class_addMethod(delegateClass, performSel, (IMP)QAScenePerformActionForShortcutItem,
-                        "v@:@@@?");
-    }
+    gQAOrigScenePerformAction = (void (*)(id, SEL, id, id, void (^)(BOOL)))QAInstallHook(
+        delegateClass, @selector(windowScene:performActionForShortcutItem:completionHandler:),
+        (IMP)QAScenePerformActionForShortcutItem, "v@:@@@?");
 
     // Always on, one line per process launch: which class we bound to, and by which of
     // the two routes. Under the scene lifecycle this is the difference between a working
@@ -669,41 +664,28 @@ static void QAInstallSceneHooksFromScene(UIScene *scene) {
     const char *sceneConfigBranch = "absent";
 
     // Swizzle application:didFinishLaunchingWithOptions: (Unity implements it).
-    SEL didFinishSel = @selector(application:didFinishLaunchingWithOptions:);
-    Method didFinish = class_getInstanceMethod(cls, didFinishSel);
-    if (didFinish != NULL) {
-        gQAOrigDidFinishLaunching =
-            (BOOL (*)(id, SEL, UIApplication *, NSDictionary *))method_getImplementation(didFinish);
-        class_replaceMethod(cls, didFinishSel, (IMP)QADidFinishLaunching, method_getTypeEncoding(didFinish));
-        didFinishBranch = "wrapped";
-    } else {
-        // Defensive fallback (Unity always implements the selector). Build the return
-        // encoding from @encode(BOOL) instead of hardcoding a character: on every
-        // 64-bit iOS slice objc.h takes the OBJC_BOOL_IS_BOOL branch, so BOOL is C99
-        // _Bool and the encoding is "B"; the legacy 'c' (signed char) belongs to the
-        // retired armv7/i386 ABI. Static so the buffer outlives +load whatever the
-        // runtime chooses to do with the pointer.
-        static char didFinishTypes[16];
-        snprintf(didFinishTypes, sizeof(didFinishTypes), "%s@:@@", @encode(BOOL));
-        class_addMethod(cls, didFinishSel, (IMP)QADidFinishLaunching, didFinishTypes);
-    }
+    // Defensive fallback (Unity always implements the selector): ADD it when absent,
+    // with the return encoding built from @encode(BOOL) rather than a hardcoded character:
+    // on every 64-bit iOS slice objc.h takes the OBJC_BOOL_IS_BOOL branch, so BOOL is
+    // C99 _Bool and the encoding is "B"; the legacy 'c' (signed char) belongs to the
+    // retired armv7/i386 ABI. Static so the buffer outlives +load whatever the
+    // runtime chooses to do with the pointer.
+    static char didFinishTypes[16];
+    snprintf(didFinishTypes, sizeof(didFinishTypes), "%s@:@@", @encode(BOOL));
+    gQAOrigDidFinishLaunching = (BOOL (*)(id, SEL, UIApplication *, NSDictionary *))QAInstallHook(
+        cls, @selector(application:didFinishLaunchingWithOptions:), (IMP)QADidFinishLaunching,
+        didFinishTypes);
+    if (gQAOrigDidFinishLaunching != NULL) didFinishBranch = "wrapped";
 
     // Install application:performActionForShortcutItem:completionHandler:
     // (Unity does not implement it, so normally we add it; if something already
-    // implements it we preserve and chain to that IMP instead of dropping it).
-    SEL performSel = @selector(application:performActionForShortcutItem:completionHandler:);
-    const char *performTypes = "v@:@@@?";
-    Method perform = class_getInstanceMethod(cls, performSel);
-    if (perform != NULL) {
-        // Preserve the existing implementation so QAPerformActionForShortcutItem
-        // can chain to it (host app / another plugin also handling quick actions).
-        gQAOrigPerformAction =
-            (void (*)(id, SEL, UIApplication *, UIApplicationShortcutItem *, void (^)(BOOL)))method_getImplementation(perform);
-        class_replaceMethod(cls, performSel, (IMP)QAPerformActionForShortcutItem, method_getTypeEncoding(perform));
-        performBranch = "wrapped";
-    } else {
-        class_addMethod(cls, performSel, (IMP)QAPerformActionForShortcutItem, performTypes);
-    }
+    // implements it — host app / another plugin also handling quick actions — we
+    // preserve and chain to that IMP instead of dropping it).
+    gQAOrigPerformAction =
+        (void (*)(id, SEL, UIApplication *, UIApplicationShortcutItem *, void (^)(BOOL)))QAInstallHook(
+            cls, @selector(application:performActionForShortcutItem:completionHandler:),
+            (IMP)QAPerformActionForShortcutItem, "v@:@@@?");
+    if (gQAOrigPerformAction != NULL) performBranch = "wrapped";
 
     // Install application:configurationForConnectingSceneSession:options: — the only
     // way to learn the scene-delegate class, since it exists solely in the configuration
@@ -717,19 +699,12 @@ static void QAInstallSceneHooksFromScene(UIScene *scene) {
     // touch the app — the legacy launch path has to stay byte-identical.
     BOOL hasSceneManifest = [NSBundle mainBundle].infoDictionary[@"UIApplicationSceneManifest"] != nil;
     if (@available(iOS 13.0, *)) {
-        SEL sceneConfigSel = @selector(application:configurationForConnectingSceneSession:options:);
-        Method sceneConfig = class_getInstanceMethod(cls, sceneConfigSel);
-        if (sceneConfig != NULL) {
-            gQAOrigSceneConfiguration =
-                (id (*)(id, SEL, id, id, id))method_getImplementation(sceneConfig);
-            class_replaceMethod(cls, sceneConfigSel, (IMP)QAConfigurationForConnectingSceneSession,
-                                method_getTypeEncoding(sceneConfig));
-            sceneConfigBranch = "wrapped";
-        } else if (hasSceneManifest) {
-            class_addMethod(cls, sceneConfigSel, (IMP)QAConfigurationForConnectingSceneSession,
-                            "@@:@@@");
-            sceneConfigBranch = "added";
-        }
+        // NULL types: without a manifest the selector is never ADDED (see above).
+        gQAOrigSceneConfiguration = (id (*)(id, SEL, id, id, id))QAInstallHook(
+            cls, @selector(application:configurationForConnectingSceneSession:options:),
+            (IMP)QAConfigurationForConnectingSceneSession, hasSceneManifest ? "@@:@@@" : NULL);
+        if (gQAOrigSceneConfiguration != NULL) sceneConfigBranch = "wrapped";
+        else if (hasSceneManifest) sceneConfigBranch = "added";
     }
 
     // End the cold-dedup window at the first activation, so ONLY a duplicate that
@@ -812,10 +787,9 @@ void _QuickActions_SetShortcuts(const char *json) {
             // Every unmarked item is preserved — a host app's / other plugin's live
             // shortcut, even one whose `type` collides with an id we're writing. On a
             // collision the id then renders twice, the honest result of two publishers
-            // claiming one id; we never adopt or drop an item we didn't mark. (This is
-            // the first release, so there is no pre-marker build of this package whose
-            // unmarked leftovers would need migrating — the static plist path in
-            // QuickActionsBuildPostProcessoriOS makes the same call.)
+            // claiming one id; we never adopt or drop an item we didn't mark. (No release
+            // predates the marker, so there are no unmarked leftovers to migrate; the
+            // static plist path in QuickActionsBuildPostProcessoriOS makes the same call.)
             [merged addObject:item];
         }
         [merged addObjectsFromArray:ours];
@@ -856,8 +830,9 @@ char *_QuickActions_ConsumePendingPerformed(void) {
 }
 
 // Builds {"items":[...]} from the OS's current *dynamic* shortcut items (static
-// Info.plist items are not surfaced by shortcutItems). Icons can't be read back,
-// so Icon is reported as 0 (None). Must run on the main thread (UIApplication).
+// Info.plist items are not surfaced by shortcutItems). Icon, symbol, template, payload
+// and L10n come back from our userInfo, since the OS cannot read icons back. Must run
+// on the main thread (UIApplication).
 static char *QABuildShortcutsJson(void) {
     NSArray<UIApplicationShortcutItem *> *items = [UIApplication sharedApplication].shortcutItems;
     NSMutableArray *out = [NSMutableArray array];

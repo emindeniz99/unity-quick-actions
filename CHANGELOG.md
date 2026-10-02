@@ -120,6 +120,35 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   iOS 27 simulator refuses one. Whether 2021.3 needs `-ld_classic` under Xcode
   15+ is marked unverified.
 
+- **The iOS image is labelled a Simulator capture, and `llms.txt` is pinned.**
+  The README captioned its iOS long-press image "iPhone", but the commit that
+  added it records an iOS Simulator capture; no iPhone run exists. `llms.txt`
+  pinned `#v0.6.0`; it names the current version now, and `verify.sh` checks
+  it with the other install pins.
+
+- **Two Android logcat lines read differently.** The two collision warnings
+  are one now: `Dropped a dynamic shortcut whose id collides with a static,
+  host-dynamic or pinned shortcut`. The write-failure warning says `dynamic
+  shortcut write failed` instead of naming `setDynamicShortcuts`, an API the
+  bridge never calls. No other log text changes.
+
+- **Internal cleanup, no behaviour change.** The Android C# bridge sends its
+  eight JNI calls through one helper; the iOS plugin installs its five hooks
+  through one helper and shares its "is our hook still installed?" lookup in
+  one function; a refused relabel, the localization row filter and the Android
+  editor's attribute setter each exist once. Dead null checks, a parameter
+  that was always `YES`, stale comments and 16 `.meta` files in folders Unity
+  never imports are gone, and CI's eight copies of the Docker shared-memory
+  step are one local action. `verify.sh` passes on every commit; the native
+  paths are covered by the Unity and macOS CI jobs only. No device run.
+
+### Removed
+
+- **`Plugins/iOS/QuickActions.h`.** Nothing in the package imported it. It
+  called itself informational and had drifted from the plugin (it did not
+  mention the `L10n` field). A host plugin that `#import`s it must drop the
+  import; the C entry points it declared are unchanged.
+
 ### Fixed
 
 - **`RemoveById` reports a removal Android already applied.** Android's write

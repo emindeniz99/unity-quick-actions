@@ -217,13 +217,18 @@ namespace EminDeniz99.QuickActions.Internal
             }
         }
 
+        // A row that can actually render; Find and Usable share it, so the blob
+        // never carries rows that resolution would ignore anyway.
+        private static bool IsUsable(LocalizedText entry) =>
+            entry != null && !string.IsNullOrEmpty(entry.Locale) && !string.IsNullOrEmpty(entry.Text);
+
         private static string Find(List<LocalizedText> entries, string locale, bool regionTagged = false)
         {
             foreach (var entry in entries)
             {
                 // Skip junk rather than resolving to it: an empty text installs a
                 // blank label the OS refuses, so the base text is the honest answer.
-                if (entry == null || string.IsNullOrEmpty(entry.Locale) || string.IsNullOrEmpty(entry.Text))
+                if (!IsUsable(entry))
                     continue;
                 if (regionTagged
                         ? entry.Locale.StartsWith(locale + "-", StringComparison.OrdinalIgnoreCase)
@@ -233,15 +238,13 @@ namespace EminDeniz99.QuickActions.Internal
             return null;
         }
 
-        // Only entries that can actually render — the same filter Find applies, so
-        // the blob never carries rows resolution would ignore anyway.
         private static List<LocalizedText> Usable(List<LocalizedText> entries)
         {
             var usable = new List<LocalizedText>();
             if (entries == null)
                 return usable;
             foreach (var entry in entries)
-                if (entry != null && !string.IsNullOrEmpty(entry.Locale) && !string.IsNullOrEmpty(entry.Text))
+                if (IsUsable(entry))
                     usable.Add(entry);
             return usable;
         }

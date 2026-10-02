@@ -8,12 +8,7 @@ namespace UnityEditor
     public class EditorWindow : ScriptableObject
     {
         public Vector2 minSize;
-        public Vector2 maxSize;
-        public GUIContent titleContent;
-        public static T GetWindow<T>() where T : EditorWindow => CreateInstance<T>();
         public static T GetWindow<T>(bool utility, string title) where T : EditorWindow => CreateInstance<T>();
-        public void Show() { }
-        public void Close() { }
     }
 
     public static class EditorStyles
@@ -22,8 +17,6 @@ namespace UnityEditor
         public static GUIStyle label => new GUIStyle();
         public static GUIStyle wordWrappedLabel => new GUIStyle();
         public static GUIStyle textArea => new GUIStyle();
-        public static GUIStyle textField => new GUIStyle();
-        public static GUIStyle miniButton => new GUIStyle();
         public static GUIStyle miniLabel => new GUIStyle();
     }
 
@@ -61,7 +54,6 @@ namespace UnityEditor
         public static void BeginChangeCheck() { }
         public static bool EndChangeCheck() => false;
         public static Enum EnumPopup(Rect position, GUIContent label, Enum selected) => selected;
-        public static bool PropertyField(Rect position, SerializedProperty property, GUIContent label) => false;
         public static void LabelField(Rect position, string label, GUIStyle style) { }
         public static void LabelField(Rect position, GUIContent label, GUIStyle style) { }
     }
@@ -83,7 +75,6 @@ namespace UnityEditor
         public static void Space() { }
         public static void HelpBox(string message, MessageType type) { }
         public static string TextField(string label, string text) => text;
-        public static bool Toggle(string label, bool value) => value;
     }
 
     public enum MessageType { None, Info, Warning, Error }

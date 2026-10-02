@@ -55,106 +55,57 @@ namespace EminDeniz99.QuickActions.Internal
             catch (AndroidJavaException e)
             {
                 // Guarded like every other JNI path here: this is evaluated AHEAD of
-                // the try blocks in the members below, so a throw from it would be the
-                // one JNI exception that could escape into the caller's Add()/GetAll().
+                // CallBridge's try block (and the other guarded calls below), so a throw
+                // from it would be the one JNI exception that could escape into the
+                // caller's Add()/GetAll().
                 Debug.LogWarning("[QuickActions] Could not read Build.VERSION.SDK_INT: " + e.Message);
                 sdkInt = -1;
                 return false;
             }
         }
 
-        public bool IsPlatformSupported => TrySdkInt(out var sdkInt) && sdkInt >= 25;
-
-        public int MaxShortcutCount
+        // The JNI call shared by every member that passes the Activity: it goes
+        // first, ahead of args. A JNI exception is logged under the C# member's
+        // name and answered with that member's failure value, so it never escapes
+        // into the caller.
+        private static T CallBridge<T>(string member, string method, T fallback, params object[] args)
         {
-            get
+            try
             {
-                if (!IsPlatformSupported) return 0;
-                try
+                using (var bridge = new AndroidJavaClass(BridgeClass))
+                using (var activity = CurrentActivity())
                 {
-                    using (var bridge = new AndroidJavaClass(BridgeClass))
-                    using (var activity = CurrentActivity())
-                        return bridge.CallStatic<int>("getMaxShortcutCount", activity);
-                }
-                catch (AndroidJavaException e)
-                {
-                    Debug.LogWarning("[QuickActions] MaxShortcutCount failed: " + e.Message);
-                    return 0;
+                    var all = new object[args.Length + 1];
+                    all[0] = activity;
+                    args.CopyTo(all, 1);
+                    return bridge.CallStatic<T>(method, all);
                 }
             }
+            catch (AndroidJavaException e)
+            {
+                Debug.LogWarning("[QuickActions] " + member + " failed: " + e.Message);
+                return fallback;
+            }
         }
+
+        public bool IsPlatformSupported => TrySdkInt(out var sdkInt) && sdkInt >= 25;
+
+        public int MaxShortcutCount =>
+            IsPlatformSupported ? CallBridge(nameof(MaxShortcutCount), "getMaxShortcutCount", 0) : 0;
 
         // Advisory: the OS throttles background shortcut writes and resets the
         // flag on foreground. Racy by nature (it can flip before the next write),
-        // so it explains a refused Add/AddRange/Update rather than gating one.
-        public bool IsRateLimitingActive
-        {
-            get
-            {
-                if (!IsPlatformSupported) return false;
-                try
-                {
-                    using (var bridge = new AndroidJavaClass(BridgeClass))
-                    using (var activity = CurrentActivity())
-                        return bridge.CallStatic<bool>("isRateLimitingActive", activity);
-                }
-                catch (AndroidJavaException e)
-                {
-                    Debug.LogWarning("[QuickActions] IsRateLimitingActive failed: " + e.Message);
-                    return false;
-                }
-            }
-        }
+        // so it explains a refused Add/AddList/Update rather than gating one.
+        public bool IsRateLimitingActive =>
+            IsPlatformSupported && CallBridge(nameof(IsRateLimitingActive), "isRateLimitingActive", false);
 
         // requestPinShortcut is API 26+; below that pinning doesn't exist.
-        public bool IsPinSupported
-        {
-            get
-            {
-                try
-                {
-                    using (var bridge = new AndroidJavaClass(BridgeClass))
-                    using (var activity = CurrentActivity())
-                        return bridge.CallStatic<bool>("isPinSupported", activity);
-                }
-                catch (AndroidJavaException e)
-                {
-                    Debug.LogWarning("[QuickActions] IsPinSupported failed: " + e.Message);
-                    return false;
-                }
-            }
-        }
+        public bool IsPinSupported => CallBridge(nameof(IsPinSupported), "isPinSupported", false);
 
-        public bool RequestPin(string id)
-        {
-            try
-            {
-                using (var bridge = new AndroidJavaClass(BridgeClass))
-                using (var activity = CurrentActivity())
-                    return bridge.CallStatic<bool>("requestPinShortcut", activity, id);
-            }
-            catch (AndroidJavaException e)
-            {
-                Debug.LogWarning("[QuickActions] RequestPin failed: " + e.Message);
-                return false;
-            }
-        }
+        public bool RequestPin(string id) => CallBridge(nameof(RequestPin), "requestPinShortcut", false, id);
 
-        public bool ReportUsed(string id)
-        {
-            if (!IsPlatformSupported) return false;
-            try
-            {
-                using (var bridge = new AndroidJavaClass(BridgeClass))
-                using (var activity = CurrentActivity())
-                    return bridge.CallStatic<bool>("reportShortcutUsed", activity, id);
-            }
-            catch (AndroidJavaException e)
-            {
-                Debug.LogWarning("[QuickActions] ReportUsed failed: " + e.Message);
-                return false;
-            }
-        }
+        public bool ReportUsed(string id) =>
+            IsPlatformSupported && CallBridge(nameof(ReportUsed), "reportShortcutUsed", false, id);
 
         public IList<QuickActionItem> SetShortcuts(IList<QuickActionItem> items)
         {
@@ -167,23 +118,12 @@ namespace EminDeniz99.QuickActions.Internal
             if (!TrySdkInt(out var sdkInt)) return null;
             if (sdkInt < 25) return new List<QuickActionItem>();
             var json = JsonUtility.ToJson(new QuickActionList(items));
-            string applied;
-            try
-            {
-                using (var bridge = new AndroidJavaClass(BridgeClass))
-                using (var activity = CurrentActivity())
-                    // Java trims to the OS cap and returns the ids it APPLIED (null on a
-                    // failed/rate-limited write). We deliberately use this return value,
-                    // NOT a separate getDynamicShortcuts() read-back: a read after a failed
-                    // write reflects the stale prior set and would make us prune (delete)
-                    // just-added shortcuts.
-                    applied = bridge.CallStatic<string>("setShortcuts", activity, json);
-            }
-            catch (AndroidJavaException e)
-            {
-                Debug.LogWarning("[QuickActions] SetShortcuts failed: " + e.Message);
-                return null; // write may not have landed — signal failure (facade re-syncs)
-            }
+            // Java trims to the OS cap and returns the ids it APPLIED (null on a
+            // failed/rate-limited write, and a JNI exception comes back as null too).
+            // We deliberately use this return value, NOT a separate
+            // getDynamicShortcuts() read-back: a read after a failed write reflects
+            // the stale prior set and would make us prune (delete) just-added shortcuts.
+            var applied = CallBridge<string>(nameof(SetShortcuts), "setShortcuts", null, json);
 
             // Null/empty = the write did not land (rejected/rate-limited/errored). Return
             // null so the facade reconciles with the real OS state on next access rather
@@ -213,17 +153,8 @@ namespace EminDeniz99.QuickActions.Internal
         {
             if (!TrySdkInt(out var sdkInt)) return false; // unknown SDK level: report failure, not success
             if (sdkInt < 25) return true; // no dynamic shortcuts exist below API 25
-            try
-            {
-                using (var bridge = new AndroidJavaClass(BridgeClass))
-                using (var activity = CurrentActivity())
-                    return bridge.CallStatic<bool>("removeAll", activity);
-            }
-            catch (AndroidJavaException e)
-            {
-                Debug.LogWarning("[QuickActions] RemoveAll failed: " + e.Message);
-                return false; // couldn't remove — let the facade keep its list
-            }
+            // false on a JNI failure: couldn't remove — let the facade keep its list
+            return CallBridge(nameof(RemoveAll), "removeAll", false);
         }
 
         public string GetLastPerformed() => CallStringStatic("getLastPerformed");
@@ -253,25 +184,11 @@ namespace EminDeniz99.QuickActions.Internal
                 return null;
             if (sdkInt < 25)
                 return new List<QuickActionItem>();
-            try
-            {
-                using (var bridge = new AndroidJavaClass(BridgeClass))
-                using (var activity = CurrentActivity())
-                {
-                    // Java returns null when the read itself failed (locked device etc.).
-                    // Propagate that as null so the facade doesn't treat a failed read as
-                    // an authoritative-empty set.
-                    var json = bridge.CallStatic<string>("getShortcutsJson", activity);
-                    return json == null ? null : QuickActionList.Parse(json);
-                }
-            }
-            catch (AndroidJavaException e)
-            {
-                // Defense in depth: never let a JNI exception escape the reconcile.
-                // Return null (read failed) so the facade retries rather than caching empty.
-                Debug.LogWarning("[QuickActions] GetShortcuts failed: " + e.Message);
-                return null;
-            }
+            // Java returns null when the read itself failed (locked device etc.), and
+            // a JNI exception comes back as null too. Propagate that as null so the
+            // facade doesn't treat a failed read as an authoritative-empty set.
+            var json = CallBridge<string>(nameof(GetShortcuts), "getShortcutsJson", null);
+            return json == null ? null : QuickActionList.Parse(json);
         }
 
         private static string CallStringStatic(string method)

@@ -119,7 +119,8 @@ Tags are plain semver, one per release; `v0.4.0`, cut 2026-08-07, was the first.
       `Unreleased` left). `verify.sh` check 6 fails the PR otherwise — the
       release is cut from those two files, so the bump must be in the commit
       that gets tagged. The same commit moves the `#v<version>` install pins
-      (README, GETTING_STARTED, CONTRIBUTING, CLAUDE.md), the README's
+      (README, GETTING_STARTED, CONTRIBUTING, CLAUDE.md, AGENTS.md, llms.txt
+      — `release_notes.py`'s `PIN_FILES`), the README's
       OpenUPM version snippet and its Status line (`This is **<version>**`) —
       check 6 fails the PR when any of them still names the previous version.
 - [ ] Stay in `0.x` until the matrix above has actually been walked on devices;

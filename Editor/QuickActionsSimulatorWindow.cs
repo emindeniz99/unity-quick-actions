@@ -76,8 +76,6 @@ namespace EminDeniz99.QuickActions.Editor
             // build target — see the _placeholderPreview note.
             if (_settings != null && _settings.StaticShortcuts.Count > 0)
             {
-                if (_placeholderPreview == null)
-                    RefreshSettings();
                 EditorGUILayout.Space();
                 EditorGUILayout.LabelField("Static shortcuts (baked into the build)", EditorStyles.boldLabel);
                 foreach (var item in _settings.StaticShortcuts)
