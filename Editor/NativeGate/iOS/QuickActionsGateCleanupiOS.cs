@@ -21,21 +21,12 @@ using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
 using UnityEditor.iOS.Xcode;
 using UnityEngine;
+using static EminDeniz99.QuickActions.Editor.NativeGate.QuickActionsTemplateImages;
 
 namespace EminDeniz99.QuickActions.Editor.NativeGate
 {
     internal sealed class QuickActionsGateCleanupiOS : IPostprocessBuildWithReport
     {
-        private const string ItemsKey = "UIApplicationShortcutItems";
-        private const string UserInfoKey = "UIApplicationShortcutItemUserInfo";
-        private const string MarkerKey = "com.emindeniz99.quickactions.managed";
-        // Must match Editor/iOS/QuickActionsBuildPostProcessoriOS.cs — the gated
-        // assembly that WRITES these, which does not compile when the define is off,
-        // so this one cannot share the constants with it. Pinned together by
-        // tools~/check_frozen_strings.py so the two copies cannot drift.
-        private const string IconsFolder = "QuickActionsIcons";
-        private const string IconManifestName = "quickactions_manifest.txt";
-
         public int callbackOrder => 95;
 
         public void OnPostprocessBuild(BuildReport report)
@@ -194,18 +185,9 @@ namespace EminDeniz99.QuickActions.Editor.NativeGate
 
             var plist = new PlistDocument();
             plist.ReadFromFile(plistPath);
-            if (!plist.root.values.TryGetValue(ItemsKey, out var existing) || !(existing is PlistElementArray arr))
+            if (!QuickActionsPlistShortcuts.ClearOurEntries(plist))
                 return;
 
-            var removed = arr.values.RemoveAll(e =>
-                e is PlistElementDict d
-                && d.values.TryGetValue(UserInfoKey, out var ui) && ui is PlistElementDict uiDict
-                && uiDict.values.TryGetValue(MarkerKey, out var marker) && marker.AsBoolean());
-            if (removed == 0)
-                return;
-
-            if (arr.values.Count == 0)
-                plist.root.values.Remove(ItemsKey);
             plist.WriteToFile(plistPath);
             Debug.Log("[QuickActions] Stripped static Quick Actions shortcuts from Info.plist (gate is off).");
         }

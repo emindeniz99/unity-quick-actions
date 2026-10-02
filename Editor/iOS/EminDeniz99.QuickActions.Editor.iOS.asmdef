@@ -3,7 +3,8 @@
     "rootNamespace": "EminDeniz99.QuickActions.Editor",
     "references": [
         "EminDeniz99.QuickActions",
-        "EminDeniz99.QuickActions.Editor"
+        "EminDeniz99.QuickActions.Editor",
+        "EminDeniz99.QuickActions.Editor.NativeGate.iOS"
     ],
     "includePlatforms": [
         "Editor"

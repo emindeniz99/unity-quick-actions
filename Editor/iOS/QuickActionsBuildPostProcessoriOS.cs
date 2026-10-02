@@ -3,11 +3,13 @@
 using System.Collections.Generic;
 using System.IO;
 using EminDeniz99.QuickActions;
+using EminDeniz99.QuickActions.Editor.NativeGate;
 using UnityEditor;
 using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
 using UnityEditor.iOS.Xcode;
 using UnityEngine;
+using static EminDeniz99.QuickActions.Editor.NativeGate.QuickActionsTemplateImages;
 
 namespace EminDeniz99.QuickActions.Editor
 {
@@ -105,7 +107,7 @@ namespace EminDeniz99.QuickActions.Editor
                 else if (item.Icon != IconType.None)
                     dict.SetString("UIApplicationShortcutItemIconType", "UIApplicationShortcutIconType" + item.Icon);
                 // Tag our entries so a later cleanup/refresh can find exactly ours.
-                dict.CreateDict("UIApplicationShortcutItemUserInfo")
+                dict.CreateDict(QuickActionsPlistShortcuts.UserInfoKey)
                     .SetBoolean(QuickActionsPlistShortcuts.MarkerKey, true);
                 count++;
             }
@@ -113,13 +115,6 @@ namespace EminDeniz99.QuickActions.Editor
             plist.WriteToFile(plistPath);
             Debug.Log($"[QuickActions] Wrote {count} static shortcut(s) to Info.plist.");
         }
-
-        private const string IconsFolder = "QuickActionsIcons";
-        // Duplicated in Editor/NativeGate/iOS/QuickActionsGateCleanupiOS.cs, which
-        // must delete what this writes but cannot reference this assembly (it is
-        // compiled out when the define is off). tools~/check_frozen_strings.py pins
-        // both copies of both names.
-        private const string IconManifestName = "quickactions_manifest.txt";
 
         // Copies the configured template-image textures into the generated Xcode
         // project and adds them to the MAIN app target's resources (shortcut icons
@@ -296,47 +291,5 @@ namespace EminDeniz99.QuickActions.Editor
         // group instead of adding a second producer — and must be validated on a real
         // Xcode build, not compile-checked: the PBX stubs here are no-ops, which is
         // precisely why the collision shipped unnoticed.
-    }
-
-    /// <summary>
-    /// Shared helpers for reading/merging our entries in the iOS
-    /// <c>UIApplicationShortcutItems</c> plist array. Our entries carry a marker in
-    /// their <c>UIApplicationShortcutItemUserInfo</c> so cleanup/refresh touches only
-    /// ours and never a host app's own shortcuts.
-    /// </summary>
-    internal static class QuickActionsPlistShortcuts
-    {
-        internal const string ItemsKey = "UIApplicationShortcutItems";
-        internal const string UserInfoKey = "UIApplicationShortcutItemUserInfo";
-        internal const string MarkerKey = "com.emindeniz99.quickactions.managed";
-
-        internal static PlistElementArray GetOrCreateArray(PlistDocument plist)
-        {
-            if (plist.root.values.TryGetValue(ItemsKey, out var existing) && existing is PlistElementArray arr)
-                return arr;
-            return plist.root.CreateArray(ItemsKey);
-        }
-
-        // True only for entries this package wrote (marked in their user info).
-        internal static bool IsOurs(PlistElement entry)
-        {
-            if (!(entry is PlistElementDict dict))
-                return false;
-            if (!dict.values.TryGetValue(UserInfoKey, out var ui) || !(ui is PlistElementDict uiDict))
-                return false;
-            return uiDict.values.TryGetValue(MarkerKey, out var marker) && marker.AsBoolean();
-        }
-
-        // Removes our marked entries, dropping the whole key if nothing else remains.
-        // Returns true if the plist changed.
-        internal static bool ClearOurEntries(PlistDocument plist)
-        {
-            if (!plist.root.values.TryGetValue(ItemsKey, out var existing) || !(existing is PlistElementArray arr))
-                return false;
-            var removed = arr.values.RemoveAll(IsOurs);
-            if (arr.values.Count == 0)
-                plist.root.values.Remove(ItemsKey);
-            return removed > 0;
-        }
     }
 }
