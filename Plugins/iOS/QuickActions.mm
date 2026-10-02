@@ -167,6 +167,17 @@ static BOOL QAIsOurShortcut(UIApplicationShortcutItem *item) {
     return [marker isKindOfClass:[NSNumber class]] && [marker boolValue];
 }
 
+// Diagnostics, off unless the app's home holds Library/com.emindeniz99.quickactions.diag
+// (the iOS SpringBoard harness creates it): one line per entry-hook call. A file, not an
+// environment variable, because an app SpringBoard launches does not inherit simctl's.
+static void QADiagLog(const char *hook, UIApplicationShortcutItem *item) {
+    NSString *flag = [NSHomeDirectory() stringByAppendingPathComponent:@"Library/com.emindeniz99.quickactions.diag"];
+    if (![[NSFileManager defaultManager] fileExistsAtPath:flag]) return;
+    if (![item isKindOfClass:[UIApplicationShortcutItem class]]) item = nil;
+    NSLog(@"[QuickActions] diag %s type='%@' ours=%s userInfo=%@", hook, item.type,
+          QAIsOurShortcut(item) ? "yes" : "no", [item.userInfo.allKeys componentsJoinedByString:@","]);
+}
+
 // Builds UIApplicationShortcutItems from
 // {"items":[{Id,Title,Subtitle,Icon,IosSystemImage,IosTemplateImage,Payload,L10n}]}.
 // Title/Subtitle arrive already resolved for the active locale (see kQAL10nKey).
@@ -245,6 +256,7 @@ static BOOL (*gQAOrigDidFinishLaunching)(id, SEL, UIApplication *, NSDictionary 
 static BOOL QADidFinishLaunching(id self, SEL _cmd, UIApplication *application, NSDictionary *launchOptions) {
     UIApplicationShortcutItem *launchItem = launchOptions[UIApplicationLaunchOptionsShortcutItemKey];
     BOOL launchedFromOurShortcut = QAIsOurShortcut(launchItem);
+    QADiagLog("app didFinishLaunching", launchItem);
     if (launchedFromOurShortcut) {
         QAStorePerformedCold(launchItem.type);
     }
@@ -301,6 +313,7 @@ static void QAPerformActionForShortcutItem(id self, SEL _cmd, UIApplication *app
             @selector(application:performActionForShortcutItem:completionHandler:));
         terminal = current != NULL && method_getImplementation(current) == (IMP)QAPerformActionForShortcutItem;
     }
+    QADiagLog("app performAction", shortcutItem);
     if (QAIsOurShortcut(shortcutItem)) {
         // Enqueue for the single C# poll channel. This runs before
         // applicationDidBecomeActive, so the focus poll drains it on resume. Only
@@ -368,6 +381,7 @@ API_AVAILABLE(ios(13.0))
 static void QASceneWillConnect(id self, SEL _cmd, UIScene *scene, UISceneSession *session,
                                UISceneConnectionOptions *connectionOptions) {
     UIApplicationShortcutItem *item = connectionOptions.shortcutItem;
+    QADiagLog("scene willConnect", item);
     BOOL record = QAIsOurShortcut(item);
     if (!record && item != nil && gQAOrigScenePerformAction == NULL && !gQASceneOwnerUnconfirmed) {
         // Unmarked: UIKit hands a launch item here, not to the warm hook, so adopt it
@@ -411,6 +425,7 @@ static void QAScenePerformActionForShortcutItem(id self, SEL _cmd, UIWindowScene
                    method_getImplementation(current) == (IMP)QAScenePerformActionForShortcutItem;
     }
     BOOL adopted = NO;
+    QADiagLog("scene performAction", shortcutItem);
     if (QAIsOurShortcut(shortcutItem)) {
         // Ours, wrapped or terminal: record it — deduped against a cold tap of the same
         // id that the connecting scene already queued this launch.

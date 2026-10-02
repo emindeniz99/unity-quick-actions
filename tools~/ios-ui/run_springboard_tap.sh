@@ -31,6 +31,11 @@
 #                before its first frame                                    (75)
 #   QA_LEG       the CI leg's name, for the summary heading
 #
+# Every pass also turns on the package's native diagnostics (a flag file in the
+# app's data container, read by Plugins/iOS/QuickActions.mm: one "[QuickActions]
+# diag" line per entry-hook call), saves the app's unified log for the pass to
+# unified-log.txt, and prints its [QuickActions] lines to the step log.
+#
 # Exit 0 on PASS and on SKIPPED — the automation's own misses never fail a run —
 # non-zero on FAIL and when the test wrote no verdict at all.
 set -euo pipefail
@@ -49,6 +54,15 @@ PASS="${QA_PASS:-$ACTION_ID}"
 LEG="${QA_LEG:-}"
 
 mkdir -p "$OUT"
+START="$SECONDS"
+# Flag file read by QADiagLog in Plugins/iOS/QuickActions.mm. Best effort: no flag, no diag lines.
+APP_DATA="$(xcrun simctl get_app_container "$UDID" "$APP_ID" data 2>/dev/null || true)"
+if [ -n "$APP_DATA" ] && mkdir -p "$APP_DATA/Library" \
+  && : > "$APP_DATA/Library/com.emindeniz99.quickactions.diag"; then
+  echo "native diagnostics on: $APP_DATA/Library/com.emindeniz99.quickactions.diag"
+else
+  echo "::warning::could not write the diagnostics flag into the app's data container"
+fi
 if [ -n "${QA_WARM:-}" ]; then
   echo "tapping '$ROW_TITLE' ($ACTION_ID) on the RUNNING app — marker: $MARKER"
 else
@@ -102,11 +116,18 @@ rc="${PIPESTATUS[0]}"
 set -e
 echo "xcodebuild test exit: $rc"
 
-# Context only, never asserted on: the unified log is per device and spans
-# launches (same caveat as the coex leg).
-xcrun simctl spawn "$UDID" log show --style compact --last 10m \
-  --predicate "processImagePath CONTAINS \"$APP_NAME\"" \
+# Context only, never asserted on: the unified log is per device, and --last has
+# minute granularity, so the window opens up to two minutes before this pass and
+# can hold the previous launch (tell them apart by pid). --info keeps UIKit's own
+# lines from the app process; the message clause catches our lines even if the
+# executable is not named after the icon.
+LOG_MINUTES=$(( (SECONDS - START) / 60 + 2 ))
+xcrun simctl spawn "$UDID" log show --style compact --info --last "${LOG_MINUTES}m" \
+  --predicate "processImagePath CONTAINS \"$APP_NAME\" OR eventMessage CONTAINS \"[QuickActions]\"" \
   >"$OUT/unified-log.txt" 2>/dev/null || true
+grep -F '[QuickActions]' "$OUT/unified-log.txt" >"$OUT/quickactions-log.txt" || true
+echo "[QuickActions] lines in the last ${LOG_MINUTES} min of the unified log: $(wc -l <"$OUT/quickactions-log.txt" | tr -d ' ') (newest 12):"
+tail -n 12 "$OUT/quickactions-log.txt"
 if [ -f "$MARKER" ]; then cp "$MARKER" "$OUT/marker.txt"; fi
 
 VERDICT="$(cat "$OUT/launcher-tap.txt" 2>/dev/null || true)"
