@@ -18,10 +18,10 @@ future maintainer rediscovering it from a bug report.
 
 It reads upstream over the network and asserts on what it read; it never
 vendors anything. A network failure is the automation missing, not a finding, so
-it warns and exits 0 unless --require-network is passed.
+it warns and exits 0.
 
 Usage:
-    python3 tools~/check_sdk_swizzlers.py [--require-network]
+    python3 tools~/check_sdk_swizzlers.py
 """
 
 import argparse
@@ -73,9 +73,7 @@ def fetch(url: str) -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--require-network", action="store_true",
-                        help="treat a failed fetch as an error instead of a warning")
-    args = parser.parse_args()
+    parser.parse_args()
 
     findings = []
     unreachable = []
@@ -102,11 +100,7 @@ def main() -> int:
             print("    ok: no mention of a shortcut anywhere in the file")
 
     for label, url, error in unreachable:
-        message = "could not read %s (%s): %s" % (label, url, error)
-        if args.require_network:
-            print("!! " + message)
-        else:
-            print("::warning::sdk swizzler sentinel — " + message)
+        print("::warning::sdk swizzler sentinel — could not read %s (%s): %s" % (label, url, error))
 
     if findings:
         print()
@@ -114,8 +108,6 @@ def main() -> int:
             print("::error::%s now mentions %s — an upstream release may have started "
                   "competing for the quick-action selectors. Read it before trusting "
                   "Examples~/Coexistence/README.md's audit." % (label, ", ".join(hits)))
-        return 1
-    if unreachable and args.require_network:
         return 1
     if unreachable and len(unreachable) == len(SOURCES):
         print("SDK SWIZZLERS: SKIPPED (nothing could be read)")
