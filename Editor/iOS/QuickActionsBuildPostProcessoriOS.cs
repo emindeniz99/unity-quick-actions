@@ -116,6 +116,13 @@ namespace EminDeniz99.QuickActions.Editor
             Debug.Log($"[QuickActions] Wrote {count} static shortcut(s) to Info.plist.");
         }
 
+        private const string IconsFolder = "QuickActionsIcons";
+        // Duplicated in Editor/NativeGate/iOS/QuickActionsGateCleanupiOS.cs, which
+        // must delete what this writes but cannot reference this assembly (it is
+        // compiled out when the define is off). tools~/check_frozen_strings.py pins
+        // both copies of both names.
+        private const string IconManifestName = "quickactions_manifest.txt";
+
         // Copies the configured template-image textures into the generated Xcode
         // project and adds them to the MAIN app target's resources (shortcut icons
         // load from the app bundle, not UnityFramework). Ownership for Append-build
@@ -134,14 +141,7 @@ namespace EminDeniz99.QuickActions.Editor
         //
         // NOTE: the .verify harness compile-checks this method only (its PBX
         // stubs are no-ops) — behavior needs a real Editor + Xcode build; see
-        // ROADMAP "v0.3 feature validation".
-        private const string IconsFolder = "QuickActionsIcons";
-        // Duplicated in Editor/NativeGate/iOS/QuickActionsGateCleanupiOS.cs, which
-        // must delete what this writes but cannot reference this assembly (it is
-        // compiled out when the define is off). tools~/check_frozen_strings.py pins
-        // both copies of both names.
-        private const string IconManifestName = "quickactions_manifest.txt";
-
+        // ROADMAP "v0.2.0 feature validation".
         private static void SyncTemplateImages(string buildPath, QuickActionsSettings settings)
         {
             try
