@@ -21,6 +21,15 @@ them anyway compiles them to nothing.
 
 ## What it proves
 
+Each check below is named as it appears in the log (`QA-COEX: PASS <name>`), and
+the `ios-simulator-coex` job in `.github/workflows/unity-ci.yml` requires every one
+of those names. The `scene-*` names are required only on a leg that expects the
+scene lifecycle; every other name is required on every leg.
+
+* **Which lifecycle this build runs** (`lifecycle-app-delegate` on the 2022.3
+  testbed, `lifecycle-scene` on the 6000.3 one). The leg requires the one it
+  expects, so a testbed that starts or stops emitting `UIApplicationSceneManifest`
+  turns the leg red instead of quietly changing what it covers.
 * **Install ordering, measured — not required.** The category `+load` records
   whether `application:performActionForShortcutItem:completionHandler:` — a selector
   Unity never implements — already existed on `UnityAppController` when it ran
@@ -29,14 +38,26 @@ them anyway compiles them to nothing.
   handler for the package to wrap later. The first run saw both orders — category
   first on the 2022.3.62f3 export, class first on 6000.3.21f1 — with every file in
   `UnityFramework`, which is why the design rests on composing in either order, not
-  on winning the race.
+  on winning the race. CI requires the `category-load-ran` line, not either order.
 * **Chain integrity** through a subclass, a category swizzle and an isa proxy at the
   same time: the cold call reaches the package and its `NO` comes back up through both
   wrappers; a warm tap through the proxied delegate still lands in the package's queue.
+  By name: `subclass-super-called-once` (the host subclass called `super` once),
+  `category-cold-chained` (the category swizzle saw `didFinishLaunching`),
+  `cold-returns-no` (the `NO` for a marked launch item came back up),
+  `isa-proxy-installed` (the live delegate's class is the proxy),
+  `isa-proxy-warm-reaches-package` (a warm tap through the proxied delegate queued
+  its id and completed once) and `category-warm-chained` (the category swizzle saw
+  `performActionForShortcutItem`).
 * **The cold contract**: a marked item in `launchOptions` produces exactly one queue
-  entry and a `NO` return, and the host discarding that `NO` does not double-deliver.
+  entry (`cold-queued-id`) and a `NO` return (`cold-returns-no`, above), and the host
+  discarding that `NO` does not double-deliver (`cold-warm-dedup`, below).
 * **Exactly-once completion**: the category wrapper owns the completion handler and
-  calls it once; if the package ever completed while wrapped, the counter would read 2.
+  calls it once; if the package ever completed while wrapped, the counter would read 2
+  (`warm-completion-once`). Two more completion counts: an unmarked item — a host's
+  own quick action — still has its handler run once, whether or not the package
+  adopts the item (`unmarked-completion-once`), and three taps before C# drains run
+  the handler three times (`multi-id-completion-each`).
 * **Cold/warm dedup, driven**: a delegate that returns YES for a launch item is also
   handed that item through the warm selector, and this host returns YES. UIKit will not
   redeliver an item the host injected into `launchOptions` itself, so the subclass sends
@@ -44,15 +65,34 @@ them anyway compiles them to nothing.
   queue must hand the id back once (`cold-warm-dedup`) and the handler must run once
   (`cold-warm-dedup-completion-once`). Without that send, "once" would hold for any
   implementation, dedup or not.
+* **The warm queue**: a tap sent down the lifecycle's own warm selector produces one
+  queue entry, the one sent (`warm-queued-id`), and a second read finds nothing
+  (`warm-queued-once`). Several taps arriving before C# drains are all kept, in
+  arrival order, and a repeat is not collapsed — `a, b, a` comes back as `a, b, a`
+  (`multi-id-queue-order`).
 * **GoogleUtilities' own gate**: its `class_getInstanceSize` equality condition holds
   for a proxy built over the class we hooked, so this leg stops where Firebase would
-  stop rather than sailing past it.
+  stop rather than sailing past it (`isa-proxy-size-equal`). The package's warm hook
+  still resolves through the proxy subclass (`isa-proxy-warm-hook-resolves`).
 * **Scene binding** (on a scene-manifest testbed): the connected scene's delegate is a
-  real `UnityScene`, `session.configuration.delegateClass` is `UnityScene`, and the
-  package's warm hook is on that class — checked both when the host subclass forwards
+  real `UnityScene` (`scene-delegate-is-unityscene`),
+  `session.configuration.delegateClass` is `UnityScene` (`scene-config-delegate-class`),
+  and the package's warm hook is on that class (`scene-warm-hook-installed`) — checked
+  both when the host subclass forwards
   `application:configurationForConnectingSceneSession:options:` to super and when it
   shadows it without calling super (`SIMCTL_CHILD_QA_COEX_SHADOW_SCENE_CONFIG=1`),
-  which forces the `UISceneWillConnectNotification` fallback.
+  which forces the `UISceneWillConnectNotification` fallback. The job also requires
+  the package's own install line to say which of the two it was:
+  `[QuickActions] iOS scene hooks installed on UnityScene via configuration` on the
+  default launch and
+  `[QuickActions] iOS scene hooks installed on UnityScene via notification` on the
+  shadowed one.
+* **An unmarked item on a cold scene launch** (scene lifecycle only). The owner is
+  confirmed, so the package is terminal for the warm selector: the item is queued once
+  (`scene-unmarked-cold-queued-once`); a warm redelivery of it before activation
+  collapses into that entry and its handler runs once (`scene-unmarked-cold-warm-dedup`);
+  and with the warm selector wrapped by someone else it is not queued at all
+  (`scene-unmarked-cold-wrapped-not-queued`).
 
 ## What it does NOT prove
 
@@ -110,6 +150,12 @@ QA-COEX: FAIL <name> <detail>
 
 plus `QA-COEX: NOTE …` for context and a closing `QA-COEX: DONE`. The
 `ios-simulator-coex` job in `.github/workflows/unity-ci.yml` requires every PASS name
-it expects, requires `DONE`, requires the package's own
-`[QuickActions] iOS hooks: …` install line, and fails on any `FAIL` anywhere in the
-log.
+it expects (listed under "What it proves"; each is matched whole, so
+`cold-warm-dedup-completion-once` cannot satisfy `cold-warm-dedup`), requires `DONE`,
+requires the package's own install line, which starts
+`[QuickActions] iOS hooks: didFinishLaunching=wrapped performAction=`, plus the leg's
+expected hooks text — `sceneConfig=absent manifest=no` on the 2022.3 leg,
+`sceneConfig=added manifest=yes` on the Unity 6 one (the value after `performAction=`
+is deliberately not pinned) — and fails on any `FAIL` anywhere in the log. One name
+never prints PASS: `isa-proxy-allocated` is a FAIL-only line, printed if
+`objc_allocateClassPair` returns `Nil`, and the any-`FAIL` rule is what turns it red.
