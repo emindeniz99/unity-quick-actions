@@ -28,6 +28,8 @@ name: unity
 # drawables. And `gate-off` builds the 2022.3 testbed again with
 # QUICKACTIONS_ENABLED OFF (an APK and an iOS export), asserts the package left
 # nothing in either, and diffs the two APKs — the package's measured footprint.
+# `android-build-profile` builds Testbed6 with the define only in an active
+# Build Profile, README's Unity 6 setup, and requires the package in that APK.
 #
 # EVERY leg runs on every code push and PR — the EditMode tests (three pinned
 # testbed legs plus a unity6-latest canary that resolves the newest Unity 6
@@ -2342,6 +2344,127 @@ jobs:
                                % off_root.get("UIApplicationShortcutItems"))
           print("PASS: no QUICKACTIONS_ENABLED macro and no shortcut items in the define-off iOS export")
           PY
+
+  # README's Unity 6 setup, built: QUICKACTIONS_ENABLED removed from Testbed6's
+  # Android Player Settings and supplied only by an active Build Profile, and
+  # the APK must still carry the package. Every other leg sets the define in
+  # Player Settings. Two editor invocations: the first clears Player Settings and
+  # creates the profile; the second starts with -activeBuildProfile (game-ci's
+  # buildProfile input), which applies the profile's defines and recompiles
+  # before the build method runs, and that method refuses to build unless the
+  # define came from the profile alone. Its own job, in parallel, so it adds no
+  # time to android-build or to the jobs waiting on it.
+  android-build-profile:
+    name: android build profile (unity6)
+    needs: license
+    if: ${{ !cancelled() && needs.license.outputs.available == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      TESTBED: Examples~/Testbed6
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Import the Demo sample into the testbed
+        run: |
+          mkdir -p "$TESTBED/Assets/Samples/QuickActionsDemo"
+          cp -R Samples~/Demo/. "$TESTBED/Assets/Samples/QuickActionsDemo/"
+      # Same step, same reason, as in android-build.
+      - name: Give Unity's container the shared memory 6000.6+ needs
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+
+          path = "/etc/docker/daemon.json"
+          cfg = json.load(open(path)) if os.path.exists(path) else {}
+          cfg["default-shm-size"] = "2g"
+          with open("daemon.json.new", "w") as f:
+              json.dump(cfg, f, indent=2)
+          print(json.dumps(cfg, indent=2))
+          PY
+          sudo mv daemon.json.new /etc/docker/daemon.json
+          sudo systemctl restart docker
+          docker info --format '{{.Name}}: docker restarted, default shm raised' \
+            || { echo "docker did not come back after the restart"; exit 1; }
+      # android-build's unity6 cache, restored but never saved: this job leaves an
+      # active Build Profile in Library whose asset is not committed.
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: Examples~/Testbed6/Library
+          key: Library-unity6-android-${{ hashFiles('Examples~/Testbed6/Packages/**', 'Examples~/Testbed6/ProjectSettings/**') }}
+          restore-keys: |
+            Library-unity6-android-
+            Library-unity6-
+      - name: Move QUICKACTIONS_ENABLED into a dev Build Profile (own editor invocation)
+        uses: game-ci/unity-builder@d829bfc901f2347c8fe18898f06712b66916ef42 # v5.0.0
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+        with:
+          projectPath: Examples~/Testbed6
+          targetPlatform: Android
+          buildMethod: TestbedBuilder.CreateDevBuildProfile
+          versioning: None
+          allowDirtyBuild: true
+      - name: Build the Android APK with the dev Build Profile active
+        uses: game-ci/unity-builder@d829bfc901f2347c8fe18898f06712b66916ef42 # v5.0.0
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+        with:
+          projectPath: Examples~/Testbed6
+          targetPlatform: Android
+          buildProfile: Assets/DevBuildProfile.asset
+          buildMethod: TestbedBuilder.BuildAndroidPhoneDevProfile
+          versioning: None
+          allowDirtyBuild: true
+      # Uploaded before the assertion, so a red run keeps the bytes it judged.
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: quickactions-demo-apk-unity6-build-profile
+          path: Examples~/Testbed6/Builds/DevProfile-phone.apk
+          if-no-files-found: error
+          retention-days: 14
+      # The same two reads android-build and gate-off make: the trampoline in the
+      # merged manifest (written by the gated injector) and the plugin class in the
+      # dex (deleted by the stripper when the editor compiled without the define).
+      - name: Assert the APK carries the package
+        env:
+          APK: Examples~/Testbed6/Builds/DevProfile-phone.apk
+        run: |
+          set -euo pipefail
+          [ -f "$APK" ] || { echo "no APK at $APK"; ls -la "$(dirname "$APK")" 2>/dev/null || true; exit 1; }
+          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+          AAPT2="$(find "$SDK/build-tools" -maxdepth 2 -name aapt2 -type f 2>/dev/null | sort -V | tail -1 || true)"
+          [ -n "$AAPT2" ] || { echo "no aapt2 under '${SDK:-<unset>}'/build-tools/*/"; exit 1; }
+          # Captured then `case`, never `| grep -q` (SIGPIPE under pipefail).
+          manifest="$("$AAPT2" dump xmltree --file AndroidManifest.xml "$APK" 2>&1)" \
+            || { echo "aapt2 could not dump AndroidManifest.xml of $APK:"; printf '%s\n' "$manifest"; exit 1; }
+          case "$manifest" in
+            *QuickActionsTrampolineActivity*) echo "ok: manifest carries QuickActionsTrampolineActivity" ;;
+            *)
+              echo "MISSING from the APK manifest: QuickActionsTrampolineActivity"
+              printf '%s\n' "$manifest"
+              exit 1
+              ;;
+          esac
+          dex="$(unzip -p "$APK" 'classes*.dex' 2>/dev/null | strings -a || true)"
+          [ -n "$dex" ] || { echo "no readable classes*.dex in $APK"; unzip -l "$APK" | head -40; exit 1; }
+          case "$dex" in
+            *com/emindeniz99/quickactions/QuickActionsBridge*) echo "ok: dex carries com/emindeniz99/quickactions/QuickActionsBridge" ;;
+            *)
+              echo "MISSING from classes.dex: com/emindeniz99/quickactions/QuickActionsBridge"
+              exit 1
+              ;;
+          esac
+          echo "PASS: with QUICKACTIONS_ENABLED only in the active Build Profile, the APK carries the package"
 
   # iOS export per testbed on the ubuntu docker image: proves the package's
   # iOS build post-processor (static shortcuts + template-image sync + the

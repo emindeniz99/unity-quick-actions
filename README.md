@@ -405,7 +405,11 @@ Constraints only work for managed code, **not** native plugins):
    symbols are **additive** on top of Player Settings — they can *add* a symbol but
    [cannot *remove*](https://docs.unity3d.com/6000.1/Documentation/Manual/custom-scripting-symbols.html)
    one inherited from Player Settings — so defining it only in the dev profile means
-   prod profiles (which don't add it) build **without** it. ⚠️ Do **not** put it in
+   prod profiles (which don't add it) build **without** it. CI builds this shape:
+   the `android-build-profile` job in [`unity-ci.yml`](https://github.com/emindeniz99/unity-quick-actions/blob/main/.github/workflows/unity-ci.yml)
+   removes the define from the Unity 6 testbed's Android Player Settings, supplies
+   it only through an active Build Profile, and fails unless the APK still carries
+   the trampoline `<activity>` and the `QuickActionsBridge` class. ⚠️ Do **not** put it in
    the shared Player Settings and expect a prod Build Profile that merely *omits* it
    to drop it: the symbol is inherited additively and stays on, leaving the gate
    active in the prod build. If it is in Player Settings you must **delete it there**

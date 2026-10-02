@@ -3,6 +3,10 @@ using System.IO;
 using UnityEditor;
 using UnityEditor.Build.Reporting;
 using UnityEngine;
+#if UNITY_6000_0_OR_NEWER
+using System.Reflection;
+using UnityEditor.Build.Profile;
+#endif
 
 // Build entry points for the unity CLI (`unity build --execute-method ...`).
 // Unity has no built-in command-line build, so every CI build needs one of these.
@@ -166,6 +170,63 @@ public static class TestbedBuilder
     // Library/, not in the APK's file name, so the first APK stays on disk for
     // comparison and both are uploaded as their own artifacts.
     public static void BuildAndroidPhoneSecond() => BuildPhone("Builds/QuickActionsDemo-phone-2.apk");
+
+#if UNITY_6000_0_OR_NEWER
+    // README's Unity 6 setup: QUICKACTIONS_ENABLED only in a dev Build Profile,
+    // never in the shared Player Settings. Step 1 of 2 clears the define from
+    // Player Settings and creates that profile; step 2 runs in a new editor
+    // started with -activeBuildProfile, which applies the profile's defines and
+    // recompiles before the build method runs.
+    private const string DevProfilePath = "Assets/DevBuildProfile.asset";
+
+    public static void CreateDevBuildProfile()
+    {
+        DisableDefine();
+        // Unity 6.0-6.3 have no public factory for a platform build profile (a bare
+        // ScriptableObject.CreateInstance has no build target), so this calls the
+        // internal BuildProfile.CreateInstance(BuildTarget, StandaloneBuildSubtarget).
+        var create = typeof(BuildProfile).GetMethod("CreateInstance", BindingFlags.NonPublic | BindingFlags.Static,
+            null, new[] { typeof(BuildTarget), typeof(StandaloneBuildSubtarget) }, null);
+        var profile = create?.Invoke(null, new object[] { BuildTarget.Android, StandaloneBuildSubtarget.Default }) as BuildProfile;
+        if (profile == null)
+        {
+            Debug.LogError("[TestbedBuilder] BuildProfile.CreateInstance(BuildTarget, StandaloneBuildSubtarget) " +
+                           "is missing or returned null; cannot create the dev Build Profile.");
+            EditorApplication.Exit(1);
+            return;
+        }
+        profile.scriptingDefines = new[] { "QUICKACTIONS_ENABLED" };
+        AssetDatabase.CreateAsset(profile, DevProfilePath);
+        AssetDatabase.SaveAssets();
+        Debug.Log($"[TestbedBuilder] created {DevProfilePath} carrying QUICKACTIONS_ENABLED; Player Settings no longer do");
+    }
+
+    // Step 2 of 2. Refuses to build unless the define reached this editor through
+    // the active profile alone, so a green APK cannot owe the package to Player
+    // Settings.
+    public static void BuildAndroidPhoneDevProfile()
+    {
+        const string define = "QUICKACTIONS_ENABLED";
+        var profile = BuildProfile.GetActiveBuildProfile();
+        var inProfile = profile != null && Array.IndexOf(profile.scriptingDefines, define) >= 0;
+        var playerSettings = PlayerSettings.GetScriptingDefineSymbols(UnityEditor.Build.NamedBuildTarget.Android);
+        var inPlayerSettings = Array.Exists(playerSettings.Split(';'), d => d.Trim() == define);
+        var compiledWithDefine = false;
+#if QUICKACTIONS_ENABLED
+        compiledWithDefine = true;
+#endif
+        if (!inProfile || inPlayerSettings || !compiledWithDefine)
+        {
+            Debug.LogError($"[TestbedBuilder] expected {define} from the active Build Profile only. " +
+                           $"Active profile: {(profile != null ? AssetDatabase.GetAssetPath(profile) : "<none>")}, " +
+                           $"in profile: {inProfile}, in Player Settings (Android): {inPlayerSettings}, " +
+                           $"editor scripts compiled with it: {compiledWithDefine}.");
+            EditorApplication.Exit(1);
+            return;
+        }
+        BuildPhone("Builds/DevProfile-phone.apk");
+    }
+#endif
 
     private static void BuildPhone(string relativeOutput, bool development = true)
     {

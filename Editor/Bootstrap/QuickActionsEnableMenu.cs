@@ -21,6 +21,11 @@ namespace EminDeniz99.QuickActions.Editor.Bootstrap
     /// and does exactly one thing: turn the package on for the platforms that
     /// matter. It adds nothing to a player build — it is Editor-only.
     /// </para>
+    /// <para>
+    /// It writes the shared Player Settings, which every build inherits; on
+    /// Unity 6, to keep the define out of prod builds, put it in a dev Build
+    /// Profile's Scripting Define Symbols instead (README "Dev-only").
+    /// </para>
     /// </summary>
     internal static class QuickActionsEnableMenu
     {
