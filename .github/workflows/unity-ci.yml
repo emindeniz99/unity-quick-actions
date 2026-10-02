@@ -2565,12 +2565,11 @@ jobs:
   # workarounds under Xcode 15+ — a red job there would say nothing about the
   # package. 2022.3 gets macos-15 (Xcode 16.4 default); Unity 6 gets the
   # current macos-latest (Xcode 26). The two `-xcode27` legs compile the SAME
-  # exports on GitHub's public-preview `xcode-27` image — Xcode 27.0 beta 6
-  # (27A5252f) today; Apple's GA 27A266a of 2026-09-14 is still awaiting
-  # deployment there (actions/runner-images#14709), so read the
-  # `xcodebuild -version` line in a leg's log for the build a result came from
-  # — with the iOS 27 SDK that App Store uploads must use from April 2027, and
-  # that no Unity line documents support for yet. They are canaries:
+  # exports on GitHub's public-preview `xcode-27` image — Xcode 27.0 GA
+  # (27A266a) is the default in image 20260921.0210.1 (runner-images README);
+  # read the `xcodebuild -version` line in a leg's log for the build a result
+  # came from — with the iOS 27 SDK that App Store uploads must use from April
+  # 2027, and that no Unity line documents support for yet. They are canaries:
   # `continue-on-error` keeps a red one from failing the workflow RUN; the
   # job's own check still shows its red X (job-level continue-on-error changes
   # the run's conclusion, never the job's), so a `*-xcode27` name must never
@@ -2758,10 +2757,11 @@ jobs:
   # explanation is refuted and the cause is somewhere else entirely.
   #
   # Two limits, stated up front. The newest runtime here comes from the xcode-27
-  # PREVIEW image, which is a seed build of both macOS and Xcode, so this
-  # isolates the SDK variable but proves nothing about released iOS 27. And both
-  # legs are continue-on-error on purpose: the ANSWER is the output, not a pass,
-  # and neither outcome should turn a PR red.
+  # PREVIEW image, and whether its macOS and simulator runtime are release or
+  # seed builds is not verified, so this isolates the SDK variable, but nothing
+  # here shows the result holds for released iOS 27. And both legs are
+  # continue-on-error on purpose: the ANSWER is the output, not a pass, and
+  # neither outcome should turn a PR red.
   ios-crossrun:
     name: ios cross-run (${{ matrix.target.name }})
     needs: ios-simulator
