@@ -296,7 +296,7 @@ namespace EminDeniz99.QuickActions
 
         /// <summary>
         /// True while Android is rate-limiting this app's shortcut writes — the
-        /// throttle that makes <see cref="Add"/>/<see cref="AddRange"/>/<see cref="Update"/>
+        /// throttle that makes <see cref="Add"/>/<see cref="AddList"/>/<see cref="Update"/>
         /// return false for a game that writes shortcuts while backgrounded. It
         /// tells "retry once the app is foregrounded again" apart from "this write
         /// will never work" (cap exhausted, id owned elsewhere).
