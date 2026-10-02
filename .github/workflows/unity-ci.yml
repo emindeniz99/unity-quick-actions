@@ -10,6 +10,9 @@ name: unity
 # keep file and trampoline really are in each, all fed into the adb device
 # smoke, and an iOS Simulator-SDK Xcode export per testbed with an unsigned
 # xcodebuild compile on macOS for the lines whose simulator support allows it.
+# Android also has a native x86_64 canary pair: `2022.3-x86_64` (android-build)
+# feeding `2022.3-api25` (android-smoke, API 25, the package's documented
+# floor), both continue-on-error until they have run green.
 # A second iOS pair, `ios-export-coex` / `ios-simulator-coex`, re-exports two
 # of those testbeds with a mock HOST stacked on the package — an app-controller
 # subclass, a category `+load` swizzle and a GoogleUtilities-style isa proxy
