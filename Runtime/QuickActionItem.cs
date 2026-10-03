@@ -96,7 +96,7 @@ namespace EminDeniz99.QuickActions
 
         /// <summary>
         /// Optional app-defined string carried with the shortcut (iOS
-        /// <c>userInfo</c>, Android intent extras) and restored by the cold-start
+        /// <c>userInfo</c>, Android extras) and restored by the cold-start
         /// reconcile. Not delivered with the tap event — read it via
         /// <c>QuickActions.GetById(id)?.Payload</c> from the id
         /// <see cref="QuickActions.Performed"/> reports. Note

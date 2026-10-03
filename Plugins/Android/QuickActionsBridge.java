@@ -48,8 +48,8 @@ public final class QuickActionsBridge {
     static final String EXTRA_ICON_DRAWABLE = "com.emindeniz99.quickactions.drawable";
     static final String EXTRA_ICON_BITMAP = "com.emindeniz99.quickactions.bitmap";
     static final String EXTRA_ICON_BITMAP_ADAPTIVE = "com.emindeniz99.quickactions.bitmap_adaptive";
-    // App-defined payload string riding the marker extras (and the launch intent),
-    // restored by the cold-start reconcile like the icon identity above.
+    // App-defined payload string riding the marker extras, restored by the
+    // cold-start reconcile like the icon identity above.
     static final String EXTRA_PAYLOAD = "com.emindeniz99.quickactions.payload";
 
     // Per-locale titles/subtitles, encoded by the managed layer into ONE opaque
@@ -133,13 +133,24 @@ public final class QuickActionsBridge {
             return null;
         }
 
+        List<ShortcutInfo> applied = replaceOurShortcuts(manager, shortcuts);
+        return applied == null ? null : appliedIdsJson(applied);
+    }
+
+    // The one write path behind setShortcuts and removeAll (an empty set): makes
+    // our marked subset exactly `shortcuts`, trimmed to the OS cap. Returns the
+    // list it applied, or null when the write did not fully land.
+    private static List<ShortcutInfo> replaceOurShortcuts(ShortcutManager manager, List<ShortcutInfo> shortcuts) {
         List<String> reEnableForUndo = null; // set once pins are re-enabled, for the catch path
         // The OS cap covers manifest (static) + dynamic shortcuts combined, so
         // leave room for any static ones; otherwise addDynamicShortcuts throws.
-        // getManifestShortcuts/addDynamicShortcuts can throw IllegalStateException
+        // getDynamicShortcuts/addDynamicShortcuts can throw IllegalStateException
         // (e.g. user locked) — keep it all inside the guard so nothing crosses JNI.
         try {
-            List<ShortcutInfo> manifest = manager.getManifestShortcuts();
+            // An empty set (removeAll) can neither collide nor overflow, so it
+            // skips the manifest and cap reads.
+            List<ShortcutInfo> manifest = shortcuts.isEmpty()
+                    ? new ArrayList<ShortcutInfo>() : manifestShortcutsOrNone(manager);
 
             // Partition the CURRENT dynamic set into ours (marked) vs another
             // publisher's (unmarked — the host app's own shortcuts). Everything
@@ -173,7 +184,7 @@ public final class QuickActionsBridge {
             // A manifest (static) id is foreign too: the collision would make
             // addDynamicShortcuts throw IllegalArgumentException and discard the
             // ENTIRE dynamic set, not just the offender.
-            if (manifest != null) for (ShortcutInfo s : manifest) foreignIds.add(s.getId());
+            for (ShortcutInfo s : manifest) foreignIds.add(s.getId());
 
             // Drop our items whose id collides with a HOST dynamic or pinned
             // shortcut (addDynamicShortcuts updates same-id entries IN PLACE, which
@@ -194,8 +205,8 @@ public final class QuickActionsBridge {
             // (Edge case: a host that declares manifest shortcuts on OTHER main
             // activities would over-count here and under-fill the dynamic budget —
             // negligible for the single-activity apps this targets.)
-            int budget = manager.getMaxShortcutCountPerActivity()
-                    - (manifest == null ? 0 : manifest.size()) - hostIds.size();
+            int budget = shortcuts.isEmpty() ? 0
+                    : maxShortcutCountOrUnbounded(manager) - manifest.size() - hostIds.size();
             if (budget < 0) budget = 0;
             if (shortcuts.size() > budget) {
                 android.util.Log.w("QuickActions", "Trimmed dynamic shortcuts to fit the OS cap: kept "
@@ -255,11 +266,36 @@ public final class QuickActionsBridge {
                 undoReEnable(manager, reEnable);
                 return null;
             }
-            return appliedIdsJson(shortcuts);
+            return shortcuts;
         } catch (RuntimeException e) {
             android.util.Log.w("QuickActions", "dynamic shortcut write failed", e);
             undoReEnable(manager, reEnableForUndo);
             return null;
+        }
+    }
+
+    // The manifest only feeds the collision drop and the budget, so an unreadable
+    // one counts as none instead of failing the whole write. A real collision or
+    // overflow then makes the OS refuse the add, which reports null as before.
+    private static List<ShortcutInfo> manifestShortcutsOrNone(ShortcutManager manager) {
+        try {
+            List<ShortcutInfo> manifest = manager.getManifestShortcuts();
+            if (manifest != null) return manifest;
+        } catch (RuntimeException e) {
+            android.util.Log.w("QuickActions", "Could not read manifest shortcuts; treating them as none", e);
+        }
+        return new ArrayList<>();
+    }
+
+    // An unreadable cap means no trim: the OS refuses an oversized add (null, so
+    // the managed layer keeps its list), where trimming to a guessed cap would
+    // report the dropped ids as refused and the managed layer would prune them.
+    private static int maxShortcutCountOrUnbounded(ShortcutManager manager) {
+        try {
+            return manager.getMaxShortcutCountPerActivity();
+        } catch (RuntimeException e) {
+            android.util.Log.w("QuickActions", "Could not read the shortcut cap; writing untrimmed", e);
+            return Integer.MAX_VALUE;
         }
     }
 
@@ -304,38 +340,13 @@ public final class QuickActionsBridge {
      * now clear (including when there is nothing to remove), false when the
      * removal failed (e.g. IllegalStateException on a locked profile) so the
      * managed layer can keep its list instead of falsely marking itself empty.
+     * Runs setShortcuts' write path with an empty set.
      */
     public static boolean removeAll(Activity activity) {
         if (activity == null || Build.VERSION.SDK_INT < 25) return true; // nothing to remove
         ShortcutManager manager = activity.getSystemService(ShortcutManager.class);
-        if (manager == null) return true;
-        try {
-            List<String> ours = new ArrayList<>();
-            List<ShortcutInfo> dynamic = manager.getDynamicShortcuts();
-            if (dynamic != null) {
-                for (ShortcutInfo s : dynamic) {
-                    if (isOurShortcut(s)) ours.add(s.getId());
-                }
-            }
-            if (!ours.isEmpty()) manager.removeDynamicShortcuts(ours);
-            // User-pinned copies of OUR shortcuts survive the dynamic removal as
-            // live launcher icons — disable them so "remove all" doesn't leave
-            // tappable ghosts (the launcher greys them out; only ours, a host's
-            // pinned shortcuts are untouched, and ours are never immutable).
-            List<String> pinnedOurs = new ArrayList<>();
-            List<ShortcutInfo> pinned = manager.getPinnedShortcuts();
-            if (pinned != null) {
-                for (ShortcutInfo s : pinned) {
-                    if (isOurShortcut(s) && s.isEnabled()) pinnedOurs.add(s.getId());
-                }
-            }
-            if (!pinnedOurs.isEmpty()) manager.disableShortcuts(pinnedOurs);
-            return true;
-        } catch (RuntimeException e) {
-            // e.g. IllegalStateException on a locked profile — never cross JNI.
-            android.util.Log.w("QuickActions", "removeAll failed", e);
-            return false;
-        }
+        if (manager == null) return true; // nothing of ours can exist
+        return replaceOurShortcuts(manager, new ArrayList<ShortcutInfo>()) != null;
     }
 
     /**
@@ -439,12 +450,9 @@ public final class QuickActionsBridge {
             extras.putString(EXTRA_ICON_BITMAP, iconBitmap);
             if (iconBitmapAdaptive) extras.putBoolean(EXTRA_ICON_BITMAP_ADAPTIVE, true);
         }
-        if (!payload.isEmpty()) {
-            extras.putString(EXTRA_PAYLOAD, payload);
-            // Also ride the launch intent so a host-side receiver could read it;
-            // the C# side reads it back via GetById (reconciled from the extras).
-            intent.putExtra(EXTRA_PAYLOAD, payload);
-        }
+        // Extras only: the intent targets our trampoline, which reads just the id,
+        // and C# reads the payload back via GetById (reconciled from the extras).
+        if (!payload.isEmpty()) extras.putString(EXTRA_PAYLOAD, payload);
         // Localization blob: stored only (never parsed here) and written only when
         // the item has one: an unlocalized shortcut carries no L10n extra.
         if (!l10n.isEmpty()) extras.putString(EXTRA_L10N, l10n);
@@ -648,13 +656,14 @@ public final class QuickActionsBridge {
      * Report in-app usage of OUR shortcut with this id to the launcher's ranking
      * predictor ({@code reportShortcutUsed}). Ownership-gated like every other
      * call here — a host app's shortcut id is refused. Returns true when the
-     * signal was sent. Never throws across JNI.
+     * signal was sent. Never throws: the trampoline calls it on every tap
+     * without a guard of its own.
      */
     public static boolean reportShortcutUsed(Activity activity, String id) {
         if (activity == null || id == null || id.isEmpty() || Build.VERSION.SDK_INT < 25) return false;
-        ShortcutManager manager = activity.getSystemService(ShortcutManager.class);
-        if (manager == null) return false;
         try {
+            ShortcutManager manager = activity.getSystemService(ShortcutManager.class);
+            if (manager == null) return false;
             for (ShortcutInfo s : manager.getDynamicShortcuts()) {
                 if (isOurShortcut(s) && id.equals(s.getId())) {
                     manager.reportShortcutUsed(id);

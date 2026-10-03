@@ -85,6 +85,22 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **Breaking (Android): the shortcut's launch intent no longer carries the
+  payload.** `buildShortcut` wrote `Payload` twice: into the marker extras,
+  which the package reads back, and into the launch intent, which nothing in
+  the package read. Only the marker copy remains. C# callers are unaffected
+  (`QuickActions.GetById(id)?.Payload`, as before). Native code that read
+  `com.emindeniz99.quickactions.payload` from the shortcut intent must read
+  the payload through `GetById` instead. Shortcuts published by an older build
+  keep their old intent until they are written again.
+
+- **`RemoveAll` shares the Android write path.** It is now an empty-set write
+  through `setShortcuts`, so the marker-scoped removal and the pinned-copy
+  disable live in one place. Its results are unchanged, and an empty set never
+  reads the manifest or the cap. Its failure warning now reads `dynamic
+  shortcut write failed` instead of `removeAll failed`. The tap's usage report
+  is guarded inside the bridge, so the trampoline no longer wraps it.
+
 - **`Locale = null` restores the device default.** Assigning `null` used to
   store the empty string — base text only — and nothing public could get back
   to the device language once an app had picked one. The empty string keeps
@@ -150,6 +166,14 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   import; the C entry points it declared are unchanged.
 
 ### Fixed
+
+- **An unreadable manifest or cap no longer fails the whole Android write.**
+  When `getManifestShortcuts()` or `getMaxShortcutCountPerActivity()` threw,
+  `setShortcuts` gave up and wrote nothing. Now an unreadable manifest counts as
+  empty and an unreadable cap means the set is written untrimmed, each with one
+  `Log.w`; if the set really is too large or collides, the OS refuses it and the
+  call reports a failed write, so the managed list is kept. Java smoke tests
+  make each read throw; no device has hit either case.
 
 - **`RemoveById` reports a removal Android already applied.** Android's write
   removes stale dynamic ids before the rate-limitable add. When the add was

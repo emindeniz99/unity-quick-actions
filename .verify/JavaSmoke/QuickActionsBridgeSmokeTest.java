@@ -35,11 +35,14 @@ public final class QuickActionsBridgeSmokeTest {
         hostAndManifestCollisionsAreDropped();
         budgetSubtractsManifestAndHost();
         removeAllIsMarkerScoped();
+        removeAllKeepsItsErrorResults();
         readBackIsMarkerScopedAndRankOrdered();
         readBackNullVsEmpty();
         rateLimitReportsNull();
         emptySetSkipsAddAndStillClears();
         parseFailureReportsNull();
+        unreadableManifestCountsAsNone();
+        unreadableCapWritesUntrimmed();
         pinnedForeignIdsAreDroppedButDontShrinkBudget();
         removedPinnedCopiesAreDisabledAndReAddReEnables();
         iconIdentityRoundTripsThroughExtras();
@@ -47,12 +50,13 @@ public final class QuickActionsBridgeSmokeTest {
         trampolineSurvivesAHostileExtrasBundle();
         bitmapIconIsChosenAndFallsBackWhenUndecodable();
         builtInIconYieldsToTheProjectsOwn();
-        payloadRoundTripsThroughExtrasAndIntent();
+        payloadRoundTripsThroughExtras();
         localizationBlobRoundTripsThroughExtras();
         pinRequestIsOwnershipGated();
         maxShortcutCountIsExposed();
         adaptiveAndPinDegradeBelowApi26();
         usageReportIsOwnershipGated();
+        usageReportNeverThrowsIntoTheTrampoline();
         bitmapIconsAreClampedToTheOsBudget();
         rateLimitFlagIsExposed();
 
@@ -116,6 +120,36 @@ public final class QuickActionsBridgeSmokeTest {
         check(!hasId(mgr.dynamic, "mine"), "removeAll removes our marked shortcut");
     }
 
+    private static void removeAllKeepsItsErrorResults() {
+        // No ShortcutManager: nothing of ours can exist, so the clear succeeded.
+        check(QuickActionsBridge.removeAll(activity(null)), "removeAll without a ShortcutManager reports success");
+
+        // The manifest and the cap only shape what a write ADDS; an empty set
+        // needs neither, so failing reads of them must not stop the clear.
+        ShortcutManager mgr = new ShortcutManager();
+        ShortcutInfo host = host("h1");
+        ShortcutInfo ourPin = ours("pin", 0);
+        mgr.dynamic.add(host);
+        mgr.dynamic.add(ours("mine", 0));
+        mgr.pinned.add(ourPin);
+        mgr.throwOnManifestRead = true;
+        mgr.throwOnMaxCountRead = true;
+        android.util.Log.warnings.clear();
+        check(QuickActionsBridge.removeAll(activity(mgr)), "removeAll succeeds with the manifest and cap unreadable");
+        check(android.util.Log.warnings.isEmpty(), "…without reading either: " + android.util.Log.warnings);
+        check(!hasId(mgr.dynamic, "mine"), "…and still removes our dynamic entry");
+        check(!ourPin.isEnabled(), "…and still disables our pinned copy");
+        check(containsSame(mgr.dynamic, host), "…and keeps the host's");
+
+        // A read the clear cannot do without still reports failure, so the
+        // managed layer keeps its list instead of marking itself empty.
+        ShortcutManager locked = new ShortcutManager();
+        locked.dynamic.add(ours("kept", 0));
+        locked.throwOnDynamicRead = true;
+        check(!QuickActionsBridge.removeAll(activity(locked)), "removeAll reports failure when the dynamic set is unreadable");
+        check(hasId(locked.dynamic, "kept"), "…and removed nothing");
+    }
+
     private static void readBackIsMarkerScopedAndRankOrdered() throws Exception {
         ShortcutManager mgr = new ShortcutManager();
         mgr.dynamic.add(ours("second", 1));      // stored out of rank order on purpose
@@ -176,6 +210,56 @@ public final class QuickActionsBridgeSmokeTest {
         ShortcutManager mgr = new ShortcutManager();
         check(QuickActionsBridge.setShortcuts(activity(mgr), "not json") == null, "unparseable payload -> null");
         check(mgr.dynamic.isEmpty(), "unparseable payload changed nothing");
+    }
+
+    private static void unreadableManifestCountsAsNone() throws Exception {
+        ShortcutManager mgr = new ShortcutManager(); // cap 4
+        ShortcutInfo host = host("h1");
+        mgr.manifest.add(host("m1"));
+        mgr.dynamic.add(host);
+        mgr.dynamic.add(ours("stale", 0));
+        mgr.throwOnManifestRead = true;
+
+        android.util.Log.warnings.clear();
+        String applied = QuickActionsBridge.setShortcuts(activity(mgr), itemsJson("a", "b"));
+
+        check(applied != null && idsOf(applied).equals(List.of("a", "b")),
+                "an unreadable manifest no longer fails a write that fits: " + applied);
+        check(android.util.Log.warnings.equals(List.of("Could not read manifest shortcuts; treating them as none")),
+                "…with exactly one warning: " + android.util.Log.warnings);
+        check(!hasId(mgr.dynamic, "stale"), "our stale entry was removed");
+        check(containsSame(mgr.dynamic, host), "the host survives the write");
+
+        // A manifest id can't be dropped up front without the manifest; the OS
+        // refuses the add instead, which reports null like any failed write.
+        check(QuickActionsBridge.setShortcuts(activity(mgr), itemsJson("a", "m1")) == null,
+                "a manifest collision the bridge could not see is refused by the OS (null)");
+        check(hasId(mgr.dynamic, "a") && !hasId(mgr.dynamic, "m1"), "the refused add wrote nothing");
+        check(!hasId(mgr.dynamic, "b"), "…but the stale removal before it landed (null = not FULLY landed)");
+    }
+
+    private static void unreadableCapWritesUntrimmed() throws Exception {
+        ShortcutManager mgr = new ShortcutManager(); // cap 4, unreadable below
+        ShortcutInfo host = host("h1");
+        mgr.dynamic.add(host);
+        mgr.dynamic.add(ours("stale", 0));
+        mgr.throwOnMaxCountRead = true;
+
+        android.util.Log.warnings.clear();
+        String applied = QuickActionsBridge.setShortcuts(activity(mgr), itemsJson("a", "b", "c"));
+
+        check(applied != null && idsOf(applied).equals(List.of("a", "b", "c")),
+                "an unreadable cap no longer fails a write that fits: " + applied);
+        check(android.util.Log.warnings.equals(List.of("Could not read the shortcut cap; writing untrimmed")),
+                "…with exactly one warning: " + android.util.Log.warnings);
+        check(!hasId(mgr.dynamic, "stale"), "our stale entry was removed");
+        check(containsSame(mgr.dynamic, host), "the host survives the write");
+
+        // Over the real cap nothing is trimmed on a guess (a trimmed id would be
+        // reported as refused and pruned); the OS refuses the add instead.
+        check(QuickActionsBridge.setShortcuts(activity(mgr), itemsJson("a", "b", "c", "d")) == null,
+                "a write over the cap the bridge could not read is refused by the OS (null)");
+        check(hasId(mgr.dynamic, "c") && !hasId(mgr.dynamic, "d"), "the refused add wrote nothing");
     }
 
     private static void pinnedForeignIdsAreDroppedButDontShrinkBudget() throws Exception {
@@ -390,15 +474,15 @@ public final class QuickActionsBridgeSmokeTest {
         }
     }
 
-    private static void payloadRoundTripsThroughExtrasAndIntent() throws Exception {
+    private static void payloadRoundTripsThroughExtras() throws Exception {
         ShortcutManager mgr = new ShortcutManager();
         String json = "{\"items\":[{\"Id\":\"p1\",\"Title\":\"T\",\"Payload\":\"level=7\"}]}";
         check(QuickActionsBridge.setShortcuts(activity(mgr), json) != null, "payload write lands");
         ShortcutInfo p1 = byId(mgr.dynamic, "p1");
         check("level=7".equals(p1.getExtras().getString(QuickActionsBridge.EXTRA_PAYLOAD, "?")),
                 "payload persisted in the marker extras");
-        check("level=7".equals(p1.getIntent().getStringExtra(QuickActionsBridge.EXTRA_PAYLOAD)),
-                "payload rides the launch intent (readable by a host-side receiver)");
+        check(p1.getIntent().getStringExtra(QuickActionsBridge.EXTRA_PAYLOAD) == null,
+                "payload is not copied into the launch intent");
         // Cold-start reconcile must hand the payload back to C# (GetById contract).
         JSONArray items = new JSONObject(QuickActionsBridge.getShortcutsJson(activity(mgr))).optJSONArray("items");
         check("level=7".equals(items.optJSONObject(0).optString("Payload", "?")),
@@ -521,6 +605,41 @@ public final class QuickActionsBridgeSmokeTest {
         Build.VERSION.SDK_INT = 24;
         check(!QuickActionsBridge.reportShortcutUsed(activity(mgr), "mine"), "below API 25 reports false");
         Build.VERSION.SDK_INT = prev;
+    }
+
+    private static void usageReportNeverThrowsIntoTheTrampoline() throws Exception {
+        // The trampoline calls reportShortcutUsed on every tap with no guard of
+        // its own, so the bridge must contain every failure — the service lookup
+        // included — or a tap would crash the game's process.
+        ShortcutManager mgr = new ShortcutManager();
+        mgr.dynamic.add(ours("a", 0));
+        Activity broken = activity(mgr);
+        broken.failGetSystemService = new IllegalStateException("system service lookup stand-in");
+        boolean threw = false;
+        boolean sent = true;
+        try {
+            sent = QuickActionsBridge.reportShortcutUsed(broken, "a");
+        } catch (RuntimeException e) {
+            threw = true;
+        }
+        check(!threw, "a throwing getSystemService does not escape reportShortcutUsed");
+        check(!sent, "…and the signal is reported as not sent");
+
+        // A tap whose usage report throws is still delivered.
+        mgr.throwOnUsageReport = true;
+        QuickActionsTrampolineActivity t = new QuickActionsTrampolineActivity();
+        t.testSystemService = mgr;
+        java.lang.reflect.Method handle = QuickActionsTrampolineActivity.class.getDeclaredMethod("handleIntent", Intent.class);
+        handle.setAccessible(true);
+        threw = false;
+        try {
+            handle.invoke(t, new Intent().putExtra(QuickActionsBridge.EXTRA_ACTION_ID, "a"));
+        } catch (java.lang.reflect.InvocationTargetException e) {
+            threw = true;
+        }
+        check(!threw, "a throwing usage report does not escape the trampoline");
+        check("a".equals(QuickActionsBridge.consumePendingPerformed()), "…and the tap is still recorded");
+        QuickActionsBridge.resetLastPerformed();
     }
 
     // ---- helpers ----
