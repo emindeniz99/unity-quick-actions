@@ -101,18 +101,20 @@ namespace EminDeniz99.QuickActions.Editor
         /// </summary>
         private static string Validate(QuickActionsSettings settings)
         {
-            var seen = new HashSet<string>();
+            var filter = new QuickActionsBakeFilter();
             var duplicates = new List<string>();
             var emptyCount = 0;
             foreach (var item in settings.StaticShortcuts)
             {
-                if (item == null || string.IsNullOrEmpty(item.Id) || string.IsNullOrEmpty(item.Title))
+                switch (filter.Check(item))
                 {
-                    emptyCount++;
-                    continue;
+                    case QuickActionsBakeFilter.Verdict.MissingIdOrTitle:
+                        emptyCount++;
+                        break;
+                    case QuickActionsBakeFilter.Verdict.DuplicateId:
+                        duplicates.Add(item.Id);
+                        break;
                 }
-                if (!seen.Add(item.Id))
-                    duplicates.Add(item.Id);
             }
 
             if (emptyCount == 0 && duplicates.Count == 0)

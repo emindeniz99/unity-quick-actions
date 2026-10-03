@@ -27,6 +27,7 @@
 using System.IO;
 using System.Linq;
 using System.Xml;
+using EminDeniz99.QuickActions.Editor.Core;
 using UnityEditor.Android;
 
 namespace EminDeniz99.QuickActions.Editor.NativeGate
@@ -72,15 +73,8 @@ namespace EminDeniz99.QuickActions.Editor.NativeGate
             // define-ON) — the injector just injected a trampoline the caller wanted
             // gone. Detect that incoherence and fail the build loudly instead of
             // silently shipping dev-only pieces in what was meant to be a prod build.
-            if (EffectiveDefinesStillContainGate())
-                return; // enabled and coherent — keep the trampoline
-            throw new UnityEditor.Build.BuildFailedException(
-                "[QuickActions] QUICKACTIONS_ENABLED was removed from the scripting defines, but the editor " +
-                "assemblies are still compiled with it (defines changed without a script recompile — e.g. " +
-                "SetScriptingDefineSymbols + BuildPlayer inside one batch invocation). This build would still " +
-                "contain the dev-only quick-actions pieces. Split the define change and the build into two " +
-                "editor invocations (so scripts recompile), or re-add the define. If you supply the define " +
-                "only via csc.rsp, mirror it in Player Settings or the active Build Profile so this check can see it.");
+            // Returns when enabled and coherent: the trampoline stays.
+            QuickActionsDefineGate.FailBuildIfDefineRemoved(UnityEditor.Build.NamedBuildTarget.Android);
 #else
             Strip(path);
 #endif
@@ -89,7 +83,7 @@ namespace EminDeniz99.QuickActions.Editor.NativeGate
         // The define-off branch, as a method the harness can reach: the .verify test
         // assembly compiles WITH QUICKACTIONS_ENABLED (it has to, to reach the gated
         // post-processor), which makes the #else above unreachable there. Kept
-        // outside the #if for the same reason EffectiveDefinesStillContainGate is.
+        // outside the #if so every config type-checks it.
         internal static void Strip(string path)
         {
             // unityLibrary (given) or the sibling launcher module may hold the manifest.
@@ -196,44 +190,6 @@ namespace EminDeniz99.QuickActions.Editor.NativeGate
                 return;
             try { Directory.Delete(directoryPath, recursive: true); }
             catch { /* best-effort cleanup; the classes are unreachable either way */ }
-        }
-
-        // Kept OUTSIDE the #if so the stub harness type-checks it in every config;
-        // only the compile-time-ON branch above calls it. True when the EFFECTIVE
-        // defines still contain the gate: Player Settings for Android, plus the
-        // active Unity 6 Build Profile (profiles ADD symbols on top of Player
-        // Settings — a dev profile may carry the define alone; read reflectively,
-        // the API doesn't exist on 2021/2022 LTS where Player Settings is the
-        // whole truth).
-        private static bool EffectiveDefinesStillContainGate()
-        {
-            var defines = UnityEditor.PlayerSettings.GetScriptingDefineSymbols(UnityEditor.Build.NamedBuildTarget.Android);
-            foreach (var define in defines.Split(';'))
-                if (define.Trim() == "QUICKACTIONS_ENABLED")
-                    return true;
-            try
-            {
-                var profileType = System.Type.GetType("UnityEditor.Build.Profile.BuildProfile, UnityEditor.CoreModule");
-                var getActive = profileType?.GetMethod("GetActiveBuildProfile",
-                    System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
-                var profile = getActive?.Invoke(null, null);
-                if (profile != null)
-                {
-                    // Unity 6 exposes scriptingDefines as a public FIELD (not a
-                    // property) — probe both so a future API change can't silently
-                    // blind this check and fail coherent dev-profile builds.
-                    object value = profileType.GetProperty("scriptingDefines")?.GetValue(profile)
-                        ?? profileType.GetField("scriptingDefines")?.GetValue(profile);
-                    if (value is string[] profileDefines)
-                        return System.Array.IndexOf(profileDefines, "QUICKACTIONS_ENABLED") >= 0;
-                }
-            }
-            catch (System.Exception)
-            {
-                // Reflection shape drifted — fall through to "not found" and let the
-                // loud BuildFailedException explain the remedies.
-            }
-            return false;
         }
     }
 }

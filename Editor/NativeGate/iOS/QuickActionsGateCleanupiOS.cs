@@ -15,26 +15,18 @@
 // COHERENCE check that fails the build loudly instead of choosing a side. It only
 // depends on UNITY_IOS.
 using System.IO;
+using EminDeniz99.QuickActions.Editor.Core;
 using UnityEditor;
 using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
 using UnityEditor.iOS.Xcode;
 using UnityEngine;
+using static EminDeniz99.QuickActions.Editor.NativeGate.QuickActionsTemplateImages;
 
 namespace EminDeniz99.QuickActions.Editor.NativeGate
 {
     internal sealed class QuickActionsGateCleanupiOS : IPostprocessBuildWithReport
     {
-        private const string ItemsKey = "UIApplicationShortcutItems";
-        private const string UserInfoKey = "UIApplicationShortcutItemUserInfo";
-        private const string MarkerKey = "com.emindeniz99.quickactions.managed";
-        // Must match Editor/iOS/QuickActionsBuildPostProcessoriOS.cs — the gated
-        // assembly that WRITES these, which does not compile when the define is off,
-        // so this one cannot share the constants with it. Pinned together by
-        // tools~/check_frozen_strings.py so the two copies cannot drift.
-        private const string IconsFolder = "QuickActionsIcons";
-        private const string IconManifestName = "quickactions_manifest.txt";
-
         public int callbackOrder => 95;
 
         public void OnPostprocessBuild(BuildReport report)
@@ -48,56 +40,12 @@ namespace EminDeniz99.QuickActions.Editor.NativeGate
             // the define and builds in the SAME editor invocation runs with stale
             // define-ON assemblies (the macro injector just ran). Detect that and fail
             // the build loudly rather than silently shipping the dev-only native layer.
-            if (EffectiveDefinesStillContainGate())
-                return;
-            throw new BuildFailedException(
-                "[QuickActions] QUICKACTIONS_ENABLED was removed from the scripting defines, but the editor " +
-                "assemblies are still compiled with it (defines changed without a script recompile — e.g. " +
-                "SetScriptingDefineSymbols + BuildPlayer inside one batch invocation). This build would still " +
-                "contain the dev-only quick-actions pieces. Split the define change and the build into two " +
-                "editor invocations (so scripts recompile), or re-add the define. If you supply the define " +
-                "only via csc.rsp, mirror it in Player Settings or the active Build Profile so this check can see it.");
+            QuickActionsDefineGate.FailBuildIfDefineRemoved(NamedBuildTarget.iOS);
 #else
             RemoveMacro(report.summary.outputPath);
             RemoveOurPlistEntries(report.summary.outputPath);
             RemoveOurTemplateImages(report.summary.outputPath);
 #endif
-        }
-
-        // Kept OUTSIDE the #if so the stub harness type-checks it in every config; only
-        // the compile-time-ON branch calls it. Player Settings for iOS, plus the active
-        // Unity 6 Build Profile (profiles ADD symbols on top of Player Settings; read
-        // reflectively — the API doesn't exist on 2021/2022 LTS, where Player Settings
-        // is the whole truth).
-        private static bool EffectiveDefinesStillContainGate()
-        {
-            var defines = PlayerSettings.GetScriptingDefineSymbols(NamedBuildTarget.iOS);
-            foreach (var define in defines.Split(';'))
-                if (define.Trim() == "QUICKACTIONS_ENABLED")
-                    return true;
-            try
-            {
-                var profileType = System.Type.GetType("UnityEditor.Build.Profile.BuildProfile, UnityEditor.CoreModule");
-                var getActive = profileType?.GetMethod("GetActiveBuildProfile",
-                    System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
-                var profile = getActive?.Invoke(null, null);
-                if (profile != null)
-                {
-                    // Unity 6 exposes scriptingDefines as a public FIELD (not a
-                    // property) — probe both so a future API change can't silently
-                    // blind this check and fail coherent dev-profile builds.
-                    object value = profileType.GetProperty("scriptingDefines")?.GetValue(profile)
-                        ?? profileType.GetField("scriptingDefines")?.GetValue(profile);
-                    if (value is string[] profileDefines)
-                        return System.Array.IndexOf(profileDefines, "QUICKACTIONS_ENABLED") >= 0;
-                }
-            }
-            catch (System.Exception)
-            {
-                // Reflection shape drifted — fall through to "not found" and let the
-                // loud BuildFailedException explain the remedies.
-            }
-            return false;
         }
 
         // Strip QUICKACTIONS_ENABLED=1 from the UnityFramework target so the .mm
@@ -135,8 +83,8 @@ namespace EminDeniz99.QuickActions.Editor.NativeGate
         // Ownership-scoped exactly like RemoveOurPlistEntries: the manifest lists the
         // files WE copied, so a file a host dropped into the same folder is left
         // alone — and the folder itself is removed only once it is empty. Kept
-        // OUTSIDE the #if, like EffectiveDefinesStillContainGate, so the stub harness
-        // type-checks and drives it in every config.
+        // OUTSIDE the #if so the stub harness type-checks and drives it in every
+        // config.
         //
         // Not covered by CI, and it cannot be as the workflow stands: the gate-off
         // job exports both projects fresh ("Replace"), where this folder never
@@ -237,18 +185,9 @@ namespace EminDeniz99.QuickActions.Editor.NativeGate
 
             var plist = new PlistDocument();
             plist.ReadFromFile(plistPath);
-            if (!plist.root.values.TryGetValue(ItemsKey, out var existing) || !(existing is PlistElementArray arr))
+            if (!QuickActionsPlistShortcuts.ClearOurEntries(plist))
                 return;
 
-            var removed = arr.values.RemoveAll(e =>
-                e is PlistElementDict d
-                && d.values.TryGetValue(UserInfoKey, out var ui) && ui is PlistElementDict uiDict
-                && uiDict.values.TryGetValue(MarkerKey, out var marker) && marker.AsBoolean());
-            if (removed == 0)
-                return;
-
-            if (arr.values.Count == 0)
-                plist.root.values.Remove(ItemsKey);
             plist.WriteToFile(plistPath);
             Debug.Log("[QuickActions] Stripped static Quick Actions shortcuts from Info.plist (gate is off).");
         }

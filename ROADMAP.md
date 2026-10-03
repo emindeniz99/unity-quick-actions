@@ -236,7 +236,7 @@ The stub harness compiles the C#/Java but can't confirm Unity-only wiring:
   Build Profile, and the asset is never orphaned.
   The fix would be to move the SO type into an always-compiled editor assembly.
   Cost is not size: an ungated *Editor* assembly reaches no player at all, and
-  the one that already exists proves it — `EminDeniz99.QuickActions.Editor.Bootstrap`
+  one that already exists proves it — `EminDeniz99.QuickActions.Editor.Bootstrap`
   and `QuickActionsSettings` each appear **0 times** in the shipped APK's IL2CPP
   metadata, on both the development and the release build of PR #19 run 64.
   The cost is permanent maintenance: `QuickActionItem` must stay gated (it is a

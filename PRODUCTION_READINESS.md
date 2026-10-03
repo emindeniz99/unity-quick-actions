@@ -11,7 +11,7 @@ physical-device work is done — is the **Status** section of the
 the two must not disagree.
 
 **Legend — Verified by:**
-`unit` = headless NUnit (`dotnet test`, 155 tests) · `unity-test` = Unity Test
+`unit` = headless NUnit (`dotnet test`, 173 tests) · `unity-test` = Unity Test
 Runner only (JsonUtility) · `static` = compiles in the stub harness (11 configs) ·
 `review` = code review, several adversarial rounds (see git log) ·
 `device` = **requires a real physical device** — Android partially done
@@ -97,7 +97,7 @@ says "6.3" for work dated later than 2026-07-17, the Editor was `6000.3.21f1`.
 ## Sign-off
 
 - **Headless gate (closable without a Unity Editor): GREEN.** `tools~/verify.sh` → **VERIFY: PASS** —
-  11 C# configs compile with **0 warnings**, **155 unit tests pass** (`dotnet test`),
+  11 C# configs compile with **0 warnings**, **173 unit tests pass** (`dotnet test`),
   the Android plugin compiles and its Java smoke test passes **125 checks, 0
   failed**, and every asset has a stable `.meta`. Every managed feature has a
   dedicated, intent-encoding test. Reviewed feature by feature across repeated

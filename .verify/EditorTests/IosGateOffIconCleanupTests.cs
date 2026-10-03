@@ -31,11 +31,10 @@ namespace EminDeniz99.QuickActions.Tests
     [TestFixture]
     public class IosGateOffIconCleanupTests
     {
-        // Spelled out rather than read back from the cleanup: these two names are the
-        // contract between two assemblies that cannot reference each other, so a test
-        // deriving them from the same constant as the code would agree with any typo.
-        // (tools~/check_frozen_strings.py pins the two source copies against each other;
-        // this pins them against what the test believes.)
+        // Spelled out rather than read back from QuickActionsTemplateImages: these
+        // names decide which folder a define-off build deletes, so a test that
+        // derived them from the same constant as the code would agree with any typo
+        // or rename.
         private const string IconsFolder = "QuickActionsIcons";
         private const string ManifestName = "quickactions_manifest.txt";
 
