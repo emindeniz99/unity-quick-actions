@@ -31,10 +31,12 @@
 #                before its first frame                                    (75)
 #   QA_LEG       the CI leg's name, for the summary heading
 #
-# Every pass also turns on the package's native diagnostics (a flag file in the
-# app's data container, read by Plugins/iOS/QuickActions.mm: one "[QuickActions]
-# diag" line per entry-hook call), saves the app's unified log for the pass to
-# unified-log.txt, and prints its [QuickActions] lines to the step log.
+# Every pass also turns on the package's native diagnostics — "[QuickActions]
+# diag" lines for the entry hooks and the scene plumbing around them — through a
+# flag file in the app's data container. It is read once per process by
+# QADiagEnabled in Plugins/iOS/QuickActions.mm, first from +load, so the flag
+# must exist before the app is launched. Each pass saves the app's unified log
+# to unified-log.txt and prints its newest [QuickActions] lines to the step log.
 #
 # Exit 0 on PASS and on SKIPPED — the automation's own misses never fail a run —
 # non-zero on FAIL and when the test wrote no verdict at all.
@@ -55,7 +57,9 @@ LEG="${QA_LEG:-}"
 
 mkdir -p "$OUT"
 START="$SECONDS"
-# Flag file read by QADiagLog in Plugins/iOS/QuickActions.mm. Best effort: no flag, no diag lines.
+# Flag file read once per process by QADiagEnabled in Plugins/iOS/QuickActions.mm
+# (first from +load), so the flag must exist before the app is launched. Best
+# effort: no flag, no diag lines.
 APP_DATA="$(xcrun simctl get_app_container "$UDID" "$APP_ID" data 2>/dev/null || true)"
 if [ -n "$APP_DATA" ] && mkdir -p "$APP_DATA/Library" \
   && : > "$APP_DATA/Library/com.emindeniz99.quickactions.diag"; then
@@ -126,8 +130,8 @@ xcrun simctl spawn "$UDID" log show --style compact --info --last "${LOG_MINUTES
   --predicate "processImagePath CONTAINS \"$APP_NAME\" OR eventMessage CONTAINS \"[QuickActions]\"" \
   >"$OUT/unified-log.txt" 2>/dev/null || true
 grep -F '[QuickActions]' "$OUT/unified-log.txt" >"$OUT/quickactions-log.txt" || true
-echo "[QuickActions] lines in the last ${LOG_MINUTES} min of the unified log: $(wc -l <"$OUT/quickactions-log.txt" | tr -d ' ') (newest 12):"
-tail -n 12 "$OUT/quickactions-log.txt"
+echo "[QuickActions] lines in the last ${LOG_MINUTES} min of the unified log: $(wc -l <"$OUT/quickactions-log.txt" | tr -d ' ') (newest 60):"
+tail -n 60 "$OUT/quickactions-log.txt"
 if [ -f "$MARKER" ]; then cp "$MARKER" "$OUT/marker.txt"; fi
 
 VERDICT="$(cat "$OUT/launcher-tap.txt" 2>/dev/null || true)"

@@ -168,14 +168,51 @@ static BOOL QAIsOurShortcut(UIApplicationShortcutItem *item) {
 }
 
 // Diagnostics, off unless the app's home holds Library/com.emindeniz99.quickactions.diag
-// (the iOS SpringBoard harness creates it): one line per entry-hook call. A file, not an
-// environment variable, because an app SpringBoard launches does not inherit simctl's.
+// (the iOS SpringBoard harness creates it): one line per entry-hook call, plus the scene
+// plumbing around them. A file, not an environment variable, because an app SpringBoard
+// launches does not inherit simctl's. Checked ONCE per process, first from +load: with no
+// flag every diag site costs one cached branch, and once +load has logged its line no
+// hook in that process can run without logging — a missing hook line means the hook did
+// not run. A process started before the flag existed stays silent.
+static BOOL QADiagEnabled(void) {
+    static BOOL enabled = NO;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        NSString *flag = [NSHomeDirectory() stringByAppendingPathComponent:@"Library/com.emindeniz99.quickactions.diag"];
+        enabled = [[NSFileManager defaultManager] fileExistsAtPath:flag];
+    });
+    return enabled;
+}
+
 static void QADiagLog(const char *hook, UIApplicationShortcutItem *item) {
-    NSString *flag = [NSHomeDirectory() stringByAppendingPathComponent:@"Library/com.emindeniz99.quickactions.diag"];
-    if (![[NSFileManager defaultManager] fileExistsAtPath:flag]) return;
+    if (!QADiagEnabled()) return;
     if (![item isKindOfClass:[UIApplicationShortcutItem class]]) item = nil;
     NSLog(@"[QuickActions] diag %s type='%@' ours=%s userInfo=%@", hook, item.type,
           QAIsOurShortcut(item) ? "yes" : "no", [item.userInfo.allKeys componentsJoinedByString:@","]);
+}
+
+// Free-form diag line with the same prefix. Reached only through QA_DIAG, so its
+// arguments are never even evaluated without the flag.
+static void QADiagLine(NSString *format, ...) NS_FORMAT_FUNCTION(1, 2);
+static void QADiagLine(NSString *format, ...) {
+    va_list args;
+    va_start(args, format);
+    NSString *line = [[NSString alloc] initWithFormat:format arguments:args];
+    va_end(args);
+    NSLog(@"[QuickActions] diag %@", line);
+}
+#define QA_DIAG(...) do { if (QADiagEnabled()) QADiagLine(__VA_ARGS__); } while (0)
+
+// What `sel` on `cls` resolves to right now: our hook, someone else's IMP, or nothing.
+static const char *QADiagImpState(Class cls, SEL sel, IMP ours) {
+    if (cls == Nil) return "no-class";
+    Method m = class_getInstanceMethod(cls, sel);
+    if (m == NULL) return "none";
+    return method_getImplementation(m) == ours ? "ours" : "other";
+}
+
+static NSString *QADiagClassName(Class cls) {
+    return cls != Nil ? NSStringFromClass(cls) : @"(nil)";
 }
 
 // True when `sel` still resolves to `ours` on self's class, i.e. no host plugin has
@@ -277,10 +314,13 @@ static IMP QAInstallHook(Class cls, SEL sel, IMP hook, const char *typesIfAdded)
 
 static BOOL (*gQAOrigDidFinishLaunching)(id, SEL, UIApplication *, NSDictionary *) = NULL;
 
+static void QADiagLaunch(id self, UIApplication *application, NSDictionary *launchOptions);
+
 static BOOL QADidFinishLaunching(id self, SEL _cmd, UIApplication *application, NSDictionary *launchOptions) {
     UIApplicationShortcutItem *launchItem = launchOptions[UIApplicationLaunchOptionsShortcutItemKey];
     BOOL launchedFromOurShortcut = QAIsOurShortcut(launchItem);
     QADiagLog("app didFinishLaunching", launchItem);
+    if (QADiagEnabled()) QADiagLaunch(self, application, launchOptions);
     if (launchedFromOurShortcut) {
         QAStorePerformedCold(launchItem.type);
     }
@@ -390,6 +430,20 @@ static id (*gQAOrigSceneConfiguration)(id, SEL, id, id, id) = NULL;
 // quick-action consumer, so the unmarked best-effort adoption below stays off. Written
 // once, on the main thread, before any hook it gates can fire.
 static BOOL gQASceneOwnerUnconfirmed = NO;
+// The class QAInstallSceneHooks bound to, read only by diag lines. Main thread only.
+static Class gQASceneHookClass = Nil;
+
+// One session for a diag line: the id ties a launch-time session to the scene that
+// later connects with it, and a restored session can connect without UIKit asking
+// application:configurationForConnectingSceneSession:options: again.
+API_AVAILABLE(ios(13.0))
+static NSString *QADiagSession(UISceneSession *session) {
+    if (session == nil) return @"session=(nil)";
+    UISceneConfiguration *configuration = session.configuration;
+    return [NSString stringWithFormat:@"session=%@ role=%@ config='%@' configDelegate=%@ hasScene=%s",
+            session.persistentIdentifier, session.role, configuration.name,
+            QADiagClassName(configuration.delegateClass), session.scene != nil ? "yes" : "no"];
+}
 
 // WARM tap under the scene lifecycle — the scene-delegate twin of
 // QAPerformActionForShortcutItem, with the same terminal/chaining rules.
@@ -443,6 +497,7 @@ static void QASceneWillConnect(id self, SEL _cmd, UIScene *scene, UISceneSession
                                UISceneConnectionOptions *connectionOptions) {
     UIApplicationShortcutItem *item = connectionOptions.shortcutItem;
     QADiagLog("scene willConnect", item);
+    QA_DIAG(@"scene willConnect on %@ %@", QADiagClassName(object_getClass(self)), QADiagSession(session));
     BOOL record = QAIsOurShortcut(item);
     if (!record && item != nil && gQAOrigScenePerformAction == NULL && !gQASceneOwnerUnconfirmed) {
         // Unmarked: UIKit hands a launch item here, not to the warm hook, so adopt it
@@ -480,8 +535,13 @@ static void QASceneWillConnect(id self, SEL _cmd, UIScene *scene, UISceneSession
 API_AVAILABLE(ios(13.0))
 static BOOL QAInstallSceneHooks(Class delegateClass, const char *via) {
     static BOOL installed = NO;
-    if (installed || delegateClass == Nil) return NO;
+    if (installed || delegateClass == Nil) {
+        QA_DIAG(@"scene hook install via %s skipped for %@; bound to %@", via,
+                QADiagClassName(delegateClass), QADiagClassName(gQASceneHookClass));
+        return NO;
+    }
     installed = YES;
+    gQASceneHookClass = delegateClass;
 
     // Cold: scene:willConnectToSession:options: (the Apple scene template implements
     // it; preserve and chain to it when present, add it when not).
@@ -502,6 +562,14 @@ static BOOL QAInstallSceneHooks(Class delegateClass, const char *via) {
     // existing native stack has no other way to see it. See +load for the companion line.
     NSLog(@"[QuickActions] iOS scene hooks installed on %@ via %s",
           NSStringFromClass(delegateClass), via);
+    QA_DIAG(@"scene hook install via %s on %@: willConnect %s, now %s; performAction %s, now %s",
+            via, NSStringFromClass(delegateClass),
+            gQAOrigSceneWillConnect != NULL ? "wrapped" : "added",
+            QADiagImpState(delegateClass, @selector(scene:willConnectToSession:options:),
+                           (IMP)QASceneWillConnect),
+            gQAOrigScenePerformAction != NULL ? "wrapped" : "added",
+            QADiagImpState(delegateClass, @selector(windowScene:performActionForShortcutItem:completionHandler:),
+                           (IMP)QAScenePerformActionForShortcutItem));
     return YES;
 }
 
@@ -514,6 +582,8 @@ API_AVAILABLE(ios(13.0))
 static UISceneConfiguration *QAConfigurationForConnectingSceneSession(
         id self, SEL _cmd, UIApplication *application,
         UISceneSession *connectingSceneSession, UISceneConnectionOptions *options) {
+    // Guarded here as well: without the flag this wrapper must not even read `options`.
+    if (QADiagEnabled()) QADiagLog("app configurationForConnecting", options.shortcutItem);
     UISceneConfiguration *configuration = nil;
     if (gQAOrigSceneConfiguration != NULL) {
         configuration =
@@ -537,6 +607,11 @@ static UISceneConfiguration *QAConfigurationForConnectingSceneSession(
         configuration = [[UISceneConfiguration alloc] initWithName:nil
                                                       sessionRole:connectingSceneSession.role];
     }
+    // Only id and role: the session's own configuration is what this call decides.
+    QA_DIAG(@"app configurationForConnecting session=%@ role=%@ (%s) returned config='%@' delegateClass=%@",
+            connectingSceneSession.persistentIdentifier, connectingSceneSession.role,
+            gQAOrigSceneConfiguration != NULL ? "wrapped" : "added",
+            configuration.name, QADiagClassName(configuration.delegateClass));
     // A nil configuration (or one that names no delegate class) messages to Nil here and
     // is refused — we stay inert rather than hook a guess. And the class it does name is
     // held to the same ownership rule as the notification fallback: a manifest may
@@ -572,7 +647,10 @@ static BOOL QAClassDescendsFrom(Class cls, Class ancestor) {
 // QAScenePerformActionForShortcutItem and QASceneWillConnect.
 API_AVAILABLE(ios(13.0))
 static void QAInstallSceneHooksScoped(Class declared, const char *via) {
-    if (declared == Nil) return;
+    if (declared == Nil) {
+        QA_DIAG(@"scene hook install via %s: no delegate class named, nothing hooked", via);
+        return;
+    }
     Class unityScene = NSClassFromString(@"UnityScene");
     if (unityScene != Nil) {
         if (!QAClassDescendsFrom(declared, unityScene)) {
@@ -641,6 +719,78 @@ static void QAInstallSceneHooksFromScene(UIScene *scene) {
     // 6000.3.8f1+); the shared rule binds only to it when it exists, and to the first
     // declared class with the owner recorded as unconfirmed when it does not.
     QAInstallSceneHooksScoped(declared, "notification");
+}
+
+// A scene notification for a diag line: the delegate UIKit set, what that delegate's
+// class resolves both scene selectors to right now, and which class (if any) our hooks
+// were bound to when the notification arrived.
+API_AVAILABLE(ios(13.0))
+static void QADiagScene(const char *event, NSNotification *note) {
+    if (![note.object isKindOfClass:[UIScene class]]) {
+        QADiagLine(@"%s object=%@", event, QADiagClassName(object_getClass(note.object)));
+        return;
+    }
+    UIScene *scene = (UIScene *)note.object;
+    id delegate = scene.delegate;
+    Class delegateClass = delegate != nil ? object_getClass(delegate) : Nil;
+    QADiagLine(@"%s scene=%@ state=%ld delegate=%@ willConnect=%s performAction=%s hooksOn=%@ %@ userInfo=%@",
+               event, QADiagClassName(object_getClass(scene)), (long)scene.activationState,
+               QADiagClassName(delegateClass),
+               QADiagImpState(delegateClass, @selector(scene:willConnectToSession:options:),
+                              (IMP)QASceneWillConnect),
+               QADiagImpState(delegateClass, @selector(windowScene:performActionForShortcutItem:completionHandler:),
+                              (IMP)QAScenePerformActionForShortcutItem),
+               QADiagClassName(gQASceneHookClass), QADiagSession(scene.session),
+               [note.userInfo.allKeys componentsJoinedByString:@","]);
+}
+
+// didFinishLaunching for a diag line: the app-delegate class UIKit really messages (a
+// host subclass that owns the configuration selector shows up as "other" there), the
+// launch option keys, and the scene sessions UIKit already holds before any connects.
+static void QADiagLaunch(id self, UIApplication *application, NSDictionary *launchOptions) {
+    Class delegateClass = object_getClass(self);
+    NSString *keys = [launchOptions.allKeys componentsJoinedByString:@","];
+    const char *performAction = QADiagImpState(
+        delegateClass, @selector(application:performActionForShortcutItem:completionHandler:),
+        (IMP)QAPerformActionForShortcutItem);
+    if (@available(iOS 13.0, *)) {
+        NSSet<UISceneSession *> *sessions = application.openSessions;
+        QADiagLine(@"app didFinishLaunching delegate=%@ configuration=%s performAction=%s "
+                   @"launchOptions=[%@] openSessions=%lu connectedScenes=%lu hooksOn=%@",
+                   QADiagClassName(delegateClass),
+                   QADiagImpState(delegateClass,
+                                  @selector(application:configurationForConnectingSceneSession:options:),
+                                  (IMP)QAConfigurationForConnectingSceneSession),
+                   performAction, keys, (unsigned long)sessions.count,
+                   (unsigned long)application.connectedScenes.count, QADiagClassName(gQASceneHookClass));
+        for (UISceneSession *session in sessions)
+            QADiagLine(@"app didFinishLaunching open %@", QADiagSession(session));
+    } else {
+        QADiagLine(@"app didFinishLaunching delegate=%@ performAction=%s launchOptions=[%@]",
+                   QADiagClassName(delegateClass), performAction, keys);
+    }
+}
+
+// The scene manifest this process was built with, one role:'name'->delegate per entry.
+static NSString *QADiagManifest(id manifest) {
+    if (![manifest isKindOfClass:[NSDictionary class]]) return @"none";
+    NSMutableArray<NSString *> *parts = [NSMutableArray array];
+    [parts addObject:[NSString stringWithFormat:@"multipleScenes=%@",
+                      ((NSDictionary *)manifest)[@"UIApplicationSupportsMultipleScenes"]]];
+    id configurations = ((NSDictionary *)manifest)[@"UISceneConfigurations"];
+    if ([configurations isKindOfClass:[NSDictionary class]]) {
+        for (id role in (NSDictionary *)configurations) {
+            id entries = ((NSDictionary *)configurations)[role];
+            if (![entries isKindOfClass:[NSArray class]]) continue;
+            for (id entry in (NSArray *)entries) {
+                if (![entry isKindOfClass:[NSDictionary class]]) continue;
+                [parts addObject:[NSString stringWithFormat:@"%@:'%@'->%@", role,
+                                  ((NSDictionary *)entry)[@"UISceneConfigurationName"],
+                                  ((NSDictionary *)entry)[@"UISceneDelegateClassName"]]];
+            }
+        }
+    }
+    return [parts componentsJoinedByString:@" "];
 }
 
 @interface QuickActionsAppControllerHook : NSObject
@@ -720,6 +870,7 @@ static void QAInstallSceneHooksFromScene(UIScene *scene) {
                                                        queue:nil
                                                   usingBlock:^(NSNotification *note) {
         QAClearColdDelivered();
+        QA_DIAG(@"app didBecomeActive");
     }];
     if (@available(iOS 13.0, *)) {
         [[NSNotificationCenter defaultCenter] addObserverForName:UISceneDidActivateNotification
@@ -727,6 +878,9 @@ static void QAInstallSceneHooksFromScene(UIScene *scene) {
                                                            queue:nil
                                                       usingBlock:^(NSNotification *note) {
             QAClearColdDelivered();
+            if (QADiagEnabled()) {
+                if (@available(iOS 13.0, *)) QADiagScene("notification didActivate", note);
+            }
         }];
         // Late-binding safety net for a host app-controller SUBCLASS that owns the
         // scene-configuration selector, where the hook added above is shadowed and
@@ -747,6 +901,9 @@ static void QAInstallSceneHooksFromScene(UIScene *scene) {
                 // Re-checked INSIDE the block: clang does not always carry an enclosing
                 // @available context into a block body, and this block outlives +load.
                 if (@available(iOS 13.0, *)) {
+                    // Logged BEFORE the install attempt, so hooksOn= is the state the
+                    // notification found.
+                    if (QADiagEnabled()) QADiagScene("notification willConnect", note);
                     if ([note.object isKindOfClass:[UIScene class]])
                         QAInstallSceneHooksFromScene((UIScene *)note.object);
                 }
@@ -764,6 +921,9 @@ static void QAInstallSceneHooksFromScene(UIScene *scene) {
     NSLog(@"[QuickActions] iOS hooks: didFinishLaunching=%s performAction=%s "
           @"sceneConfig=%s manifest=%s",
           didFinishBranch, performBranch, sceneConfigBranch, hasSceneManifest ? "yes" : "no");
+    // First read of the diag flag in this process (see QADiagEnabled).
+    QA_DIAG(@"load: UnityScene=%s manifest: %@", NSClassFromString(@"UnityScene") != Nil ? "present" : "absent",
+            QADiagManifest([NSBundle mainBundle].infoDictionary[@"UIApplicationSceneManifest"]));
 }
 
 @end
