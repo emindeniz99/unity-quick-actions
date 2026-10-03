@@ -598,3 +598,10 @@ deployment target iOS 13 in the docs.
   wording is from a developer's quote of Apple's ITMS message.
 - Comparison articles ("Maestro vs Appium vs Detox in 2026") were
   deliberately not used for any claim.
+
+**Note, 2026-10-02 [verified].** The runner-images `xcode-27` README
+(<https://raw.githubusercontent.com/actions/runner-images/main/images/macos/xcode-27-arm64-Readme.md>,
+image version 20260928.0222.1, read on 2026-10-02) now lists **Xcode 27.0
+(default) 27A266a**. The rows and items above that say the image carries only
+27.0 beta 6 (27A5252f), with the GA "awaiting deployment" (#14709), were
+written on 2026-09-15 and 2026-09-16 and are left as they were.

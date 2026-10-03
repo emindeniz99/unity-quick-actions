@@ -1,0 +1,7 @@
+{
+  "name": "com.quickactions.testbedtools",
+  "version": "1.0.0",
+  "displayName": "Quick Actions Testbed Tools",
+  "description": "Testbed fixture, not a shipped package. Holds TestbedBuilder, the command-line build entry points CI calls with -executeMethod, once for all three testbeds: Examples~/Testbed2021, Testbed2022 and Testbed6 each reference this folder from Packages/manifest.json as file:../../TestbedTools.",
+  "unity": "2021.3"
+}

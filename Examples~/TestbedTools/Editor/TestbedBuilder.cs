@@ -3,11 +3,16 @@ using System.IO;
 using UnityEditor;
 using UnityEditor.Build.Reporting;
 using UnityEngine;
+#if UNITY_6000_0_OR_NEWER
 using System.Reflection;
 using UnityEditor.Build.Profile;
+#endif
 
 // Build entry points for the unity CLI (`unity build --execute-method ...`).
 // Unity has no built-in command-line build, so every CI build needs one of these.
+// One copy serves all three testbeds: each lists this package in its
+// Packages/manifest.json. Every path below is relative to the project being
+// built, never to this file.
 public static class TestbedBuilder
 {
     private const string Scene = "Assets/Samples/QuickActionsDemo/QuickActionsDemo.unity";
@@ -78,7 +83,7 @@ public static class TestbedBuilder
     //     never register. README.md's "Known limits — Android minification"
     //     answers that with a keep rule in
     //     Assets/Plugins/Android/proguard-user.txt, and this build uses that file
-    //     VERBATIM (checked in beside this script) rather than a CI-only variation
+    //     VERBATIM (checked into each testbed) rather than a CI-only variation
     //     of it — the documented recipe is the supported configuration, so the
     //     recipe is the thing that has to hold.
     //
@@ -169,11 +174,14 @@ public static class TestbedBuilder
     // comparison and both are uploaded as their own artifacts.
     public static void BuildAndroidPhoneSecond() => BuildPhone("Builds/QuickActionsDemo-phone-2.apk");
 
+#if UNITY_6000_0_OR_NEWER
     // README's Unity 6 setup: QUICKACTIONS_ENABLED only in a dev Build Profile,
     // never in the shared Player Settings. Step 1 of 2 clears the define from
     // Player Settings and creates that profile; step 2 runs in a new editor
     // started with -activeBuildProfile, which applies the profile's defines and
     // recompiles before the build method runs.
+    // Build Profiles are Unity 6 API, so on 2021.3 and 2022.3 these two methods
+    // do not exist; CI calls them on Testbed6 only.
     private const string DevProfilePath = "Assets/DevBuildProfile.asset";
 
     public static void CreateDevBuildProfile()
@@ -223,6 +231,7 @@ public static class TestbedBuilder
         }
         BuildPhone("Builds/DevProfile-phone.apk");
     }
+#endif
 
     // The same development player with x86_64 as its ONLY ABI, for CI's API 25
     // emulator leg. Every other smoke leg runs its ARM APK on an x86_64 image

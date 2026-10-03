@@ -25,80 +25,17 @@ using EminDeniz99.QuickActions.Editor;
 namespace EminDeniz99.QuickActions.Tests
 {
     [TestFixture]
-    public class AndroidKeepRulesTests
+    public class AndroidKeepRulesTests : GradleProjectFixture
     {
         private const string ToolsNs = "http://schemas.android.com/tools";
 
-        private string _root;
-
-        // The Customize hook is a process-global static and this harness runs every
-        // fixture in one process; a leaked subscriber would make outcomes depend on
-        // execution order (a "zero static shortcuts" test would silently get some).
-        [SetUp]
-        public void CreateProject()
-        {
-            QuickActionsStaticBuild.ResetForTests();
-            _root = Path.Combine(Path.GetTempPath(), "qa-keep-" + Guid.NewGuid().ToString("N"));
-            Directory.CreateDirectory(UnityLibrary);
-        }
-
-        [TearDown]
-        public void RemoveProject()
-        {
-            QuickActionsStaticBuild.ResetForTests();
-            // Tolerate absence: a test may never have created the tree, and a leftover
-            // temp directory must never be the reason a suite reports red.
-            try
-            {
-                if (Directory.Exists(_root))
-                    Directory.Delete(_root, true);
-            }
-            catch (IOException)
-            {
-            }
-        }
-
-        // The module the Gradle callback is handed. The sibling "launcher" module is
-        // deliberately absent, which is the shape the post-processor must cope with.
-        private string UnityLibrary => Path.Combine(_root, "unityLibrary");
+        public AndroidKeepRulesTests() : base("qa-keep-") { }
 
         private string KeepFile =>
             Path.Combine(UnityLibrary, "src", "main", "res", "raw", "quickactions_keep.xml");
 
         private string ShortcutsFile =>
             Path.Combine(UnityLibrary, "src", "main", "res", "xml", "quickactions_shortcuts.xml");
-
-        private string ManifestPath =>
-            Path.Combine(UnityLibrary, "src", "main", "AndroidManifest.xml");
-
-        // The manifest shape FindLauncherComponents looks for: an <activity> whose
-        // <intent-filter> carries BOTH action MAIN and category LAUNCHER. `launcher:
-        // false` writes the same file minus that filter — a real shape too (a library
-        // module manifest), and the one that makes the post-processor bail out early.
-        private void WriteManifest(bool launcher)
-        {
-            Directory.CreateDirectory(Path.GetDirectoryName(ManifestPath));
-            var filter = launcher
-                ? "      <intent-filter>\n" +
-                  "        <action android:name=\"android.intent.action.MAIN\" />\n" +
-                  "        <category android:name=\"android.intent.category.LAUNCHER\" />\n" +
-                  "      </intent-filter>\n"
-                : "";
-            File.WriteAllText(ManifestPath,
-                "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
-                "<manifest xmlns:android=\"http://schemas.android.com/apk/res/android\"\n" +
-                "    package=\"com.example.app\">\n" +
-                "  <application>\n" +
-                "    <activity android:name=\"com.unity3d.player.UnityPlayerActivity\">\n" +
-                filter +
-                "    </activity>\n" +
-                "  </application>\n" +
-                "</manifest>\n");
-        }
-
-        private void RunPostProcessor() =>
-            new QuickActionsBuildPostProcessorAndroid()
-                .OnPostGenerateGradleAndroidProject(UnityLibrary);
 
         private static void WriteFile(string path, string contents)
         {

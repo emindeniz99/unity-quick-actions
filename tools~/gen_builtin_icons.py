@@ -39,11 +39,10 @@ the file to this generator byte for byte.
 
     python3 tools~/gen_builtin_icons.py                 # (re)write the .cs
     python3 tools~/gen_builtin_icons.py --check         # verify.sh: stale => exit 1
-    python3 tools~/gen_builtin_icons.py --preview       # ASCII proof of each glyph
-    python3 tools~/gen_builtin_icons.py --png-out DIR   # the same art as 96x96 PNGs
-                                                        # (store collateral, and what a
-                                                        # user's own .androidlib could
-                                                        # carry under the user prefix)
+
+write_pngs() is the one other entry point: tools~/gen_store_images.py imports it
+to render the same art as 96x96 PNGs (store collateral, and what a user's own
+.androidlib could carry under the user prefix).
 """
 from __future__ import annotations
 
@@ -62,15 +61,15 @@ OUTPUT = ROOT / "Editor" / "Android" / "QuickActionsBuiltInIcons.cs"
 # same --check, so the two can never disagree about which members ship art.
 OUTPUT_SET = ROOT / "Editor" / "QuickActionsBuiltInIconSet.cs"
 
-# The vector's viewport (and the PNG preview's pixel size). 48dp is Google's
+# The vector's viewport (and the PNGs' pixel size). 48dp is Google's
 # app-shortcut icon size; the launcher scales the drawable to whatever it needs.
 SIZE = 96
 DP = 48
-SUPERSAMPLE = 4  # PNG preview only: per axis → 16 coverage samples per pixel
+SUPERSAMPLE = 4  # PNG output only: per axis → 16 coverage samples per pixel
 
 # ---- ART STYLE --------------------------------------------------------------
 # Change these and re-run; the harness compares text, not looks.
-BACKGROUND = (0x3F, 0x51, 0xB5)   # indigo disc; None = transparent (glyph only)
+BACKGROUND = (0x3F, 0x51, 0xB5)   # indigo disc
 BACKGROUND_RADIUS = 46            # of 48 — a 2 px transparent margin
 GLYPH = (0xFF, 0xFF, 0xFF)
 
@@ -190,13 +189,10 @@ def vector_xml(kind):
         '    android:viewportWidth="%d"' % SIZE,
         '    android:viewportHeight="%d">' % SIZE,
     ]
-    if BACKGROUND is not None:
-        lines += [
-            "  <path",
-            '      android:fillColor="%s"' % hex_color(BACKGROUND),
-            '      android:pathData="%s" />' % disc_path(),
-        ]
     lines += [
+        "  <path",
+        '      android:fillColor="%s"' % hex_color(BACKGROUND),
+        '      android:pathData="%s" />' % disc_path(),
         "  <path",
         '      android:fillColor="%s"' % hex_color(GLYPH),
         '      android:pathData="%s" />' % polygon_path(GLYPHS[kind]),
@@ -230,13 +226,6 @@ def adaptive_layer_xml(color, path_data):
 def background_xml():
     """Edge to edge, no disc: the mask cuts the shape, and any inset here would
     come back as the white ring this variant exists to remove."""
-    # BACKGROUND = None is the legacy style's "glyph only, transparent" option,
-    # which an adaptive icon has no equivalent of — a transparent background layer
-    # leaves the launcher masking nothing. Fail loudly rather than invent a colour;
-    # that art direction would mean dropping the -v26 variant, not recolouring it.
-    if BACKGROUND is None:
-        raise SystemExit("BACKGROUND is None: the -v26 adaptive variant needs a background "
-                         "colour. Drop the adaptive rows from entries() instead.")
     s = ADAPTIVE_SIZE
     return adaptive_layer_xml(hex_color(BACKGROUND),
                               polygon_path([[(0, 0), (s, 0), (s, s), (0, s)]]))
@@ -322,11 +311,10 @@ def generate():
     w("//")
     w("// Two variants under ONE resource name, chosen by the res/ qualifier and never")
     w("// by anything at build time. The API 25 file: %ddp on a %d viewport," % (DP, SIZE))
-    w("// %s glyph%s. The -v26 one: an <adaptive-icon> over two layers of" % (
-        "white" if GLYPH == (255, 255, 255) else hex_color(GLYPH),
-        "" if BACKGROUND is None else " on a %s disc" % hex_color(BACKGROUND)))
+    w("// %s glyph on a %s disc. The -v26 one: an <adaptive-icon> over two layers of" % (
+        "white" if GLYPH == (255, 255, 255) else hex_color(GLYPH), hex_color(BACKGROUND)))
     w("// its own — a full-bleed %s background and the same glyph scaled into the"
-      % (hex_color(BACKGROUND) if BACKGROUND is not None else "transparent"))
+      % hex_color(BACKGROUND))
     w("// %d-of-%d safe zone — because API 26+ launchers otherwise wrap the legacy file"
       % (ADAPTIVE_SAFE, ADAPTIVE_SIZE))
     w("// onto a white plate at 0.70 of the viewport: a disc inside a white ring,")
@@ -442,7 +430,7 @@ def generate_set():
     return "\n".join(out) + "\n"
 
 
-# ---- PNG preview (same art, rasterised) --------------------------------------
+# ---- PNGs (same art, rasterised) --------------------------------------
 
 def inside(poly, x, y):
     """Even-odd point-in-polygon."""
@@ -482,7 +470,7 @@ def render(kind):
                 for sx in range(SUPERSAMPLE):
                     px = x + (sx + 0.5) / SUPERSAMPLE
                     color = None
-                    if BACKGROUND is not None and (px - cx) ** 2 + (py - cy) ** 2 <= BACKGROUND_RADIUS ** 2:
+                    if (px - cx) ** 2 + (py - cy) ** 2 <= BACKGROUND_RADIUS ** 2:
                         color = BACKGROUND
                     if gx0 <= px <= gx1 and gy0 <= py <= gy1:
                         for poly in polys:
@@ -530,42 +518,12 @@ def write_pngs(directory):
         print("wrote %s (%d bytes)" % (target, target.stat().st_size))
 
 
-def preview(rows):
-    """ASCII: '#' glyph, 'o' disc, '.' transparent (one row per two pixel rows)."""
-    lines = []
-    for y in range(0, SIZE, 2):
-        line = []
-        for x in range(SIZE):
-            r, g, b, a = rows[y][x]
-            if a < 64:
-                line.append(".")
-            elif (r, g, b) == GLYPH:
-                line.append("#")
-            else:
-                line.append("o")
-        lines.append("".join(line))
-    return "\n".join(lines)
-
-
 # ---- CLI --------------------------------------------------------------------
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n", 1)[0])
     ap.add_argument("--check", action="store_true", help="fail if the generated file is stale")
-    ap.add_argument("--preview", action="store_true", help="print an ASCII proof of each glyph")
-    ap.add_argument("--png-out", metavar="DIR", help="also write ic_quickaction_<name>.png files there")
     args = ap.parse_args()
-
-    if args.preview:
-        # The API 25 art only: the rasteriser draws the 96 canvas, and the -v26
-        # foreground is the same geometry scaled onto a 108 one.
-        for member, suffix, kind in ICONS:
-            print("%s%s (IconType.%s):" % (PREFIX, suffix, member))
-            print(preview(render(kind)))
-            print()
-
-    if args.png_out:
-        write_pngs(args.png_out)
 
     outputs = [(OUTPUT, generate()), (OUTPUT_SET, generate_set())]
     if args.check:
@@ -579,7 +537,7 @@ def main():
             len(ICONS), len(entries()), OUTPUT.relative_to(ROOT), OUTPUT_SET.relative_to(ROOT)))
         return 0
 
-    # --preview / --png-out are additive; anything but --check (re)writes the .cs files.
+    # Anything but --check (re)writes the .cs files.
     for path, text in outputs:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text, encoding="utf-8")

@@ -16,7 +16,6 @@
 // worse, quietly takes a host's Java with it on a project shape no CI leg
 // happens to build. So the scope is pinned from both sides: our two files go,
 // and Unity's, a host app's, another plugin's and the source root itself stay.
-using System;
 using System.IO;
 using NUnit.Framework;
 using EminDeniz99.QuickActions.Editor.NativeGate;
@@ -24,38 +23,14 @@ using EminDeniz99.QuickActions.Editor.NativeGate;
 namespace EminDeniz99.QuickActions.Tests
 {
     [TestFixture]
-    public class AndroidGateOffSourceStripTests
+    public class AndroidGateOffSourceStripTests : GradleProjectFixture
     {
         // Spelled out rather than read back from the stripper: the directory Unity
         // stages Plugins/Android/*.java into IS the contract, so a test that
         // derived it from the same constant as the code would agree with any typo.
         private static readonly string[] OurPackage = { "com", "emindeniz99", "quickactions" };
 
-        private string _root;
-
-        [SetUp]
-        public void CreateProject()
-        {
-            _root = Path.Combine(Path.GetTempPath(), "qa-gateoff-" + Guid.NewGuid().ToString("N"));
-            Directory.CreateDirectory(UnityLibrary);
-        }
-
-        [TearDown]
-        public void RemoveProject()
-        {
-            try
-            {
-                if (Directory.Exists(_root))
-                    Directory.Delete(_root, true);
-            }
-            catch (IOException)
-            {
-            }
-        }
-
-        private string UnityLibrary => Path.Combine(_root, "unityLibrary");
-
-        private string Launcher => Path.Combine(_root, "launcher");
+        public AndroidGateOffSourceStripTests() : base("qa-gateoff-") { }
 
         private string JavaRoot(string module) => Path.Combine(module, "src", "main", "java");
 

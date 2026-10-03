@@ -10,6 +10,9 @@ wired — including the step people miss (the scripting define).
 | [`Testbed2022/`](./Testbed2022) | 2022.3.62f3 | Unity 2022.3 LTS |
 | [`Testbed6/`](./Testbed6) | 6000.3.21f1 | Unity 6 |
 
+[`TestbedTools/`](./TestbedTools) is not a project: it is a small local package
+holding the command-line build entry points all three share.
+
 **Why three and not one.** Unity migrates a project *forward* into a newer
 editor and never backward, and each line's `Packages/manifest.json` pins package
 versions that only exist on that line (`com.unity.multiplayer.center` and the
@@ -44,7 +47,7 @@ Then in Unity Hub: **Add project from disk** → `unity-quick-actions/Examples~/
 | `testables` | `Packages/manifest.json` | Without it the package's tests never appear in the Test Runner. Local packages need it; embedded ones do not. |
 | `QUICKACTIONS_ENABLED` | `ProjectSettings/ProjectSettings.asset`, for Android / iPhone / Standalone | The package is deliberately inert without this define. Forgetting it is the #1 reason people think the package does nothing. |
 | Three **static** shortcuts | `Assets/QuickActions/QuickActionsSettings.asset` | `new_game`, `continue`, `daily_reward` are baked into the build, so they appear on a long-press **before the app is ever opened**. Edit them under *Project Settings ▸ Quick Actions*. |
-| CLI build entry points | `Assets/Editor/TestbedBuilder.cs` | Unity has no built-in command-line build, so any CI needs a static method like these. |
+| CLI build entry points | [`TestbedTools/Editor/TestbedBuilder.cs`](./TestbedTools/Editor/TestbedBuilder.cs), via `Packages/manifest.json` → `"com.quickactions.testbedtools": "file:../../TestbedTools"` | Unity has no built-in command-line build, so any CI needs a static method like these. One copy, in a local package next to the projects, serves all three; its Build Profile methods exist on Unity 6 only. |
 
 ## Try it
 
